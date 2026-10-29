@@ -1,0 +1,43 @@
+# 密钥与凭证
+.env
+.env.*
+*.pem
+*.key
+credentials*.json
+secrets/
+
+# 模型缓存与大体积产物
+models/
+.hf_cache/
+.cache/huggingface/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / 前端
+node_modules/
+.next/
+dist/
+out/
+
+# Java
+target/
+*.class
+
+# 运行时数据与上传（非源码）
+data/
+uploads/
+
+# 原始私有文档与未匿名试用记录
+docs/private/
+pilot-raw/
+*.private.*
+
+# 编辑器与系统
+.DS_Store
+.idea/
+*.swp
+*.log
