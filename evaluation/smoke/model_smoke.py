@@ -31,47 +31,61 @@ class NoRedirect(request.HTTPRedirectHandler):
 
 
 def read_config(env):
-    names = (
-        "KNOWFLOW_MODEL_BASE_URL",
-        "KNOWFLOW_EMBEDDING_MODEL",
-        "KNOWFLOW_LLM_MODEL",
-        "KNOWFLOW_EMBEDDING_DIMENSIONS",
-    )
-    missing = [name for name in names if not env.get(name)]
-    key_name = env.get("KNOWFLOW_MODEL_KEY_ENV", "OPENAI_API_KEY")
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key_name):
-        raise SmokeFailure("INVALID_KEY_VARIABLE_NAME")
-    if not env.get(key_name):
-        missing.append(key_name)
-    if missing:
-        return None, missing
-    url = parse.urlsplit(env[names[0]])
-    if (
-        url.scheme != "https"
-        or not url.hostname
-        or url.username is not None
-        or url.password is not None
-        or url.query
-        or url.fragment
-    ):
-        raise SmokeFailure("INVALID_HTTPS_BASE_URL")
-    try:
-        url.port  # Validate malformed ports before any request.
-        dimension = int(env[names[3]])
-    except ValueError:
-        raise SmokeFailure("INVALID_CONFIGURATION") from None
-    if not 1 <= dimension <= 65536:
-        raise SmokeFailure("INVALID_DIMENSIONS")
-    for name in names[1:3]:
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}", env[name]):
+    missing = []
+    config = {}
+    for role in ("EMBEDDING", "LLM"):
+        prefix = "KNOWFLOW_" + role
+        model = env.get(prefix + "_MODEL", "").strip()
+        if not model:
+            missing.append(prefix + "_MODEL")
+        elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}", model):
             raise SmokeFailure("INVALID_MODEL_IDENTIFIER")
-    return {
-        "base_url": env[names[0]].rstrip("/"),
-        "embedding_model": env[names[1]],
-        "llm_model": env[names[2]],
-        "dimensions": dimension,
-        "key": env[key_name],
-    }, []
+        if role == "EMBEDDING" and model.rsplit("/", 1)[-1].lower().startswith("bge-reranker"):
+            raise SmokeFailure("RERANKER_IS_NOT_EMBEDDING")
+        # Separate endpoints require explicit credential selectors. Never forward a
+        # shared provider key to a newly configured provider by silent fallback.
+        separate_url = env.get(prefix + "_BASE_URL", "").strip()
+        base_url = separate_url or env.get("KNOWFLOW_MODEL_BASE_URL", "").strip()
+        if not base_url:
+            missing.append(prefix + "_BASE_URL")
+        else:
+            try:
+                url = parse.urlsplit(base_url)
+                url.port
+            except ValueError:
+                raise SmokeFailure("INVALID_HTTPS_BASE_URL") from None
+            if (url.scheme != "https" or not url.hostname or url.username is not None
+                    or url.password is not None or url.query or url.fragment):
+                raise SmokeFailure("INVALID_HTTPS_BASE_URL")
+        key_name = env.get(prefix + "_KEY_ENV")
+        if key_name is None and not separate_url:
+            key_name = env.get("KNOWFLOW_MODEL_KEY_ENV", "OPENAI_API_KEY")
+        if key_name is None:
+            missing.append(prefix + "_KEY_ENV")
+        elif not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key_name):
+            raise SmokeFailure("INVALID_KEY_VARIABLE_NAME")
+        elif not env.get(key_name):
+            missing.append(key_name)
+        config[role.lower()] = {
+            "base_url": base_url.rstrip("/"), "model": model,
+            "key": env.get(key_name) if key_name else None,
+        }
+    dimension = env.get("KNOWFLOW_EMBEDDING_DIMENSIONS")
+    if not dimension:
+        missing.append("KNOWFLOW_EMBEDDING_DIMENSIONS")
+    else:
+        try:
+            dimension = int(dimension)
+        except ValueError:
+            raise SmokeFailure("INVALID_DIMENSIONS") from None
+        if not 1 <= dimension <= 65536:
+            raise SmokeFailure("INVALID_DIMENSIONS")
+    thinking = env.get("KNOWFLOW_LLM_THINKING", "default")
+    if thinking not in ("default", "enabled", "disabled"):
+        raise SmokeFailure("INVALID_THINKING_MODE")
+    config["llm"]["thinking"] = thinking
+    config["dimensions"] = dimension
+    return (None, list(dict.fromkeys(missing))) if missing else (config, [])
 
 
 def post_json(opener, config, path, payload, timeout):
@@ -176,9 +190,10 @@ def runtime_metadata():
 
 def run(env, timeout):
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "recorded_at": datetime.now(ZoneInfo("Asia/Hong_Kong")).isoformat(),
         "fixture_sha256": hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
+        "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "runtime": runtime_metadata(),
         "network_attempted": False,
         "cost": {"amount": None, "reason": "Provider rates and billing have not been verified."},
@@ -191,33 +206,37 @@ def run(env, timeout):
             return report, 2
         fixture = json.loads(FIXTURE.read_text())
         report["configuration"] = {
-            "embedding_model": config["embedding_model"], "llm_model": config["llm_model"],
+            "embedding_model": config["embedding"]["model"], "llm_model": config["llm"]["model"],
             "expected_dimensions": config["dimensions"], "timeout_seconds": timeout,
             "max_attempts_per_endpoint": 1,
+            "llm_thinking": config["llm"]["thinking"],
         }
         opener = request.build_opener(NoRedirect())
         report["network_attempted"] = True
         checks = report["checks"]
-        checks["embedding"], result = post_json(opener, config, "/embeddings", {
-            "model": config["embedding_model"], "input": fixture["embedding_inputs"],
+        checks["embedding"], result = post_json(opener, config["embedding"], "/embeddings", {
+            "model": config["embedding"]["model"], "input": fixture["embedding_inputs"],
         }, timeout)
         if result is not None:
             checks["embedding"].update(validate_embeddings(result, 2, config["dimensions"]), status="PASSED")
-            checks["embedding"]["provider_model_matches_request"] = result.get("model") == config["embedding_model"]
+            checks["embedding"]["provider_model_matches_request"] = result.get("model") == config["embedding"]["model"]
         else:
             report["status"] = "FAILED"
             return report, 1  # Avoid a second billable call after an embedding failure.
-        checks["chat"], result = post_json(opener, config, "/chat/completions", {
-            "model": config["llm_model"],
+        payload = {
+            "model": config["llm"]["model"],
             "messages": [
                 {"role": "system", "content": "只根据提供的合成资料回答问题。"},
                 {"role": "user", "content": fixture["excerpt"] + "\n" + fixture["question"]},
             ],
             "max_tokens": 128,
-        }, timeout)
+        }
+        if config["llm"]["thinking"] != "default":
+            payload["thinking"] = {"type": config["llm"]["thinking"]}
+        checks["chat"], result = post_json(opener, config["llm"], "/chat/completions", payload, timeout)
         if result is not None:
             checks["chat"].update(validate_answer(result, fixture), status="PASSED")
-            checks["chat"]["provider_model_matches_request"] = result.get("model") == config["llm_model"]
+            checks["chat"]["provider_model_matches_request"] = result.get("model") == config["llm"]["model"]
         report["status"] = "LIVE_SMOKE_PASSED" if result is not None else "FAILED"
         return report, 0 if result is not None else 1
     except SmokeFailure as exc:
