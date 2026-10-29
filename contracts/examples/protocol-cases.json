@@ -1,0 +1,570 @@
+[
+  {
+    "name": "dispatch",
+    "definition": "IndexDispatch",
+    "structurally_valid": true,
+    "note": "Synthetic profile/dimension/digest; not a configured runtime or real model result.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "lease_expires_at": "2026-10-29T23:59:00+08:00",
+      "source": {
+        "file_id": "file-example-1",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "format": "pdf"
+      },
+      "runtime_profile_id": "runtime-example-only"
+    }
+  },
+  {
+    "name": "heartbeat",
+    "definition": "Heartbeat",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      }
+    }
+  },
+  {
+    "name": "completion-success",
+    "definition": "Completion",
+    "structurally_valid": true,
+    "note": "Requires real database manifest validation; positive structure does not authorize publication.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "outcome": "SUCCEEDED",
+      "manifest": {
+        "chunk_count": 2,
+        "embedding_count": 2,
+        "embedding_dimensions": 3,
+        "embedding_model_profile_id": "model-example-only",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  {
+    "name": "completion-failure",
+    "definition": "Completion",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "outcome": "FAILED",
+      "failure": {
+        "code": "MODEL_TIMEOUT",
+        "message": "Processing timed out",
+        "retryable": true
+      }
+    }
+  },
+  {
+    "name": "completion-accepted",
+    "definition": "CompletionReceipt",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "task_id": "task-example-1",
+      "index_version_id": "index-example-1",
+      "result": "ACCEPTED"
+    }
+  },
+  {
+    "name": "completion-replay",
+    "definition": "CompletionReceipt",
+    "structurally_valid": true,
+    "note": "Expected response shape only. Runtime must match the stored accepted execution and result; no republish.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "task_id": "task-example-1",
+      "index_version_id": "index-example-1",
+      "result": "ALREADY_ACCEPTED"
+    }
+  },
+  {
+    "name": "invalid-request",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "HTTP 400 This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "INVALID_REQUEST",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "unauthenticated",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "HTTP 401 This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "UNAUTHENTICATED",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "scope-denied",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "Internal HTTP 403; external inaccessible resources return generic 404. This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "SCOPE_DENIED",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "not-found",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "External HTTP 404 including deleted/non-owner resources. This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "RESOURCE_NOT_FOUND",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "expired-lease",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "Internal HTTP 409, no lease renewal or publication. This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "LEASE_REJECTED",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "deleted-document",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "Internal HTTP 409; never reactivate. This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "DOCUMENT_UNAVAILABLE",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "conflicting-replay",
+    "definition": "Error",
+    "structurally_valid": true,
+    "note": "Internal HTTP 409; preserve accepted result. This fixture tests only response structure.",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "COMPLETION_CONFLICT",
+      "message": "Request could not be accepted",
+      "retryable": false
+    }
+  },
+  {
+    "name": "public-question",
+    "definition": "PublicQuestion",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "question": "租约过期后如何处理？"
+    }
+  },
+  {
+    "name": "trusted-scope",
+    "definition": "TrustedScope",
+    "structurally_valid": true,
+    "note": "Only Java creates this scope. Schema cannot establish ownership.",
+    "payload": {
+      "owner_id": "user-example-a",
+      "knowledge_base_id": "kb-example-a",
+      "snapshot_id": "snapshot-example-1",
+      "indexes": [
+        {
+          "document_id": "doc-example-1",
+          "content_version_id": "content-example-1",
+          "index_version_id": "index-example-1"
+        }
+      ]
+    }
+  },
+  {
+    "name": "pdf-source",
+    "definition": "Source",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "source_id": "source-example-1",
+      "document_id": "doc-example-1",
+      "content_version_id": "content-example-1",
+      "index_version_id": "index-example-1",
+      "chunk_id": "chunk-example-1",
+      "locator": {
+        "kind": "pdf_page",
+        "page": 1
+      },
+      "quote": "仅用于结构校验的合成示例。"
+    }
+  },
+  {
+    "name": "text-source",
+    "definition": "Source",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "source_id": "source-example-1",
+      "document_id": "doc-example-1",
+      "content_version_id": "content-example-1",
+      "index_version_id": "index-example-1",
+      "chunk_id": "chunk-example-1",
+      "locator": {
+        "kind": "text_range",
+        "start": 0,
+        "end": 10,
+        "unit": "unicode_code_point"
+      },
+      "quote": "仅用于结构校验的合成示例。"
+    }
+  },
+  {
+    "name": "historical-source-accessible",
+    "definition": "HistoricalSource",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "status": "ACCESSIBLE",
+      "source": {
+        "source_id": "source-example-1",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "chunk_id": "chunk-example-1",
+        "locator": {
+          "kind": "pdf_page",
+          "page": 1
+        },
+        "quote": "仅用于结构校验的合成示例。"
+      }
+    }
+  },
+  {
+    "name": "historical-source-deleted",
+    "definition": "HistoricalSource",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "status": "DELETED",
+      "source_id": "source-example-1"
+    }
+  },
+  {
+    "name": "historical-source-purged",
+    "definition": "HistoricalSource",
+    "structurally_valid": true,
+    "note": "",
+    "payload": {
+      "status": "PURGED",
+      "source_id": "source-example-1"
+    }
+  },
+  {
+    "name": "reject-client-owner",
+    "definition": "PublicQuestion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "question": "问题",
+      "owner_id": "user-example-b"
+    }
+  },
+  {
+    "name": "reject-empty-question",
+    "definition": "PublicQuestion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "question": ""
+    }
+  },
+  {
+    "name": "reject-zero-dimension",
+    "definition": "Completion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "outcome": "SUCCEEDED",
+      "manifest": {
+        "chunk_count": 2,
+        "embedding_count": 2,
+        "embedding_dimensions": 0,
+        "embedding_model_profile_id": "model-example-only",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  {
+    "name": "reject-missing-execution-token",
+    "definition": "Completion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2
+      },
+      "outcome": "SUCCEEDED",
+      "manifest": {
+        "chunk_count": 2,
+        "embedding_count": 2,
+        "embedding_dimensions": 3,
+        "embedding_model_profile_id": "model-example-only",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  {
+    "name": "reject-zero-fencing",
+    "definition": "Completion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 0,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "outcome": "SUCCEEDED",
+      "manifest": {
+        "chunk_count": 2,
+        "embedding_count": 2,
+        "embedding_dimensions": 3,
+        "embedding_model_profile_id": "model-example-only",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  },
+  {
+    "name": "reject-success-with-failure",
+    "definition": "Completion",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "outcome": "SUCCEEDED",
+      "manifest": {
+        "chunk_count": 2,
+        "embedding_count": 2,
+        "embedding_dimensions": 3,
+        "embedding_model_profile_id": "model-example-only",
+        "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "failure": {
+        "code": "MODEL_TIMEOUT",
+        "message": "Timeout",
+        "retryable": true
+      }
+    }
+  },
+  {
+    "name": "reject-time-without-zone",
+    "definition": "IndexDispatch",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "lease": {
+        "task_id": "task-example-1",
+        "owner_id": "user-example-a",
+        "knowledge_base_id": "kb-example-a",
+        "document_id": "doc-example-1",
+        "content_version_id": "content-example-1",
+        "index_version_id": "index-example-1",
+        "pipeline_profile_id": "pipeline-example-1",
+        "lease_id": "lease-example-2",
+        "fencing": 2,
+        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN"
+      },
+      "lease_expires_at": "2026-10-29T23:59:00",
+      "source": {
+        "file_id": "file-example-1",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "format": "pdf"
+      },
+      "runtime_profile_id": "runtime-example-only"
+    }
+  },
+  {
+    "name": "reject-zero-pdf-page",
+    "definition": "Source",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "source_id": "source-example-1",
+      "document_id": "doc-example-1",
+      "content_version_id": "content-example-1",
+      "index_version_id": "index-example-1",
+      "chunk_id": "chunk-example-1",
+      "locator": {
+        "kind": "pdf_page",
+        "page": 0
+      },
+      "quote": "仅用于结构校验的合成示例。"
+    }
+  },
+  {
+    "name": "reject-fabricated-text-page",
+    "definition": "Source",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "source_id": "source-example-1",
+      "document_id": "doc-example-1",
+      "content_version_id": "content-example-1",
+      "index_version_id": "index-example-1",
+      "chunk_id": "chunk-example-1",
+      "locator": {
+        "kind": "text_range",
+        "start": 0,
+        "end": 10,
+        "unit": "unicode_code_point",
+        "page": 1
+      },
+      "quote": "仅用于结构校验的合成示例。"
+    }
+  },
+  {
+    "name": "reject-deleted-source-quote",
+    "definition": "HistoricalSource",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "status": "DELETED",
+      "source_id": "source-example-1",
+      "quote": "should not leak"
+    }
+  },
+  {
+    "name": "reject-error-token",
+    "definition": "Error",
+    "structurally_valid": false,
+    "note": "",
+    "payload": {
+      "contract_version": "0.2.0-draft.1",
+      "request_id": "request-example-1",
+      "code": "RESOURCE_NOT_FOUND",
+      "message": "Unavailable",
+      "retryable": false,
+      "execution_token": "should not leak"
+    }
+  }
+]
