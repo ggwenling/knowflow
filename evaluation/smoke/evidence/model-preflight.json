@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-30T00:01:58.833077+08:00",
+  "fixture_sha256": "fd2f78ebccc09336abc7796dfa5bcf2e79fa691743df1723db63c0631f356598",
+  "runtime": {
+    "python": "3.12.14",
+    "machine": "x86_64",
+    "logical_cpus": 3,
+    "cpu_quota": "200000 100000",
+    "memory_limit_bytes": "8589934592",
+    "git_head": "7d5095b8bc987c1c7e6f4106887d3355fa88d4c2"
+  },
+  "network_attempted": false,
+  "cost": {
+    "amount": null,
+    "reason": "Provider rates and billing have not been verified."
+  },
+  "checks": {},
+  "status": "WAITING_INPUT",
+  "missing_configuration": [
+    "KNOWFLOW_MODEL_BASE_URL",
+    "KNOWFLOW_EMBEDDING_MODEL",
+    "KNOWFLOW_LLM_MODEL",
+    "KNOWFLOW_EMBEDDING_DIMENSIONS",
+    "OPENAI_API_KEY"
+  ]
+}

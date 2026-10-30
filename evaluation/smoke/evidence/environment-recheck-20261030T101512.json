@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-10-30T10:15:12.791014+08:00",
+  "purpose": "Connectivity recheck after user-reported environment update; not model verification.",
+  "credential_variable_presence": {
+    "SILICONFLOW_API_KEY": false,
+    "DEEPSEEK_API_KEY": false
+  },
+  "results": [
+    {
+      "host": "api.siliconflow.cn",
+      "credentials_sent": false,
+      "status": "NETWORK_FAILURE",
+      "reason_type": "OSError",
+      "proxy_tunnel_403": true
+    },
+    {
+      "host": "api.deepseek.com",
+      "credentials_sent": false,
+      "status": "NETWORK_FAILURE",
+      "reason_type": "OSError",
+      "proxy_tunnel_403": true
+    }
+  ]
+}

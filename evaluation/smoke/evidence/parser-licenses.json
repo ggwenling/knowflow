@@ -1,0 +1,46 @@
+{
+  "recorded_at": "2026-10-30T00:04:27.385098+08:00",
+  "scope": "Direct parser candidates only; not an installed service lock or transitive audit.",
+  "packages": [
+    {
+      "name": "PyMuPDF",
+      "version": "2.0",
+      "metadata_url": "https://pypi.org/pypi/PyMuPDF/2.0/json",
+      "requires_python": ">=3.11",
+      "license_expression": null,
+      "license_metadata": "Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License",
+      "wheel": "pymupdf-2.0-cp311-abi3-manylinux_2_28_x86_64.whl",
+      "wheel_url": "https://files.pythonhosted.org/packages/f6/fc/cbdf76a9b9bdacc50e9ef3099cca4c8bb9a369be033abfd0c0097ba4e8ef/pymupdf-2.0-cp311-abi3-manylinux_2_28_x86_64.whl",
+      "wheel_sha256": "f92e8a7ae92c7b1cbffcbe8764166ab1234e0a37b07549f5951e7739241d34f0",
+      "wheel_digest_verified": true,
+      "license_files": [
+        {
+          "path": "pymupdf-2.0.dist-info/COPYING",
+          "sha256": "40e60697600535eabfb5ae05f72829d88cfe8d02dd4792f5a754f6f51dabe55b",
+          "bytes": 64
+        }
+      ],
+      "installed": false
+    },
+    {
+      "name": "pypdf",
+      "version": "6.21.4",
+      "metadata_url": "https://pypi.org/pypi/pypdf/6.21.4/json",
+      "requires_python": ">=3.9",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "wheel": "pypdf-6.21.4-py3-none-any.whl",
+      "wheel_url": "https://files.pythonhosted.org/packages/3f/4b/77e8ad4ac42c9d93600f40541a50e9feb3a61d2bbee2d76f659346072051/pypdf-6.21.4-py3-none-any.whl",
+      "wheel_sha256": "33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c",
+      "wheel_digest_verified": true,
+      "license_files": [
+        {
+          "path": "pypdf-6.21.4.dist-info/licenses/LICENSE",
+          "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524",
+          "bytes": 1605
+        }
+      ],
+      "installed": false
+    }
+  ]
+}
