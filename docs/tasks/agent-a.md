@@ -18,13 +18,13 @@
 | 顺序 | 任务 | 依赖 | 实际状态 | 当前产物或解除条件 |
 |---|---|---|---|---|
 | 1 | KF2-001 V0.2 新基线决策 | 无 | IN_REVIEW | 用户授权采用新基线；原 V1.1 及旧任务映射仍未验证，见[兼容性记录](../architecture/compatibility.md) |
-| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | 已合并 B/M 输入并增加模型协议 Schema；B/M 消费确认及 Q 审阅未完成 |
+| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 候选为 draft.4；当前 B 分支仍锁定 draft.2，联调升级条件见[记录](java-python-integration.md)；M 消费确认及 Q 审阅未完成 |
 | 3 | KF2-006 Java 骨架 | 004、005 | IN_REVIEW | 骨架已可启动并通过认证/health/本地 WebClient 验收；005 与契约仍待审阅 |
-| 4 | KF2-011 迁移与受限角色 | 004、005 | PLANNED | 等待契约/Q 审阅、B 索引角色需求及 Java 骨架集成验证 |
-| 5 | KF2-012 认证 | 006、011 | PLANNED | 依赖通过后领取 |
-| 6 | KF2-013 知识库隔离 | 012 | PLANNED | 依赖通过后领取 |
-| 7 | KF2-014 上传与状态 | 009、013 | PLANNED | 需 M 的基础设施真实交付 |
-| 8 | KF2-015 任务租约 | 007、014 | PLANNED | 需 B 的内部服务与上传接口 |
+| 4 | KF2-011 迁移与受限角色 | 004、005 | IN_REVIEW | Flyway/pgvector 与真实 PostgreSQL 权限测试通过；Q/M 消费确认待处理 |
+| 5 | KF2-012 认证 | 006、011 | IN_REVIEW | 注册、登录、会话撤销/过期的真实 PostgreSQL 测试通过；Q 与安全/产品缺口待审阅 |
+| 6 | KF2-013 知识库隔离 | 012 | IN_REVIEW | owner-scoped CRUD 与删除状态真实 PostgreSQL 测试通过；Q 审阅、物理清理与并发删除协调待处理 |
+| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@e4efd054` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
+| 8 | KF2-015 任务租约 | 007、014 | BLOCKED | B KF2-007 服务已交付，但仍依赖被阻断的 KF2-014 上传/状态基础设施 |
 | 9 | KF2-019 索引发布 | 015、018 | PLANNED | 需 B 的真实索引写入证据 |
 | 10 | KF2-023 问答入口 | 013、022 | PLANNED | 需 B 的真实生成与证据 |
 | 11 | KF2-024 引用与删除 | 019、023 | PLANNED | 依赖通过后领取 |
@@ -102,4 +102,12 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - KF2-013：创建、分页列表、详情、删除均从已验证 principal 派生 user id；每个查询显式限制 `owner_user_id`，JSON 多余字段拒绝，含 `owner_id` 的创建请求返回 400。删除事务标记知识库/文档不可见并取消排队/运行任务、清除租约。对象和向量的物理清理仍需 KF2-014/024 的存储/清理入口；后续创建文档任务也必须与删除做状态/锁协调。
 - 契约候选升至 `0.2.0-draft.4`；Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。包含注册、登录、会话、当前用户、知识库、分页与通用冲突错误样例；B 未消费，M 未确认，Q 未审阅，KF2-004 仍未冻结。
 - 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 通过，21 项 Java 测试；真实 PostgreSQL 16.12/pgvector 0.8.1 覆盖 V1/V2、应用 profile、注册/登录/哈希/过期/撤销、双用户 owner 隔离、owner 注入、资源 404 和删除文档/任务状态。`python contracts/validate.py` 通过 54 项；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 通过 16 项；`git diff --check` 通过。
-- 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。JP-I1 仍等待 B 服务，详见[双进程记录](java-python-integration.md)。
+- 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。此记录写入时 JP-I1 仍等待 B 服务；最新双进程状态见[联调记录](java-python-integration.md)。
+
+## 2026-10-30：JP-I1 真实双进程复核
+
+- 联调候选：`integration/jp-01@4c6a00032c2ca186c8278301edcc941620465e93`，汇集 Java `3b76131071b88365d14237769a7d3d5d111b873a` 与 Python `e4efd054880c506c1e57a76f28f6710e3d761016`；未合并 main，也未改动 python 分支。
+- Python 原分支消费 draft.2 / SHA `edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087`；Java 当前 draft.4 / SHA `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。合并候选直接跑 Python 测试有 8 项因精确契约哈希不符而失败；用 B 分支原 Schema 和 examples 复核，33 项全量 Python 测试通过。
+- B 脚本启动真实 Uvicorn/Spring Boot 后，5 项原有跨进程场景通过。一次性额外断言让 Java `AiInternalHealthClient` 对实际 draft.2 响应按预期拒绝版本不匹配，并在真实慢响应下约 5 秒超时；合计 7 项通过。未把临时修改留在 B 文件范围。
+- 结论：传输/认证/request ID/404/405/网络失败与超时边界已开发验证；**JP-I1 对当前 draft.4 候选仍 `BLOCKED_CONTRACT_VERSION`**，待 B 明确升级消费后重跑无覆盖的集成测试。没有放宽 Java 严格版本检查。
+- 后续 Java 任务：KF2-014 `BLOCKED`，M 的 KF2-009 在最新 Python target 中未交付；KF2-015 同样等待 KF2-014。KF2-011/012/013 仍 `IN_REVIEW`，不得在缺 Q/M 确认时转 `DONE`。
