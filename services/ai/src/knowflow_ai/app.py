@@ -162,9 +162,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
         if not settings.ai_database_url:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
-        EmbeddingSettings.from_environment()
+        embedding_settings = EmbeddingSettings.from_environment()
         LlmSettings.from_environment()
-        service = AnswerService(settings.ai_database_url, contract)
+        service = AnswerService(settings.ai_database_url, contract,
+                                max_question_codepoints=embedding_settings.max_text_codepoints)
         return await service.answer(payload)
 
     return app

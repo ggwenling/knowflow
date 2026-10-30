@@ -115,6 +115,7 @@ class JavaGateway:
                                    "HeartbeatReceipt", request_id)
         if receipt.get("task_id") != lease["task_id"]:
             raise JavaGatewayError("LEASE_REJECTED", 409)
+        return receipt["lease_expires_at"]
 
     async def write_batch(self, batch: dict):
         request_id = batch["request_id"]

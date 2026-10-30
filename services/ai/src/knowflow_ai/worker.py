@@ -1,6 +1,7 @@
 """Single-process index executor fenced by Java's per-attempt lease."""
 import asyncio
 from collections import OrderedDict
+from datetime import datetime, timezone
 from hashlib import sha256
 import uuid
 
@@ -66,7 +67,7 @@ class IndexWorker:
         if self._queue.full():
             raise WorkerUnavailable("INDEX_QUEUE_FULL")
         self._queued.add(key)
-        heartbeat = asyncio.create_task(self._heartbeat(dispatch["lease"]))
+        heartbeat = asyncio.create_task(self._heartbeat(dispatch))
         heartbeat.add_done_callback(lambda completed: completed.exception()
                                     if not completed.cancelled() else None)
         self._heartbeats[key] = heartbeat
@@ -162,10 +163,14 @@ class IndexWorker:
             if embedding is not None:
                 await embedding.aclose()
 
-    async def _heartbeat(self, lease: dict):
+    async def _heartbeat(self, dispatch: dict):
+        lease = dispatch["lease"]
+        lease_expires_at = dispatch["lease_expires_at"]
         while True:
-            await asyncio.sleep(self._heartbeat_seconds)
-            await self._gateway.heartbeat(lease)
+            expires_at = datetime.fromisoformat(lease_expires_at.replace("Z", "+00:00"))
+            remaining_seconds = (expires_at - datetime.now(timezone.utc)).total_seconds()
+            await asyncio.sleep(max(0.1, min(self._heartbeat_seconds, remaining_seconds / 3)))
+            lease_expires_at = await self._gateway.heartbeat(lease)
 
     async def _index(self, dispatch: dict, embedding):
         lease = dispatch["lease"]
@@ -181,6 +186,7 @@ class IndexWorker:
             raise ParseFailure("EMPTY_DOCUMENT")
         batches: list[dict] = []
         model_profile = "BAAI/bge-m3"
+        chunk_namespace = uuid.UUID(lease["index_version_id"])
         for start in range(0, len(chunks), 16):
             source_chunks = chunks[start:start + 16]
             vectors = await embedding.embed([chunk.text for chunk in source_chunks],
@@ -189,7 +195,7 @@ class IndexWorker:
             for offset, (chunk, vector) in enumerate(zip(source_chunks, vectors["data"], strict=True)):
                 locator = dict(chunk.locator)
                 rows.append({
-                    "chunk_id": str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.chunk_id)),
+                    "chunk_id": str(uuid.uuid5(chunk_namespace, chunk.chunk_id)),
                     "sequence_no": chunk.sequence + 1,
                     "text": chunk.text,
                     "text_sha256": chunk.text_sha256,

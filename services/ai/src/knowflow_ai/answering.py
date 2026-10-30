@@ -13,7 +13,8 @@ import psycopg
 
 from .adapters import ProcessingError
 from .config import ConfigurationError
-from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
+from .embedding import (DEFAULT_MAX_TEXT_CODEPOINTS, EmbeddingSettings,
+                        SiliconFlowEmbeddingAdapter)
 from .protocol import CONTRACT_VERSION
 
 
@@ -210,13 +211,17 @@ class AnswerService:
     _citation = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
 
     def __init__(self, database_url: str, contract, embedding_factory=None,
-                 llm_factory=None, retriever=None):
+                 llm_factory=None, retriever=None,
+                 max_question_codepoints: int = DEFAULT_MAX_TEXT_CODEPOINTS):
         self._contract = contract
         self._retriever = retriever or ReadOnlyRetriever(database_url, embedding_factory)
         self._llm_factory = llm_factory or (lambda: DeepSeekAdapter(LlmSettings.from_environment()))
+        self._max_question_codepoints = max_question_codepoints
 
     async def answer(self, request: dict) -> dict:
         self._contract.validate("TrustedAnswerRequest", request)
+        if len(request["question"]) > self._max_question_codepoints:
+            raise ProcessingError("INVALID_REQUEST", 400, retryable=False)
         evidence = await self._retriever.retrieve(request["question"], request["scope"],
                                                   request["request_id"])
         allowed_indexes = [

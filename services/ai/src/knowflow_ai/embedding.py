@@ -18,6 +18,7 @@ EXPECTED_MODEL = "BAAI/bge-m3"
 EXPECTED_DIMENSIONS = 1024
 EXPECTED_HOST = "api.siliconflow.cn"
 DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1"
+DEFAULT_MAX_TEXT_CODEPOINTS = 800
 _VARIABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z", re.ASCII)
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z", re.ASCII)
 
@@ -40,7 +41,7 @@ class EmbeddingSettings:
     api_key: str = field(default="", repr=False)
     timeout_seconds: float = 20.0
     max_batch_items: int = 32
-    max_text_codepoints: int = 800
+    max_text_codepoints: int = DEFAULT_MAX_TEXT_CODEPOINTS
     max_response_bytes: int = 2 * 1024 * 1024
 
     def __post_init__(self) -> None:
@@ -78,7 +79,8 @@ class EmbeddingSettings:
             dimensions = int(env.get("KNOWFLOW_EMBEDDING_DIMENSIONS", str(EXPECTED_DIMENSIONS)))
             timeout = float(env.get("KNOWFLOW_EMBEDDING_TIMEOUT_SECONDS", "20"))
             max_batch = int(env.get("KNOWFLOW_EMBEDDING_MAX_BATCH_ITEMS", "32"))
-            max_text = int(env.get("KNOWFLOW_EMBEDDING_MAX_TEXT_CODEPOINTS", "800"))
+            max_text = int(env.get("KNOWFLOW_EMBEDDING_MAX_TEXT_CODEPOINTS",
+                                  str(DEFAULT_MAX_TEXT_CODEPOINTS)))
         except (TypeError, ValueError):
             raise ConfigurationError("EMBEDDING_CONFIGURATION_INVALID") from None
         return cls(
