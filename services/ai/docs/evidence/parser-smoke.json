@@ -1,0 +1,100 @@
+{
+  "recorded_at": "2026-10-30T12:14:17.281629+08:00",
+  "parser_profile": "text-v1+pypdf-6.21.4",
+  "parser_sha256": "57edf9d3150c6e6c726cb44b7ca294142f2b3c7fdda62862b975e735978d1f9e",
+  "git_head_at_run": "fc98d575d1a1b3095adaff867c5fa7a2edd1010f",
+  "checks": [
+    {
+      "id": "api",
+      "status": "PASSED",
+      "source_sha256": "ca47c675c4bd8a837d3d5a2db985df5ed7c8115559e169b71c6fced7f6dd595c",
+      "characters": 141
+    },
+    {
+      "id": "chunk",
+      "status": "PASSED",
+      "source_sha256": "fe454004d06f2bad31f338c3003b224428136c70b2b83cb599ea3aca463f8f44",
+      "characters": 114
+    },
+    {
+      "id": "draft",
+      "status": "PASSED",
+      "source_sha256": "8362e40b718578db8bdd1a63dcc325ad39bdd2437d33545ad2dcb102580a3cb1",
+      "characters": 74
+    },
+    {
+      "id": "adr",
+      "status": "PASSED",
+      "source_sha256": "bde8b35afd9bafc2b1f5b69198e6c6823ebcf6444e5e6572bab29117029b185e",
+      "characters": 94
+    },
+    {
+      "id": "files",
+      "status": "PASSED",
+      "source_sha256": "51506fdb87f9ada6f5e068e2e285938b50f2fc58193c30d57f5ae89fb6e36140",
+      "characters": 119
+    },
+    {
+      "id": "access",
+      "status": "PASSED",
+      "source_sha256": "503d4cbc690bb7454bd63e3772a14d73f570fb657a6360cc49175b6b3a71c86d",
+      "characters": 115
+    },
+    {
+      "id": "publish",
+      "status": "PASSED",
+      "source_sha256": "62776eb7eafaca7d1588e70d6853ddfce37b370756ab43a6fdc35b3cb31782df",
+      "characters": 114
+    },
+    {
+      "id": "locator",
+      "status": "PASSED",
+      "source_sha256": "55da63696276a50c9e32b0e709101a64ebdb0adbf696de8bceba4a6e1c0ea9c1",
+      "characters": 131
+    },
+    {
+      "id": "outbound",
+      "status": "PASSED",
+      "source_sha256": "5e20e82abacd077a4be34e4d471ef999d78a67a420873d65f23d9e7940608f18",
+      "characters": 131
+    },
+    {
+      "id": "timeout",
+      "status": "PASSED",
+      "source_sha256": "aa50543a6c932ea08cfedb92f9426de376df99c185c09671c413ab8c1b582538",
+      "characters": 118
+    },
+    {
+      "id": "chinese-pages.pdf",
+      "status": "PASSED",
+      "observed": "PARSED",
+      "source_sha256": "426b1f6a5dd99828658f370654efdc111c30bda10bed5c4369be69f313377062"
+    },
+    {
+      "id": "blank.pdf",
+      "status": "PASSED",
+      "observed": "PDF_NO_TEXT",
+      "source_sha256": "226bdbe274d3222c3ed276db4f6736d457282e01abf7982629360f7b4f1ad77b"
+    },
+    {
+      "id": "image-only.pdf",
+      "status": "PASSED",
+      "observed": "PDF_NO_TEXT",
+      "source_sha256": "3eeba438c714cc6b607cd9ee747c17ef0495df08526d2651ae72fa8e0650b09f"
+    },
+    {
+      "id": "encrypted.pdf",
+      "status": "PASSED",
+      "observed": "PDF_ENCRYPTED",
+      "source_sha256": "89edd4ac644f4cdf5aff02cb08b66cb2209b1279fa63b1a14fa4749502e68e03"
+    },
+    {
+      "id": "malformed.pdf",
+      "status": "PASSED",
+      "observed": "INVALID_PDF",
+      "source_sha256": "c6cb54b238cfc0e0c71fafb99d10e77bbdb72c3faf660ecf0aee32984b0248d2"
+    }
+  ],
+  "external_model_calls": 0,
+  "scope": "Synthetic local samples only; no production capacity claim."
+}

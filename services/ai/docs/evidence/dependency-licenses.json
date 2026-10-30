@@ -1,6 +1,6 @@
 {
   "scope": "Installed Linux CPython 3.12 runtime + dev metadata, not legal approval. Wheel/sdist hashes in uv.lock; platform-only packages not installed remain unreviewed.",
-  "lock_sha256": "8c4b46b5b8f926f9b586dc1736ba7a3f66c6aa13314a97fb77b63641827bc3a5",
+  "lock_sha256": "b19e93809daf649e1b2050a29a1bc1e9ac4e39fc8699a7f95b28b1bfed7c58a7",
   "build_backend": "uv_build==0.12.23 (isolated build dependency; not installed metadata)",
   "packages": [
     {
@@ -74,6 +74,20 @@
         {
           "path": "certifi-2026.10.23.dist-info/licenses/LICENSE",
           "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7"
+        }
+      ]
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "installed": true,
+      "license_expression": null,
+      "license_metadata": "MIT",
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "charset_normalizer-3.5.2.dist-info/licenses/LICENSE",
+          "sha256": "6d0d41bfe170ac6c7dc248c9a63e254d0fb45a60d50a8257d0af92c6e249b887"
         }
       ]
     },
@@ -269,6 +283,20 @@
       ]
     },
     {
+      "name": "pillow",
+      "version": "13.0.0",
+      "installed": true,
+      "license_expression": "MIT-CMU",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pillow-13.0.0.dist-info/licenses/LICENSE",
+          "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce"
+        }
+      ]
+    },
+    {
       "name": "pluggy",
       "version": "1.7.0",
       "installed": true,
@@ -331,6 +359,20 @@
       ]
     },
     {
+      "name": "pypdf",
+      "version": "6.21.4",
+      "installed": true,
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "license_files": [
+        {
+          "path": "pypdf-6.21.4.dist-info/licenses/LICENSE",
+          "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524"
+        }
+      ]
+    },
+    {
       "name": "pytest",
       "version": "9.2.0",
       "installed": true,
@@ -369,6 +411,26 @@
         {
           "path": "referencing-0.37.0.dist-info/licenses/COPYING",
           "sha256": "42dcd63495f87b4eb7c7757afa379bb55a53f94afd7a5f657d9adf57236e515c"
+        }
+      ]
+    },
+    {
+      "name": "reportlab",
+      "version": "5.1.0",
+      "installed": true,
+      "license_expression": null,
+      "license_metadata": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc.",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "license_files": [
+        {
+          "path": "reportlab-5.1.0.dist-info/licenses/LICENSE",
+          "sha256": "ef831761646313921375fc2cb888e8eeaf7da213d0b92852c10c42f3a0b4d138"
+        },
+        {
+          "path": "reportlab/license.txt",
+          "sha256": "a02a6aeb5dde4c4194494bc0b10d5ed62a32628ccd2882c363fdb9a7874ab2b8"
         }
       ]
     },

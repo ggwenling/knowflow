@@ -1,0 +1,31 @@
+{
+  "origin": "Original synthetic fixtures; no external/user document. CC0-1.0. Encryption password is public fixture-only.",
+  "generation": "build_pdf_fixtures.py; reportlab invariant text fixtures. pypdf encryption includes randomness; encrypted file SHA pins this committed artifact, not deterministic regeneration.",
+  "fixtures": [
+    {
+      "path": "blank.pdf",
+      "sha256": "226bdbe274d3222c3ed276db4f6736d457282e01abf7982629360f7b4f1ad77b",
+      "bytes": 1308
+    },
+    {
+      "path": "chinese-pages.pdf",
+      "sha256": "426b1f6a5dd99828658f370654efdc111c30bda10bed5c4369be69f313377062",
+      "bytes": 3197
+    },
+    {
+      "path": "encrypted.pdf",
+      "sha256": "89edd4ac644f4cdf5aff02cb08b66cb2209b1279fa63b1a14fa4749502e68e03",
+      "bytes": 3205
+    },
+    {
+      "path": "image-only.pdf",
+      "sha256": "3eeba438c714cc6b607cd9ee747c17ef0495df08526d2651ae72fa8e0650b09f",
+      "bytes": 2958
+    },
+    {
+      "path": "malformed.pdf",
+      "sha256": "c6cb54b238cfc0e0c71fafb99d10e77bbdb72c3faf660ecf0aee32984b0248d2",
+      "bytes": 37
+    }
+  ]
+}
