@@ -2,6 +2,7 @@ package com.knowflow.api.config;
 
 import java.net.URI;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "knowflow.ai")
 public class AiServiceProperties {
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
+    private static final Pattern BEARER_TOKEN = Pattern.compile("[A-Za-z0-9._~+/-]+=*\\z");
 
     @NotNull
     private URI baseUrl = URI.create("http://localhost:8000");
@@ -45,11 +47,11 @@ public class AiServiceProperties {
                 && baseUrl.getFragment() == null;
     }
 
-    @AssertTrue(message = "AI internal shared secret must contain 32 to 256 non-whitespace characters")
+    @AssertTrue(message = "AI internal shared secret must contain 32 to 256 valid Bearer token characters")
     public boolean isInternalSharedSecretAllowed() {
         return internalSharedSecret != null
                 && internalSharedSecret.length() >= 32
                 && internalSharedSecret.length() <= 256
-                && !internalSharedSecret.isBlank();
+                && BEARER_TOKEN.matcher(internalSharedSecret).matches();
     }
 }

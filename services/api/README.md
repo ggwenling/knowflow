@@ -4,7 +4,7 @@
 
 KF2-006 最小服务骨架已建立。当前只公开 `GET /actuator/health`；其余路由默认关闭，登录与业务 API 尚未实现。A 维护 Java、Flyway 与唯一正式契约；Python 服务不写业务状态。
 
-要求 Java 21。服务运行需要 Java 21 JRE；当前编译器插件固定使用 Eclipse Compiler，因而在本开发环境不必另装 `javac`。构建前先设置 `KNOWFLOW_INTERNAL_SHARED_SECRET`（至少 32 字符）；空值或过短值会使服务启动失败。`KNOWFLOW_AI_BASE_URL` 默认 `http://localhost:8000`，只校验配置结构，不会在启动时连接 AI 服务。数据库配置仅供后续 KF2-011 使用，当前不读取。真实密钥只能经本地忽略文件或运行环境提供。
+要求 Java 21。服务运行需要 Java 21 JRE；当前编译器插件固定使用 Eclipse Compiler，因而在本开发环境不必另装 `javac`。构建前先设置 `KNOWFLOW_INTERNAL_SHARED_SECRET`（32–256 字符的 Bearer token：ASCII 字母、数字及 `-._~+/`，末尾可有 `=` 填充）；缺失、过短或含空白/控制字符时服务启动失败。`KNOWFLOW_AI_BASE_URL` 默认 `http://localhost:8000`，只校验配置结构，不会在启动时连接 AI 服务。数据库配置仅供后续 KF2-011 使用，当前不读取。真实密钥只能经本地忽略文件或运行环境提供。
 
 从仓库根启动：
 

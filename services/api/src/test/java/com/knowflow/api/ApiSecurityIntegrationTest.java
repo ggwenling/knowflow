@@ -2,6 +2,7 @@ package com.knowflow.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -107,6 +108,30 @@ class ApiSecurityIntegrationTest {
                         "Bearer " + INTERNAL_SECRET))
                 .andExpect(status().isOk())
                 .andExpect(content().json("{\"status\":\"authenticated\"}"));
+    }
+
+    @Test
+    void authenticatedUnknownInternalRouteReturnsStandardizedNotFound() throws Exception {
+        mockMvc.perform(get("/internal/not-found")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET))
+                .andExpect(status().isNotFound())
+                .andExpect(header().exists(RequestIdFilter.HEADER))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.2"))
+                .andExpect(jsonPath("$.code").value("ENDPOINT_UNAVAILABLE"))
+                .andExpect(jsonPath("$.message").value("The requested endpoint is not available."));
+    }
+
+    @Test
+    void unsupportedInternalMethodReturnsStandardizedMethodNotAllowed() throws Exception {
+        mockMvc.perform(post("/internal/test-auth")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string(HttpHeaders.ALLOW, org.hamcrest.Matchers.containsString("GET")))
+                .andExpect(header().exists(RequestIdFilter.HEADER))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.2"))
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message")
+                        .value("The HTTP method is not supported for this endpoint."));
     }
 
     @Test

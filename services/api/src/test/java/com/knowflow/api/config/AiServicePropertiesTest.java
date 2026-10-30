@@ -2,7 +2,6 @@ package com.knowflow.api.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.StringJoiner;
 
@@ -41,6 +40,27 @@ class AiServicePropertiesTest {
                     assertThat(causeMessages(context.getStartupFailure()))
                             .doesNotContain("user:password", "too-short");
                 });
+    }
+
+    @Test
+    void refusesBearerSecretsContainingHeaderControlCharacters() {
+        for (String separator : List.of("\n", "\r", "\t")) {
+            String unsafeSecret = VALID_SECRET.substring(0, 10) + separator
+                    + VALID_SECRET.substring(10);
+            AiServiceProperties properties = new AiServiceProperties();
+            properties.setInternalSharedSecret(unsafeSecret);
+            assertThat(properties.isInternalSharedSecretAllowed()).isFalse();
+
+            contextRunner.withPropertyValues(
+                            "knowflow.ai.base-url=http://localhost:8000",
+                            "knowflow.ai.internal-shared-secret=" + unsafeSecret)
+                    .run(context -> {
+                        assertThat(context).hasFailed();
+                        assertThat(causeMessages(context.getStartupFailure()))
+                                .contains("internalSharedSecret")
+                                .doesNotContain(unsafeSecret);
+                    });
+        }
     }
 
     @Test

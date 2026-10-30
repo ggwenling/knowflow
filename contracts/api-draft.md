@@ -49,6 +49,8 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 | 未认证或服务认证失败 | 401 / UNAUTHENTICATED | 无内部凭证细节 |
 | 内部范围不符 | 403 / SCOPE_DENIED | 外部不可用资源仍统一 404 |
 | 不存在/他人/已删的外部资源 | 404 / RESOURCE_NOT_FOUND | 防止枚举 |
+| 服务路由不存在或不可用 | 404 / ENDPOINT_UNAVAILABLE | 不泄露路由内部细节 |
+| 当前路由不支持该 HTTP 方法 | 405 / INVALID_REQUEST | 返回 `Allow` 响应头 |
 | 旧、过期或被替换的执行租约 | 409 / LEASE_REJECTED | 不延长、不写状态、不发布 |
 | 当前有效执行但资源已删除 | 409 / DOCUMENT_UNAVAILABLE | 内部专用；不恢复文档 |
 | 已完成任务的不同结果 | 409 / COMPLETION_CONFLICT | 不重新发布、不覆盖第一次结果 |
