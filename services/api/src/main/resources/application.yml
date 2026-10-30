@@ -48,3 +48,4 @@ knowflow:
     bucket: ${KNOWFLOW_STORAGE_BUCKET:knowflow-documents}
     access-key: ${KNOWFLOW_STORAGE_ACCESS_KEY:}
     secret-key: ${KNOWFLOW_STORAGE_SECRET_KEY:}
+    request-timeout: ${KNOWFLOW_STORAGE_REQUEST_TIMEOUT:10s}

@@ -1,6 +1,7 @@
 package com.knowflow.api.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,6 +17,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.HexFormat;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -45,6 +47,9 @@ import com.knowflow.api.indexing.HeartbeatRequest;
 import com.knowflow.api.indexing.IndexManifestDigest;
 import com.knowflow.api.indexing.SourceReadRequest;
 import com.knowflow.api.indexing.AiExecutionCancellationClient;
+import com.knowflow.api.storage.ObjectStore;
+import com.knowflow.api.storage.ObjectStoreException;
+import com.knowflow.api.storage.S3ObjectStore;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.flywaydb.core.Flyway;
@@ -55,6 +60,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -66,6 +75,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -76,6 +86,7 @@ import org.testcontainers.utility.DockerImageName;
         "knowflow.ai.internal-shared-secret=document-test-internal-secret-long-enough"
 })
 @AutoConfigureMockMvc
+@Import(DocumentApiIntegrationTest.StorageConcurrencyTestConfiguration.class)
 class DocumentApiIntegrationTest {
     private static final String ADMIN_PASSWORD = "document-test-admin-password";
     private static final String MIGRATOR_PASSWORD = "document-test-migrator-password";
@@ -111,7 +122,11 @@ class DocumentApiIntegrationTest {
             .withEnv("MINIO_ROOT_USER", MINIO_ACCESS)
             .withEnv("MINIO_ROOT_PASSWORD", MINIO_SECRET)
             .withExposedPorts(9000)
-            .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000).forStatusCode(200));
+            .waitingFor(new WaitAllStrategy()
+                    .withStrategy(Wait.forLogMessage(".*\\*\\* Starting MinIO \\*\\*.*", 1))
+                    .withStrategy(Wait.forHttp("/minio/health/ready").forPort(9000)
+                            .forStatusCode(200).withStartupTimeout(Duration.ofSeconds(90)))
+                    .withStartupTimeout(Duration.ofSeconds(90)));
 
     @Autowired
     private MockMvc mockMvc;
@@ -124,6 +139,9 @@ class DocumentApiIntegrationTest {
 
     @Autowired
     private com.knowflow.api.storage.S3ObjectStore objectStore;
+
+    @Autowired
+    private BlockingObjectStore blockingObjectStore;
 
     @Autowired
     private TransactionTemplate transactions;
@@ -349,12 +367,18 @@ class DocumentApiIntegrationTest {
         AI_RESPONSE.set(request -> {
             TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
             return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
-                    "Evidence marker [evidence-1] supports the answer.", true,
-                    java.util.List.of(new AiAnswerResponse.AiSource("evidence-1",
-                            scope.documentId(), scope.contentVersionId(), scope.indexVersionId(),
-                            published.chunkId(), new AiAnswerResponse.Locator("text_range", null,
-                            0, evidence.codePointCount(0, evidence.length()),
-                            "unicode_code_point"), evidence)));
+                    "The plain ID s1 remains; [s10] and [s1] are citations.", true,
+                    java.util.List.of(
+                            new AiAnswerResponse.AiSource("s1", scope.documentId(),
+                                    scope.contentVersionId(), scope.indexVersionId(),
+                                    published.chunkId(), new AiAnswerResponse.Locator("text_range",
+                                    null, 0, evidence.codePointCount(0, evidence.length()),
+                                    "unicode_code_point"), evidence),
+                            new AiAnswerResponse.AiSource("s10", scope.documentId(),
+                                    scope.contentVersionId(), scope.indexVersionId(),
+                                    published.chunkId(), new AiAnswerResponse.Locator("text_range",
+                                    null, 0, evidence.codePointCount(0, evidence.length()),
+                                    "unicode_code_point"), evidence)));
         });
 
         var answerResult = mockMvc.perform(post(
@@ -370,10 +394,13 @@ class DocumentApiIntegrationTest {
         JsonNode answer = objectMapper.readTree(answerResult.getResponse().getContentAsByteArray());
         assertThat(answer.path("contract_version").asText()).isEqualTo(ApiError.CONTRACT_VERSION);
         assertThat(answer.path("has_answer").asBoolean()).isTrue();
-        assertThat(answer.path("sources")).hasSize(1);
+        assertThat(answer.path("sources")).hasSize(2);
         assertThat(answer.path("sources").get(0).path("quote").asText()).isEqualTo(evidence);
         String sourceId = answer.path("sources").get(0).path("source_id").asText();
-        assertThat(answer.path("answer").asText()).contains(sourceId);
+        String sourceId10 = answer.path("sources").get(1).path("source_id").asText();
+        assertThat(answer.path("answer").asText()).isEqualTo(
+                "The plain ID s1 remains; [" + sourceId10 + "] and [" + sourceId
+                        + "] are citations.");
         assertThat(AI_RECEIVED_AUTHORIZATION.get()).isEqualTo("Bearer " + AI_SECRET);
         assertThat(AI_RECEIVED_REQUEST_ID.get()).isEqualTo(answer.path("request_id").asText());
 
@@ -669,6 +696,79 @@ class DocumentApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(request))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("LEASE_REJECTED"));
+    }
+
+    @Test
+    void sourceStorageWaitDoesNotBlockHeartbeat() throws Exception {
+        JsonNode owner = register("source-read-locks@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Source read locks");
+        JsonNode uploaded = upload(token, knowledgeBaseId, "source-lock.txt", "source bytes");
+        ClaimedIndexTask claim = indexingTasks.claimNext().orElseThrow();
+        assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
+        String requestId = "source-read-storage-wait";
+        byte[] sourceRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
+                ApiError.CONTRACT_VERSION, requestId, claim.lease()));
+        BlockingObjectStore.ReadGate gate = blockingObjectStore.blockNextRead();
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var sourceRead = executor.submit(() -> mockMvc.perform(post(
+                            "/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
+                    .header("Authorization", "Bearer " + AI_SECRET)
+                    .header("X-Request-ID", requestId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_OCTET_STREAM)
+                    .content(sourceRequest)).andReturn());
+
+            assertThat(gate.started().await(5, TimeUnit.SECONDS)).isTrue();
+            HeartbeatRequest heartbeat = new HeartbeatRequest(ApiError.CONTRACT_VERSION,
+                    "heartbeat-during-source-read", claim.lease());
+            var heartbeatCall = executor.submit(() -> mockMvc.perform(post(
+                            "/internal/v1/tasks/{taskId}/heartbeat", claim.lease().taskId())
+                    .header("Authorization", "Bearer " + AI_SECRET)
+                    .header("X-Request-ID", heartbeat.requestId())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsBytes(heartbeat))).andReturn());
+            assertThat(heartbeatCall.get(3, TimeUnit.SECONDS).getResponse().getStatus())
+                    .isEqualTo(200);
+
+            gate.release().countDown();
+            assertThat(sourceRead.get(5, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
+        } finally {
+            gate.release().countDown();
+        }
+    }
+
+    @Test
+    void fileStorageWaitDoesNotBlockDeletionAndDeletedBytesAreNotReturned() throws Exception {
+        JsonNode owner = register("file-read-locks@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "File read locks");
+        JsonNode uploaded = upload(token, knowledgeBaseId, "file-lock.txt", "private file bytes");
+        String documentId = uploaded.path("document_id").asText();
+        UUID documentUuid = UUID.fromString(documentId);
+        String contentVersionId = jdbc.queryForObject("""
+                SELECT current_content_version_id FROM knowflow.documents WHERE id = ?
+                """, UUID.class, documentUuid).toString();
+        BlockingObjectStore.ReadGate gate = blockingObjectStore.blockNextRead();
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var fileRead = executor.submit(() -> mockMvc.perform(get(
+                            "/api/v1/documents/{documentId}/contents/{contentVersionId}/file",
+                            documentId, contentVersionId)
+                    .header("Authorization", "Bearer " + token)).andReturn());
+            assertThat(gate.started().await(5, TimeUnit.SECONDS)).isTrue();
+
+            var deletion = executor.submit(() -> mockMvc.perform(delete(
+                            "/api/v1/documents/{documentId}", documentId)
+                    .header("Authorization", "Bearer " + token)).andReturn());
+            assertThat(deletion.get(3, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(204);
+
+            gate.release().countDown();
+            assertThat(fileRead.get(5, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(404);
+        } finally {
+            gate.release().countDown();
+        }
     }
 
     @Test
@@ -1156,6 +1256,72 @@ class DocumentApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());
         return created.path("id").asText();
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class StorageConcurrencyTestConfiguration {
+        @Bean
+        @Primary
+        BlockingObjectStore blockingObjectStore(S3ObjectStore delegate) {
+            return new BlockingObjectStore(delegate);
+        }
+    }
+
+    static final class BlockingObjectStore implements ObjectStore {
+        private final S3ObjectStore delegate;
+        private final AtomicReference<ReadGate> nextRead = new AtomicReference<>();
+
+        BlockingObjectStore(S3ObjectStore delegate) {
+            this.delegate = delegate;
+        }
+
+        ReadGate blockNextRead() {
+            ReadGate gate = new ReadGate();
+            if (!nextRead.compareAndSet(null, gate)) {
+                throw new IllegalStateException("A blocking storage read is already configured");
+            }
+            return gate;
+        }
+
+        @Override
+        public void ensureBucket() {
+            delegate.ensureBucket();
+        }
+
+        @Override
+        public void putObject(String key, String contentType, byte[] contents) {
+            delegate.putObject(key, contentType, contents);
+        }
+
+        @Override
+        public byte[] getObject(String key, int maximumBytes) {
+            ReadGate gate = nextRead.getAndSet(null);
+            if (gate != null) {
+                gate.started().countDown();
+                try {
+                    if (!gate.release().await(20, TimeUnit.SECONDS)) {
+                        throw new ObjectStoreException("Test storage read was not released");
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new ObjectStoreException("Test storage read was interrupted", interrupted);
+                }
+            }
+            return delegate.getObject(key, maximumBytes);
+        }
+
+        @Override
+        public void deleteObject(String key) {
+            delegate.deleteObject(key);
+        }
+
+        static final class ReadGate {
+            private final CountDownLatch started = new CountDownLatch(1);
+            private final CountDownLatch release = new CountDownLatch(1);
+
+            CountDownLatch started() { return started; }
+            CountDownLatch release() { return release; }
+        }
     }
 
     private record PublishedIndex(LeaseContext lease, UUID chunkId) {}

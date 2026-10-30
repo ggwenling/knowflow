@@ -193,7 +193,8 @@ public class QuestionService {
             storedSources.add(new SourceResponse(ApiError.CONTRACT_VERSION, publicSourceId,
                     source.documentId(), source.contentVersionId(), source.indexVersionId(),
                     source.chunkId(), toPublicLocator(chunk.locator()), source.quote()));
-            publicAnswer = publicAnswer.replace(source.sourceId(), publicSourceId.toString());
+            publicAnswer = publicAnswer.replace("[" + source.sourceId() + "]",
+                    "[" + publicSourceId + "]");
         }
         jdbc.update("""
                 UPDATE knowflow.questions

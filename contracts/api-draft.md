@@ -73,7 +73,7 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 
 `SourceReadRequest` 仅携带路由 task ID 和完整 `LeaseContext`，不接受 object key、URL 或本机路径。Java 在一次读取中验证内部服务身份、任务范围、有效租约、执行令牌/fencing、文档/内容版本归属及未删除状态。成功响应是原始文件字节，使用 `X-Contract-Version`、`X-Request-ID`、`X-Source-Format`、`X-Source-SHA256` 和 `Content-Length` 描述，禁止重定向或返回存储凭据。
 
-问答公开请求只包含问题。Java 从认证主体查询所有者知识库的 `READY` 活动索引，构造 `TrustedScope` 并调用 Python；客户端不能提交 owner、snapshot、索引范围或向量。Python 仅使用只读身份，按 owner/kb/document/content/index 联合过滤。回答最多 5 条引用；有答案必须有至少一个来源，无证据时返回 `has_answer=false` 和空来源。Java 在响应前重新核对来源仍可见，已删除或切换的索引不能返回原文。
+问答公开请求只包含问题。Java 从认证主体查询所有者知识库的 `READY` 活动索引，构造 `TrustedScope` 并调用 Python；客户端不能提交 owner、snapshot、索引范围或向量。Python 仅使用只读身份，按 owner/kb/document/content/index 联合过滤。回答最多 5 条引用；答案中的引用必须使用精确的 `[source_id]` 标记，Java 只把这些标记映射为公开来源 ID，不改写普通正文；有答案必须有至少一个来源，无证据时返回 `has_answer=false` 和空来源。Java 在响应前重新核对来源仍可见，已删除或切换的索引不能返回原文。
 
 ## 错误与幂等提议
 

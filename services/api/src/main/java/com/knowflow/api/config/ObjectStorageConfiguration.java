@@ -15,7 +15,8 @@ public class ObjectStorageConfiguration {
     S3ObjectStore objectStore(ObjectStorageProperties properties) {
         properties.requireValid();
         return new S3ObjectStore(properties.getEndpoint(), properties.getBucket(),
-                properties.getAccessKey(), properties.getSecretKey());
+                properties.getAccessKey(), properties.getSecretKey(),
+                properties.getRequestTimeout());
     }
 
     @Bean

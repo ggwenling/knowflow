@@ -12,7 +12,7 @@ import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
 import com.knowflow.api.security.AuthenticatedUser;
 import com.knowflow.api.storage.ObjectStoreException;
-import com.knowflow.api.storage.S3ObjectStore;
+import com.knowflow.api.storage.ObjectStore;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -32,11 +32,11 @@ public class DocumentService {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
-    private final S3ObjectStore objectStore;
+    private final ObjectStore objectStore;
     private final DeletionCoordinator deletions;
 
     public DocumentService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                           S3ObjectStore objectStore, DeletionCoordinator deletions) {
+                           ObjectStore objectStore, DeletionCoordinator deletions) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.objectStore = objectStore;
@@ -236,37 +236,38 @@ public class DocumentService {
     }
 
     public FileContent readFile(AuthenticatedUser user, UUID documentId, UUID contentVersionId) {
-        FileContent result = transactions.execute(status -> {
-            List<FileReference> files = jdbc.query("""
-                    SELECT d.original_name, cv.object_key, cv.source_format, cv.source_sha256,
-                           cv.byte_size
-                      FROM knowflow.documents d
-                      JOIN knowflow.knowledge_bases kb
-                        ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
-                       AND kb.status = 'ACTIVE'
-                      JOIN knowflow.content_versions cv
-                        ON cv.document_id = d.id AND cv.id = ?
-                     WHERE d.id = ? AND d.owner_user_id = ? AND d.status = 'ACTIVE'
-                     FOR UPDATE OF d
-                    """, (row, index) -> new FileReference(row.getString("original_name"),
-                    row.getString("object_key"), row.getString("source_format"),
-                    row.getString("source_sha256"), row.getLong("byte_size")),
-                    contentVersionId, documentId, user.id());
-            if (files.isEmpty()) {
-                throw ApiFailure.resourceNotFound();
-            }
-            FileReference file = files.getFirst();
-            byte[] contents = objectStore.getObject(file.objectKey(),
-                    Math.toIntExact(UploadLimits.MAX_FILE_BYTES));
-            if (contents.length != file.byteSize() || !sha256(contents).equals(file.sha256())) {
-                throw new ObjectStoreException("Stored source failed integrity verification");
-            }
-            return new FileContent(file.originalName(), file.format(), file.sha256(), contents);
-        });
-        if (result == null) {
-            throw new IllegalStateException("File read transaction returned no result");
+        FileReference file = findReadableFile(user.id(), documentId, contentVersionId);
+        byte[] contents = objectStore.getObject(file.objectKey(),
+                Math.toIntExact(UploadLimits.MAX_FILE_BYTES));
+        if (contents.length != file.byteSize() || !sha256(contents).equals(file.sha256())) {
+            throw new ObjectStoreException("Stored source failed integrity verification");
         }
-        return result;
+        if (!file.equals(findReadableFile(user.id(), documentId, contentVersionId))) {
+            throw ApiFailure.resourceNotFound();
+        }
+        return new FileContent(file.originalName(), file.format(), file.sha256(), contents);
+    }
+
+    private FileReference findReadableFile(UUID ownerId, UUID documentId,
+                                           UUID contentVersionId) {
+        List<FileReference> files = jdbc.query("""
+                SELECT d.original_name, cv.object_key, cv.source_format, cv.source_sha256,
+                       cv.byte_size
+                  FROM knowflow.documents d
+                  JOIN knowflow.knowledge_bases kb
+                    ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
+                   AND kb.status = 'ACTIVE'
+                  JOIN knowflow.content_versions cv
+                    ON cv.document_id = d.id AND cv.id = ?
+                 WHERE d.id = ? AND d.owner_user_id = ? AND d.status = 'ACTIVE'
+                """, (row, index) -> new FileReference(row.getString("original_name"),
+                row.getString("object_key"), row.getString("source_format"),
+                row.getString("source_sha256"), row.getLong("byte_size")),
+                contentVersionId, documentId, ownerId);
+        if (files.isEmpty()) {
+            throw ApiFailure.resourceNotFound();
+        }
+        return files.getFirst();
     }
 
     private void requireOwnedKnowledgeBase(UUID ownerId, UUID knowledgeBaseId) {

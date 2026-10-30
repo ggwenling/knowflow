@@ -1,11 +1,12 @@
 package com.knowflow.api.storage;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,14 +15,22 @@ import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.util.regex.Pattern;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /** Minimal path-style S3 client for the local MinIO-backed API. */
-public final class S3ObjectStore {
+public final class S3ObjectStore implements ObjectStore {
     private static final Pattern BUCKET = Pattern.compile("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]");
     private static final Pattern OBJECT_KEY = Pattern.compile("[A-Za-z0-9/_-]{1,512}");
     private static final DateTimeFormatter AMZ_DATE = DateTimeFormatter
@@ -36,13 +45,24 @@ public final class S3ObjectStore {
     private final String accessKey;
     private final byte[] secretKey;
     private final Clock clock;
+    private final Duration requestTimeout;
     private final HttpClient http;
 
     public S3ObjectStore(URI endpoint, String bucket, String accessKey, String secretKey) {
-        this(endpoint, bucket, accessKey, secretKey, Clock.systemUTC());
+        this(endpoint, bucket, accessKey, secretKey, Clock.systemUTC(), Duration.ofSeconds(10));
     }
 
     S3ObjectStore(URI endpoint, String bucket, String accessKey, String secretKey, Clock clock) {
+        this(endpoint, bucket, accessKey, secretKey, clock, Duration.ofSeconds(10));
+    }
+
+    public S3ObjectStore(URI endpoint, String bucket, String accessKey, String secretKey,
+                         Duration requestTimeout) {
+        this(endpoint, bucket, accessKey, secretKey, Clock.systemUTC(), requestTimeout);
+    }
+
+    S3ObjectStore(URI endpoint, String bucket, String accessKey, String secretKey, Clock clock,
+                  Duration requestTimeout) {
         if (endpoint == null || !("http".equals(endpoint.getScheme())
                 || "https".equals(endpoint.getScheme()))
                 || endpoint.getHost() == null || endpoint.getRawUserInfo() != null
@@ -56,13 +76,19 @@ public final class S3ObjectStore {
                 || secretKey == null || secretKey.isBlank()) {
             throw new IllegalArgumentException("Object storage configuration is invalid");
         }
+        if (clock == null || requestTimeout == null || requestTimeout.isNegative()
+                || requestTimeout.isZero()) {
+            throw new IllegalArgumentException("Object storage timeout configuration is invalid");
+        }
         this.endpoint = endpoint;
         this.bucket = bucket;
         this.accessKey = accessKey;
         this.secretKey = secretKey.getBytes(StandardCharsets.UTF_8);
         this.clock = clock;
+        this.requestTimeout = requestTimeout;
         this.http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(3))
+                .connectTimeout(requestTimeout.compareTo(Duration.ofSeconds(3)) < 0
+                        ? requestTimeout : Duration.ofSeconds(3))
                 .version(HttpClient.Version.HTTP_1_1)
                 .build();
     }
@@ -96,24 +122,19 @@ public final class S3ObjectStore {
         URI uri = objectUri(key);
         SignedRequest signed = sign("GET", uri, new byte[0], "application/octet-stream");
         try {
-            HttpResponse<InputStream> response = http.send(signed.request(),
-                    HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<BoundedBody> response = sendWithDeadline(signed.request(), responseInfo -> {
+                long declaredLength = responseInfo.headers()
+                        .firstValueAsLong("Content-Length").orElse(-1);
+                return new BoundedBodySubscriber(maximumBytes,
+                        declaredLength > maximumBytes);
+            });
             if (response.statusCode() != 200) {
-                closeQuietly(response.body());
                 throw storageFailure(response.statusCode());
             }
-            long declaredLength = response.headers().firstValueAsLong("Content-Length").orElse(-1);
-            if (declaredLength > maximumBytes) {
-                closeQuietly(response.body());
+            if (response.body().tooLarge()) {
                 throw new ObjectStoreException("Object exceeds the configured read limit");
             }
-            try (InputStream body = response.body()) {
-                byte[] contents = body.readNBytes(maximumBytes + 1);
-                if (contents.length > maximumBytes || body.read() != -1) {
-                    throw new ObjectStoreException("Object exceeds the configured read limit");
-                }
-                return contents;
-            }
+            return response.body().contents();
         } catch (IOException exception) {
             throw new ObjectStoreException("Object storage request failed", exception);
         } catch (InterruptedException exception) {
@@ -132,7 +153,7 @@ public final class S3ObjectStore {
     private Response request(String method, URI uri, byte[] payload, String contentType) {
         SignedRequest signed = sign(method, uri, payload, contentType);
         try {
-            HttpResponse<byte[]> response = http.send(signed.request(),
+            HttpResponse<byte[]> response = sendWithDeadline(signed.request(),
                     HttpResponse.BodyHandlers.ofByteArray());
             return new Response(response.statusCode(), response.body());
         } catch (IOException exception) {
@@ -166,7 +187,7 @@ public final class S3ObjectStore {
                 + ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
 
         HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(10))
+                .timeout(requestTimeout)
                 .header("x-amz-content-sha256", payloadHash)
                 .header("x-amz-date", amzDate)
                 .header("Authorization", authorization);
@@ -176,6 +197,33 @@ public final class S3ObjectStore {
         HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofByteArray(payload);
         builder.method(method, body);
         return new SignedRequest(builder.build());
+    }
+
+    private <T> HttpResponse<T> sendWithDeadline(HttpRequest request,
+                                                 HttpResponse.BodyHandler<T> bodyHandler)
+            throws IOException, InterruptedException {
+        CompletableFuture<HttpResponse<T>> pending = http.sendAsync(request, bodyHandler);
+        try {
+            return pending.get(requestTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException timedOut) {
+            pending.cancel(true);
+            HttpTimeoutException failure = new HttpTimeoutException(
+                    "Object storage request timed out");
+            failure.initCause(timedOut);
+            throw failure;
+        } catch (ExecutionException failed) {
+            Throwable cause = failed.getCause();
+            if (cause instanceof IOException ioFailure) {
+                throw ioFailure;
+            }
+            if (cause instanceof RuntimeException runtimeFailure) {
+                throw runtimeFailure;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IOException("Object storage request failed", cause);
+        }
     }
 
     private URI bucketUri() {
@@ -232,14 +280,67 @@ public final class S3ObjectStore {
         return result;
     }
 
-    private static void closeQuietly(InputStream stream) {
-        try {
-            stream.close();
-        } catch (IOException ignored) {
-            // Ignore an already failing response stream.
+    private static final class BoundedBodySubscriber
+            implements HttpResponse.BodySubscriber<BoundedBody> {
+        private final int maximumBytes;
+        private final CompletableFuture<BoundedBody> body = new CompletableFuture<>();
+        private final ByteArrayOutputStream contents;
+        private final boolean knownTooLarge;
+        private Flow.Subscription subscription;
+
+        private BoundedBodySubscriber(int maximumBytes, boolean knownTooLarge) {
+            this.maximumBytes = maximumBytes;
+            this.knownTooLarge = knownTooLarge;
+            this.contents = new ByteArrayOutputStream(Math.min(maximumBytes, 8192));
+        }
+
+        @Override
+        public CompletionStage<BoundedBody> getBody() {
+            return body;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            if (knownTooLarge) {
+                subscription.cancel();
+                body.complete(new BoundedBody(null, true));
+            } else {
+                subscription.request(1);
+            }
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (body.isDone()) {
+                return;
+            }
+            for (ByteBuffer item : items) {
+                int remaining = item.remaining();
+                if ((long) contents.size() + remaining > maximumBytes) {
+                    subscription.cancel();
+                    body.complete(new BoundedBody(null, true));
+                    return;
+                }
+                byte[] bytes = new byte[remaining];
+                item.get(bytes);
+                contents.write(bytes, 0, bytes.length);
+            }
+            subscription.request(1);
+        }
+
+        @Override
+        public void onError(Throwable failure) {
+            body.completeExceptionally(failure);
+        }
+
+        @Override
+        public void onComplete() {
+            body.complete(new BoundedBody(contents.toByteArray(), false));
         }
     }
 
+    private record BoundedBody(byte[] contents, boolean tooLarge) {}
     private record Response(int status, byte[] body) {}
     private record SignedRequest(HttpRequest request) {}
 }

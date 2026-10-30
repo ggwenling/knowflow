@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -28,9 +29,11 @@ class S3ObjectStoreIntegrationTest {
             .withEnv("MINIO_ROOT_USER", ACCESS_KEY)
             .withEnv("MINIO_ROOT_PASSWORD", SECRET_KEY)
             .withExposedPorts(9000)
-            .waitingFor(Wait.forHttp("/minio/health/live")
-                    .forPort(9000)
-                    .forStatusCode(200)
+            .waitingFor(new WaitAllStrategy()
+                    .withStrategy(Wait.forLogMessage(".*\\*\\* Starting MinIO \\*\\*.*", 1))
+                    .withStrategy(Wait.forHttp("/minio/health/ready")
+                            .forPort(9000).forStatusCode(200)
+                            .withStartupTimeout(Duration.ofSeconds(90)))
                     .withStartupTimeout(Duration.ofSeconds(90)));
 
     @Test

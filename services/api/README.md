@@ -43,6 +43,7 @@ export KNOWFLOW_STORAGE_ENDPOINT=http://127.0.0.1:59000
 export KNOWFLOW_STORAGE_BUCKET=knowflow-documents
 export KNOWFLOW_STORAGE_ACCESS_KEY="$KNOWFLOW_DEV_MINIO_ROOT_USER"
 export KNOWFLOW_STORAGE_SECRET_KEY="$KNOWFLOW_DEV_MINIO_ROOT_PASSWORD"
+export KNOWFLOW_STORAGE_REQUEST_TIMEOUT=10s
 SPRING_PROFILES_ACTIVE=db-migrate ./mvnw spring-boot:run \
   -Dspring-boot.run.main-class=com.knowflow.api.db.DatabaseMigrationApplication
 ```
@@ -50,6 +51,8 @@ SPRING_PROFILES_ACTIVE=db-migrate ./mvnw spring-boot:run \
 迁移成功后以 `SPRING_PROFILES_ACTIVE=database,storage ./mvnw spring-boot:run` 启动应用。请勿把 `.env` 中的开发凭据用于其他环境。`docker compose ... down` 停止服务；只有要删除本地开发数据时才使用 `down -v`。
 
 MinIO 使用锁定的 `bitnamilegacy/minio:2025.4.22` 镜像摘要 `sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01`。S3 v4 签名、bucket 建立、对象 put/get/delete、错误凭证与读取上限由 Testcontainers 对真实 MinIO 测试。
+
+对象存储每个请求（包括完整响应正文）的总时限由 `KNOWFLOW_STORAGE_REQUEST_TIMEOUT` 控制，默认 `10s`，允许范围为大于 0 且不超过 `2m`。请求超时后会取消未完成读取；源文件代理和内部索引源读取也不会在访问对象存储期间持有数据库事务。
 
 应用进程连接数据库前，设置 `KNOWFLOW_DATABASE_URL`、`KNOWFLOW_DATABASE_USERNAME=knowflow_app`、`KNOWFLOW_DATABASE_PASSWORD`，并启用 profile：`SPRING_PROFILES_ACTIVE=database ./mvnw spring-boot:run`。当前外部路由包括注册/登录/登出、当前用户、个人知识库、上传/文档列表/文档与任务查询、文档删除、单轮提问、引用查询和原文件代理读取。内部路由包括任务派发所需的健康调用、受控源文件读取、heartbeat、索引批次和 completion；数据库租约与 `fencing` 是唯一写入授权依据。注册/登录 JSON 使用契约版本 `0.2.0-draft.5`。不要将迁移角色凭据用于应用连接。
 
