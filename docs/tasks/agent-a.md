@@ -94,3 +94,12 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - JP-I1：Java→Python 请求只在本地 loopback stub 上完成；真实双进程联调 `WAITING_B_SERVICE`。截至 `origin/python@150cd847a5750143fb6eb2c74c762962381952fe`，`services/ai/` 只有 README 和 `.env.example`，无 FastAPI 实现。未修改 B 所有的 `services/ai/`，未把本地 stub 说成真实集成。
 - ADR-002 提出 Java 有界批量写入网关并保留 AI 只读；B 的批大小/重试/清理需求与 Q 的 fencing 审阅未到位，方案仍为 `PROPOSED`，不开放 Python 直写，不启动 KF2-018。
 - KF2-011 / KF2-004 状态：`IN_REVIEW`；真实 Python 联调未执行；Q 审阅未执行。数据库证据只覆盖新建空库，不声称兼容未知旧库或完成租约、fencing、删除/发布竞态。
+
+## 2026-10-30：JP-01 G3 Java 后续（KF2-012/013）
+
+- 分支：`java`；base 为 JP-01 Java 交付 `f2204a52f221e1b9691824cac845d0f75c6a2f29`；target：`895a1ba4655d9e875730d5bbeb65e570853c8d01`。
+- KF2-012：`database` profile 下提供注册、登录、logout、`/me`。密码由 Spring Security PBKDF2 编码器处理；只存密码摘要。opaque bearer token 由 32 随机字节构造，有效期 8 小时，数据库只存 SHA-256；session 查询核对数据库到期时间与撤销状态。错误密码/未知账户使用相同 401；注册冲突不回显邮箱/密码，但 409 状态仍可能泄露地址冲突。未实现密码重置、refresh、多 session 撤销、邮箱验证及登录限速。
+- KF2-013：创建、分页列表、详情、删除均从已验证 principal 派生 user id；每个查询显式限制 `owner_user_id`，JSON 多余字段拒绝，含 `owner_id` 的创建请求返回 400。删除事务标记知识库/文档不可见并取消排队/运行任务、清除租约。对象和向量的物理清理仍需 KF2-014/024 的存储/清理入口；后续创建文档任务也必须与删除做状态/锁协调。
+- 契约候选升至 `0.2.0-draft.4`；Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。包含注册、登录、会话、当前用户、知识库、分页与通用冲突错误样例；B 未消费，M 未确认，Q 未审阅，KF2-004 仍未冻结。
+- 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 通过，21 项 Java 测试；真实 PostgreSQL 16.12/pgvector 0.8.1 覆盖 V1/V2、应用 profile、注册/登录/哈希/过期/撤销、双用户 owner 隔离、owner 注入、资源 404 和删除文档/任务状态。`python contracts/validate.py` 通过 54 项；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 通过 16 项；`git diff --check` 通过。
+- 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。JP-I1 仍等待 B 服务，详见[双进程记录](java-python-integration.md)。

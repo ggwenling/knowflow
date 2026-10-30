@@ -74,3 +74,11 @@ cd services/api
 - 联调证据见 [JP-01 Java→Python 记录](java-python-integration.md)：仅 Java loopback stub 通过。`origin/python@150cd847a5750143fb6eb2c74c762962381952fe` 没有可启动的 Python 服务，所以 JP-I1 等待 B target SHA。
 
 请 Q 检查 `V1` 所有权/复合外键、迁移身份与历史 Schema、AI 读取范围、vector 扩展位置/维度、应用 profile 的启动边界，以及 ADR-002 的 Java 网关提案是否足以约束旧 Worker。真实 Python 行为、迁移旧库升级、租约/Fencing 和删除/发布竞态均未由本 target 证明。
+
+## JP-01 G3 Java 审阅包（KF2-012/013）
+
+- 分支：`java`；base `f2204a52f221e1b9691824cac845d0f75c6a2f29`；target `895a1ba4655d9e875730d5bbeb65e570853c8d01`。
+- 变更：在 `database` profile 增加 PBKDF2 密码摘要、opaque 8 小时 Bearer session（只存 token SHA-256）、注册/登录/logout/current-user 及个人知识库 CRUD。每条 KB SQL 都从 principal 取 owner；含 owner 字段的 JSON 请求拒绝。删除同事务软删知识库/文档并取消活动索引任务。完整应用实现见 [ADR-003](../architecture/ADR-003-auth-and-owner-boundary.md)。
+- 契约候选 `0.2.0-draft.4`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`；B/M/Q 尚未确认，不冻结。
+- 复核命令：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`（21 项）；`python contracts/validate.py`（54 项）；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`（16 项）；`git diff --check`。认证/owner 的 HTTP 流程在真实 PostgreSQL 16.12 + pgvector 0.8.1 和 `knowflow_app` 角色上运行。
+- 请 Q 检查密码 KDF 参数升级策略、session 哈希/到期/撤销、数据库 profile 的启动和过滤器边界、邮箱冲突 409 的枚举风险、owner ID 替换、软删/任务取消与删除/创建竞态。尚无登录限速、邮箱验证、密码重置、旧账户凭证补录和物理对象/向量清理；这些缺口不伪报通过。
