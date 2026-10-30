@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "recorded_at": "2026-10-30T10:39:35.663758+08:00",
+  "fixture_sha256": "207c83d562ad8ddac351fe500468b7adc592b3361d0a8af195800145a3d93799",
+  "runner_sha256": "0ab056334e164e551f59b33144a83a3cc961c9556808e19cd99e90b542175a79",
+  "runtime": {
+    "python": "3.12.14",
+    "machine": "x86_64",
+    "logical_cpus": 3,
+    "cpu_quota": "200000 100000",
+    "memory_limit_bytes": "8589934592",
+    "git_head": "5a3d84413f69437b23f2a38fcae032a4ddf8d326"
+  },
+  "network_attempted": true,
+  "cost": {
+    "amount": null,
+    "reason": "Actual account billing was not retrieved; price-based estimate is documented in provider-profile.md."
+  },
+  "checks": {
+    "embedding": {
+      "status": "PASSED",
+      "elapsed_ms": 1490.532,
+      "usage": {
+        "prompt_tokens": 33,
+        "completion_tokens": 0,
+        "total_tokens": 33
+      },
+      "count": 2,
+      "observed_dimensions": 1024,
+      "finite_nonzero": true,
+      "provider_model_matches_request": true
+    },
+    "chat": {
+      "status": "PASSED",
+      "elapsed_ms": 1159.281,
+      "usage": {
+        "prompt_tokens": 76,
+        "completion_tokens": 14,
+        "total_tokens": 90
+      },
+      "synthetic_fact_check": true,
+      "answer_sha256": "fddef0fe5735826f60b66c8c9b66a6cac29e0e1635c78735810b9ead167a01ad",
+      "provider_model_matches_request": true
+    }
+  },
+  "configuration": {
+    "embedding_model": "BAAI/bge-m3",
+    "llm_model": "deepseek-flash",
+    "expected_dimensions": 1024,
+    "timeout_seconds": 30.0,
+    "max_attempts_per_endpoint": 1,
+    "llm_thinking": "disabled"
+  },
+  "status": "LIVE_SMOKE_PASSED"
+}
