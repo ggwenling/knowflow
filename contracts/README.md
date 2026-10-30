@@ -1,8 +1,10 @@
-# KnowFlow 公共契约（V0.2 重建基线；提议草案）
+# KnowFlow 公共契约（V0.2 重建基线；后端开发候选）
 
-**状态：DRAFT 0.2.0-draft.4，未冻结、未发布；不能用于生产兼容性验收。**
+**状态：DRAFT 0.2.0-draft.5，未冻结、未发布；不能用于生产兼容性验收。** Java 候选 target：`489b746f9bfa8188041f12d9135cf98fe6846611`；Schema SHA-256：`3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。`origin/python@b598f1d` 仍消费 draft.4，B 消费及 Q 审阅均待完成。
 
-`0.2.0-draft.3` 为 JP-01 局部开发候选，新增受认证的内部健康响应。`0.2.0-draft.4` 增加 KF2-012/013 的注册、登录、8 小时 opaque Bearer session、logout/current-user 与个人知识库结构；密码使用 PBKDF2 哈希，数据库只存 token SHA-256，知识库 owner 只由认证身份派生。注册冲突返回通用错误，但 409 状态仍可能暴露邮箱冲突，须由 M/Q 评估验证邮箱或限速方案。候选仍待 M 消费确认和 Q 审阅，不表示 KF2-004 已冻结。
+`0.2.0-draft.5` 在 draft.4 的认证、知识库、索引和证据模型上，补齐上传/任务状态报文、精确源文件读取、Java 受控批量写入、取消代次、摘要算法、租约和原子发布语义。样例向量固定了跨语言批次摘要输入。它是后端实现的候选输入，需 B 消费精确提交/哈希并由 Q 审阅；M 消费确认、公开页面兼容性和 KF2-004 正式冻结仍未完成。
+
+此前的 `0.2.0-draft.4` 包含 KF2-012/013 的注册、登录、8 小时 opaque Bearer session、logout/current-user 与个人知识库结构；密码使用 PBKDF2 哈希，数据库只存 token SHA-256，知识库 owner 只由认证身份派生。注册冲突返回通用错误，但 409 状态仍可能暴露邮箱冲突，须由 M/Q 评估验证邮箱或限速方案。
 
 A 单写共享 API、错误码、身份与资源范围、任务租约、索引版本发布、证据定位、删除失效及历史来源语义。B/M 可提交消费场景、字段提议和样例，不另行发布不兼容版本。
 
@@ -14,6 +16,7 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 - [候选 API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
+- [批次摘要算法](./index_batch_hash.py)：与 Schema 中 `index-batch` 样例配对，固定摘要序列化规则。
 - [A 线执行记录](../docs/tasks/agent-a.md)记录 V0.2 基线决策、KF2-001/004/006 进度和各提交 SHA。
 - [JP-01 Java→Python 联调记录](../docs/tasks/java-python-integration.md)区分本地 stub 与真实双进程证据。
 - [B 线运行基线](../docs/architecture/runtime-profile.md)：真实调用已验证 `BAAI/bge-m3` 的 1024 维和 `deepseek-flash` 中文输出；提供商别名和生产容量仍按原记录说明。
@@ -25,16 +28,17 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 ```bash
 python -m pip install -r contracts/requirements-validation.txt
 python contracts/validate.py
+python -m unittest contracts.test_index_batch_hash -v
 git diff --check
 ```
 
-检查 Schema、结构与字段格式。**结构合法不代表调用已授权**：租约状态、完成幂等和删除竞态仍需 Java 数据库事务验证。`jsonschema` 默认可能缺少日期时间检查器；脚本要求 RFC 3339 检查器可用，否则直接失败。
+检查 Schema、结构与字段格式，并验证共同批次样例的摘要。**结构合法不代表调用已授权**：租约状态、完成幂等和删除竞态仍需 Java 数据库事务验证。`jsonschema` 默认可能缺少日期时间检查器；脚本要求 RFC 3339 检查器可用，否则直接失败。
 
 ## 约定
 
 - JSON 使用 `snake_case`；客户端不能提交 `owner_id` 或内部可信范围。owner 由 Java 按认证主体生成。
 - 时间使用带时区 RFC 3339；服务器时钟判定租约。UUID/标识符不承担授权职责。
-- 请求 ID 由 Java 生成并传给 B；外部关联值只接受受长度限制的诊断使用。
+- Java 对缺失或格式不安全的 `X-Request-ID` 生成 UUID；符合 Schema 标识符字符集且不超过 128 字符的请求 ID 可原样关联响应头、错误体和内部调用。它仅用于诊断，不参与身份或授权。
 - 内部服务凭证与执行令牌分离；凭证认证服务，任务/租约/递增 fencing/数据库状态共同授权执行。凭证不得写入日志。
 - JSON Schema 的 `writeOnly` 不会自动脱敏；实现应过滤凭证、全文、向量和提供商密钥。
 - 外部非存在、非所有者、已删除资源统一返回无资源细节的 404。未认证返回 401；内部可信范围不匹配返回 403，不透传给浏览器。

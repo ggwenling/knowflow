@@ -65,6 +65,39 @@ cd services/api
 - 集成后差异与验证：
 - 最终任务状态：
 
+## JP2 draft.5 / Java 后端候选审阅包（A01–A12）
+
+审阅状态：待 Q 独立复核；此记录不代填批准结论。
+
+- 分支：`java`；JP2 base `f63a295`；Java 代码 target `489b746f9bfa8188041f12d9135cf98fe6846611`。
+- 契约：`0.2.0-draft.5`；`contracts/schemas/protocol.schema.json` SHA-256 `3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。
+- A01 前序修复：Q 406 修复 `24a07fd85c70cab3c522118697824727bf9651fe`（base `ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434`）；415 修复提交 `b2e6fe2`。当前 target 保留两项修复并通过回归。
+- 本 target 新增 Java 上传/文档/任务、调度租约与 heartbeat、受控源读取、索引批次网关与原子发布、问答可信快照、来源与 Range 文件代理、删除 outbox；含 V3–V5 迁移、独立 Postgres/MinIO Compose 和故障/越权测试。设计不变量见 [ADR-002](../architecture/ADR-002-index-write-boundary-proposal.md)。
+
+### 可复核命令和结果
+
+- `cd services/api && ./mvnw clean verify`：46 项测试，0 失败、0 错误、1 项 opt-in `RealPythonHealthSmokeTest` 跳过（未配置 `KNOWFLOW_REAL_AI_BASE_URL` / `KNOWFLOW_REAL_AI_SECRET`）；索引、来源、问答及存储使用 Java HTTP fixture 与真实 Testcontainers PostgreSQL/MinIO。
+- `python3 contracts/validate.py`：70 个结构样例通过；`python3 -m unittest contracts.test_index_batch_hash -v`：5 项通过。
+- `docker compose --env-file services/api/.env.dev.example -f services/api/compose.dev.yml config --quiet` 通过；本机 Compose Postgres/MinIO 均 healthy，Flyway 以独立迁移角色实际应用 V1–V5。
+- `git diff --check` 通过。测试没有调用供应商模型；没有宣称完成模型质量/费用、真实 B 索引流水线或完整 A/B 闭环。
+
+### A12 与共同依赖边界
+
+当前 B `origin/python@b598f1d62cc2367a4bfd49fccd3c31b521abff23` 的消费者仍固定 draft.4 和 Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`，没有合入本 Java draft.5 target。已完成的 draft.4 真实 health 联调证据是运行 target `225124f`、8/8、报告 SHA-256 `a3cc1355d1b9979dfdfbbb91d9bb176c9d63fbece1f4ab8ee2661d95cc356960`；详见[联调记录](java-python-integration.md)。
+
+因此 A01–A11 的 Java 开发验证可供审阅；A12 仅完成 Java 依赖侧和故障夹具验证。真实 B06 索引执行/网关消费、B09/B10 生成与证据校验、B12 双服务中断恢复及模型指标仍待 B 交付。B 消费 draft.5 前，不得把现有 draft.4 health smoke 描述成 draft.5 集成。
+
+### Q 结论（由 Q 填写）
+
+- 审阅 base → target：
+- 复核 HTTP 状态/响应头（406、415、404、405）：
+- Schema 与 B 消费目标：
+- 关键权限、fencing、事务/删除竞态：
+- 阻断问题 / 非阻断建议：
+- 结论：BLOCKED / CHANGES_REQUESTED / APPROVED
+- 修复 SHA / 复核：
+- 最终任务状态：
+
 ## JP-01 Java 增量审阅包（KF2-011 / KF2-004 candidate）
 
 - 分支：`java`；base `150cd847a5750143fb6eb2c74c762962381952fe`；Java target `115931caaf99fe3fd9c473d2f0f1b6ebd9648ccd`。
@@ -98,3 +131,11 @@ cd services/api
 - 回归测试：携带有效内部凭证访问 JSON 端点并发送 `Accept: application/xml`，断言状态 406、`Accept` 包含 `application/json`、`X-Request-ID` 存在、错误体为 draft.4 JSON 且 code/message 固定脱敏值。
 - 复核命令及结果：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`（22 项通过）；`python3 contracts/validate.py`（54 项通过）；`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`（16 项通过）；`git diff --check` 通过。
 - 请 Q 复核此 target 和响应头断言；尚无批准结论。
+
+## 审查发现修复：引用、对象存储读取与 MinIO 启动（2026-10-30）
+
+- Review base `533b1f1622accb696fdf26e90e8a8c322998ea0b` → 修复 target `806190b07e71d028dcb3327fcd663a1ff625d01b`；审阅记录在后续文档提交中单独追加。
+- 问答回答只替换完整 `[source_id]` 引用标记，正文中的普通来源 ID 保持原样，短 ID 不再影响更长 ID 的引用；契约说明同步明确引用格式。
+- S3 请求时限现在覆盖响应正文读取，默认 10 秒，可通过 `KNOWFLOW_STORAGE_REQUEST_TIMEOUT` 配置（最大 2 分钟）。文件代理和内部源读取将对象存储 I/O 移出数据库事务；下载完成后重新核对文档可见性或任务租约，避免删除/租约变化期间返回失效内容。
+- MinIO Testcontainers 等待 Bitnami 最终启动日志及 `/minio/health/ready`，避免初始化阶段的临时健康状态放行上传测试。新增慢正文超时回归，以及回答引用、心跳/文件删除并发回归。
+- 验证：`cd services/api && ./mvnw clean verify`（49 项，0 failures，0 errors，1 skipped）；`python3 contracts/validate.py`（70 个结构样例通过）；`python3 -m unittest contracts.test_index_batch_hash -v`（5 项通过）；`git diff --check` 通过。契约 Schema 未变，SHA-256 仍为 draft.5 的 `3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。

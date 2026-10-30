@@ -28,6 +28,7 @@ public class DatabaseApiSecurityConfiguration {
         InternalSecretAuthenticationFilter internalAuthFilter =
                 new InternalSecretAuthenticationFilter(aiProperties.getInternalSharedSecret());
         OncePerRequestFilter bearerSessionFilter = new BearerSessionAuthenticationFilter(jdbc, errors);
+        RequestBodySizeLimitFilter indexBatchLimitFilter = new RequestBodySizeLimitFilter(errors);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -51,7 +52,8 @@ public class DatabaseApiSecurityConfiguration {
                         .anyRequest().denyAll())
                 .addFilterAfter(requestIdFilter, SecurityContextHolderFilter.class)
                 .addFilterAfter(internalAuthFilter, RequestIdFilter.class)
-                .addFilterAfter(bearerSessionFilter, InternalSecretAuthenticationFilter.class);
+                .addFilterAfter(bearerSessionFilter, InternalSecretAuthenticationFilter.class)
+                .addFilterAfter(indexBatchLimitFilter, BearerSessionAuthenticationFilter.class);
 
         return http.build();
     }

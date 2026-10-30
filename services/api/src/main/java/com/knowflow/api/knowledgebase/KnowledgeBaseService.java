@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
+import com.knowflow.api.document.DeletionCoordinator;
 import com.knowflow.api.security.AuthenticatedUser;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,9 +19,11 @@ public class KnowledgeBaseService {
     private static final int MAX_OFFSET = 1_000_000;
 
     private final JdbcTemplate jdbc;
+    private final DeletionCoordinator deletions;
 
-    public KnowledgeBaseService(JdbcTemplate jdbc) {
+    public KnowledgeBaseService(JdbcTemplate jdbc, DeletionCoordinator deletions) {
         this.jdbc = jdbc;
+        this.deletions = deletions;
     }
 
     @Transactional
@@ -86,30 +89,7 @@ public class KnowledgeBaseService {
 
     @Transactional
     public void delete(AuthenticatedUser user, UUID id) {
-        int updated = jdbc.update("""
-                UPDATE knowflow.knowledge_bases
-                   SET status = 'DELETED', deleted_at = CURRENT_TIMESTAMP,
-                       updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ? AND owner_user_id = ? AND status = 'ACTIVE'
-                """, id, user.id());
-        if (updated == 0) {
-            throw ApiFailure.resourceNotFound();
-        }
-
-        jdbc.update("""
-                UPDATE knowflow.documents
-                   SET status = 'DELETED', deleted_at = CURRENT_TIMESTAMP,
-                       updated_at = CURRENT_TIMESTAMP
-                 WHERE knowledge_base_id = ? AND owner_user_id = ? AND status = 'ACTIVE'
-                """, id, user.id());
-        jdbc.update("""
-                UPDATE knowflow.indexing_tasks
-                   SET status = 'CANCELLED', lease_id = NULL, lease_expires_at = NULL,
-                       execution_token_hash = NULL, failure_code = NULL,
-                       finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                 WHERE knowledge_base_id = ? AND owner_user_id = ?
-                   AND status IN ('QUEUED', 'RUNNING')
-                """, id, user.id());
+        deletions.deleteKnowledgeBase(user, id);
     }
 
     private static void requireCurrentContract(String contractVersion) {

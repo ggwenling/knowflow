@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
+from index_batch_hash import batch_sha256
 
 
 def main():
@@ -34,6 +35,10 @@ def main():
         )
         if (not errors) != case["structurally_valid"]:
             failures.append(name)
+        if name == "index-batch" and case["payload"].get("batch_sha256") != batch_sha256(
+            case["payload"]
+        ):
+            failures.append("index-batch-digest-vector")
     if failures:
         raise SystemExit("FAIL: " + ", ".join(failures))
     print(f"PASS: schema and {len(cases)} structural cases")

@@ -21,6 +21,12 @@ public final class ApiErrorWriter {
 
     public void write(HttpServletRequest request, HttpServletResponse response,
                       HttpStatusCode status, String code, String message) throws IOException {
+        write(request, response, status, code, message, false);
+    }
+
+    public void write(HttpServletRequest request, HttpServletResponse response,
+                      HttpStatusCode status, String code, String message, boolean retryable)
+            throws IOException {
         if (response.isCommitted()) {
             return;
         }
@@ -30,6 +36,6 @@ public final class ApiErrorWriter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         objectMapper.writeValue(response.getOutputStream(),
-                new ApiError(ApiError.CONTRACT_VERSION, requestId, code, message, false));
+                new ApiError(ApiError.CONTRACT_VERSION, requestId, code, message, retryable));
     }
 }

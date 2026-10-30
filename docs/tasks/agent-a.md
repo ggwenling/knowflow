@@ -1,5 +1,38 @@
 # Codex-A 执行记录
 
+## JP2 Java 后端当前交付（2026-10-30）
+
+当前 `java` 分支已提交 Java 后端候选，代码 target 为 `489b746f9bfa8188041f12d9135cf98fe6846611`，基于 `f63a295`；契约为 `0.2.0-draft.5`，Schema SHA-256 `3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。该提交可供 Q 独立复核，但仍是候选，不代表 Q 批准或 B 已消费。
+
+| 子任务 | Java 交付状态 | 证据与边界 |
+|---|---|---|
+| A01 HTTP 状态映射 | 已实现，待 Q 复核 | 400、404、405、406、415 保留正确状态；405 保留 `Allow`，406/415 保留框架支持媒体类型头。对应回归测试通过。406 修复提交 `24a07fd`，415 修复提交 `b2e6fe2`。 |
+| A02 draft.5 / ADR-002 | 候选已发布，B 消费与 Q 审阅待处理 | API Schema、成功/失败样例、索引批次/Manifest 摘要、lease/heartbeat/completion/cancel 与可信问答范围已固定；消费清单记录 Java SHA 和 Schema SHA。 |
+| A03 隔离开发环境 | 已实现并启动验证 | `services/api/compose.dev.yml` 独立启动固定摘要的 pgvector PostgreSQL 与 MinIO；本机 Compose 健康检查通过，迁移角色真实应用 V1–V5。没有修改共享 `infra/`。 |
+| A04 上传、文档与任务查询 | 已实现 | 真实 MinIO/PostgreSQL 覆盖 TXT/MD/PDF 上传、签名/大小检查、摘要、202/QUEUED、列表与状态查询；对象写入或事务失败走补偿清理队列，越权返回无资源信息。 |
+| A05 队列、租约与 fencing | 已实现 | 原子数据库领取、60 秒租约、15 秒 heartbeat、fencing 替换、5/30 秒退避、最多 3 次尝试、过期执行隔离重领；并发领取、旧租约、失败重试和 heartbeat 边界有数据库测试。 |
+| A06 受控源文件读取 | 已实现 | 内部读取按当前任务/文档/版本/有效 lease 核验，响应只提供字节与摘要元数据，不暴露对象键或主凭据；越权、失效和删除后读取有回归。 |
+| A07 批量写入网关 | 已实现 | 同一事务内校验 service auth、owner/范围、token hash、lease/fencing、1 MiB/32 条、1024 维有限向量、Chunk 序号/文本摘要和批次 SHA；相同摘要重放幂等，复用身份但摘要不同冲突。 |
+| A08 完整性验收与发布 | 已实现 | Java 对数据库中实际 Chunk、向量、序号、批次和 Manifest 核对后，在同一事务完成 task、候选状态与活动版本切换；失败不覆盖旧活动索引。 |
+| A09 问答可信快照 | Java 入口已实现 | owner/READY 索引快照由 Java 构造，WebClient 调 Python，返回来源逐项按快照、Chunk 和引用片段核验；调用前后检查可见性。真实模型/完整 B 问答尚未联调。 |
+| A10 来源与原文件代理 | 已实现 | 来源绑定问题/用户/文档/内容/索引/Chunk；原文件代理提供有界单段 Range，校验对象长度与 SHA；删除后来源与文件立即失效。 |
+| A11 删除、取消与可重试清理 | 已实现 | 逻辑删除立即撤销可见性和 lease；取消、对象/索引物理清理经 outbox 重试。覆盖删除与迟到 batch/heartbeat/completion、清理重试。 |
+| A12 后端集成与故障验收 | Java 侧完成；真实跨服务闭环待 B | Java + 真实 PostgreSQL/MinIO 的上传、索引发布、问答 fixture、来源/文件与删除故障测试通过。`origin/python@b598f1d` 仍只提供 draft.4 health 与解析，不含 B06 索引执行器或 B09 真实生成；没有真实模型凭证，因此不宣称 A/B 完整闭环、Worker 进程中断恢复或生产质量验收完成。 |
+
+### JP2 验证
+
+- `cd services/api && ./mvnw clean verify`：46 项，0 失败、0 错误、1 项可选真实 Python smoke 因未设置外部服务变量而跳过；其余 Java 测试使用真实 Testcontainers PostgreSQL/pgvector 和 MinIO。
+- `python3 contracts/validate.py`：Schema 与 70 个结构样例通过；`python3 -m unittest contracts.test_index_batch_hash -v`：5 项跨语言批次摘要测试通过。
+- 独立 Compose `config --quiet`、PostgreSQL/MinIO 健康检查及真实本机库 V1–V5 Flyway 迁移均通过；`git diff --check` 通过。
+- draft.4 真实 Java/Python health 联调仍以原固定候选为准：A `ec5c71c`、B `b598f1d`、运行 target `225124f`，8/8 通过，报告 SHA-256 `a3cc1355d1b9979dfdfbbb91d9bb176c9d63fbece1f4ab8ee2661d95cc356960`。这不表示 draft.5 已被 B 消费；当前 B target 的实际版本与 Schema SHA 见[联调记录](java-python-integration.md)。
+
+本段 JP2 记录和 Q 审阅包以更晚的文档提交追加，不改变上述代码 target。Q 结论留空，等待独立复核。
+
+### 2026-10-30 后续审查修复
+
+- Review base `533b1f1622accb696fdf26e90e8a8c322998ea0b` → Java 修复 target `806190b07e71d028dcb3327fcd663a1ff625d01b`；引用替换、S3 总读取时限、存储 I/O 事务边界及 MinIO 最终就绪等待修复可供 Q 复核，详细验证记录见 [后续 Q 审阅包](agent-a-review-package.md)。
+- `cd services/api && ./mvnw clean verify`：49 项，0 失败、0 错误、1 项 opt-in 真实 Python smoke 跳过。契约结构校验 70 项，跨语言摘要测试 5 项通过。
+
 ## 初始准备（2026-10-29）
 
 - 日期：2026-10-29（Asia/Hong_Kong）；实际执行者：当前 Codex，角色 A。
@@ -11,7 +44,7 @@
 - 云环境可连接，Git 拉取已实际成功；未配置模型凭证或目标硬件基线。未发起真实模型调用。
 - 仅修改 A 的架构、任务记录和公共契约；未接替 B/M/Q，也未改计划包的初始状态。
 
-## 计划顺序（当前执行记录见下文）
+## 原始 KF2 计划顺序（JP-01 历史快照；当前状态以 JP2 表为准）
 
 本文件记录实际执行状态；计划包中的 `PLANNED` 保留为规划快照。无 Q 审阅/实际集成证据的任务不标记 `DONE`。阻断任务不占用正在开发名额；一次仅推进一项允许的准备工作。
 

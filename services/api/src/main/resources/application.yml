@@ -8,6 +8,10 @@ spring:
     property-naming-strategy: SNAKE_CASE
     deserialization:
       fail-on-unknown-properties: true
+  servlet:
+    multipart:
+      max-file-size: 8MB
+      max-request-size: 9MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -39,3 +43,9 @@ knowflow:
   ai:
     base-url: ${KNOWFLOW_AI_BASE_URL:http://localhost:8000}
     internal-shared-secret: ${KNOWFLOW_INTERNAL_SHARED_SECRET:}
+  storage:
+    endpoint: ${KNOWFLOW_STORAGE_ENDPOINT:http://localhost:59000}
+    bucket: ${KNOWFLOW_STORAGE_BUCKET:knowflow-documents}
+    access-key: ${KNOWFLOW_STORAGE_ACCESS_KEY:}
+    secret-key: ${KNOWFLOW_STORAGE_SECRET_KEY:}
+    request-timeout: ${KNOWFLOW_STORAGE_REQUEST_TIMEOUT:10s}

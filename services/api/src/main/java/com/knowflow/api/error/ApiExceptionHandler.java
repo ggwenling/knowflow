@@ -2,10 +2,11 @@ package com.knowflow.api.error;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.knowflow.api.storage.ObjectStoreException;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.beans.TypeMismatchException;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -27,7 +30,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
             HandlerMethodValidationException.class, TypeMismatchException.class,
-            MissingServletRequestParameterException.class})
+            MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
     void invalidRequest(HttpServletRequest request, HttpServletResponse response)
             throws java.io.IOException {
         errors.write(request, response, HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
@@ -37,7 +40,22 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ApiFailure.class)
     void apiFailure(HttpServletRequest request, HttpServletResponse response, ApiFailure failure)
             throws java.io.IOException {
-        errors.write(request, response, failure.status(), failure.code(), failure.getMessage());
+        errors.write(request, response, failure.status(), failure.code(), failure.getMessage(),
+                failure.retryable());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    void uploadTooLarge(HttpServletRequest request, HttpServletResponse response)
+            throws java.io.IOException {
+        errors.write(request, response, HttpStatus.PAYLOAD_TOO_LARGE, "RESOURCE_LIMIT",
+                "The uploaded file exceeds a configured limit.");
+    }
+
+    @ExceptionHandler(ObjectStoreException.class)
+    void objectStoreUnavailable(HttpServletRequest request, HttpServletResponse response)
+            throws java.io.IOException {
+        ApiFailure failure = ApiFailure.storageUnavailable();
+        errors.write(request, response, failure.status(), failure.code(), failure.getMessage(), true);
     }
 
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
@@ -51,14 +69,8 @@ public class ApiExceptionHandler {
     void methodNotSupported(HttpServletRequest request, HttpServletResponse response,
                             HttpRequestMethodNotSupportedException exception)
             throws java.io.IOException {
-        var supportedMethods = exception.getSupportedHttpMethods();
-        if (supportedMethods != null && !supportedMethods.isEmpty()) {
-            response.setHeader(HttpHeaders.ALLOW, supportedMethods.stream()
-                    .map(HttpMethod::name)
-                    .sorted()
-                    .collect(java.util.stream.Collectors.joining(", ")));
-        }
-        errors.write(request, response, HttpStatus.METHOD_NOT_ALLOWED, "INVALID_REQUEST",
+        copyHeaders(exception.getHeaders(), response);
+        errors.write(request, response, exception.getStatusCode(), "INVALID_REQUEST",
                 "The HTTP method is not supported for this endpoint.");
     }
 
@@ -66,8 +78,7 @@ public class ApiExceptionHandler {
     void notAcceptable(HttpServletRequest request, HttpServletResponse response,
                        HttpMediaTypeNotAcceptableException exception)
             throws java.io.IOException {
-        exception.getHeaders().forEach((name, values) -> values.forEach(
-                value -> response.addHeader(name, value)));
+        copyHeaders(exception.getHeaders(), response);
         var status = exception.getStatusCode();
         boolean clientError = status.is4xxClientError();
         String code = clientError ? "INVALID_REQUEST" : "INTERNAL_ERROR";
@@ -75,6 +86,19 @@ public class ApiExceptionHandler {
                 ? "The requested response media type is not acceptable."
                 : "The request could not be processed.";
         errors.write(request, response, status, code, message);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    void unsupportedContentType(HttpServletRequest request, HttpServletResponse response,
+                                HttpMediaTypeNotSupportedException exception)
+            throws java.io.IOException {
+        copyHeaders(exception.getHeaders(), response);
+        errors.write(request, response, exception.getStatusCode(), "INVALID_REQUEST",
+                "The request content type is not supported.");
+    }
+
+    private static void copyHeaders(HttpHeaders headers, HttpServletResponse response) {
+        headers.forEach((name, values) -> values.forEach(value -> response.addHeader(name, value)));
     }
 
     @ExceptionHandler(Exception.class)

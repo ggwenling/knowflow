@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.sql.Connection;
@@ -96,6 +97,18 @@ class AuthKnowledgeBaseIntegrationTest {
     void registrationAndLoginUseHashedPasswordsAndOpaqueRevocableSessions() throws Exception {
         String password = "synthetic-user-password-123";
         mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(registerBody("unsupported-content-type@example.test",
+                                "synthetic-registration-password")))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(header().string(org.springframework.http.HttpHeaders.ACCEPT,
+                        org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)))
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message")
+                        .value("The request content type is not supported."));
+
+        mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody("short@example.test", "too-short")))
                 .andExpect(status().isBadRequest())
@@ -105,7 +118,7 @@ class AuthKnowledgeBaseIntegrationTest {
         String userId = registered.path("user_id").asText();
         String registrationToken = registered.path("access_token").asText();
 
-        assertThat(registered.path("contract_version").asText()).isEqualTo("0.2.0-draft.4");
+        assertThat(registered.path("contract_version").asText()).isEqualTo("0.2.0-draft.5");
         assertThat(registered.path("email").asText()).isEqualTo("owner@example.test");
         assertThat(registrationToken).matches("[A-Za-z0-9_-]{43}");
         String encodedPassword = jdbc.queryForObject(
@@ -155,7 +168,7 @@ class AuthKnowledgeBaseIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("owner@example.test", password)
-                                .replace("0.2.0-draft.4", "0.2.0-draft.3")))
+                                .replace("0.2.0-draft.5", "0.2.0-draft.3")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
@@ -189,7 +202,7 @@ class AuthKnowledgeBaseIntegrationTest {
         mockMvc.perform(get("/api/v1/knowledge-bases"))
                 .andExpect(status().isUnauthorized());
         String body = """
-                {"contract_version":"0.2.0-draft.4","name":"Research"}
+                {"contract_version":"0.2.0-draft.5","name":"Research"}
                 """;
         JsonNode created = objectMapper.readTree(mockMvc.perform(post("/api/v1/knowledge-bases")
                         .header("Authorization", "Bearer " + tokenA)
@@ -204,7 +217,7 @@ class AuthKnowledgeBaseIntegrationTest {
                         .header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.4","name":"Injected",
+                                {"contract_version":"0.2.0-draft.5","name":"Injected",
                                  "owner_id":"%s"}
                                 """.formatted(ownerA.path("user_id").asText())))
                 .andExpect(status().isBadRequest())
@@ -325,7 +338,7 @@ class AuthKnowledgeBaseIntegrationTest {
 
     private static String registerBody(String email, String password) {
         return """
-                {"contract_version":"0.2.0-draft.4","email":"%s","password":"%s"}
+                {"contract_version":"0.2.0-draft.5","email":"%s","password":"%s"}
                 """.formatted(email, password);
     }
 
