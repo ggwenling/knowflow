@@ -6,14 +6,15 @@ import math
 
 
 class ProcessingError(RuntimeError):
-    def __init__(self, code: str, status: int = 502):
+    def __init__(self, code: str, status: int = 502, *, retryable: bool | None = None):
         super().__init__(code)
         self.code, self.status = code, status
+        self.retryable = status in (502, 504) if retryable is None else retryable
 
 
 class ModelAdapter(Protocol):
-    async def embed(self, texts: list[str]) -> dict[str, Any]: ...
-    async def generate(self, question: str, context: list[str]) -> dict[str, Any]: ...
+    async def embed(self, texts: list[str], *, request_id: str) -> dict[str, Any]: ...
+    async def generate(self, question: str, context: list[str], *, request_id: str) -> dict[str, Any]: ...
 
 
 class IndexExecutor(Protocol):

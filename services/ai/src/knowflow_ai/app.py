@@ -13,10 +13,12 @@ from .adapters import ProcessingError
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
 
 
-def failure(request_id, status, code, *, headers=None):
+def failure(request_id, status, code, *, headers=None, retryable=None):
     # Messages are constants. Never serialize exception text or validation inputs.
+    if retryable is None:
+        retryable = status in (502, 504)
     payload = ErrorBody(request_id=request_id, code=code, message=code,
-                        retryable=status in (502, 504)).model_dump()
+                        retryable=retryable).model_dump()
     return JSONResponse(payload, status_code=status, headers=headers)
 
 
@@ -84,8 +86,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(ProcessingError)
     async def processing_error(request: Request, exc: ProcessingError):
-        code = 'PROCESSING_TIMEOUT' if exc.status == 504 else 'AI_PROCESSING_FAILED'
-        return failure(request.state.request_id, exc.status, code)
+        code = {400: 'INVALID_REQUEST', 504: 'PROCESSING_TIMEOUT'}.get(
+            exc.status, 'AI_PROCESSING_FAILED')
+        return failure(request.state.request_id, exc.status, code, retryable=exc.retryable)
 
     @app.get('/health/live')
     async def live():
