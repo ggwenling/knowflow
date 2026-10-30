@@ -157,6 +157,11 @@ def validate_embeddings(result, count, dimension):
     return {"count": count, "observed_dimensions": dimension, "finite_nonzero": True}
 
 
+def validate_provider_model(result, requested_model):
+    if result.get("model") != requested_model:
+        raise SmokeFailure("PROVIDER_MODEL_MISMATCH")
+
+
 def validate_answer(result, fixture):
     try:
         answer = result["choices"][0]["message"]["content"]
@@ -196,7 +201,7 @@ def run(env, timeout):
         "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "runtime": runtime_metadata(),
         "network_attempted": False,
-        "cost": {"amount": None, "reason": "Provider rates and billing have not been verified."},
+        "cost": {"amount": None, "reason": "Official rates support estimates; actual account billing was not retrieved."},
         "checks": {},
     }
     try:
@@ -218,8 +223,14 @@ def run(env, timeout):
             "model": config["embedding"]["model"], "input": fixture["embedding_inputs"],
         }, timeout)
         if result is not None:
+            try:
+                validate_provider_model(result, config["embedding"]["model"])
+            except SmokeFailure as exc:
+                checks["embedding"].update(status="FAILED", error=exc.args[0])
+                report["status"] = "FAILED"
+                return report, 1
             checks["embedding"].update(validate_embeddings(result, 2, config["dimensions"]), status="PASSED")
-            checks["embedding"]["provider_model_matches_request"] = result.get("model") == config["embedding"]["model"]
+            checks["embedding"]["provider_model_matches_request"] = True
         else:
             report["status"] = "FAILED"
             return report, 1  # Avoid a second billable call after an embedding failure.
@@ -235,8 +246,14 @@ def run(env, timeout):
             payload["thinking"] = {"type": config["llm"]["thinking"]}
         checks["chat"], result = post_json(opener, config["llm"], "/chat/completions", payload, timeout)
         if result is not None:
+            try:
+                validate_provider_model(result, config["llm"]["model"])
+            except SmokeFailure as exc:
+                checks["chat"].update(status="FAILED", error=exc.args[0])
+                report["status"] = "FAILED"
+                return report, 1
             checks["chat"].update(validate_answer(result, fixture), status="PASSED")
-            checks["chat"]["provider_model_matches_request"] = result.get("model") == config["llm"]["model"]
+            checks["chat"]["provider_model_matches_request"] = True
         report["status"] = "LIVE_SMOKE_PASSED" if result is not None else "FAILED"
         return report, 0 if result is not None else 1
     except SmokeFailure as exc:

@@ -8,7 +8,7 @@
 - [鉴权检查](evidence/provider-auth-20261030.json)：两个 GET /v1/models 均 HTTP 200；记录不含凭证值。
 - [前次完整句测试](evidence/model-live-20261030-full-sentence.json)通过；[首轮中文输出检查失败](evidence/model-live-20261030.json)作为失败样本保留。
 - [历史网络失败](evidence/siliconflow-deepseek-live-attempt.json)及[旧代理诊断](evidence/provider-connectivity.json)保留为历史记录，不代表目前网络状态。
-- [15 项客户端离线回归](test_model_smoke.py)只验证客户端逻辑，不等同真实模型证据。
+- [16 项客户端离线回归](test_model_smoke.py)只验证客户端逻辑，不等同真实模型证据；其中覆盖返回模型 ID 不匹配或缺失时冒烟必须失败。
 - [解析候选许可证检查](evidence/parser-licenses.json)只核对两个 wheel，不是已安装服务依赖的完整许可清单。
 - [模型、费用与供应商政策](provider-profile.md)记录当前核查结果和未决项；[运行基线](../../docs/architecture/runtime-profile.md)记录容量边界。
 

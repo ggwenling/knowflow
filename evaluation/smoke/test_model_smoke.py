@@ -100,10 +100,12 @@ class SmokeTests(unittest.TestCase):
                 self.assertEqual((report["error"], code), (expected, 1))
 
     def test_success_path_redacts_provider_text_and_vectors(self):
-        embedding = {"data": [{"index": 0, "embedding": [0.5, 0.7]},
+        embedding = {"model": "example-embedding-v1",
+                     "data": [{"index": 0, "embedding": [0.5, 0.7]},
                                {"index": 1, "embedding": [0.1, 0.3]}],
                      "usage": {"total_tokens": 20, "private": "secret"}}
-        chat = {"choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
+        chat = {"model": "example-chat-v1",
+                "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
         responses = [io.BytesIO(json.dumps(value).encode()) for value in (embedding, chat)]
         with patch.object(smoke.request.OpenerDirector, "open", side_effect=responses) as opened:
             report, code = smoke.run(self.env, 1)
@@ -115,6 +117,43 @@ class SmokeTests(unittest.TestCase):
         self.assertNotIn("[0.5, 0.7]", serialized)
         self.assertIsNone(report["cost"]["amount"])
 
+    def test_requested_and_returned_model_ids_must_match(self):
+        good_embedding = {
+            "model": "example-embedding-v1",
+            "data": [{"index": i, "embedding": [1, 2]} for i in range(2)],
+        }
+        wrong_embedding = {
+            "model": "different-embedding-model",
+            "data": [{"index": i, "embedding": [1, 2]} for i in range(2)],
+        }
+        missing_embedding_model = {
+            "data": [{"index": i, "embedding": [1, 2]} for i in range(2)],
+        }
+        good_chat = {
+            "model": "example-chat-v1",
+            "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}],
+        }
+        wrong_chat = {
+            "model": "different-chat-model",
+            "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}],
+        }
+        for role, case, responses in (
+            ("embedding", "mismatched id", [wrong_embedding]),
+            ("embedding", "missing id", [missing_embedding_model]),
+            ("chat", "mismatched id", [good_embedding, wrong_chat]),
+        ):
+            with self.subTest(role=role, case=case):
+                stream = [io.BytesIO(json.dumps(value).encode()) for value in responses]
+                with patch.object(smoke.request.OpenerDirector, "open", side_effect=stream) as opened:
+                    report, code = smoke.run(self.env, 1)
+                self.assertEqual((report["status"], code), ("FAILED", 1))
+                self.assertEqual(report["checks"][role]["status"], "FAILED")
+                self.assertEqual(report["checks"][role]["error"], "PROVIDER_MODEL_MISMATCH")
+                self.assertFalse(report["checks"][role].get("provider_model_matches_request", False))
+                self.assertEqual(opened.call_count, len(responses))
+                if role == "embedding":
+                    self.assertNotIn("chat", report["checks"])
+
     def test_split_providers_use_separate_urls_and_credentials(self):
         env = {**self.env,
                "KNOWFLOW_EMBEDDING_BASE_URL": "https://embedding.example.invalid/v1/",
@@ -124,8 +163,10 @@ class SmokeTests(unittest.TestCase):
                "KNOWFLOW_LLM_KEY_ENV": "CHAT_API_KEY",
                "CHAT_API_KEY": "chat-only-secret",
                "KNOWFLOW_LLM_THINKING": "disabled"}
-        embedding = {"data": [{"index": i, "embedding": [1, 2]} for i in range(2)]}
-        chat = {"choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
+        embedding = {"model": "example-embedding-v1",
+                     "data": [{"index": i, "embedding": [1, 2]} for i in range(2)]}
+        chat = {"model": "example-chat-v1",
+                "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
         responses = [io.BytesIO(json.dumps(value).encode()) for value in (embedding, chat)]
         with patch.object(smoke.request.OpenerDirector, "open", side_effect=responses) as opened:
             report, code = smoke.run(env, 1)
