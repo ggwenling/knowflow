@@ -1,6 +1,6 @@
 # KF2-017：可复现分段与来源定位
 
-状态：B02 实现与本地回归已完成，等待 A 的 draft.5 接口定义及独立 Q 审阅。此模块是纯 Python 处理代码；尚未注册业务 HTTP 路由，也不读取数据库或写入索引。
+状态：分段器已接入本机 `local` 的 `0.2.0-draft.6` `IndexWorker` 并通过本地回归；独立 Q 审阅和 M 消费确认仍待完成。此模块本身是纯 Python 处理代码，不是 HTTP 入口或数据库写入者；lease-scoped 调度由 worker 执行，Chunk/向量写入经 Java gateway 完成。
 
 ## 配置与不变量
 

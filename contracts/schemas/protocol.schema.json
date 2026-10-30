@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.5",
+  "title": "KnowFlow proposed messages 0.2.0-draft.6",
   "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.5"
+      "const": "0.2.0-draft.6"
     },
     "Identifier": {
       "type": "string",
@@ -90,12 +90,18 @@
           "minimum": 1
         },
         "embedding_model_profile_id": {
-          "$ref": "#/$defs/Identifier"
+          "$ref": "#/$defs/EmbeddingModelProfileId"
         },
         "manifest_sha256": {
           "$ref": "#/$defs/Sha256"
         }
       }
+    },
+    "EmbeddingModelProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
     },
     "Failure": {
       "type": "object",

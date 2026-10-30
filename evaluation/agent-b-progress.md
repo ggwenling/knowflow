@@ -134,3 +134,22 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 针对 B03 复审反馈修复两处边界问题：供应商 Embedding 响应的顶层及 data 行 `object` 等扩展字段不再透传，内部结果通过仓库共享 `EmbeddingResult` Schema 校验；请求现在逐次显式应用配置超时并设置 `follow_redirects=False`，对调用方注入的宽松 httpx 客户端同样有效。离线 307 测试注入 `timeout=None, follow_redirects=True` 的客户端，并验证请求只抵达原主机、正文未转发，且请求扩展携带配置超时。未调用真实模型。
 
 验证：Python 全量测试 100 passed；共享契约结构样例 54/54 通过；`git diff --check` 通过。B03 仍待独立 Q 审阅，未据此更新任务验收状态。
+
+## 2026-10-30：本机 `local` draft.6 B 线集成与 Windows 修复
+
+- B 消费 A/B 本机共同候选 `0.2.0-draft.6`，Schema SHA-256 `d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`；分支为用户指定的 `local`，base commit `dd3abd4aa003fe5b6b88ce649b8806d9b82b8631`，变更尚未提交。
+- Python worker、Java gateway、解析/分段、batch digest、只读检索和证据回答已接入 draft.6。新增 Windows 兼容修复：Windows 默认 Proactor 事件循环不支持 psycopg async 连接，数据库 SELECT 改由 `asyncio.to_thread` 运行同步 psycopg，并保持只读事务、5 秒连接/语句超时；新增线程执行回归。
+- 验证：Python 全量最新 **120 passed**；Schema **70** 个结构样例；离线评测单测 **16 passed**；Python HTTP process smoke **8 passed**。新增真实 Java deletion outbox→Python cancel 的活动任务跨进程验证，修复 `_execute` 取消时未等待 `_index` 子任务的问题；报告 `services/ai/docs/evidence/cancellation-e2e-local-draft6-verified.json`。真实本机 Java/Python/pgvector/MinIO 合成索引与问答闭环报告为 `services/ai/docs/evidence/local-backend-e2e-draft6-verified.json`；真实 Java/WebClient ↔ Python HTTP health **9/9** 见 `java-python-smoke-local-draft6-verified.json`。
+- 所有模型 adapter 都被临时本地合成实现替代，外部 Embedding/LLM 调用 **0**；没有保存资料正文、回答全文、向量、用户 token 或凭证。真实模型质量/费用、Q 审阅和 M 消费确认仍未执行；B 任务继续保持待审状态。
+- 本轮复跑 Python 全量 **116 passed**、Java 全量 49 tests（0 failure/error，1 skip），并重新通过真实 Java/WebClient ↔ Python HTTP health **9/9**。当前没有 Embedding 或 LLM 凭证，因此未发起真实 provider 请求。
+- 对原创种子集做了独立的 source→Chunk evidence coverage 核验：开发集 12 题/21 个证据区间全部可复核，留出集 3 题/3 个区间全部可复核。报告 `services/ai/docs/evidence/seed-chunk-coverage-local-draft6.json` 明确不声称语义检索排序或生成质量；留出题未用于调参。
+- 新增可信快照范围 guard：Python 在任何 LLM adapter 调用前核对每条检索记录的 document/content/index 版本三元组必须属于 Java 给定范围；三种越界负例在模型创建前 fail closed。新 guard 后复跑本机真实服务合成 E2E，合法范围通过，未调用外部模型。
+- Python worker heartbeat fencing 回归：模拟 Java heartbeat 返回 `LEASE_REJECTED`，确认活动 embedding 被取消、adapter 随后关闭，且不写 batch/completion；目标用例连续 **10/10** 通过。worker 测试 **5 passed**，Python 全量 **123 passed**，Schema **70** 个结构样例通过。
+- 文档一致性复核：将 contract-consumption 中 draft.4/未启用路由说明标为历史快照；更新解析与分段文档，说明纯函数现由 draft.6 lease-scoped worker 调用，Java gateway 负责来源授权、索引写入和 READY 发布。
+- 有界队列回归：容量为 1 时拒绝第二个 lease 且不创建 heartbeat；HTTP dispatch 将队列满转换为脱敏、带 request ID 的可重试 503，不返回 ACCEPTED。两条定向测试和 Python 全量 **123 passed**，契约结构验证 **70** 项通过。
+- 最新本机回归：Python 全量 **123 passed**；Schema **70** 项；离线模型回归 **16 passed**；Python 真实 HTTP process smoke **8/8**；真实 Java WebClient ↔ Python HTTP health **9/9**。health 报告中的 app、consumer、Schema SHA 均匹配当前文件，外部模型及数据库调用为 0，进程日志无秘密。
+- 新增 provider 凭证 fail-closed 路由回归：索引请求缺少 Embedding 凭证时返回脱敏可重试 `503` 且不进入 worker；问答分别缺少 Embedding/LLM 凭证时返回 `503`，不构造 `AnswerService`、不触发数据库或模型请求。`test_service.py` **21 passed**；Python 全量最新 **126 passed**；Schema **70** 个结构样例通过。外部模型调用 **0**；pytest 有 1 条 Starlette/httpx 上游弃用警告，不影响结果。
+- 2026-10-30 22:56（香港时间）提前复验下一日检查点：Python 全量 **132 passed**、Schema **70**、离线模型回归 **16**、Python HTTP smoke **8/8**。合成资料种子校验 10 份文档、15 道题与证据位置通过；现有 Chunk 覆盖报告绑定的 manifest/questions 哈希与当前文件一致。
+- 可重放本机闭环的 `services/ai/tools/local_backend_e2e.py` 现验证活动取消送达及 adapter 收尾、等待相关物理清理，Windows 上清理 Java 进程树，并拒绝在已有未完成任务或清理队列的数据库启动。实际真实服务合成重放通过，证据 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`；合成账户记录留在本地数据库，知识库已删除且会话已退出。
+- 当前所选 Embedding/LLM 凭证均不存在，开发集真实模型评测记录为 `SKIPPED_NO_CREDENTIALS`（`services/ai/docs/evidence/development-evaluation-local-draft6-skipped.json`），本次外部模型调用 0；向量排序与生成质量仍未测，不能用合成 adapter 冒充。Q/M 正式验收仍待独立执行。
+- 提交前复验发现 Windows `taskkill` 偶尔在目标进程已退出后返回错误码；重放工具现仅在进程仍存活时传播该错误，并在清理后检查服务端口。两种错误码分支、进程树测试及真实服务合成重放均通过，Python 全量 **134 passed**；这次重放仍使用合成 adapter，外部模型调用 0。

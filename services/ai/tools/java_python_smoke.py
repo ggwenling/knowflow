@@ -28,7 +28,8 @@ parser.add_argument('--require-clean', action='store_true')
 args=parser.parse_args()
 
 def git(*arguments):
-    return subprocess.check_output(['git', *arguments], cwd=repo, text=True).strip()
+    return subprocess.check_output(['git', *arguments], cwd=repo, text=True,
+                                   encoding='utf-8').strip()
 
 clean_before = not git('status', '--porcelain')
 if args.require_clean and not clean_before:
@@ -52,6 +53,14 @@ class SlowFixture(BaseHTTPRequestHandler):
             self.send_header('Content-Length',str(len(body)))
             self.end_headers(); self.wfile.write(body)
             return
+        if self.headers.get('X-Request-ID') == 'java-draft5-fixture':
+            body = json.dumps({'status':'UP', 'contract_version':'0.2.0-draft.5',
+                               'request_id':'java-draft5-fixture'}).encode()
+            self.send_response(200)
+            self.send_header('Content-Type','application/json')
+            self.send_header('Content-Length',str(len(body)))
+            self.end_headers(); self.wfile.write(body)
+            return
         time.sleep(36)  # deliberately exceed Java's real 30s response timeout
         self.send_response(200);self.end_headers()
     def log_message(self,*args):pass
@@ -69,7 +78,8 @@ env['SPRING_PROFILES_ACTIVE'] = ''
 with tempfile.TemporaryDirectory(prefix='knowflow-java-python-') as temporary, tempfile.TemporaryFile() as pylog, tempfile.TemporaryFile() as javalog:
     temp=Path(temporary);java=temp/'api';java.mkdir()
     # Only source/build inputs; no local .env, target, settings or secret files are copied.
-    for name in ('pom.xml','mvnw'):
+    wrapper = 'mvnw.cmd' if os.name == 'nt' else 'mvnw'
+    for name in ('pom.xml',wrapper):
         shutil.copy2(repo/'services/api'/name,java/name)
     for name in ('src','.mvn'):
         shutil.copytree(repo/'services/api'/name,java/name)
@@ -85,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix='knowflow-java-python-') as temporary, t
                 except httpx.TransportError:pass
                 time.sleep(.05)
             else:raise RuntimeError('PYTHON_START_TIMEOUT')
-        command=['./mvnw','-B','-q']
+        command=['cmd','/c',wrapper,'-B','-q'] if os.name == 'nt' else ['./mvnw','-B','-q']
         if args.maven_settings:command+=['-s',str(args.maven_settings.resolve())]
         command+=['-Dtest=JavaPythonHealthIntegrationTest','test']
         result=subprocess.run(command,cwd=java,env=env,stdout=javalog,stderr=javalog,timeout=240)
@@ -96,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix='knowflow-java-python-') as temporary, t
             raise RuntimeError('JAVA_PYTHON_PROBE_FAILED')
         xml=next((java/'target/surefire-reports').glob('TEST-*JavaPythonHealthIntegrationTest.xml'))
         suite=ElementTree.parse(xml).getroot()
-        assert int(suite.attrib['tests'])==8 and int(suite.attrib['failures'])==0 and int(suite.attrib['errors'])==0
+        assert int(suite.attrib['tests'])==9 and int(suite.attrib['failures'])==0 and int(suite.attrib['errors'])==0
     finally:
         process.terminate()
         try:process.wait(timeout=5)
@@ -108,23 +118,25 @@ clean_after = not git('status', '--porcelain')
 if args.require_clean and not clean_after:
     raise RuntimeError('INTEGRATION_WORKTREE_CHANGED')
 report={'recorded_at':datetime.now(ZoneInfo('Asia/Hong_Kong')).isoformat(),
-        'git_head_at_run':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),
-        'contract_version':'0.2.0-draft.4','java_tests':8,'failures':0,'errors':0,
+        'git_head_at_run':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,
+                                                  text=True,encoding='utf-8').strip(),
+        'contract_version':'0.2.0-draft.6','java_tests':9,'failures':0,'errors':0,
         'clean_worktree_before':clean_before, 'clean_worktree_after':clean_after,
         'integration_tree':git('rev-parse','HEAD^{tree}'), 'java_target':java_target,
         'schema_sha256':sha256((repo/'contracts/schemas/protocol.schema.json').read_bytes()).hexdigest(),
         'examples_sha256':sha256((repo/'contracts/examples/protocol-cases.json').read_bytes()).hexdigest(),
         'consumer_sha256':sha256((root/'src/knowflow_ai/protocol.py').read_bytes()).hexdigest(),
-        'real_java_health_client':True, 'java_health_client_accepts_draft4':True,
-        'java_health_client_rejects_draft2_fixture':True, 'java_health_client_five_second_timeout':True,
+        'real_java_health_client':True, 'java_health_client_accepts_draft6':True,
+        'java_health_client_rejects_draft2_fixture':True, 'java_health_client_rejects_draft5_fixture':True,
+        'java_health_client_five_second_timeout':True,
         'java_health_client_sha256':sha256((repo/'services/api/src/main/java/com/knowflow/api/ai/AiInternalHealthClient.java').read_bytes()).hexdigest(),
         'real_java_http_service':True,'real_java_webclient':True,'real_python_http_service':True,
         'timeout_target':'Separate local slow fixture; real Java responseTimeout config, not a Python business route.',
-        'public_java_gateway_error_mapping':'Not implemented by A yet; probe validates transport and Python error bodies only.',
+        'public_java_gateway_error_mapping':'An upstream AI HTTP 503 maps to a retryable public 502 in DocumentApiIntegrationTest using a local HTTP fixture; this health-only probe does not exercise that route.',
         'external_model_calls':0,'database_calls':0,'secret_in_process_logs':False,
         'app_sha256':sha256((root/'src/knowflow_ai/app.py').read_bytes()).hexdigest(),
         'java_client_config_sha256':sha256((repo/'services/api/src/main/java/com/knowflow/api/config/AiHttpClientConfiguration.java').read_bytes()).hexdigest(),
         'java_probe_sha256':sha256(source.read_bytes()).hexdigest()}
 output = args.output or root/'docs/evidence/java-python-smoke.json'
-output.write_text(json.dumps(report,indent=2)+'\n')
+output.write_text(json.dumps(report,indent=2)+'\n', encoding='utf-8')
 print('real Java service/WebClient + Python HTTP:',report['java_tests'],'integration checks passed')

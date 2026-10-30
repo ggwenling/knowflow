@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-10-30T22:56:33+08:00",
+  "branch": "local",
+  "base_commit": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "contract_version": "0.2.0-draft.6",
+  "result": "SKIPPED_NO_CREDENTIALS",
+  "dataset_id": "qingzhu-seed-v1",
+  "development_questions_available": 12,
+  "development_questions_evaluated": 0,
+  "holdout_questions_used_for_tuning": 0,
+  "manifest_sha256": "42801e563d59ee8afb4ee1e86d2889c101dd6490fa10c7560e1482391df38a99",
+  "questions_sha256": "dff8531289aff64de9c9904d1ea65cd6578c9abe79c0f30e4e460023df27cef8",
+  "selected_credentials_present": {
+    "embedding": false,
+    "llm": false
+  },
+  "this_run_external_calls": {
+    "embedding": 0,
+    "llm": 0
+  },
+  "semantic_vector_ranking_evaluated": false,
+  "generated_answer_quality_evaluated": false,
+  "scope_note": "A check of the current environment only; no model score or quality claim is made."
+}

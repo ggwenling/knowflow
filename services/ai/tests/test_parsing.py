@@ -24,8 +24,8 @@ def test_unicode_source_offsets_are_original(format):
 
 def test_all_seed_documents_preserve_source_text_and_evidence():
     root=ROOT/'evaluation/data/seed-v1'
-    manifest=json.loads((root/'manifest.json').read_text())
-    questions=json.loads((root/'questions.json').read_text())
+    manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+    questions=json.loads((root/'questions.json').read_text(encoding='utf-8'))
     parsed={}
     for d in manifest['documents']:
         result=parse_document((root/d['path']).read_bytes(),format=d['format'],
@@ -80,7 +80,7 @@ def test_limits_identity_and_exact_boundary():
 
 
 def test_committed_pdf_fixture_hashes():
-    for fixture in json.loads((FIXTURES/'manifest.json').read_text())['fixtures']:
+    for fixture in json.loads((FIXTURES/'manifest.json').read_text(encoding='utf-8'))['fixtures']:
         raw=(FIXTURES/fixture['path']).read_bytes()
         assert len(raw)==fixture['bytes'] and sha256(raw).hexdigest()==fixture['sha256']
 

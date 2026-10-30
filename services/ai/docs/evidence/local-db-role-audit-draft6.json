@@ -1,0 +1,45 @@
+{
+  "run_date": "2026-10-30",
+  "branch": "local",
+  "base_commit": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "contract_version": "0.2.0-draft.6",
+  "database": "local Compose PostgreSQL",
+  "migrations": {
+    "schema": "knowflow_flyway",
+    "max_version": 5,
+    "failed_count": 0
+  },
+  "extension": {
+    "name": "vector",
+    "version": "0.8.1"
+  },
+  "ai_role": {
+    "can_login": true,
+    "select": {
+      "knowledge_bases": true,
+      "documents": true,
+      "index_versions": true,
+      "chunks": true,
+      "chunk_embeddings": true
+    },
+    "write": {
+      "knowledge_bases_insert": false,
+      "documents_update": false,
+      "index_versions_update": false,
+      "chunks_insert": false,
+      "chunks_update": false,
+      "chunk_embeddings_insert": false,
+      "chunk_embeddings_update": false,
+      "knowflow_schema_create": false
+    }
+  },
+  "app_role": {
+    "can_login": true,
+    "superuser": false,
+    "create_database": false,
+    "create_role": false,
+    "knowflow_schema_create": false,
+    "database_create": false
+  },
+  "contains_credentials": false
+}

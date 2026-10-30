@@ -9,7 +9,7 @@ from knowflow_ai.parsing import parse_document,ParseFailure,PARSER_PROFILE
 
 root=Path(__file__).resolve().parents[1]
 repo=root.parents[1]
-manifest=json.loads((repo/'evaluation/data/seed-v1/manifest.json').read_text())
+manifest=json.loads((repo/'evaluation/data/seed-v1/manifest.json').read_text(encoding='utf-8'))
 checks=[]
 for doc in manifest['documents']:
     raw=(repo/'evaluation/data/seed-v1'/doc['path']).read_bytes()

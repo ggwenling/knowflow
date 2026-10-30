@@ -5,7 +5,7 @@
     "structurally_valid": true,
     "note": "Synthetic profile/dimension/digest; not a configured runtime or real model result.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -34,7 +34,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -56,7 +56,7 @@
     "structurally_valid": true,
     "note": "The lease expiry is chosen by Java using database time; the client cannot extend by a requested duration.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "task_id": "task-example-1",
       "lease_expires_at": "2026-10-30T00:01:00+08:00"
@@ -68,7 +68,7 @@
     "structurally_valid": true,
     "note": "Requires real database manifest validation; positive structure does not authorize publication.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -98,7 +98,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -126,7 +126,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "task_id": "task-example-1",
       "index_version_id": "index-example-1",
@@ -139,7 +139,7 @@
     "structurally_valid": true,
     "note": "Expected response shape only. Runtime must match the stored accepted execution and result; no republish.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "task_id": "task-example-1",
       "index_version_id": "index-example-1",
@@ -152,7 +152,7 @@
     "structurally_valid": true,
     "note": "HTTP 400 This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "INVALID_REQUEST",
       "message": "Request could not be accepted",
@@ -165,7 +165,7 @@
     "structurally_valid": true,
     "note": "HTTP 401 This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "UNAUTHENTICATED",
       "message": "Request could not be accepted",
@@ -178,7 +178,7 @@
     "structurally_valid": true,
     "note": "Internal HTTP 403; external inaccessible resources return generic 404. This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "SCOPE_DENIED",
       "message": "Request could not be accepted",
@@ -191,7 +191,7 @@
     "structurally_valid": true,
     "note": "External HTTP 404 including deleted/non-owner resources. This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "RESOURCE_NOT_FOUND",
       "message": "Request could not be accepted",
@@ -204,7 +204,7 @@
     "structurally_valid": true,
     "note": "Internal HTTP 409, no lease renewal or publication. This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "LEASE_REJECTED",
       "message": "Request could not be accepted",
@@ -217,7 +217,7 @@
     "structurally_valid": true,
     "note": "Internal HTTP 409; never reactivate. This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "DOCUMENT_UNAVAILABLE",
       "message": "Request could not be accepted",
@@ -230,7 +230,7 @@
     "structurally_valid": true,
     "note": "Internal HTTP 409; preserve accepted result. This fixture tests only response structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "COMPLETION_CONFLICT",
       "message": "Request could not be accepted",
@@ -368,7 +368,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -398,7 +398,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -427,7 +427,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -457,7 +457,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -492,7 +492,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "lease": {
         "task_id": "task-example-1",
@@ -571,7 +571,7 @@
     "structurally_valid": false,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-example-1",
       "code": "RESOURCE_NOT_FOUND",
       "message": "Unavailable",
@@ -3787,7 +3787,7 @@
     "structurally_valid": true,
     "note": "Candidate response for authenticated internal liveness only; it does not probe model or database readiness.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "status": "UP",
       "request_id": "request-health-1"
     }
@@ -3798,7 +3798,7 @@
     "structurally_valid": false,
     "note": "Only the minimal UP response is defined for this internal health route.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "status": "DEGRADED",
       "request_id": "request-health-1"
     }
@@ -3809,7 +3809,7 @@
     "structurally_valid": true,
     "note": "Synthetic credentials; never use this example as a real password.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "email": "person@example.test",
       "password": "synthetic-password-only"
     }
@@ -3820,7 +3820,7 @@
     "structurally_valid": false,
     "note": "The candidate password bound is 12 to 128 characters.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "email": "person@example.test",
       "password": "short"
     }
@@ -3831,7 +3831,7 @@
     "structurally_valid": false,
     "note": "Authentication requests do not accept identity or owner fields.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "email": "person@example.test",
       "password": "synthetic-password-only",
       "owner_id": "attacker"
@@ -3843,7 +3843,7 @@
     "structurally_valid": true,
     "note": "Synthetic credentials only.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "email": "person@example.test",
       "password": "synthetic-password-only"
     }
@@ -3854,7 +3854,7 @@
     "structurally_valid": true,
     "note": "Synthetic bearer token; runtime returns a cryptographically random token once and stores only its digest.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "user_id": "user-example-1",
       "email": "person@example.test",
       "access_token": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -3868,7 +3868,7 @@
     "structurally_valid": true,
     "note": "Identity comes from the validated server session.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "user_id": "user-example-1",
       "email": "person@example.test"
     }
@@ -3879,7 +3879,7 @@
     "structurally_valid": true,
     "note": "The owner is derived from the authenticated subject.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "name": "Research"
     }
   },
@@ -3889,7 +3889,7 @@
     "structurally_valid": false,
     "note": "Clients cannot select or replace a knowledge-base owner.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "name": "Research",
       "owner_id": "user-example-2"
     }
@@ -3900,7 +3900,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "id": "kb-example-1",
       "name": "Research",
       "status": "ACTIVE",
@@ -3914,10 +3914,10 @@
     "structurally_valid": true,
     "note": "Items are restricted to the authenticated owner; this fixture checks only structure.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "items": [
         {
-          "contract_version": "0.2.0-draft.5",
+          "contract_version": "0.2.0-draft.6",
           "id": "kb-example-1",
           "name": "Research",
           "status": "ACTIVE",
@@ -3936,7 +3936,7 @@
     "structurally_valid": false,
     "note": "Candidate page size is capped at 100.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "items": [],
       "limit": 101,
       "offset": 0,
@@ -3949,7 +3949,7 @@
     "structurally_valid": true,
     "note": "HTTP 409 with a generic message; the conflict status can still reveal an email collision, so rate limits or a verified-email flow need product review.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-account-1",
       "code": "ACCOUNT_CREATE_REJECTED",
       "message": "The account could not be created.",
@@ -3962,7 +3962,7 @@
     "structurally_valid": false,
     "note": "Offset is capped to keep the candidate API bounded.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "items": [],
       "limit": 50,
       "offset": 1000001,
@@ -3975,7 +3975,7 @@
     "structurally_valid": true,
     "note": "Synthetic vector only; digest is a structural placeholder and is not an accepted manifest.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-batch-1",
       "lease": {
         "task_id": "11111111-1111-4111-8111-111111111111",
@@ -5040,7 +5040,7 @@
     "structurally_valid": false,
     "note": "Schema ceiling is 32 rows; Java also rejects a serialized body over 1 MiB.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-batch-1",
       "lease": {
         "task_id": "11111111-1111-4111-8111-111111111111",
@@ -5100,7 +5100,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-batch-1",
       "task_id": "11111111-1111-4111-8111-111111111111",
       "index_version_id": "66666666-6666-4666-8666-666666666666",
@@ -5116,7 +5116,7 @@
     "structurally_valid": true,
     "note": "Route contains the task ID; the body contains no path, URL, bucket, or object key.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-source-1",
       "lease": {
         "task_id": "11111111-1111-4111-8111-111111111111",
@@ -5138,7 +5138,7 @@
     "structurally_valid": true,
     "note": "Cancellation is scoped to this exact task lease and fencing generation.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-cancel-1",
         "task_id": "11111111-1111-4111-8111-111111111111",
         "lease_id": "77777777-7777-4777-8777-777777777777",
@@ -5151,7 +5151,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "document_id": "44444444-4444-4444-8444-444444444444",
       "task_id": "11111111-1111-4111-8111-111111111111",
       "status": "QUEUED"
@@ -5163,7 +5163,7 @@
     "structurally_valid": true,
     "note": "",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "task_id": "11111111-1111-4111-8111-111111111111",
       "document_id": "44444444-4444-4444-8444-444444444444",
       "status": "QUEUED",
@@ -5178,7 +5178,7 @@
     "structurally_valid": true,
     "note": "Synthetic result shape only; runtime must verify source ownership and model evidence.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-answer-1",
       "answer": "The project stores source evidence.",
       "has_answer": true,
@@ -5206,7 +5206,7 @@
     "structurally_valid": false,
     "note": "A factual answer cannot be returned without at least one source.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-answer-2",
       "answer": "Unsupported claim.",
       "has_answer": true,
@@ -5219,7 +5219,7 @@
     "structurally_valid": true,
     "note": "No-evidence response is an explicit refusal with no source records.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-answer-3",
       "answer": "I could not find supporting information.",
       "has_answer": false,
@@ -5232,7 +5232,7 @@
     "structurally_valid": true,
     "note": "HTTP 409; a batch identity was reused with a different digest.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-batch-2",
       "code": "BATCH_CONFLICT",
       "message": "The batch conflicts with an accepted batch.",
@@ -5245,7 +5245,7 @@
     "structurally_valid": true,
     "note": "Metadata only; READY requires Java integrity check and active version publication.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "id": "44444444-4444-4444-8444-444444444444",
       "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
       "original_name": "notes.txt",
@@ -5263,10 +5263,10 @@
     "structurally_valid": true,
     "note": "Only owner-visible and non-deleted documents may appear.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "items": [
         {
-          "contract_version": "0.2.0-draft.5",
+          "contract_version": "0.2.0-draft.6",
           "id": "44444444-4444-4444-8444-444444444444",
           "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
           "original_name": "notes.txt",
@@ -5289,7 +5289,7 @@
     "structurally_valid": false,
     "note": "Development upload ceiling is 8 MiB.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "id": "44444444-4444-4444-8444-444444444444",
       "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
       "original_name": "notes.txt",
@@ -5307,7 +5307,7 @@
     "structurally_valid": true,
     "note": "A 202 response means Python accepted a bounded execution; it does not mean indexing succeeded.",
     "payload": {
-      "contract_version": "0.2.0-draft.5",
+      "contract_version": "0.2.0-draft.6",
       "request_id": "request-dispatch-1",
       "task_id": "11111111-1111-4111-8111-111111111111",
       "index_version_id": "66666666-6666-4666-8666-666666666666",

@@ -70,8 +70,8 @@ def test_pdf_chunks_keep_physical_page_identity_and_never_cross_pages():
 
 def test_seed_evidence_remains_retrievable_from_chunks():
     root = ROOT / "evaluation/data/seed-v1"
-    manifest = json.loads((root / "manifest.json").read_text())
-    questions = json.loads((root / "questions.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    questions = json.loads((root / "questions.json").read_text(encoding="utf-8"))
     chunks_by_document = {}
     for item in manifest["documents"]:
         document = parse_document((root / item["path"]).read_bytes(), format=item["format"],

@@ -100,6 +100,9 @@ class DocumentApiIntegrationTest {
     private static final AtomicReference<String> AI_RECEIVED_AUTHORIZATION = new AtomicReference<>();
     private static final AtomicReference<String> AI_RECEIVED_REQUEST_ID = new AtomicReference<>();
     private static final AtomicReference<String> AI_HANDLER_FAILURE = new AtomicReference<>();
+    private static final AtomicReference<Integer> AI_HTTP_STATUS = new AtomicReference<>(200);
+    private static final AtomicReference<CountDownLatch> AI_RESPONSE_GATE =
+            new AtomicReference<>(new CountDownLatch(0));
     private static final AtomicReference<Function<TrustedAnswerRequest, AiAnswerResponse>> AI_RESPONSE =
             new AtomicReference<>();
     private static final HttpServer AI_SERVER = startAiServer();
@@ -202,6 +205,8 @@ class DocumentApiIntegrationTest {
         AI_RECEIVED_AUTHORIZATION.set(null);
         AI_RECEIVED_REQUEST_ID.set(null);
         AI_HANDLER_FAILURE.set(null);
+        AI_HTTP_STATUS.set(200);
+        AI_RESPONSE_GATE.set(new CountDownLatch(0));
         try (Connection connection = DriverManager.getConnection(
                 DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword());
              Statement statement = connection.createStatement()) {
@@ -227,7 +232,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/tasks/")))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andReturn();
         JsonNode response = objectMapper.readTree(uploaded.getResponse().getContentAsByteArray());
@@ -494,6 +499,77 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    void pythonUnavailableMapsToRetryablePublicFailureAndMarksQuestionFailed() throws Exception {
+        JsonNode owner = register("question-ai-unavailable@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "AI unavailable");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Local evidence text.",
+                "ai-unavailable-index");
+        AI_HTTP_STATUS.set(503);
+
+        var result = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                "What is the evidence?"))))
+                .andReturn();
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(502);
+        JsonNode error = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        assertThat(error.path("code").asText()).isEqualTo("AI_PROCESSING_FAILED");
+        assertThat(error.path("retryable").asBoolean()).isTrue();
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("UPSTREAM_PRIVATE_MARKER");
+        assertThat(AI_HANDLER_FAILURE.get()).isNull();
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code FROM knowflow.questions
+                 ORDER BY created_at DESC LIMIT 1
+                """);
+        assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("AI_PROCESSING_FAILED");
+    }
+
+    @Test
+    void pythonAnswerTimeoutMapsToRetryableGatewayTimeoutAndMarksQuestionFailed() throws Exception {
+        JsonNode owner = register("question-ai-timeout@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "AI timeout");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Local timeout evidence.",
+                "ai-timeout-index");
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+
+        org.springframework.test.web.servlet.MvcResult result;
+        try {
+            result = mockMvc.perform(post(
+                            "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(
+                                    new com.knowflow.api.answer.PublicQuestion(
+                                            "What is the evidence?"))))
+                    .andReturn();
+        } finally {
+            responseGate.countDown();
+        }
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(504);
+        JsonNode error = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        assertThat(error.path("code").asText()).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(error.path("retryable").asBoolean()).isTrue();
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("UPSTREAM_PRIVATE_MARKER");
+        assertThat(AI_RECEIVED_REQUEST_ID.get()).isNotBlank();
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code FROM knowflow.questions
+                 ORDER BY created_at DESC LIMIT 1
+                """);
+        assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+    }
+
+    @Test
     void indexBatchBodyLimitRejectsOversizedBodyBeforeJsonParsing() throws Exception {
         String oversized = "x".repeat(1_048_577);
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/index-batches",
@@ -656,7 +732,7 @@ class DocumentApiIntegrationTest {
         assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         String requestId = "source-read-regression";
         byte[] request = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.5", requestId, claim.lease()));
+                "0.2.0-draft.6", requestId, claim.lease()));
 
         var response = mockMvc.perform(post("/internal/v1/tasks/{taskId}/source",
                         claim.lease().taskId())
@@ -666,13 +742,14 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.APPLICATION_OCTET_STREAM)
                         .content(request))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.5"))
+                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.6"))
                 .andExpect(header().string("X-Request-ID", requestId))
                 .andExpect(header().string("X-Source-Format", "md"))
                 .andExpect(header().string("X-Source-SHA256",
                         "5382bbc0935e381ac557c7a0e46d5fe8ec4480f0f2a8c12e1685afcabc408bbe"))
                 .andExpect(header().doesNotExist("X-Object-Key"))
                 .andReturn().getResponse();
+        assertThat(response.getHeaders("X-Request-ID")).containsExactly(requestId);
         assertThat(response.getContentAsByteArray()).isEqualTo(sourceBytes);
 
         LeaseContext forged = new LeaseContext(claim.lease().taskId(), claim.lease().ownerId(),
@@ -681,7 +758,7 @@ class DocumentApiIntegrationTest {
                 claim.lease().pipelineProfileId(), claim.lease().leaseId(),
                 claim.lease().fencing(), "x".repeat(43));
         byte[] forgedRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.5", requestId, forged));
+                "0.2.0-draft.6", requestId, forged));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
                         .header("Authorization", "Bearer document-test-internal-secret-long-enough")
                         .header("X-Request-ID", requestId)
@@ -846,7 +923,7 @@ class DocumentApiIntegrationTest {
                         "BAAI/bge-m3", 1024),
                 1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
                         1, batch.batchId(), batch.batchSha256(), 1)));
-        CompletionRequest completion = new CompletionRequest("0.2.0-draft.5", requestId,
+        CompletionRequest completion = new CompletionRequest("0.2.0-draft.6", requestId,
                 claim.lease(), "SUCCEEDED",
                 new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
         byte[] body = objectMapper.writeValueAsBytes(completion);
@@ -894,7 +971,7 @@ class DocumentApiIntegrationTest {
         JsonNode uploaded = upload(token, knowledgeBaseId, "retry.txt", "retry this task");
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
-        CompletionRequest failure = new CompletionRequest("0.2.0-draft.5", "retryable-failure",
+        CompletionRequest failure = new CompletionRequest("0.2.0-draft.6", "retryable-failure",
                 first.lease(), "FAILED", null,
                 new CompletionRequest.Failure("MODEL_TIMEOUT", "model request timed out", true));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion", first.lease().taskId())
@@ -1016,6 +1093,26 @@ class DocumentApiIntegrationTest {
                         .header("X-Request-ID", lateHeartbeat.requestId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(lateHeartbeat)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_UNAVAILABLE"));
+        String completionRequestId = "delete-late-completion";
+        String manifestHash = IndexManifestDigest.calculate(
+                new IndexManifestDigest.ManifestIdentity(claim.lease().taskId(),
+                        claim.lease().ownerId(), claim.lease().knowledgeBaseId(),
+                        claim.lease().documentId(), claim.lease().contentVersionId(),
+                        claim.lease().indexVersionId(), claim.lease().pipelineProfileId(),
+                        "BAAI/bge-m3", 1024),
+                1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
+                        1, batch.batchId(), batch.batchSha256(), batch.chunks().size())));
+        CompletionRequest lateCompletion = new CompletionRequest(ApiError.CONTRACT_VERSION,
+                completionRequestId, claim.lease(), "SUCCEEDED",
+                new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
+        mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion",
+                        claim.lease().taskId())
+                        .header("Authorization", "Bearer " + AI_SECRET)
+                        .header("X-Request-ID", completionRequestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(lateCompletion)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DOCUMENT_UNAVAILABLE"));
 
@@ -1144,6 +1241,11 @@ class DocumentApiIntegrationTest {
                 respond(exchange, 400, "{}");
                 return;
             }
+            AI_RESPONSE_GATE.get().await();
+            if (AI_HTTP_STATUS.get() != 200) {
+                respond(exchange, AI_HTTP_STATUS.get(), "{\"message\":\"UPSTREAM_PRIVATE_MARKER\"}");
+                return;
+            }
             AiAnswerResponse answer = AI_RESPONSE.get().apply(request);
             respond(exchange, 200, AI_MAPPER.writeValueAsString(answer));
         } catch (Exception failure) {
@@ -1192,7 +1294,7 @@ class DocumentApiIntegrationTest {
                 hash, new IndexBatchRequest.Locator("text_range", null, 0,
                 text.codePointCount(0, text.length()), "unicode_code_point"),
                 java.util.Collections.nCopies(1024, BigDecimal.ZERO));
-        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.5", requestId, lease,
+        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.6", requestId, lease,
                 batchId, 1, "0".repeat(64), java.util.List.of(chunk));
         String digest = IndexBatchDigest.calculate(candidate).sha256();
         return new IndexBatchRequest(candidate.contractVersion(), candidate.requestId(),
@@ -1239,7 +1341,7 @@ class DocumentApiIntegrationTest {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.5","email":"%s",
+                                {"contract_version":"0.2.0-draft.6","email":"%s",
                                  "password":"synthetic-document-password"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
@@ -1251,7 +1353,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.5","name":"%s"}
+                                {"contract_version":"0.2.0-draft.6","name":"%s"}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());

@@ -87,7 +87,7 @@ class ApiSecurityIntegrationTest {
         var response = mockMvc.perform(get("/internal/test-auth")
                         .header(RequestIdFilter.HEADER, "caller controlled id"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
                 .andReturn();
 
@@ -134,7 +134,7 @@ class ApiSecurityIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET))
                 .andExpect(status().isNotFound())
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
                 .andExpect(jsonPath("$.code").value("ENDPOINT_UNAVAILABLE"))
                 .andExpect(jsonPath("$.message").value("The requested endpoint is not available."));
     }
@@ -146,7 +146,7 @@ class ApiSecurityIntegrationTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(header().string(HttpHeaders.ALLOW, org.hamcrest.Matchers.containsString("GET")))
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message")
                         .value("The HTTP method is not supported for this endpoint."));
@@ -162,7 +162,7 @@ class ApiSecurityIntegrationTest {
                         org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)))
                 .andExpect(header().exists(RequestIdFilter.HEADER))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("The requested response media type is not acceptable."));
     }
@@ -203,7 +203,7 @@ class ApiSecurityIntegrationTest {
                 .block(Duration.ofSeconds(3));
 
         assertThat(response).isNotNull();
-        assertThat(response.contract_version()).isEqualTo("0.2.0-draft.5");
+        assertThat(response.contract_version()).isEqualTo("0.2.0-draft.6");
         assertThat(response.status()).isEqualTo("UP");
         assertThat(response.request_id()).isEqualTo("request-health-integration");
         assertThat(RECEIVED_AUTHORIZATION.get()).isEqualTo("Bearer " + INTERNAL_SECRET);
@@ -237,7 +237,7 @@ class ApiSecurityIntegrationTest {
         RECEIVED_AUTHORIZATION.set(exchange.getRequestHeaders().getFirst(HttpHeaders.AUTHORIZATION));
         String requestId = exchange.getRequestHeaders().getFirst(RequestIdFilter.HEADER);
         RECEIVED_REQUEST_ID.set(requestId);
-        String body = "{\"contract_version\":\"0.2.0-draft.5\",\"status\":\"UP\","
+        String body = "{\"contract_version\":\"0.2.0-draft.6\",\"status\":\"UP\","
                 + "\"request_id\":\"" + requestId + "\"}";
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");

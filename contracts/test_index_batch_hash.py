@@ -10,7 +10,7 @@ class IndexBatchHashTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cases = json.loads(Path(__file__).with_name('examples').joinpath(
-            'protocol-cases.json').read_text())
+            'protocol-cases.json').read_text(encoding='utf-8'))
         cls.batch = next(case['payload'] for case in cases if case['name'] == 'index-batch')
 
     def test_shared_contract_vector_matches_its_digest(self):

@@ -1,0 +1,50 @@
+{
+  "run_date": "2026-10-30",
+  "result": "PASS_LOCAL_CROSS_PROCESS_CANCELLATION",
+  "branch": "local",
+  "base_commit": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "contract_version": "0.2.0-draft.6",
+  "schema_sha256": "d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1",
+  "runtime": {
+    "java": "local Spring Boot database/storage profiles with schedulers enabled",
+    "python": "local Uvicorn process with a blocking synthetic embedding adapter",
+    "database": "local PostgreSQL with pgvector 0.8.1",
+    "object_storage": "local MinIO"
+  },
+  "checks": {
+    "python_process_ready": "passed",
+    "java_process_ready": "passed",
+    "previous_synthetic_fixture_cleanup": "passed",
+    "synthetic_upload": "passed",
+    "java_dispatched_running_execution": "passed",
+    "java_revoked_execution_and_enqueued_cancel": "passed",
+    "outbox_http_cancel_interrupted_active_worker": "passed",
+    "no_late_completion_or_index_write": "passed",
+    "storage_and_index_cleanup_acknowledged": "passed",
+    "synthetic_knowledge_base_cleanup": "passed",
+    "synthetic_session_logout": "passed"
+  },
+  "database_after_cancel": {
+    "task_status": "CANCELLED",
+    "cancellation_outbox_rows": 0,
+    "chunk_rows": 0,
+    "embedding_rows": 0,
+    "storage_and_index_cleanup_outboxes": 0
+  },
+  "external_model_calls": 0,
+  "synthetic_content_only": true,
+  "test_identity": {
+    "email_or_token_in_report": false,
+    "knowledge_base_deleted": true,
+    "session_logged_out": true,
+    "user_id_in_report": false
+  },
+  "code_sha256": {
+    "python_worker": "c74116ffd8dec45810f3d74236e1a579ed602e42fcc85f28c413278c11250b92",
+    "python_cancel_route": "b350937330ffa33dc12cc806ec508fab2b37f01c317c383f29e25e24b1abd923",
+    "java_deletion_outbox": "dfe79347c6be2640867f58eb1eda5df05a4b5856a30977b3c0873bd1057164bd"
+  },
+  "limitations": [
+    "Synthetic owner accounts remain in the local development database; their sessions were logged out and their knowledge bases were deleted."
+  ]
+}

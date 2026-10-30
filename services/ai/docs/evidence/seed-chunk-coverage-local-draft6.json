@@ -1,0 +1,32 @@
+{
+  "run_date": "2026-10-30",
+  "branch": "local",
+  "contract_version": "0.2.0-draft.6",
+  "dataset_id": "qingzhu-seed-v1",
+  "manifest_sha256": "42801e563d59ee8afb4ee1e86d2889c101dd6490fa10c7560e1482391df38a99",
+  "questions_sha256": "dff8531289aff64de9c9904d1ea65cd6578c9abe79c0f30e4e460023df27cef8",
+  "chunking_profile": "default unicode-codepoint profile, max 800 codepoints, overlap 100",
+  "result": "PASS_GOLD_EVIDENCE_IS_PRESENT_IN_SOURCE_CHUNKS",
+  "splits": {
+    "development": {
+      "questions": 12,
+      "answerable": 10,
+      "unanswerable": 2,
+      "evidence_spans": 21,
+      "covered_evidence_spans": 21
+    },
+    "holdout": {
+      "questions": 3,
+      "answerable": 2,
+      "unanswerable": 1,
+      "evidence_spans": 3,
+      "covered_evidence_spans": 3
+    }
+  },
+  "all_evidence_positions_verified": true,
+  "holdout_used_for_tuning": false,
+  "semantic_vector_retrieval_evaluated": false,
+  "answer_quality_evaluated": false,
+  "external_model_calls": 0,
+  "scope_note": "Source/chunk evidence availability only; this does not measure vector ranking or generated answer quality."
+}

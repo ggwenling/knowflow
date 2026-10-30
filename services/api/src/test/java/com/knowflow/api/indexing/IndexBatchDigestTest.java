@@ -28,7 +28,7 @@ class IndexBatchDigestTest {
                 "77b1c6bacf338d620e8aa02d40187be5163fbca4df6c04b33ab6af7c1c615c65",
                 new IndexBatchRequest.Locator("text_range", null, 0, 19, "unicode_code_point"),
                 java.util.Collections.nCopies(1024, BigDecimal.ZERO));
-        IndexBatchRequest batch = new IndexBatchRequest("0.2.0-draft.5", "request-batch-1",
+        IndexBatchRequest batch = new IndexBatchRequest("0.2.0-draft.6", "request-batch-1",
                 lease, UUID.fromString("88888888-8888-4888-8888-888888888888"), 1,
                 "0564303225ea440820c2aa05bd93ff31043e7ed80ee36965b16118dc037751bc",
                 List.of(chunk));
@@ -68,7 +68,7 @@ class IndexBatchDigestTest {
                 "982d9e3eb996f559e633f4d194def3761d909f5a3b647d1a851fead67c32c9d1",
                 new IndexBatchRequest.Locator("text_range", null, 0, 4, "unicode_code_point"),
                 java.util.Collections.nCopies(1024, BigDecimal.ZERO));
-        return new IndexBatchRequest("0.2.0-draft.5", "request-1", lease, UUID.randomUUID(),
+        return new IndexBatchRequest("0.2.0-draft.6", "request-1", lease, UUID.randomUUID(),
                 1, "0".repeat(64), List.of(chunk));
     }
 

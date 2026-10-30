@@ -56,7 +56,7 @@ class SmokeTests(unittest.TestCase):
             smoke.validate_embeddings({"data": [{"index": 0, "embedding": [1, 2]}] * 2}, 2, 2)
 
     def test_incomplete_or_unsupported_answer_is_rejected(self):
-        fixture = json.loads(smoke.FIXTURE.read_text())
+        fixture = json.loads(smoke.FIXTURE.read_text(encoding="utf-8"))
         for answer, finish in (("", "stop"), ("限制是 16 MiB。", "stop"),
                                ("The limit is 8 MiB.", "stop"), ("限制是 8 MiB。", "length")):
             with self.subTest(answer=answer), self.assertRaises(smoke.SmokeFailure):

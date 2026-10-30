@@ -4,25 +4,22 @@ AI 知识库与文档助手实践项目，首轮面向需要反复查询中文�
 
 ## 当前状态
 
-仓库包含 V0.2 计划、KF2-002 用户场景和 KF2-003 双模型验证记录。KF2-002、003、005 已交付并等待独立 Q 复核；A 已提交 V0.2 新基线决策、共享契约候选和可运行的 Java 服务骨架及修复，仍待审阅。Python AI 服务及 Web 应用尚未实现。旧 V1.1 兼容性未验证；当前按已批准的 V0.2 新基线继续研发，跨服务契约尚未正式冻结。
+Java API 已实现认证、知识库/文档状态、租约与 fencing、受控索引批次写入、原子发布、问答快照和来源权限边界。Python AI 服务已有解析/分段、Embedding 适配器、lease-fenced Worker、只读范围检索和证据校验问答。两端及共享 Schema 当前在本地 `local` 集成分支推进，基于 `main`；契约为 `0.2.0-draft.6`，未冻结、未发布。真实双服务索引/问答闭环与 Q/M 正式验收仍待完成，不能把候选代码等同生产就绪。
 
-硅基流动 BAAI/bge-m3（1024 维）和 DeepSeek deepseek-flash 的合成输入真实冒烟通过。实际项目文档不得在确认供应商条款和授权前上传外部模型。详情见 [模型、隐私和费用记录](evaluation/smoke/provider-profile.md)。
+当前本机会话未提供模型密钥，因此没有新的真实 Embedding/LLM 请求。已有模型服务商验证记录是合成夹具上的独立证据；不得上传未确认授权的项目资料。详情见 [模型、隐私和费用记录](evaluation/smoke/provider-profile.md)。
 
 ## 仓库布局
 
-- apps/web：M 负责的 Next.js 前端。
-- services/api：A 负责的 Java / Spring API 与业务状态。
-- services/ai：B 负责的 Python / FastAPI 解析和 RAG 服务。
-- contracts：共享接口由 A 唯一发布，其他主线先提交变更提议。
-- infra：M 负责的 Compose、CI 和本地开发支撑。
-- docs/planning：计划基线；docs/product：用户场景与试用协议。
-- docs/tasks、docs/reviews：任务记录、PR 信息与独立审阅。
-- evaluation：B 负责的模型、解析、许可与评测证据。
+- `apps/web`：M 负责的 Next.js 前端。
+- `services/api`：Codex-A / Java Spring API、业务状态与唯一索引写入/发布方。
+- `services/ai`：Codex-B / Python FastAPI 解析、索引执行、受限检索与生成方。
+- `contracts`：共享契约由 A 发布，B 提交消费与字段提议。
+- `infra`：M 负责的 Compose、CI 和本地开发支撑。
+- `docs/planning`：计划基线；`docs/tasks`、`docs/reviews`：任务和审阅记录。
+- `evaluation`：模型、解析、许可与评测证据。
 
-## 协作和验证
+## 本地推进计划
 
-下一轮 Java / Python 使用同一份 [JP-01 并行开发计划](docs/planning/v0.2/java-python-parallel-plan.md)：Java 主做 KF2-011，Python 主做 KF2-007，并对齐契约、完成双服务 HTTP 联调。按用户指示先推进开发，保留待复核状态；两条主线分别使用 java / python 分支及独立工作区。
+当前使用 `local` 分支进行集成开发，`local` 由 `main` 建立；Java 文件仍归 Codex-A，Python/evaluation 文件仍归 Codex-B，共享契约由 A 单写。完整的今天与明天安排见 [JP-01 Java/Python 计划](docs/planning/v0.2/java-python-parallel-plan.md)：今天完成 draft.6 同步、两端回归和本地数据库环境准备；明天完成真实双进程联调、索引/问答边界与交付记录。所有候选验证与独立复核、正式冻结分开记录。
 
-从当前集成基线为任务创建独立分支/worktree；每个主线一次只写其所有权范围。见 [协作规则与任务卡](docs/tasks/README.md) 及 [PR 和审阅模板](docs/reviews/pull-request-review-template.md)。本地 Python 模型客户端回归和许可审计命令见 [KF2-003 冒烟说明](evaluation/smoke/README.md)。
-
-Java 骨架的独立启动方式见 services/api/README.md；完整产品仍需 Python、Web、基础设施及业务链路交付。服务需要的密钥须由本机/托管环境注入，不能提交到仓库。
+Python 环境需 Python 3.12，命令见 [Python 服务开发说明](services/ai/README.md)。Java 开发需要 Java 21 与 Docker daemon；PostgreSQL/pgvector、MinIO 本地 Compose 命令见 [Java 服务开发说明](services/api/README.md)。服务密钥仅通过本机环境注入，不提交仓库。

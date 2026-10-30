@@ -1,10 +1,10 @@
 [
   {
-    "name": "accept-draft4",
+    "name": "accept-draft6",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.4",
-      "request_id": "java-health-draft4"
+      "contract_version": "0.2.0-draft.6",
+      "request_id": "java-health-draft6"
     },
     "valid": true
   },
@@ -13,7 +13,7 @@
     "payload": {
       "status": "UP",
       "contract_version": "0.2.0-draft.2",
-      "request_id": "java-health-draft4"
+      "request_id": "java-health-draft6"
     },
     "valid": false
   },
@@ -22,7 +22,7 @@
     "payload": {
       "status": "UP",
       "contract_version": "0.2.0-draft.3",
-      "request_id": "java-health-draft4"
+      "request_id": "java-health-draft6"
     },
     "valid": false
   },
@@ -30,8 +30,8 @@
     "name": "reject-extra",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.4",
-      "request_id": "java-health-draft4",
+      "contract_version": "0.2.0-draft.6",
+      "request_id": "java-health-draft6",
       "extra": "unsupported"
     },
     "valid": false
@@ -40,7 +40,7 @@
     "name": "reject-missing-request-id",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.4"
+      "contract_version": "0.2.0-draft.6"
     },
     "valid": false
   }

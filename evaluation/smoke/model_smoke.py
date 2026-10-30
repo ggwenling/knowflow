@@ -209,7 +209,7 @@ def run(env, timeout):
         if missing:
             report.update(status="WAITING_INPUT", missing_configuration=missing)
             return report, 2
-        fixture = json.loads(FIXTURE.read_text())
+        fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
         report["configuration"] = {
             "embedding_model": config["embedding"]["model"], "llm_model": config["llm"]["model"],
             "expected_dimensions": config["dimensions"], "timeout_seconds": timeout,

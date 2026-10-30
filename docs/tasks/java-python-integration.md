@@ -1,6 +1,6 @@
 # JP-01 Java → Python 开发联调记录
 
-状态：JP-I1 draft.4 `DEV_PASS_Q_REVIEW_PENDING`；JP2 draft.5 `B_CONSUMPTION_PENDING`。draft.4 的真实双进程 health 证据有效，但当前 A draft.5 与 B `origin/python` 的 draft.4 不匹配，不能据此宣称 draft.5 联调或全业务闭环通过。
+状态：JP-I1 draft.4 的历史证据仍有效；JP2 draft.6 在本机 `local` 工作树完成开发联调和合成后端 E2E，真实模型调用为 0。当前候选 Schema 尚待 Q 审阅/M 消费确认；本机证据不替代正式验收或真实模型质量评测。此前 draft.5/旧 B target 的状态保留在历史记录中。
 
 ## 固定的提交与契约
 
@@ -34,3 +34,24 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - A 的真实 PostgreSQL/MinIO 集成测试已覆盖 Java 侧上传、队列/索引写入与原子发布、问答证据校验 fixture、来源/文件和删除/迟到 Worker。全链路 A/B、真实模型质量/费用、Worker 跨进程中断恢复待 B 合入 B06/B09/B10/B12 并固定消费本 Schema 后再运行。
 
 因此 JP2 的 A01–A11 可按 Java target 复核，A12 标记为跨服务阻塞；Q 审阅及 B 对 draft.5 的消费 SHA/测试结果待填。
+
+## 2026-10-30：`local` draft.6 完整本地联调
+
+- 基线：从 `main` 派生的 `local`，base commit `dd3abd4aa003fe5b6b88ce649b8806d9b82b8631`；本轮交付保留为未提交工作树。Java、Python 与消费者都使用 `0.2.0-draft.6`，Schema SHA-256 `d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`。
+- Java：`services/api` Maven/Testcontainers 全量 **49 项，0 failure、0 error、1 skip**。集成复现期间修复了 Python source GET 的 Accept 媒体类型和重复添加 `X-Request-ID` 造成的逗号合并问题；对应客户端和“恰好一个 request ID”回归已更新。
+- Python：**116 passed**；Schema **70** 个结构样例；模型离线回归 **16 passed**；真实 HTTP process smoke **8 passed**；本轮重新运行 Java 调用真实 Python health 的双进程 smoke **9/9**，报告见 `services/ai/docs/evidence/java-python-smoke-local-draft6-verified.json`。
+- 本机依赖：PostgreSQL/pgvector 0.8.1 与 MinIO Compose 健康；迁移 V1–V5 已应用。使用真实 Java/Python 服务及本机数据库/对象存储完成合成文件上传→Java source 网关→合成 embedding→受 fencing 验证的批次/完成→READY→AI 只读向量检索→合成回答→Java scope/quote/locator/citation 校验和来源持久化；测试知识库已通过 Java API 删除。
+- 当前 Compose 数据库权限审计：Flyway V5、失败迁移 0、vector 0.8.1；AI 查询角色可 SELECT 检索所需关系但无所测 DML/schema-create，应用角色无 superuser/database/role/schema DDL 权限，脱敏报告见 `services/ai/docs/evidence/local-db-role-audit-draft6.json`。种子资料 12 道开发题及 3 道留出题的标注证据均可在 Chunk 中复核，证据见 `services/ai/docs/evidence/seed-chunk-coverage-local-draft6.json`；它不代表向量排序或模型答案质量通过。
+- 问答复现发现 Windows Proactor 与 psycopg async API 不兼容。Python 改为在 `asyncio.to_thread` 中使用同步 psycopg，仍强制只读事务、5 秒连接超时和 5 秒语句超时；新增线程/只读查询回归。整个合成 E2E 成功，外部 Embedding/LLM 调用均为 **0**。
+- 新增 scope guard 后再次执行合成端到端：合法的文档/内容版本/索引版本通过 Python guard 和 Java 引文校验，上传至 READY、只读检索、回答来源持久化及测试知识库清理均通过。三种越界身份各有单测，确认 LLM adapter 创建前拒绝。最新脱敏报告：`services/ai/docs/evidence/local-backend-e2e-draft6-verified.json`；不包含文档正文、回答、向量、用户 token 或凭据。
+- 真实删除取消链路也已通过：Java 调度器派发任务后，在合成 embedding 阻塞期间通过文档删除写 cancellation outbox；Python HTTP cancel 中断并收尾 `_index` 子任务，关闭 adapter；取消与物理清理 outbox 排空。等待后数据库仍为 `CANCELLED`，没有 Chunk、向量或迟到 completion。脱敏报告：`services/ai/docs/evidence/cancellation-e2e-local-draft6-verified.json`。
+- 该联调复现并修复 Python 子任务泄漏：取消 `_execute` 时显式取消并等待 `asyncio.wait` 旁的 processing task，避免关闭 adapter 后 `_index` 仍运行。新增活动取消测试确认 processing 先结束、adapter 后关闭，且不写 batch/completion。Python 全量回归 **120 passed**；Maven **49 项，0 failure、0 error、1 skip**。真实 provider 质量/费用评测未执行；Q 审阅与 M 消费确认仍待执行，任务不标 DONE。
+- 删除后的迟到 completion 现在也有 Java 集成回归：使用与现有批次匹配的 SHA-256 manifest 提交 `SUCCEEDED` completion，API 返回 `DOCUMENT_UNAVAILABLE`，全量 Maven/Testcontainers **49 项**通过（0 failure、0 error、1 skip）。
+- Python worker 新增 heartbeat fencing 回归：Java heartbeat 返回 `LEASE_REJECTED` 后，worker 取消并等待活动 `_index`，先于 adapter 关闭完成清理，且不写 batch/completion；目标用例连续 **10/10** 通过。worker 测试 **5 passed**，Python 全量 **123 passed**，Schema **70** 个结构样例通过。
+- 文档检查修复了旧 draft.4 消费说明与当前 draft.6 路由不一致的问题；解析和分段文档现与 IndexWorker/Java gateway 的实际调用和写入边界一致。
+- 有界队列容量耗尽时，Python 不创建新 heartbeat 或接受回执；HTTP 返回脱敏可重试 `503` 并保留 request ID。两条定向回归通过，Python 全量 **123 passed**，契约结构验证 **70** 项通过。
+- 10/30 重新执行 Java Maven/Testcontainers **49 项通过（0 failure/error，1 skip）**、Python **123 项通过**、Schema **70 项**、Python process smoke **8/8**、Java↔Python health **9/9**。最新 health 证据绑定当前 app/consumer/Schema 哈希，且外部模型/数据库调用为 0。
+- 补充 provider 凭证 fail-closed HTTP 回归：索引入口缺少 Embedding 凭证时返回脱敏可重试 `503`，worker `accept` 未调用；问答入口分别缺少 Embedding 或 LLM 凭证时返回同样的 `503`，`AnswerService` 未构造，未触发数据库或模型请求。定向 `test_service.py` **21 passed**；Python 全量 **126 passed**；Schema **70** 个结构样例通过。真实外部模型调用为 0；唯一 pytest 提示是 Starlette/httpx 上游弃用警告。
+- Java 公开问答边界补测：本地 AI HTTP fixture 返回上游 `503` 并携带私有错误标记；`DocumentApiIntegrationTest` 确认公开 API 返回可重试 `502 AI_PROCESSING_FAILED`，不泄漏上游正文，数据库问题记录进入 `FAILED/AI_PROCESSING_FAILED`。该用例类 **20 passed**，更新后的全量 Maven/Testcontainers **50 项，0 failure、0 error、1 skip，BUILD SUCCESS**。
+- 超时边界复验：AI HTTP fixture 阻塞响应，触发 Java 配置的 30 秒响应时限；公开 API 返回脱敏可重试 `504 PROCESSING_TIMEOUT`，数据库问题记录为 `FAILED/PROCESSING_TIMEOUT`。`DocumentApiIntegrationTest` **21/21** 通过；含上游 503 与 timeout 回归的全量 Maven/Testcontainers **51 项，0 failure、0 error、1 skip，BUILD SUCCESS**。ReadTimeout 日志来自故意阻塞的测试 fixture。
+- 2026-10-30 22:56（香港时间）提前复验下一日检查点：真实双进程 health **9/9**，真实 Java/Python/PostgreSQL/MinIO 合成上传→READY→只读检索/问答→活动删除取消通过；确认取消被送达活动执行、embedding 取消后 adapter 关闭，相关任务和清理队列无迟到写入并排空。修复重放工具的 Windows Java 子进程泄漏和清理等待，进程/队列复查通过；证据为 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json` 与 `java-python-smoke-local-draft6-replay.json`。Java 全量 **51 项（1 skip）**、Python **132 passed**；所选模型凭证缺失，provider 评测 `SKIPPED_NO_CREDENTIALS`，本次外部调用 0。Q/M 状态不变。

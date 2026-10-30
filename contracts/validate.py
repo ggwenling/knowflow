@@ -9,8 +9,8 @@ from index_batch_hash import batch_sha256
 
 def main():
     root = Path(__file__).resolve().parent
-    schema = json.loads((root / "schemas/protocol.schema.json").read_text())
-    cases = json.loads((root / "examples/protocol-cases.json").read_text())
+    schema = json.loads((root / "schemas/protocol.schema.json").read_text(encoding="utf-8"))
+    cases = json.loads((root / "examples/protocol-cases.json").read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     formats = FormatChecker()
     if "date-time" not in formats.checkers:

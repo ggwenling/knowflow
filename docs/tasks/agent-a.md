@@ -137,6 +137,18 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 通过，21 项 Java 测试；真实 PostgreSQL 16.12/pgvector 0.8.1 覆盖 V1/V2、应用 profile、注册/登录/哈希/过期/撤销、双用户 owner 隔离、owner 注入、资源 404 和删除文档/任务状态。`python contracts/validate.py` 通过 54 项；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 通过 16 项；`git diff --check` 通过。
 - 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。此记录写入时 JP-I1 仍等待 B 服务；最新双进程状态见[联调记录](java-python-integration.md)。
 
+## 2026-10-30：本机 `local` draft.6 Java 集成复核
+
+- 基线为从 `main` 派生的 `local`，base commit `dd3abd4aa003fe5b6b88ce649b8806d9b82b8631`；本轮 Java 变更与 B 消费端一起留在未提交工作树。共享 Schema `0.2.0-draft.6` SHA-256：`d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`。
+- `services/api` 全量 Maven/Testcontainers 套件：**49 tests，0 failures，0 errors，1 skipped，BUILD SUCCESS**。迁移 V1–V5 在本机 PostgreSQL/pgvector 上成功；MinIO 健康。
+- Java/Python 实际双进程 health smoke **9/9**。真实 Java 和 Python 服务通过本地 Java 网关完成合成 Markdown 上传、租约派发、源文件读取、批次/完成、PostgreSQL READY 发布；问答通过 AI 只读检索后，由 Java 对 scope、Chunk quote、locator 和 citation 重新校验并持久化。详细脱敏报告见联调记录 `local-backend-e2e-draft6.json`。
+- 新增 B 侧 fail-closed scope guard 后，真实本机合成问答链路再次通过；Python 先核对检索返回的 document/content/index tuple 是否属于 Java 提供的可信快照，再构造 LLM 请求。越界 document、content version、index version 三类单测均验证 LLM 不会被创建；最新报告见 `services/ai/docs/evidence/local-backend-e2e-draft6-verified.json`。
+- 本机问答联调发现 Windows Proactor 不支持 psycopg 异步连接；对应 Python 只读查询改为线程池中的同步 psycopg，保留只读事务和 5 秒超时。索引和问答均由合成 adapter 执行，真实外部模型调用 **0**。
+- Java 公共 API 行为与既有安全/发布边界回归通过；合同仍是候选版本，Q 审阅及 M 消费确认待执行，KF2 状态不因此登记为 DONE。
+- 本轮再次执行 `mvnw.cmd -B test`，全量结果仍为 49 tests、0 failures、0 errors、1 skip。当前本机数据库角色审计已检查 V5/pgvector、AI 查询与禁止写权限、app 无 DDL，报告见 `services/ai/docs/evidence/local-db-role-audit-draft6.json`。
+- 删除边界新增结构有效的迟到 completion 检查：任务删除后，带正确 batch/manifest 摘要的 `SUCCEEDED` completion 被 Java 拒绝并返回 `DOCUMENT_UNAVAILABLE`。目标用例和全量 Maven/Testcontainers 49 项均通过。
+- 10/30 再次执行 Java Maven/Testcontainers 全量套件：49 tests，0 failures、0 errors、1 skip，BUILD SUCCESS；Testcontainers 实际应用 V1–V5，并启动 pgvector PostgreSQL 与 MinIO。
+
 ## 2026-10-30：JP-I1 draft.4 双进程完成
 
 - A Java target：`ec5c71c9be5a8766540fc48e174f215c0cf388ac`；B Python target：`b598f1d62cc2367a4bfd49fccd3c31b521abff23`（测试代码 target `2623a6282b2695a8ef96e3553a849729efd42403`）；共同消费 A draft.4 提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
@@ -144,8 +156,20 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - B 全量测试 65 项、契约 54 项、Python 离线回归 16 项通过；Q 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe` 的 Java `verify` 22 项通过。KF2-004 仍是待审候选；JP-I1 开发验证通过但不代替 Q/M 正式审批。
 - KF2-014 仍 `BLOCKED`（缺 M KF2-009）；KF2-015 仍受 KF2-014 阻断。
 
+## 2026-10-30：local 最新 Java / Python 边界复验
+
+- Java 公开问答上游 AI `503` 回归通过：对外返回脱敏、可重试 `502 AI_PROCESSING_FAILED`，数据库问题状态为 `FAILED/AI_PROCESSING_FAILED`。`DocumentApiIntegrationTest` 20/20；Maven/Testcontainers 全量 **50 项，0 failure、0 error、1 skip，BUILD SUCCESS**。
+- 同步复验 Python 全量 **126 passed**、Schema **70** 项、离线模型回归 **16** 项、Python HTTP smoke **8/8**、真实 Java→Python health smoke **9/9**。当前 provider 凭证缺失，外部模型请求 0。
+- 增加 Python 问答响应超时回归：真实 WebClient 调用本地阻塞 HTTP fixture，Java 30 秒读超时映射为脱敏可重试 `504 PROCESSING_TIMEOUT`，问题状态持久化为 `FAILED/PROCESSING_TIMEOUT`。`DocumentApiIntegrationTest` **21/21**，全量 Maven/Testcontainers **51 项，0 failure、0 error、1 skip，BUILD SUCCESS**；上游 `503` 映射用例仍通过。
+
 ## 2026-10-30：Q 复核修复（406 Content Negotiation）
 
 - Q review base：`ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434`；代码修复 target：`24a07fd85c70cab3c522118697824727bf9651fe`；审阅记录随 Java `ec5c71c` 推送。
 - `Accept` 无可用表示时，专用处理器保留 Spring 的 406 status 与支持类型响应头，返回脱敏的 `INVALID_REQUEST` 错误体；新增 MockMvc 回归验证 status/header/request ID/body。
 - `mvnw verify` 22 项、契约样例 54 项、Python 离线回归 16 项均通过。请 Q 复核具体修复 SHA，不预填批准结论。
+
+## 2026-10-30：提前复验下一日 Java 检查点
+
+- `./services/api/mvnw.cmd -B -f services/api/pom.xml test`：**51 项，0 failure、0 error、1 skip，BUILD SUCCESS**，包含 Testcontainers 迁移、租约/fencing、删除和迟到 completion 回归；跳过项为未配置真实 Python 服务的独立 smoke，另以真实双进程 health **9/9** 验证。
+- 本地 Compose V1–V5、pgvector 0.8.1 和角色权限复核通过。真实 Java/Python/PostgreSQL/MinIO 合成索引、问答及活动取消重放见 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`。测试服务已退出、三种清理队列为空；本次无外部模型调用。
+- 这是 10/30 提前复验，未声称 10/31 当天复跑；工作树仍为未提交的 `local` 候选，Q/M 结论不变。

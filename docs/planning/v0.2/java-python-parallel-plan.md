@@ -2,7 +2,35 @@
 
 计划版本：JP-01；日期：2026-10-30（Asia/Hong_Kong）。适用角色：A / Java 与 B / Python。
 
-本计划由用户要求制定：不等待当前 Q 复核，继续安排两条分支并行开发。它是下一轮实施计划，不表示已启动开发、完成测试或得到 Q 批准。原始 KF2 任务编号和规划文件保留。
+本计划由用户要求制定：不等待当前 Q 复核，继续安排 Codex-A Java 与 Codex-B Python 开发，并明确覆盖今天和明天。用户后续指定在本机创建从 `main` 派生的 `local` 分支并在该分支实施；本轮据此将 `local` 作为集成开发分支，保留 A/B 文件所有权。它不表示代码已合入 `main`、契约已冻结或得到 Q 批准。原始 KF2 任务编号和规划文件保留。
+
+## 0.1 今天与明天的执行计划（Asia/Hong_Kong）
+
+| 日期 | Codex-A / Java | Codex-B / Python | 集成验收与交付 |
+|---|---|---|---|
+| **今天：2026-10-30** | Java 错误体/测试同步到 draft.6；Maven/Testcontainers 全量 **51 项，0 failure、0 error、1 skip**。新增上游 AI `503` 映射回归（公开问答脱敏为可重试 `502 AI_PROCESSING_FAILED`）及响应超时回归（公开问答可重试 `504 PROCESSING_TIMEOUT`）；两者都把问题记录持久化为 `FAILED`。删除后补上带正确摘要的迟到 `SUCCEEDED` completion 回归，Java 拒绝并返回 `DOCUMENT_UNAVAILABLE`。 | Python 3.12；完成 Schema 哈希消费、单 Worker/heartbeat/取消、Java source/batch/completion 客户端、分段和证据问答；范围 guard 对三元组越界前置拒绝；修复取消时未收尾 `_index` 子任务的问题；heartbeat `LEASE_REJECTED` 停止活动任务的回归连续 **10/10** 通过；新增满队列拒收及 HTTP 可重试 `503` 回归；索引/问答入口缺少 provider 凭证时均 fail closed，新增 3 条 HTTP 路由回归；全量测试 **126 passed**，离线模型回归 **16 passed**。 | `local` 从 `main` 派生；修复 `BAAI/bge-m3` profile 的 `/` 契约缺陷。Schema **70** 个结构样例、Python 真实 HTTP smoke **8/8**、Java→Python health 联调 **9/9**。本机 PostgreSQL/pgvector、MinIO 健康，迁移 V1–V5 已应用。真实服务和合成 adapter 完成上传→READY→检索/问答闭环；另完成 deletion outbox→Python cancel 的真实进程联调，worker 中断且无迟到 Chunk/向量写入。外部模型调用 **0**。见 `local-backend-e2e-draft6-verified.json` 与 `cancellation-e2e-local-draft6-verified.json`。 |
+| **明天：2026-10-31** | 复查已核实的迁移/角色权限；复核任务租约/fencing、过期 worker、删除与迟到 completion 的 DB/Java 边界，处理新增阻断缺陷；删除后的迟到 completion 已有完整摘要回归，明日随全量套件复验。 | 复核只读检索、空证据拒答、伪造引用拒绝及取消/超时边界；删除 outbox→Python cancel HTTP 已于 10/30 通过真实进程验证，明日检查其他变更后的回归。Chunk gold evidence 覆盖报告已完成；真实向量排名和生成质量评测仍取决于可用 provider 凭证，不用替身分数冒充。 | 用真实本地服务重跑跨进程 health、索引、问答和取消关键链路；当前未发现真实模型凭证，若状态不变则将 provider 评测记为 `SKIPPED_NO_CREDENTIALS`、外部调用保持 0。若有凭证，最多 **10 次 Embedding + 10 次 LLM**，只传获准合成资料、不重试。更新 A/B/联调/handoff、全量回归和差异检查；不推送、不合并 `main`、不代填 Q/M 结论。 |
+
+截至 2026-10-30 21:40（香港时间）追加复验：Java Maven/Testcontainers **51 项，0 failure、0 error、1 skip**；公开问答对上游 AI `503` 映射为可重试 `502 AI_PROCESSING_FAILED`，对实际 30 秒响应超时映射为可重试 `504 PROCESSING_TIMEOUT`，两种失败状态均持久化且不泄漏上游正文。Python 全量 **126 passed**、契约结构校验 **70 项**、离线模型回归 **16 项**、Python process smoke **8/8**、真实 Java→Python health smoke **9/9**。真实 provider 调用为 0。
+
+截至 2026-10-30 22:56（香港时间），已提前执行明日计划中可执行的服务及安全边界复验：Java **51 项，0 failure/error，1 skip**，Python **132 passed**，Schema **70**、离线回归 **16**、Python process smoke **8/8**、Java→Python health **9/9**；V1–V5、pgvector 和 AI 只读角色复核通过。真实 Java/Python/PostgreSQL/MinIO 合成索引、问答和活动取消重放通过，并等待清理队列排空，见 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`。修复重放脚本在 Windows 遗留 Java 子进程及过早退出清理队列的问题；新增回归与进程/队列复查通过。当前所选模型凭证缺失，开发集 provider 评测为 `SKIPPED_NO_CREDENTIALS`，本次外部调用 0，见 `services/ai/docs/evidence/development-evaluation-local-draft6-skipped.json`；向量排名和答案质量仍待可用凭证验证。本条是 10/30 的提前复验，不表示已在 10/31 再次执行。
+
+### 2026-10-31 详细检查点（香港时间）
+
+| 时间 | Codex-A / Java | Codex-B / Python | 可验收结果 |
+|---|---|---|---|
+| 09:30–10:00 | 复查 `local`、Java API 和 Compose 状态；本机已提前核实 V1–V5、pgvector 0.8.1、AI 只读权限及 app 无 DDL，见 `local-db-role-audit-draft6.json`。 | 确认 Python 3.12/uv 锁文件、draft.6 Schema 哈希和服务环境；不输出密钥。 | 数据库角色审计已通过；次日仅复核服务仍健康及变更后迁移状态。 |
+| 10:00–11:30 | 复跑 Maven/Testcontainers 全量套件；复核租约、fencing、批次摘要和 READY 发布结果。 | 复跑 Python 全量测试、70 个契约样例与 8 项进程 smoke；检查 Windows 只读查询线程池回归。 | 命令、通过数、跳过项及失败原因写入交付记录。 |
+| 11:30–13:00 | 对已发布索引、删除知识库、迟到 completion 和来源落库做边界复核；删除后提交正确摘要的迟到 completion 用例已于 10/30 通过。 | 使用已通过的空检索拒答、伪造引用拒绝和 locator 测试；复核 Chunk 证据覆盖报告：开发 12 题/21 个证据区间、留出 3 题/3 个区间均可复核。复跑 heartbeat `LEASE_REJECTED` 与满队列 `503` 两项回归；两者分别已于 10/30 连续 10/10 和定向/全量测试通过。删除 outbox→Python cancel 与无迟到写入已于 10/30 通过真实服务复验；次日复核变更后回归。 | 报告只证明证据进入 Chunk；不把它表述成向量排名或答案质量评测，留出集不参与调参。 |
+| 14:00–15:00 | 配合观察 Java 侧状态和调用量；无凭证时不启动外部模型测试。 | 截至 2026-10-30 已确认当前环境没有 Embedding/LLM 凭证；只有次日凭证可用时才从开发题选不超过 10 题，每题各最多一次请求，累计各不超过 10 次，不重试。 | 有凭证才记录真实调用数、账单可得性/响应元数据和引用准确性；无凭证则明确记 `SKIPPED_NO_CREDENTIALS`，真实模型质量保持待验。 |
+| 15:00–16:30 | 修复并复验真实集成暴露的 Java 缺陷。 | 修复并复验 Python adapter、只读检索、引用边界缺陷。 | 相关单测、全量回归和真实本地链路均通过，或明确保留 blocker。 |
+| 16:30–17:30 | 更新 A 交付记录与联调证据。 | 更新 B 消费记录、评测状态与服务说明。 | 更新 handoff；工作仍留在 `local`，未提交、未推送、未合并；Q/M 状态不变。 |
+
+### 每日完成门槛
+
+- 今天：本机分支归属正确；Java/Python/Schema 版本与字节哈希一致；Python 用例和 Java 全量测试有明确结果；Docker 依赖能启动或记录具体故障。
+- 明天：跨服务联调用真实进程；数据库与对象存储使用真实本地容器；索引发布必须以 Java 数据库事实验收为准；模型调用、Q 审阅、M 消费确认各自单独报告。
+- 若时间或环境因素阻塞某门槛，把未完成项移入下一工作日并保留 blocker；不通过 mock 替身、Schema 结构校验或旧 draft.4 报告宣称真实闭环。
 
 ## 1. 当前事实与本轮授权
 
@@ -37,11 +65,10 @@ JP-* 是本轮工作包标记，映射到已有 KF2 任务，不另造一套完�
 
 ## 3. 分支、基线与文件单写
 
-1. 两位作者先确认各自工作区和未提交内容。Java 使用 `java` 分支，Python 使用 `python` 分支；不要让两个作者继续向同一个 `python` 分支同时推代码。A 先前已在 python 的提交按共同基线保留，不回退、不重复 cherry-pick。
-2. 两端先获取包含本计划的同一提交，登记 `BASE_SHA`。Java 若仍停在旧祖先且没有独立提交，可快进到该提交；若已产生独立工作，正常合并并处理差异，禁止强推、reset 覆盖他人工作。
-3. 使用不同工作目录或 worktree。创建前先查看 `git worktree list`，已有工作区继续沿用；不要在对方正在编辑的目录切分支。
-4. 各自推送自己的分支。A 发布新契约后交付精确提交 SHA；B 在干净工作区合入该提交及其必要祖先，再实现消费侧，不能只手抄字段或拷贝整个 contracts 目录。
-5. A 在独立的本地 `integration/jp-01` 分支/worktree 汇集双方**明确 target SHA**做联调；新一轮联调只在该工作区更新。该分支是开发集成候选，不改 main。需要回写修复时由原作者提交，再更新候选，不把候选分支整体反灌造成重复业务提交。
+1. 一般远端并行协作仍使用 Java `java` 与 Python `python` 作者分支；本轮用户明确要求先创建 `local`（从 `main` 派生）并在本地完成 A/B 路线，因此该要求覆盖本节的独立工作树约定。当前 A/B 修改都在 `local`，按文件单写表区分责任；不额外创建、切换或推送 `java` / `python` / `integration/jp-01` 分支。
+2. 本轮登记基线 `dd3abd4aa003fe5b6b88ce649b8806d9b82b8631`，即 `local` 创建时的 `main` target。对方已有提交作为基线保留；不回退、不强推、不 reset 覆盖他人工作。
+3. A 发布的共享契约改动在 `local` 直接与 B 消费端一起验证；记录 Schema 精确哈希及双方测试结果。未来要推送到各作者分支时再创建干净 worktree、登记 target SHA，并由文件所有者确认移交，本轮不自动运输代码。
+4. 本地联调候选就是 `local` 的当前工作树；它不改 `main`，不代表 Q/M 审批。工作完成后保持未提交，等待用户决定是否分发/提交。
 
 | 文件范围 | 唯一写入方 | 另一方如何交接 |
 |---|---|---|

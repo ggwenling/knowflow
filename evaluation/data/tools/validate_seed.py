@@ -5,7 +5,7 @@ from pathlib import Path
 
 def validate(root=None):
     root=root or Path(__file__).resolve().parents[1]/'seed-v1'
-    manifest=json.loads((root/'manifest.json').read_text());questions=json.loads((root/'questions.json').read_text())
+    manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'));questions=json.loads((root/'questions.json').read_text(encoding='utf-8'))
     assert manifest['synthetic'] is True
     docs={};texts={}
     for d in manifest['documents']:

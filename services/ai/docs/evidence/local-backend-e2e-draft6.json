@@ -1,0 +1,46 @@
+{
+  "run_date": "2026-10-30",
+  "result": "DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS",
+  "branch": "local",
+  "base_commit": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "contract_version": "0.2.0-draft.6",
+  "schema_sha256": "d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1",
+  "runtime": {
+    "java": "local Spring Boot service with database and storage profiles",
+    "python": "local Uvicorn process on Python 3.12",
+    "database": "local PostgreSQL with pgvector 0.8.1",
+    "object_storage": "local MinIO"
+  },
+  "flow": {
+    "authenticated_synthetic_upload": "passed",
+    "real_java_to_python_index_dispatch_and_source_read": "passed",
+    "synthetic_embedding_and_java_batch_completion": "passed",
+    "java_publication_and_document_ready": "passed",
+    "read_only_postgres_pgvector_retrieval": "passed",
+    "synthetic_llm_generation": "passed",
+    "java_scope_quote_locator_and_citation_validation": "passed",
+    "answer_and_public_source_persistence": "passed",
+    "synthetic_knowledge_base_cleanup": "passed"
+  },
+  "model_calls": {
+    "embedding_adapter": "local deterministic synthetic adapter",
+    "llm_adapter": "local deterministic synthetic adapter",
+    "external_model_calls": 0
+  },
+  "windows_database_compatibility": {
+    "resolution": "synchronous psycopg query executed with asyncio.to_thread",
+    "read_only_transaction": true,
+    "connect_timeout_seconds": 5,
+    "statement_timeout_ms": 5000
+  },
+  "artifacts": {
+    "contains_document_text": false,
+    "contains_model_response": false,
+    "contains_embeddings": false,
+    "contains_credentials_or_user_tokens": false
+  },
+  "limitations": [
+    "Real SiliconFlow and DeepSeek model calls were not performed.",
+    "Q review and M consumption confirmation remain pending; this is local development evidence only."
+  ]
+}

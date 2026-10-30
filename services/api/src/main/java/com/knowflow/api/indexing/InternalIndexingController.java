@@ -41,7 +41,6 @@ public class InternalIndexingController {
                 .contentType(MediaType.parseMediaType(contentType))
                 .contentLength(source.contents().length)
                 .header("X-Contract-Version", source.contractVersion())
-                .header("X-Request-ID", source.requestId())
                 .header("X-Task-ID", source.taskId().toString())
                 .header("X-Document-ID", source.documentId().toString())
                 .header("X-Content-Version-ID", source.contentVersionId().toString())

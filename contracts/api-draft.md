@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.5`；Java 候选 target `489b746f9bfa8188041f12d9135cf98fe6846611`，Schema SHA-256 `3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。当前 B `origin/python@b598f1d` 仍消费 draft.4；draft.5 需 B 精确消费提交和 Schema 哈希，并由 Q 审阅；不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
+状态：`DRAFT 0.2.0-draft.6`；当前 Schema SHA-256 `d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`。`local` 分支从 `main` 建立，包含 Java 与 Python 的未提交集成开发；draft.6 对模型配置标识的语法作了版本化修正。Java/Python 单测与真实双进程结果仍按本地验收记录更新；本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
 
 ## 公开入口：浏览器 → Java
 

@@ -45,7 +45,8 @@ with tempfile.TemporaryFile() as log:
             checks['unknown_route'] = client.get('/internal/unknown',headers=auth).status_code == 404
             r = client.post('/internal/v1/health', headers=auth)
             checks['wrong_method'] = r.status_code == 405 and 'GET' in r.headers['allow']
-            checks['business_disabled'] = client.post('/internal/v1/answers',headers=auth,json={'question':'synthetic'}).status_code == 404
+            checks['answer_route_validates_contract'] = client.post(
+                '/internal/v1/answers', headers=auth, json={}).status_code == 400
             assert all(checks.values()), 'PROCESS_SMOKE_FAILED'
     finally:
         process.terminate()

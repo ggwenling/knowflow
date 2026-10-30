@@ -7,8 +7,8 @@ from jsonschema import Draft202012Validator, FormatChecker
 from pydantic import BaseModel, ConfigDict
 from .config import ConfigurationError
 
-CONTRACT_VERSION = '0.2.0-draft.4'
-SCHEMA_SHA256 = 'ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41'
+CONTRACT_VERSION = '0.2.0-draft.6'
+SCHEMA_SHA256 = 'd64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1'
 
 
 class InvalidMessage(ValueError):

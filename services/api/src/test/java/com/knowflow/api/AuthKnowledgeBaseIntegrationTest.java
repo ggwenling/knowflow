@@ -118,7 +118,7 @@ class AuthKnowledgeBaseIntegrationTest {
         String userId = registered.path("user_id").asText();
         String registrationToken = registered.path("access_token").asText();
 
-        assertThat(registered.path("contract_version").asText()).isEqualTo("0.2.0-draft.5");
+        assertThat(registered.path("contract_version").asText()).isEqualTo("0.2.0-draft.6");
         assertThat(registered.path("email").asText()).isEqualTo("owner@example.test");
         assertThat(registrationToken).matches("[A-Za-z0-9_-]{43}");
         String encodedPassword = jdbc.queryForObject(
@@ -168,7 +168,7 @@ class AuthKnowledgeBaseIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("owner@example.test", password)
-                                .replace("0.2.0-draft.5", "0.2.0-draft.3")))
+                                .replace("0.2.0-draft.6", "0.2.0-draft.3")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
@@ -202,7 +202,7 @@ class AuthKnowledgeBaseIntegrationTest {
         mockMvc.perform(get("/api/v1/knowledge-bases"))
                 .andExpect(status().isUnauthorized());
         String body = """
-                {"contract_version":"0.2.0-draft.5","name":"Research"}
+                {"contract_version":"0.2.0-draft.6","name":"Research"}
                 """;
         JsonNode created = objectMapper.readTree(mockMvc.perform(post("/api/v1/knowledge-bases")
                         .header("Authorization", "Bearer " + tokenA)
@@ -217,7 +217,7 @@ class AuthKnowledgeBaseIntegrationTest {
                         .header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.5","name":"Injected",
+                                {"contract_version":"0.2.0-draft.6","name":"Injected",
                                  "owner_id":"%s"}
                                 """.formatted(ownerA.path("user_id").asText())))
                 .andExpect(status().isBadRequest())
@@ -338,7 +338,7 @@ class AuthKnowledgeBaseIntegrationTest {
 
     private static String registerBody(String email, String password) {
         return """
-                {"contract_version":"0.2.0-draft.5","email":"%s","password":"%s"}
+                {"contract_version":"0.2.0-draft.6","email":"%s","password":"%s"}
                 """.formatted(email, password);
     }
 

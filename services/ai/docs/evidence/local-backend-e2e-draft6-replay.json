@@ -1,0 +1,72 @@
+{
+  "run_date": "2026-10-30",
+  "result": "DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS",
+  "branch": "local",
+  "base_commit": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "contract_version": "0.2.0-draft.6",
+  "schema_sha256": "d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1",
+  "runtime": {
+    "java": "local Spring Boot service with database/storage profiles",
+    "python": "local synthetic-adapter Uvicorn process",
+    "database": "local PostgreSQL with pgvector 0.8.1",
+    "object_storage": "local MinIO"
+  },
+  "flow": {
+    "registered_owner": true,
+    "knowledge_base_created": true,
+    "authenticated_upload": true,
+    "index_dispatched": true,
+    "document_ready": true,
+    "read_only_retrieval": true,
+    "synthetic_answer_and_source": true,
+    "synthetic_cancellation": true,
+    "active_cancel_delivered_and_adapter_closed": true,
+    "no_late_chunk_or_embedding": true,
+    "knowledge_base_deleted": true,
+    "document_cleanup_queues_drained": true,
+    "session_logged_out": true
+  },
+  "cancellation_database_after_cancel": {
+    "task_status": "CANCELLED",
+    "chunk_rows": 0,
+    "embedding_rows": 0,
+    "cancellation_outbox_rows": 0,
+    "storage_outbox_rows": 0,
+    "index_outbox_rows": 0
+  },
+  "document_cleanup_after_knowledge_base_delete": {
+    "indexed_document": {
+      "task_status": "SUCCEEDED",
+      "chunk_rows": 0,
+      "embedding_rows": 0,
+      "cancellation_outbox_rows": 0,
+      "storage_outbox_rows": 0,
+      "index_outbox_rows": 0
+    },
+    "cancelled_document": {
+      "task_status": "CANCELLED",
+      "chunk_rows": 0,
+      "embedding_rows": 0,
+      "cancellation_outbox_rows": 0,
+      "storage_outbox_rows": 0,
+      "index_outbox_rows": 0
+    }
+  },
+  "model_calls": {
+    "embedding_adapter": "local deterministic synthetic adapter",
+    "llm_adapter": "local deterministic synthetic adapter",
+    "external_model_calls": 0
+  },
+  "secret_in_process_logs": false,
+  "code_sha256": {
+    "replay_script": "fa8555df0de531979b6c148a57ea428b855c79a1f1dce6eaf901e92e3c07be9a",
+    "python_worker": "c74116ffd8dec45810f3d74236e1a579ed602e42fcc85f28c413278c11250b92",
+    "python_cancel_route": "b350937330ffa33dc12cc806ec508fab2b37f01c317c383f29e25e24b1abd923",
+    "java_deletion_outbox": "dfe79347c6be2640867f58eb1eda5df05a4b5856a30977b3c0873bd1057164bd"
+  },
+  "limitations": [
+    "Real SiliconFlow/DeepSeek model calls were not performed.",
+    "Synthetic owner accounts remain in the local development database; sessions are logged out and knowledge bases are deleted.",
+    "Q review and M consumption confirmation remain pending."
+  ]
+}

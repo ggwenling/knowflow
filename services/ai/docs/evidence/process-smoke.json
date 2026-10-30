@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-10-30T12:07:33.913398+08:00",
+  "recorded_at": "2026-10-30T22:49:46.199090+08:00",
   "checks": {
     "authenticated_health": true,
     "request_id_header": true,
@@ -7,12 +7,12 @@
     "wrong_credential": true,
     "unknown_route": true,
     "wrong_method": true,
-    "business_disabled": true,
+    "answer_route_validates_contract": true,
     "no_secret_in_process_log": true
   },
   "external_model_calls": 0,
   "java_webclient_called": false,
   "scope": "Real Python HTTP process only; Java caller separately required.",
-  "git_head_at_run": "150cd847a5750143fb6eb2c74c762962381952fe",
-  "app_sha256": "bed7cb636167d18e4858eda266a7e07fd0d93bc98299e20ecffef14b1190d492"
+  "git_head_at_run": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
+  "app_sha256": "b350937330ffa33dc12cc806ec508fab2b37f01c317c383f29e25e24b1abd923"
 }
