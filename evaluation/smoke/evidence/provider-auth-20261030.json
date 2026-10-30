@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-10-30T10:27:24.700219+08:00",
+  "source": "Sanitized summary of authenticated GET /v1/models checks in the resumed session",
+  "environment": {
+    "observations_current": true,
+    "network_policy_mode": "unrestricted",
+    "network_policy_state": "enforced",
+    "runtime_variables_ready": ["EMBEDING_KEY", "DEEPSEEK_API_KEY"]
+  },
+  "results": [
+    {
+      "host": "api.siliconflow.cn",
+      "key_variable": "EMBEDING_KEY",
+      "variable_present": true,
+      "http_status": 200,
+      "authenticated": true,
+      "selected_model": "BAAI/bge-m3",
+      "selected_model_listed": true,
+      "elapsed_ms": 1731
+    },
+    {
+      "host": "api.deepseek.com",
+      "key_variable": "DEEPSEEK_API_KEY",
+      "variable_present": true,
+      "http_status": 200,
+      "authenticated": true,
+      "selected_model": "deepseek-flash",
+      "selected_model_listed": true,
+      "elapsed_ms": 911
+    }
+  ]
+}

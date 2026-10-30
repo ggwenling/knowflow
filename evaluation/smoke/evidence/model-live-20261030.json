@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "recorded_at": "2026-10-30T10:27:53.265061+08:00",
+  "fixture_sha256": "fd2f78ebccc09336abc7796dfa5bcf2e79fa691743df1723db63c0631f356598",
+  "runner_sha256": "0ab056334e164e551f59b33144a83a3cc961c9556808e19cd99e90b542175a79",
+  "runtime": {
+    "python": "3.12.14",
+    "machine": "x86_64",
+    "logical_cpus": 3,
+    "cpu_quota": "200000 100000",
+    "memory_limit_bytes": "8589934592",
+    "git_head": "9ea732ab0fcca13b79a09da47aa3f338bc545346"
+  },
+  "network_attempted": true,
+  "cost": {
+    "amount": null,
+    "reason": "Provider rates and billing have not been verified."
+  },
+  "checks": {
+    "embedding": {
+      "status": "PASSED",
+      "elapsed_ms": 1474.205,
+      "usage": {
+        "prompt_tokens": 33,
+        "completion_tokens": 0,
+        "total_tokens": 33
+      },
+      "count": 2,
+      "observed_dimensions": 1024,
+      "finite_nonzero": true,
+      "provider_model_matches_request": true
+    },
+    "chat": {
+      "status": "RECEIVED",
+      "elapsed_ms": 1077.418,
+      "usage": {
+        "prompt_tokens": 63,
+        "completion_tokens": 4,
+        "total_tokens": 67
+      }
+    }
+  },
+  "configuration": {
+    "embedding_model": "BAAI/bge-m3",
+    "llm_model": "deepseek-flash",
+    "expected_dimensions": 1024,
+    "timeout_seconds": 30.0,
+    "max_attempts_per_endpoint": 1,
+    "llm_thinking": "disabled"
+  },
+  "status": "FAILED",
+  "error": "CHINESE_ANSWER_MISSING"
+}

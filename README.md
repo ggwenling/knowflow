@@ -1,24 +1,26 @@
 # KnowFlow
 
-AI 私有知识库与智能文档助手。项目当前处于计划与设计准备阶段，目标是提供文档管理、权限受控检索、问答和可核验的来源引用。
+AI 知识库与文档助手实践项目，首轮面向需要反复查询中文项目规范和 API 文档的研发成员。产品场景、真实用户假设和试用协议见 [docs/product](docs/product/scenario.md)。
 
-执行编制为两个 Codex Coding Agent、一个 Muse 主线 Agent、一个 Code Review Agent：
+## 当前状态
 
-- Codex-A：Java API、权限、索引任务与版本管理、公共契约。
-- Codex-B：Python 解析、索引、检索、生成与 RAG 评测。
-- Muse：前端主线、基础设施、真实联调和端到端验证。
-- Code Review：持续审阅三条主线，并复核最终交付。
+仓库包含 V0.2 计划、KF2-002 用户场景和 KF2-003 双模型验证记录。KF2-002、003、005 已在 python 分支交付并等待独立 Q 审阅；仓库当前尚未包含可运行的 Java 服务、Python AI 服务或 Web 应用。V1.1 设计包缺失，冻结的跨服务契约亦未建立。
 
-## V0.2 执行计划
+硅基流动 BAAI/bge-m3（1024 维）和 DeepSeek deepseek-flash 的合成输入真实冒烟通过。实际项目文档不得在确认供应商条款和授权前上传外部模型。详情见 [模型、隐私和费用记录](evaluation/smoke/provider-profile.md)。
 
-修订日期：2026-10-29。任务拆分为 44 项核心任务、12 项可选增强，共 56 项；各任务包含负责人、依赖、修改范围、验收标准和验证要求。
+## 仓库布局
 
-- [计划包说明](./docs/planning/v0.2/README.md)
-- [项目计划书](./docs/planning/v0.2/KnowFlow_V0.2_项目计划书.md)
-- [详细任务拆解](./docs/planning/v0.2/KnowFlow_V0.2_任务拆解.md)
-- [Agent 协作与派工手册](./docs/planning/v0.2/KnowFlow_V0.2_Agent协作手册.md)
-- [任务表 CSV](./docs/planning/v0.2/KnowFlow_V0.2_任务表.csv)
-- [任务数据 JSON](./docs/planning/v0.2/KnowFlow_V0.2_任务数据.json)
-- [文档审阅记录](./docs/planning/v0.2/文档审阅记录.md)
+- apps/web：M 负责的 Next.js 前端。
+- services/api：A 负责的 Java / Spring API 与业务状态。
+- services/ai：B 负责的 Python / FastAPI 解析和 RAG 服务。
+- contracts：共享接口由 A 唯一发布，其他主线先提交变更提议。
+- infra：M 负责的 Compose、CI 和本地开发支撑。
+- docs/planning：计划基线；docs/product：用户场景与试用协议。
+- docs/tasks、docs/reviews：任务记录、PR 信息与独立审阅。
+- evaluation：B 负责的模型、解析、许可与评测证据。
 
-本次提交交付计划文档，尚未实现项目功能。原计划提及的 V1.1 技术设计包仍需核对，模型配置、目标硬件、开发投入和真实试用也需在执行阶段验证。
+## 协作和验证
+
+从当前集成基线为任务创建独立分支/worktree；每个主线一次只写其所有权范围。见 [协作规则与任务卡](docs/tasks/README.md) 及 [PR 和审阅模板](docs/reviews/pull-request-review-template.md)。本地 Python 模型客户端回归和许可审计命令见 [KF2-003 冒烟说明](evaluation/smoke/README.md)。
+
+每个服务的启动说明会列出依赖及配置，但在 KF2-004/006/007/008/009 完成前不能启动完整产品。服务需要的密钥须由本机/托管环境注入，不能提交到仓库。
