@@ -167,6 +167,7 @@ uv run --project services/ai --frozen python services/ai/tools/java_python_smoke
 | B02 / KF2-017 | `338c6329742273f01eae8f9ac2956367c9d82f60` | 默认 800/100 的分段及定位；11 项定向测试通过；原种子答案证据仍可从 Chunk 切片核对 |
 | B03 / KF2-018 | `0e079e92280e8370e5914d06dd88ebc7da1ed979` | SiliconFlow 适配器和错误/限速/超时/向量回归；真实合成请求返回 1024 维，使用 26 prompt tokens |
 | Python 汇总验证 | `0e079e9` | 全套 100 项 Python 测试通过；契约 54、模型离线 16、种子题 15 全部通过 |
+| JP2-I1 开发联调 | 运行于 `03d2ed80f9d45404b4fd0604017ff616eb0a3c41`，配对 Java `ec5c71c9be5a8766540fc48e174f215c0cf388ac` | 8 项真实 Java/Python 健康、认证、错误与超时检查通过；没有数据库或模型调用；[脱敏证据](../services/ai/docs/evidence/java-python-jp2-first-batch.json) |
 
 真实模型证据：[embedding-live-20261030-b03.json](../services/ai/docs/evidence/embedding-live-20261030-b03.json)。只记录状态、响应模型、维度、token 用量、耗时和代码哈希；实际成本未知。
 

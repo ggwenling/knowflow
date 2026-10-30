@@ -123,4 +123,8 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - **真实模型冒烟**：只向硅基流动发送一条内置原创合成中文短句；本次结果为 `LIVE_EMBEDDING_PASSED`，返回模型 `BAAI/bge-m3`、1 条 1024 维有限向量，26 prompt tokens，约 2.0 秒；无自动重试。证据 `services/ai/docs/evidence/embedding-live-20261030-b03.json` 记录模型/维数/用量/延迟及代码哈希，不保存输入、向量、响应正文或凭证。用量不是实际账单；本次不做 DeepSeek 调用。
 - **回归**：Python 全量 100 passed（包括 B02/B03）；共享契约 54 个结构样例通过；既有模型离线回归 16 项通过；10 份种子文档、15 道问题及全部答案位置校验通过。另有一条现存 Starlette/httpx 上游弃用提示，不影响测试结果。
 
+## JP2 第一批双服务验证补充
+
+在 `03d2ed80f9d45404b4fd0604017ff616eb0a3c41` 上配对 A 的真实 Java 代码提交 `ec5c71c9be5a8766540fc48e174f215c0cf388ac`，使用干净工作树运行既有 `java_python_smoke.py --require-clean`。8 项真实 Spring/WebClient + Uvicorn 健康/认证/错误/请求关联/超时检查全部通过，运行前后工作树 clean；证据见 `services/ai/docs/evidence/java-python-jp2-first-batch.json`。本次模型调用 0、数据库调用 0；这只复验 draft.4 双服务健康契约，不表示 draft.5、上传、索引批次或业务问答已接通。
+
 本轮仍处第一批。远端 `java` 未变化，当前可见 HEAD 为 `894fc763b3c19a51225365f749e07cc033a4db34`，尚无计划要求的 draft.5 提交/Schema。按分工，B01 必须等 A02 发布后才能消费；B04/05/06 需要新契约中的源读取、批次、完成和取消定义，不能由 B 自行猜写。Q 最新复审所列注册接口 `Content-Type: text/plain` 的 415→500 问题归 A 修复。B02/B03 保持待独立 Q 审阅，不声称其余任务完成。
