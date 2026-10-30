@@ -1,6 +1,6 @@
 {
-  "recorded_at": "2026-10-30T13:13:08.093823+08:00",
-  "git_head_at_run": "343ce4fdc2b6df72f023c9346f59a927374cdaf8",
+  "recorded_at": "2026-10-30T13:08:53.922889+08:00",
+  "git_head_at_run": "225124fbae8041efd67ee5e6ca5bf89fdbbe8884",
   "contract_version": "0.2.0-draft.4",
   "java_tests": 8,
   "failures": 0,

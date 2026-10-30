@@ -5,17 +5,17 @@
 ## 固定的提交与契约
 
 - A Java 当前交付 target：`ec5c71c9be5a8766540fc48e174f215c0cf388ac`；其中 Q 406 修复代码 target：`24a07fd85c70cab3c522118697824727bf9651fe`。
-- B Python target：`2623a6282b2695a8ef96e3553a849729efd42403`。B 已合入 A 的 draft.4 契约提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，消费者版本为 `0.2.0-draft.4`，Schema SHA-256 为 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
-- 联调候选：`integration/jp01-draft4-final@343ce4fdc2b6df72f023c9346f59a927374cdaf8`，集成树 SHA-1 `7ea07ebe5d9763ef2e2b2d03b83815dc414dd07b`；其中包含上述两个精确 target。此分支仅供开发验证，不合并 main。
+- B Python 当前 target：`b598f1d62cc2367a4bfd49fccd3c31b521abff23`（代码/测试 target `2623a6282b2695a8ef96e3553a849729efd42403`）。B 已合入 A 的 draft.4 契约提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，消费者版本为 `0.2.0-draft.4`，Schema SHA-256 为 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
+- 联调候选：`225124fbae8041efd67ee5e6ca5bf89fdbbe8884` 是真实联调运行提交，集成树 SHA-1 `7ea07ebe5d9763ef2e2b2d03b83815dc414dd07b`；其父提交分别为 B 代码 target `2623a62` 和 A Java target `ec5c71c`。当前 B target `b598f1d` 只在该代码树上增加交付/证据记录。
 
 ## 干净候选验证
 
-在独立 worktree `/workspace/knowflow-jp01-clean` 执行，Python 3.12.14，依赖由 `uv sync --project services/ai --frozen` 安装。工作树在运行前后均干净；为抑制已核对字节与 HEAD 完全相同的 `services/api/mvnw.cmd` 行尾属性误报，仅在临时 worktree 的 index 设置 assume-unchanged，不改文件内容。
+在干净临时 worktree 执行，Python 3.12.14，依赖由 `uv sync --project services/ai --frozen` 安装。B 的版本化报告确认运行前后 worktree 均干净；临时 index 对已核对字节与 HEAD 完全相同的 `services/api/mvnw.cmd` 行尾属性误报设置 assume-unchanged，不改文件内容。
 
 - Python：`uv run --project services/ai --frozen pytest services/ai/tests -q`，65 passed。
 - Schema：`python3 contracts/validate.py`，54 个结构样例通过。
 - 离线回归：`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`，16 passed。
-- 双进程：`uv run --project services/ai --frozen python services/ai/tools/java_python_smoke.py --maven-settings /tmp/knowflow-maven-settings.xml --java-target ec5c71c9be5a8766540fc48e174f215c0cf388ac --require-clean --output /tmp/knowflow-jp01-clean-smoke.json`，8 tests、0 failure、0 error，运行前后 clean 均为 true。报告：[java-python-smoke-draft4.json](java-python-smoke-draft4.json)，SHA-256 `327c0b0b18d4be2a91e485828df41584fa6a5e0b1d1482023a82f3bb0d1a8307`。
+- 双进程：`uv run --project services/ai --frozen python services/ai/tools/java_python_smoke.py --maven-settings /tmp/knowflow-maven-settings.xml --java-target ec5c71c9be5a8766540fc48e174f215c0cf388ac --require-clean --output /tmp/knowflow-jp01-clean-smoke.json`，8 tests、0 failure、0 error，运行前后 clean 均为 true。报告：[java-python-smoke-draft4.json](java-python-smoke-draft4.json)，来自 B 当前 target 的 clean-run evidence，SHA-256 `a3cc1355d1b9979dfdfbbb91d9bb176c9d63fbece1f4ab8ee2661d95cc356960`。
 
 真实双进程场景包括：Java 健康客户端调用真实 Python health 并接受 draft.4/status/request ID；同一客户端拒绝 draft.2 fixture；实际 5 秒 deadline；凭证缺失/错误 401；404/405 与 `Allow`；进程不可达；独立慢响应夹具的 WebClient 超时。日志没有测试密钥；没有数据库或模型调用。
 

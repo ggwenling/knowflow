@@ -18,12 +18,12 @@
 | 顺序 | 任务 | 依赖 | 实际状态 | 当前产物或解除条件 |
 |---|---|---|---|---|
 | 1 | KF2-001 V0.2 新基线决策 | 无 | IN_REVIEW | 用户授权采用新基线；原 V1.1 及旧任务映射仍未验证，见[兼容性记录](../architecture/compatibility.md) |
-| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 与 B 已共同消费 draft.4（B target `2623a62`）；Q 审阅及 M 消费确认仍待处理，见[联调记录](java-python-integration.md) |
+| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 与 B 已共同消费 draft.4（B target `b598f1d`，代码 target `2623a62`）；Q 审阅及 M 消费确认仍待处理，见[联调记录](java-python-integration.md) |
 | 3 | KF2-006 Java 骨架 | 004、005 | IN_REVIEW | 骨架已可启动并通过认证/health/本地 WebClient 验收；005 与契约仍待审阅 |
 | 4 | KF2-011 迁移与受限角色 | 004、005 | IN_REVIEW | Flyway/pgvector 与真实 PostgreSQL 权限测试通过；Q/M 消费确认待处理 |
 | 5 | KF2-012 认证 | 006、011 | IN_REVIEW | 注册、登录、会话撤销/过期的真实 PostgreSQL 测试通过；Q 与安全/产品缺口待审阅 |
 | 6 | KF2-013 知识库隔离 | 012 | IN_REVIEW | owner-scoped CRUD 与删除状态真实 PostgreSQL 测试通过；Q 审阅、物理清理与并发删除协调待处理 |
-| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@2623a628` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
+| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@b598f1d` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
 | 8 | KF2-015 任务租约 | 007、014 | BLOCKED | B KF2-007 服务已交付，但仍依赖被阻断的 KF2-014 上传/状态基础设施 |
 | 9 | KF2-019 索引发布 | 015、018 | PLANNED | 需 B 的真实索引写入证据 |
 | 10 | KF2-023 问答入口 | 013、022 | PLANNED | 需 B 的真实生成与证据 |
@@ -106,8 +106,8 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 
 ## 2026-10-30：JP-I1 draft.4 双进程完成
 
-- A Java target：`ec5c71c9be5a8766540fc48e174f215c0cf388ac`；B Python target：`2623a6282b2695a8ef96e3553a849729efd42403`；共同消费 A draft.4 提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
-- 联调候选 `integration/jp01-draft4-final@343ce4fdc2b6df72f023c9346f59a927374cdaf8`。真实 Java/Python smoke 8/8 通过，且实际通过 `AiInternalHealthClient` 验证正确版本接受、draft.2 拒绝、5 秒 deadline。清洁运行报告与哈希见[联调记录](java-python-integration.md)。
+- A Java target：`ec5c71c9be5a8766540fc48e174f215c0cf388ac`；B Python target：`b598f1d62cc2367a4bfd49fccd3c31b521abff23`（测试代码 target `2623a6282b2695a8ef96e3553a849729efd42403`）；共同消费 A draft.4 提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
+- 联调运行提交 `225124fbae8041efd67ee5e6ca5bf89fdbbe8884`（A/B 父 target 分别为 `ec5c71c` / `2623a62`）。真实 Java/Python smoke 8/8 通过，且实际通过 `AiInternalHealthClient` 验证正确版本接受、draft.2 拒绝、5 秒 deadline。清洁运行报告与哈希见[联调记录](java-python-integration.md)。
 - B 全量测试 65 项、契约 54 项、Python 离线回归 16 项通过；Q 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe` 的 Java `verify` 22 项通过。KF2-004 仍是待审候选；JP-I1 开发验证通过但不代替 Q/M 正式审批。
 - KF2-014 仍 `BLOCKED`（缺 M KF2-009）；KF2-015 仍受 KF2-014 阻断。
 

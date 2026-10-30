@@ -86,8 +86,8 @@ cd services/api
 
 ## JP-I1 draft.4 双进程复核（最终 target，2026-10-30）
 
-- A Java target `ec5c71c9be5a8766540fc48e174f215c0cf388ac`（包含 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe`）；B Python target `2623a6282b2695a8ef96e3553a849729efd42403`。B 已合入确切的 A draft.4 契约提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
-- 双进程 merge candidate `343ce4fdc2b6df72f023c9346f59a927374cdaf8`。干净 worktree 报告见 [java-python-smoke-draft4.json](java-python-smoke-draft4.json)，SHA-256 `327c0b0b18d4be2a91e485828df41584fa6a5e0b1d1482023a82f3bb0d1a8307`；报告绑定 Java target 且运行前后 clean。
+- A Java target `ec5c71c9be5a8766540fc48e174f215c0cf388ac`（包含 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe`）；B Python 当前 target `b598f1d62cc2367a4bfd49fccd3c31b521abff23`（代码/测试 target `2623a6282b2695a8ef96e3553a849729efd42403`）。B 已合入确切的 A draft.4 契约提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
+- 双进程实际运行提交 `225124fbae8041efd67ee5e6ca5bf89fdbbe8884`，其父提交为该 B 代码 target 与 A target `ec5c71c`。干净 worktree 报告见 [java-python-smoke-draft4.json](java-python-smoke-draft4.json)，SHA-256 `a3cc1355d1b9979dfdfbbb91d9bb176c9d63fbece1f4ab8ee2661d95cc356960`；报告绑定 Java target 且运行前后 clean。
 - B 全量 Python 测试 65 项、契约 54 项、离线回归 16 项通过；真实 Uvicorn + Spring Boot smoke 8/8 通过。测试实际调用 Java `AiInternalHealthClient.check()`，接受 draft.4/status/request ID，拒绝 draft.2 fixture，并验证实际 5 秒超时；同时覆盖凭证、404/405、Allow、不可达和慢响应。无模型/数据库调用，秘密未出现在日志。
 - JP-I1 开发集成验证通过；Schema 仍为 DRAFT，Q 审阅和 M 消费确认尚未完成，不记录为 APPROVED 或 DONE。
 
