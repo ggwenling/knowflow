@@ -5,7 +5,7 @@
 ## 基线与依赖
 
 - 共同计划基线：`150cd847a5750143fb6eb2c74c762962381952fe`。
-- Java 分支：`java`；本地健康客户端调用 `GET /internal/v1/health`，使用 `KNOWFLOW_INTERNAL_SHARED_SECRET` 与 `X-Request-ID`，5 秒内无自动重试，并校验响应契约版本、状态和 request ID。
+- Java 分支：`java`；target `115931caaf99fe3fd9c473d2f0f1b6ebd9648ccd`。本地健康客户端调用 `GET /internal/v1/health`，使用 `KNOWFLOW_INTERNAL_SHARED_SECRET` 与 `X-Request-ID`，5 秒内无自动重试，并校验响应契约版本、状态和 request ID。
 - 契约候选：`0.2.0-draft.3`；Schema SHA-256：`1b5133ddcdac4a6accb0faf4a88f2dda7204f5932151043168473d2d8574c5c5`。
 - 当前 `origin/python`：`150cd847a5750143fb6eb2c74c762962381952fe`。该提交的 `services/ai/` 只有 `.env.example` 与 README，没有 FastAPI 入口或可启动内部 health 路由；因此没有 B target SHA 可供真实联调。
 

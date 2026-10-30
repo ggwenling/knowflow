@@ -64,3 +64,13 @@ cd services/api
 - 修复 SHA / 复核：
 - 集成后差异与验证：
 - 最终任务状态：
+
+## JP-01 Java 增量审阅包（KF2-011 / KF2-004 candidate）
+
+- 分支：`java`；base `150cd847a5750143fb6eb2c74c762962381952fe`；Java target `115931caaf99fe3fd9c473d2f0f1b6ebd9648ccd`。
+- KF2-011 变更：Flyway `V1`、pgvector 1024 维 DDL、三种无默认密码的受限角色、独立迁移 CLI 和可选 `database` profile DataSource。AI 数据库身份只有所需查询表的 `SELECT`；运行角色无 DDL；索引写 fencing 只在 ADR-002 提案中，尚未实现或授权。
+- KF2-004 candidate：`0.2.0-draft.3`，Schema SHA-256 `1b5133ddcdac4a6accb0faf4a88f2dda7204f5932151043168473d2d8574c5c5`。新增 `InternalHealth` 与 Java 消费客户端；候选未冻结，B 消费确认、M 确认及 Q 审阅缺失。
+- 复核命令：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`（18 项 Java 测试）；`python contracts/validate.py`（41 项）；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`（16 项）；`git diff --check`。真实 PostgreSQL 16.12/pgvector 0.8.1 Testcontainers 覆盖迁移、重跑、CLI、约束、向量维度与角色权限。
+- 联调证据见 [JP-01 Java→Python 记录](java-python-integration.md)：仅 Java loopback stub 通过。`origin/python@150cd847a5750143fb6eb2c74c762962381952fe` 没有可启动的 Python 服务，所以 JP-I1 等待 B target SHA。
+
+请 Q 检查 `V1` 所有权/复合外键、迁移身份与历史 Schema、AI 读取范围、vector 扩展位置/维度、应用 profile 的启动边界，以及 ADR-002 的 Java 网关提案是否足以约束旧 Worker。真实 Python 行为、迁移旧库升级、租约/Fencing 和删除/发布竞态均未由本 target 证明。

@@ -83,3 +83,14 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - KF2-006 验证：原始 8 项 Java 测试及审查修复后共 11 项 Java 测试通过；Maven `verify`、39 项契约结构样例通过。打包 JAR 冒烟确认有效 Bearer token 可启动并 health 为 `UP`，含换行密钥启动失败且不泄露密钥；404/405 集成测试核对统一错误体与 `Allow`。WebClient 只通过本地 loopback stub 测试请求 ID 和内部认证，未调用 B 服务或外部模型。
 - KF2-006 审查修复 target：`eb88cc1fe40d91f2b4fe5b992e230779ad998daa`；最新复核范围见 [A 线 Q 审阅包](agent-a-review-package.md)。任务仍待 Q 对修复 SHA 审阅及依赖集成确认。
 - 当前阶段整合基线：`0a19a7afc80fa778dd5b2e10e7a825360538a9f9`。逐项 target SHA、复核范围和验证命令见 [A 线 Q 审阅包](agent-a-review-package.md)。本轮未调用真实模型或读取/提交任何 API 密钥。
+
+## 2026-10-30：JP-01 Java 路线（KF2-011 / JP-C1 / JP-I1 Java 侧）
+
+- 仓库：`/workspace/knowflow-java`；分支：`java`；共同基线 `BASE_SHA=150cd847a5750143fb6eb2c74c762962381952fe`；Java 交付 target：`115931caaf99fe3fd9c473d2f0f1b6ebd9648ccd`。
+- KF2-011：交付 Flyway `V1`，建立 users、knowledge bases、documents、content/index versions、index tasks、chunks、`vector(1024)` 及相关唯一、外键、状态和定位约束。迁移历史在独立 `knowflow_flyway` Schema；数据库管理员引导脚本建立无默认密码的迁移、应用、AI 登录角色。AI 只有检索所需表的 SELECT，不能改状态或写 Chunk/向量；应用角色无 DDL。
+- 应用数据库配置成为可运行实现：Spring `database` profile 以 Hikari 和 `knowflow_app` 连接，默认 Java 启动仍不连接数据库；迁移使用单独 `db-migrate` profile / `--migrate-only` 命令。当前没有业务 Repository 或任务状态机。
+- JP-C1：契约候选升至 `0.2.0-draft.3`，新增内部 health 最小报文；Schema SHA-256 `1b5133ddcdac4a6accb0faf4a88f2dda7204f5932151043168473d2d8574c5c5`。Java health 客户端带内部 Bearer 与 request ID，限时 5 秒、无自动重试，并核对响应版本、状态和 ID。该候选仍待 B 消费确认、M 相关消费确认和 Q 审阅；KF2-004 未冻结。
+- KF2-011 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 成功，18 项 Java 测试通过。真实 `pgvector/pgvector:0.8.1-pg16`（镜像摘要记录于服务说明）/ PostgreSQL 16.12 覆盖 Flyway 空库与重复执行、CLI、1024 维向量、唯一/外键/检查约束、AI 无 DML、应用角色可连接但无 DDL。`python contracts/validate.py` 的 41 个结构样例通过；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 的 16 项通过；`git diff --check` 通过。
+- JP-I1：Java→Python 请求只在本地 loopback stub 上完成；真实双进程联调 `WAITING_B_SERVICE`。截至 `origin/python@150cd847a5750143fb6eb2c74c762962381952fe`，`services/ai/` 只有 README 和 `.env.example`，无 FastAPI 实现。未修改 B 所有的 `services/ai/`，未把本地 stub 说成真实集成。
+- ADR-002 提出 Java 有界批量写入网关并保留 AI 只读；B 的批大小/重试/清理需求与 Q 的 fencing 审阅未到位，方案仍为 `PROPOSED`，不开放 Python 直写，不启动 KF2-018。
+- KF2-011 / KF2-004 状态：`IN_REVIEW`；真实 Python 联调未执行；Q 审阅未执行。数据库证据只覆盖新建空库，不声称兼容未知旧库或完成租约、fencing、删除/发布竞态。
