@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.beans.TypeMismatchException;
@@ -59,6 +60,21 @@ public class ApiExceptionHandler {
         }
         errors.write(request, response, HttpStatus.METHOD_NOT_ALLOWED, "INVALID_REQUEST",
                 "The HTTP method is not supported for this endpoint.");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    void notAcceptable(HttpServletRequest request, HttpServletResponse response,
+                       HttpMediaTypeNotAcceptableException exception)
+            throws java.io.IOException {
+        exception.getHeaders().forEach((name, values) -> values.forEach(
+                value -> response.addHeader(name, value)));
+        var status = exception.getStatusCode();
+        boolean clientError = status.is4xxClientError();
+        String code = clientError ? "INVALID_REQUEST" : "INTERNAL_ERROR";
+        String message = status.value() == HttpStatus.NOT_ACCEPTABLE.value()
+                ? "The requested response media type is not acceptable."
+                : "The request could not be processed.";
+        errors.write(request, response, status, code, message);
     }
 
     @ExceptionHandler(Exception.class)

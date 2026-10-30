@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.knowflow.api.security.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,7 @@ public final class ApiErrorWriter {
     }
 
     public void write(HttpServletRequest request, HttpServletResponse response,
-                      HttpStatus status, String code, String message) throws IOException {
+                      HttpStatusCode status, String code, String message) throws IOException {
         if (response.isCommitted()) {
             return;
         }

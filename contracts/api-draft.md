@@ -54,6 +54,7 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 | 情形 | HTTP / code | 语义 |
 |---|---|---|
 | 请求结构不符 | 400 / INVALID_REQUEST | 不回显敏感输入 |
+| 请求的 Accept 表示不受支持 | 406 / INVALID_REQUEST | 保留框架提供的支持类型 `Accept` 响应头 |
 | 未认证或服务认证失败 | 401 / UNAUTHENTICATED | 无内部凭证细节 |
 | 内部范围不符 | 403 / SCOPE_DENIED | 外部不可用资源仍统一 404 |
 | 不存在/他人/已删的外部资源 | 404 / RESOURCE_NOT_FOUND | 防止枚举 |

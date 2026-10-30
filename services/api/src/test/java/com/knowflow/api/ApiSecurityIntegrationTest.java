@@ -28,6 +28,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -136,6 +137,21 @@ class ApiSecurityIntegrationTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message")
                         .value("The HTTP method is not supported for this endpoint."));
+    }
+
+    @Test
+    void unsupportedAcceptTypePreservesNotAcceptableStatusAndFrameworkHeaders() throws Exception {
+        mockMvc.perform(get("/internal/test-auth")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET)
+                        .accept(MediaType.APPLICATION_XML))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(header().string(HttpHeaders.ACCEPT,
+                        org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)))
+                .andExpect(header().exists(RequestIdFilter.HEADER))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.4"))
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").value("The requested response media type is not acceptable."));
     }
 
     @Test
