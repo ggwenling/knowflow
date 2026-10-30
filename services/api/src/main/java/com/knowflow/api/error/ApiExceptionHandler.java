@@ -7,6 +7,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,11 +25,18 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
-            HandlerMethodValidationException.class})
+            HandlerMethodValidationException.class, TypeMismatchException.class,
+            MissingServletRequestParameterException.class})
     void invalidRequest(HttpServletRequest request, HttpServletResponse response)
             throws java.io.IOException {
         errors.write(request, response, HttpStatus.BAD_REQUEST, "INVALID_REQUEST",
                 "The request is invalid.");
+    }
+
+    @ExceptionHandler(ApiFailure.class)
+    void apiFailure(HttpServletRequest request, HttpServletResponse response, ApiFailure failure)
+            throws java.io.IOException {
+        errors.write(request, response, failure.status(), failure.code(), failure.getMessage());
     }
 
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})

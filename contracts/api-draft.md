@@ -1,14 +1,15 @@
 # KF2-004 候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.3`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
+状态：`DRAFT 0.2.0-draft.4`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
 
 ## 公开入口：浏览器 → Java
 
 | 候选入口 | 成功行为 | 身份与关键边界 |
 |---|---|---|
-| `POST /api/v1/auth/register`、`POST /api/v1/auth/login` | 注册或获取凭证 | 凭证策略由 KF2-012 固定；限制大小/速率，不返回密码或敏感错误 |
+| `POST /api/v1/auth/register`、`POST /api/v1/auth/login` | 注册或获取凭证 | 使用 `RegisterRequest` / `LoginRequest`；统一错误不返回密码或账户凭据 |
+| `POST /api/v1/auth/logout` | 撤销当前凭证 | Bearer access token 的会话行标记撤销；重复/过期凭证按未认证处理 |
 | `GET /api/v1/me` | 当前用户 | 身份只来自服务器验证后的凭证 |
-| `POST /api/v1/knowledge-bases`、`GET /api/v1/knowledge-bases` | 创建/分页列表 | owner 在服务端派生；列表只返回当前所有者资源 |
+| `POST /api/v1/knowledge-bases`、`GET /api/v1/knowledge-bases` | 创建/分页列表 | `CreateKnowledgeBase` 不接受 owner；列表只返回当前所有者资源 |
 | `GET/DELETE /api/v1/knowledge-bases/{kb_id}` | 详情/逻辑删除 | 不存在、他人或已删统一 404；删除知识库同步撤销其文档可见性 |
 | `POST /api/v1/knowledge-bases/{kb_id}/documents` | 202，文档与任务标识 | TXT/MD/文本 PDF；大小、页数、字符等限额等待 B 实测；对象路径由 Java 生成 |
 | `GET /api/v1/documents/{document_id}` | 文档状态、当前活动索引与处理中任务 | 上传成功不等于 READY；更新失败时旧活动版本继续可用 |
@@ -22,6 +23,12 @@
 | `GET /api/v1/questions`、`GET/DELETE /api/v1/questions/{question_id}` | 所有者历史 | 失败/取消不标成功；每次提问独立检索，不把历史当多轮上下文 |
 
 所有输出前检查以当前可见性为准。历史答案文本可能包含删除前已经显示的内容；不可借其来源访问已失效原文件。源版本保留期限待确认，不能无限保留或直接承诺固定天数。
+
+### KF2-012/013 局部凭证与知识库候选
+
+注册和登录使用 email + password JSON；密码长度候选为 12–128 字符。Java 使用 PBKDF2 编码器，仅持久化密码哈希。成功注册/登录返回一次性显示的 32 随机字节 opaque Bearer token、用户 ID/email 和 `expires_at`；服务端只保存 token 的 SHA-256 哈希。access token 有效期为 8 小时，无 refresh token；logout 撤销当前 token。重复邮箱的注册响应使用通用消息，但 409 状态仍可能暴露邮箱冲突；需要 M/Q 在产品集成前评估验证邮箱或限速设计。客户端凭证存放、浏览器持久化、CSRF/跨站策略和登录速率限制也待确认；当前 API 仅接受 Authorization Bearer，不设置 Cookie。
+
+知识库列表默认 `limit=50`、`offset=0`，最大 `limit=100`、最大 `offset=1000000`；只查询认证主体拥有且 ACTIVE 的知识库。不存在、他人所有及已删除 ID 返回相同 404。删除立即标记知识库及其文档不可见并撤销未完成的索引任务；对象与向量物理回收由后续存储/清理任务接入。
 
 ## 内部入口与租约
 

@@ -6,5 +6,5 @@ public record ApiError(
         String code,
         String message,
         boolean retryable) {
-    public static final String CONTRACT_VERSION = "0.2.0-draft.3";
+    public static final String CONTRACT_VERSION = "0.2.0-draft.4";
 }

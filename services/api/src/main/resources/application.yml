@@ -4,6 +4,10 @@ spring:
   mvc:
     problemdetails:
       enabled: false
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: true
 
 server:
   port: ${SERVER_PORT:8080}

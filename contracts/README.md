@@ -1,8 +1,8 @@
 # KnowFlow 公共契约（V0.2 重建基线；提议草案）
 
-**状态：DRAFT 0.2.0-draft.3，未冻结、未发布；不能用于生产兼容性验收。**
+**状态：DRAFT 0.2.0-draft.4，未冻结、未发布；不能用于生产兼容性验收。**
 
-`0.2.0-draft.3` 为 JP-01 局部开发候选：新增受认证的内部健康响应 `InternalHealth`（`contract_version`、`status: UP`、`request_id`），并统一候选错误版本号。它不改变公开业务 API，也不表示 B 已确认消费或 KF2-004 已冻结。
+`0.2.0-draft.3` 为 JP-01 局部开发候选，新增受认证的内部健康响应。`0.2.0-draft.4` 增加 KF2-012/013 的注册、登录、8 小时 opaque Bearer session、logout/current-user 与个人知识库结构；密码使用 PBKDF2 哈希，数据库只存 token SHA-256，知识库 owner 只由认证身份派生。注册冲突返回通用错误，但 409 状态仍可能暴露邮箱冲突，须由 M/Q 评估验证邮箱或限速方案。候选仍待 M 消费确认和 Q 审阅，不表示 KF2-004 已冻结。
 
 A 单写共享 API、错误码、身份与资源范围、任务租约、索引版本发布、证据定位、删除失效及历史来源语义。B/M 可提交消费场景、字段提议和样例，不另行发布不兼容版本。
 
@@ -10,6 +10,7 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 
 - [状态与权限 ADR](../docs/architecture/ADR-001-state-and-contract-draft.md)
 - [索引写入边界提案](../docs/architecture/ADR-002-index-write-boundary-proposal.md)
+- [认证与 owner 隔离 ADR](../docs/architecture/ADR-003-auth-and-owner-boundary.md)
 - [候选 API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
