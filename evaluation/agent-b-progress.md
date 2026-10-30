@@ -105,3 +105,5 @@ B 线工具 services/ai/tools/java_python_smoke.py 将原 Java 源码/构建输�
 此为 B 提供的开发联调证据，不代替 A 的正式集成候选/Q。Java 对外网关尚无调用入口，上游异常到公开 502/504 的业务边界映射仍待 A 接入；不把 transport 异常检查说成公开网关已验收。KNOWFLOW_INTERNAL_SHARED_SECRET 共享方式与内部 health 路径仍是待 A 发布的新候选约定。
 
 最终环境复现：全新虚拟环境 frozen 同步后 33 项 Python 测试通过，源码分发包和 wheel 构建成功；已有 39 项契约结构样例及 16 项模型离线回归通过。本轮所有模型线上调用次数为 0。三个 KF2 任务均 IN_REVIEW（开发验证通过），未伪报批准或正式 DONE。详细 SHA 和可复制命令见 evaluation/python-jp01-delivery.md。
+
+补充真实启动失败验证：缺失、过短、含控制字符的内部密钥均使 Uvicorn 工厂非零退出，错误固定 INTERNAL_SECRET_INVALID、日志不含测试密钥；证据 startup-failures.json。本轮累计代码审阅 target 7a99ddfe3b524ef47c4500a41db46fc0ae4c5f1f，逐任务 SHA 及未执行项见 python-jp01-delivery.md。
