@@ -1,0 +1,176 @@
+{
+  "recorded_at": "2026-10-30T13:10:45.456040+08:00",
+  "git_head_at_run": "225124fbae8041efd67ee5e6ca5bf89fdbbe8884",
+  "parser_sha256": "cafe5887140be1ee5e1d9d823a0f8121674d3f396e414b79f54403969a45fe2d",
+  "checks": [
+    {
+      "format": "txt",
+      "case": "nbsp",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "ideographic",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "vertical-tab",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "form-feed",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "next-line",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "em-space",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "line-separator",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "paragraph-separator",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "ascii",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "bom",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "mixed-bom",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "a1aceb8863f9c09b353d398757f442e3339a3db96aefc7dfe2a14b0eae07f5b9"
+    },
+    {
+      "format": "txt",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "e834e1d072daa33bdb469b6d8d014706d7f21aec631894ffed9bf0ba7c3f33db"
+    },
+    {
+      "format": "txt",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "2a0ecd3b6ddad906b7ce3805b55e427ca82233ec8231786a96f94955db28e1bc"
+    },
+    {
+      "format": "md",
+      "case": "nbsp",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "ideographic",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "vertical-tab",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "form-feed",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "next-line",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "em-space",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "line-separator",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "paragraph-separator",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "ascii",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "bom",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "mixed-bom",
+      "status": "PASSED",
+      "error": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "a1aceb8863f9c09b353d398757f442e3339a3db96aefc7dfe2a14b0eae07f5b9"
+    },
+    {
+      "format": "md",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "e834e1d072daa33bdb469b6d8d014706d7f21aec631894ffed9bf0ba7c3f33db"
+    },
+    {
+      "format": "md",
+      "case": "valid-body-preservation",
+      "status": "PASSED",
+      "source_sha256": "2a0ecd3b6ddad906b7ce3805b55e427ca82233ec8231786a96f94955db28e1bc"
+    }
+  ],
+  "scope": "Synthetic inputs only; classification does not mutate valid input or offsets."
+}

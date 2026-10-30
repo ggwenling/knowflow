@@ -1,5 +1,7 @@
 # Python / JP-01 开发交付与 Q 复核包
 
+此为 python@e4efd05 的历史交付。Q 指出的空白处理及 draft.4 消费升级已在后续修复，当前修复 SHA 和干净候选证据见 [Q 修复复核包](python-q-review-fixes.md)。
+
 日期：2026-10-30（Asia/Hong_Kong）。分支 python；作者 B。本轮依据用户指令不等待旧复核，顺序交付 KF2-007、010、016 与 B 侧双服务联调。状态均为 **IN_REVIEW（开发验证通过）**，不是 Q APPROVED 或正式 DONE。
 
 ## 精确范围

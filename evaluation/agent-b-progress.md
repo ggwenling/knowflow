@@ -107,3 +107,9 @@ B 线工具 services/ai/tools/java_python_smoke.py 将原 Java 源码/构建输�
 最终环境复现：全新虚拟环境 frozen 同步后 33 项 Python 测试通过，源码分发包和 wheel 构建成功；已有 39 项契约结构样例及 16 项模型离线回归通过。本轮所有模型线上调用次数为 0。三个 KF2 任务均 IN_REVIEW（开发验证通过），未伪报批准或正式 DONE。详细 SHA 和可复制命令见 evaluation/python-jp01-delivery.md。
 
 补充真实启动失败验证：缺失、过短、含控制字符的内部密钥均使 Uvicorn 工厂非零退出，错误固定 INTERNAL_SECRET_INVALID、日志不含测试密钥；证据 startup-failures.json。本轮累计代码审阅 target 7a99ddfe3b524ef47c4500a41db46fc0ae4c5f1f，逐任务 SHA 及未执行项见 python-jp01-delivery.md。
+
+## Q 对 python@e4efd05 的修复（2026-10-30，Asia/Hong_Kong）
+
+B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断覆盖 str.isspace() Unicode 空白与既有 BOM allowance，保留有效文本、哈希和码点偏移；新增负例先复现 18 failed/10 passed，再全部通过。明确消费 A 的 895a1ba 发布的 draft.4 与精确 Schema 哈希 ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41，更新响应版本、样例、测试和消费记录，拒绝旧版本/额外字段/错误 Schema，不放宽校验。
+
+与 A 最新 target ec5c71c（含 406 修复）配对，干净集成候选 225124fbae8041efd67ee5e6ca5bf89fdbbe8884 上 65 项 Python、54 个契约样例、16 项模型离线回归及 8 项真实 Java/Python 集成测试通过。真实 AiInternalHealthClient 接受 Python draft.4，旧版本夹具拒绝及 5 秒总期限保持。运行前后工作区均干净，没有覆盖 contracts 或改 Java；新证据单独保存，旧 draft.2 报告保持历史。跨会话消息工具当前不可用，按远端 SHA/候选和复核包与 A 交接，不代替 A 确认或 Q 批准。详情见 python-q-review-fixes.md；任务状态仍 IN_REVIEW。
