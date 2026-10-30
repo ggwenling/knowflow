@@ -1,0 +1,45 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Language tooling and generated output
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+.next/
+coverage/
+dist/
+build/
+target/
+
+# Local application data and private fixtures
+/data/private/
+/data/raw/
+*.sqlite
+*.sqlite3
+*.db
+
+# Downloaded model weights and caches
+/models/
+model-cache/
+.cache/huggingface/
+**/.cache/huggingface/
+**/huggingface/hub/
+*.safetensors
+*.gguf
+
+# Editor and operating-system noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
