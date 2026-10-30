@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-30T16:42:24.363514+08:00",
+  "status": "LIVE_EMBEDDING_PASSED",
+  "provider": "siliconflow",
+  "endpoint": "https://api.siliconflow.cn/v1/embeddings",
+  "requested_model": "BAAI/bge-m3",
+  "expected_dimensions": 1024,
+  "input_kind": "single_original_synthetic_text",
+  "input_sha256": "b215d0568643ab529e774f3f5b8d899fe6706df6d3ead7f1bd3d803ab810d85a",
+  "network_attempted": true,
+  "automatic_retries": 0,
+  "response_model": "BAAI/bge-m3",
+  "vector_count": 1,
+  "vector_dimensions": 1024,
+  "vector_all_finite": true,
+  "usage": {
+    "prompt_tokens": 26,
+    "completion_tokens": 0,
+    "total_tokens": 26
+  },
+  "duration_ms": 2009,
+  "git_head_at_run": "0e079e92280e8370e5914d06dd88ebc7da1ed979",
+  "runner_sha256": "03c243fd3afb4d2c18703e9dc6a89e48c37aa91530e87933fa568ef57be9bad9",
+  "adapter_sha256": "752005f8c29e9d42b688fc699e226a22795154ca9f7afeb4df3bf59e2043dc72"
+}
