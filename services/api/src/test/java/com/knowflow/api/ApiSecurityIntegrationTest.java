@@ -85,7 +85,7 @@ class ApiSecurityIntegrationTest {
     @Test
     void requestIdIsGeneratedAndSharedByErrorBodyAndHeader() throws Exception {
         var response = mockMvc.perform(get("/internal/test-auth")
-                        .header(RequestIdFilter.HEADER, "caller-controlled-id"))
+                        .header(RequestIdFilter.HEADER, "caller controlled id"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.5"))
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
@@ -93,10 +93,23 @@ class ApiSecurityIntegrationTest {
 
         String responseId = response.getResponse().getHeader(RequestIdFilter.HEADER);
         UUID.fromString(responseId);
-        assertThat(responseId).isNotEqualTo("caller-controlled-id");
+        assertThat(responseId).isNotEqualTo("caller controlled id");
         assertThat(response.getResponse().getContentAsString())
                 .contains(responseId)
                 .doesNotContain(INTERNAL_SECRET);
+    }
+
+    @Test
+    void safeRequestIdIsPreservedAndSharedByErrorBodyAndHeader() throws Exception {
+        String requestId = "caller-controlled-id:42";
+        var response = mockMvc.perform(get("/internal/test-auth")
+                        .header(RequestIdFilter.HEADER, requestId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(RequestIdFilter.HEADER, requestId))
+                .andExpect(jsonPath("$.request_id").value(requestId))
+                .andReturn();
+
+        assertThat(response.getResponse().getContentAsString()).doesNotContain(INTERNAL_SECRET);
     }
 
     @Test

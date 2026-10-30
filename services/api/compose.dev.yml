@@ -1,0 +1,45 @@
+name: knowflow-api-dev
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    environment:
+      POSTGRES_DB: knowflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KNOWFLOW_DEV_POSTGRES_PASSWORD:?set KNOWFLOW_DEV_POSTGRES_PASSWORD in the local env file}
+      KNOWFLOW_DEV_MIGRATOR_PASSWORD: ${KNOWFLOW_DEV_MIGRATOR_PASSWORD:?set KNOWFLOW_DEV_MIGRATOR_PASSWORD in the local env file}
+      KNOWFLOW_DEV_APP_PASSWORD: ${KNOWFLOW_DEV_APP_PASSWORD:?set KNOWFLOW_DEV_APP_PASSWORD in the local env file}
+      KNOWFLOW_DEV_AI_PASSWORD: ${KNOWFLOW_DEV_AI_PASSWORD:?set KNOWFLOW_DEV_AI_PASSWORD in the local env file}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - knowflow-api-dev-postgres:/var/lib/postgresql/data
+      - ./src/main/resources/db/bootstrap-roles.sql:/docker-entrypoint-initdb.d/10-bootstrap-roles.sql:ro
+      - ./docker/dev/20-set-role-passwords.sh:/docker-entrypoint-initdb.d/20-set-role-passwords.sh:ro
+      - ./docker/dev/20-set-role-passwords.sql:/tmp/20-set-role-passwords.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: bitnamilegacy/minio:2025.4.22@sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01
+    environment:
+      MINIO_ROOT_USER: ${KNOWFLOW_DEV_MINIO_ROOT_USER:?set KNOWFLOW_DEV_MINIO_ROOT_USER in the local env file}
+      MINIO_ROOT_PASSWORD: ${KNOWFLOW_DEV_MINIO_ROOT_PASSWORD:?set KNOWFLOW_DEV_MINIO_ROOT_PASSWORD in the local env file}
+    ports:
+      - "127.0.0.1:59000:9000"
+      - "127.0.0.1:59001:9001"
+    volumes:
+      - knowflow-api-dev-minio:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  knowflow-api-dev-postgres:
+    name: knowflow-api-dev-postgres
+  knowflow-api-dev-minio:
+    name: knowflow-api-dev-minio

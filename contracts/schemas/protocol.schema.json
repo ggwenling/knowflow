@@ -114,7 +114,8 @@
             "MODEL_TIMEOUT",
             "MODEL_FAILURE",
             "INDEX_WRITE_FAILED",
-            "EXECUTION_CANCELLED"
+            "EXECUTION_CANCELLED",
+            "WORKER_LOST"
           ]
         },
         "message": {
@@ -201,6 +202,31 @@
         }
       }
     },
+    "HeartbeatReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "task_id",
+        "lease_expires_at"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lease_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "CompletionReceipt": {
       "type": "object",
       "additionalProperties": false,
@@ -265,7 +291,10 @@
             "INTERNAL_ERROR",
             "BATCH_CONFLICT",
             "INDEX_INTEGRITY_FAILED",
-            "SOURCE_UNAVAILABLE"
+            "SOURCE_UNAVAILABLE",
+            "UNSUPPORTED_CONTENT",
+            "RESOURCE_LIMIT",
+            "STORAGE_UNAVAILABLE"
           ]
         },
         "message": {
@@ -1125,7 +1154,9 @@
       "required": [
         "contract_version",
         "request_id",
-        "lease"
+        "task_id",
+        "lease_id",
+        "fencing"
       ],
       "properties": {
         "contract_version": {
@@ -1134,8 +1165,15 @@
         "request_id": {
           "$ref": "#/$defs/Identifier"
         },
-        "lease": {
-          "$ref": "#/$defs/LeaseContext"
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lease_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "fencing": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -1306,7 +1344,8 @@
             "MODEL_TIMEOUT",
             "MODEL_FAILURE",
             "INDEX_WRITE_FAILED",
-            "EXECUTION_CANCELLED"
+            "EXECUTION_CANCELLED",
+            "WORKER_LOST"
           ]
         },
         "created_at": {
@@ -1316,6 +1355,134 @@
         "updated_at": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "Document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "id",
+        "knowledge_base_id",
+        "original_name",
+        "status",
+        "format",
+        "byte_size",
+        "source_sha256",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "knowledge_base_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "original_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "status": {
+          "enum": [
+            "PROCESSING",
+            "READY",
+            "FAILED"
+          ]
+        },
+        "format": {
+          "enum": [
+            "txt",
+            "md",
+            "pdf"
+          ]
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8388608
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "active_index_version_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "DocumentList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "items",
+        "limit",
+        "offset",
+        "has_more"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Document"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      }
+    },
+    "IndexExecutionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "task_id",
+        "index_version_id",
+        "result"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "index_version_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "result": {
+          "const": "ACCEPTED"
         }
       }
     }

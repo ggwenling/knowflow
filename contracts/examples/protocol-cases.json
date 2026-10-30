@@ -51,6 +51,18 @@
     }
   },
   {
+    "name": "heartbeat-receipt",
+    "definition": "HeartbeatReceipt",
+    "structurally_valid": true,
+    "note": "The lease expiry is chosen by Java using database time; the client cannot extend by a requested duration.",
+    "payload": {
+      "contract_version": "0.2.0-draft.5",
+      "request_id": "request-example-1",
+      "task_id": "task-example-1",
+      "lease_expires_at": "2026-10-30T00:01:00+08:00"
+    }
+  },
+  {
     "name": "completion-success",
     "definition": "Completion",
     "structurally_valid": true,
@@ -5128,18 +5140,9 @@
     "payload": {
       "contract_version": "0.2.0-draft.5",
       "request_id": "request-cancel-1",
-      "lease": {
         "task_id": "11111111-1111-4111-8111-111111111111",
-        "owner_id": "22222222-2222-4222-8222-222222222222",
-        "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
-        "document_id": "44444444-4444-4444-8444-444444444444",
-        "content_version_id": "55555555-5555-4555-8555-555555555555",
-        "index_version_id": "66666666-6666-4666-8666-666666666666",
-        "pipeline_profile_id": "pipeline-v1",
         "lease_id": "77777777-7777-4777-8777-777777777777",
-        "fencing": 3,
-        "execution_token": "EXAMPLE_ONLY_NOT_A_USABLE_EXECUTION_TOKEN_1234567890"
-      }
+        "fencing": 3
     }
   },
   {
@@ -5234,6 +5237,81 @@
       "code": "BATCH_CONFLICT",
       "message": "The batch conflicts with an accepted batch.",
       "retryable": false
+    }
+  },
+  {
+    "name": "document-processing",
+    "definition": "Document",
+    "structurally_valid": true,
+    "note": "Metadata only; READY requires Java integrity check and active version publication.",
+    "payload": {
+      "contract_version": "0.2.0-draft.5",
+      "id": "44444444-4444-4444-8444-444444444444",
+      "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
+      "original_name": "notes.txt",
+      "status": "PROCESSING",
+      "format": "txt",
+      "byte_size": 64,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_at": "2026-10-30T08:00:00Z",
+      "updated_at": "2026-10-30T08:00:00Z"
+    }
+  },
+  {
+    "name": "document-list",
+    "definition": "DocumentList",
+    "structurally_valid": true,
+    "note": "Only owner-visible and non-deleted documents may appear.",
+    "payload": {
+      "contract_version": "0.2.0-draft.5",
+      "items": [
+        {
+          "contract_version": "0.2.0-draft.5",
+          "id": "44444444-4444-4444-8444-444444444444",
+          "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
+          "original_name": "notes.txt",
+          "status": "PROCESSING",
+          "format": "txt",
+          "byte_size": 64,
+          "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "created_at": "2026-10-30T08:00:00Z",
+          "updated_at": "2026-10-30T08:00:00Z"
+        }
+      ],
+      "limit": 50,
+      "offset": 0,
+      "has_more": false
+    }
+  },
+  {
+    "name": "reject-document-over-size-limit",
+    "definition": "Document",
+    "structurally_valid": false,
+    "note": "Development upload ceiling is 8 MiB.",
+    "payload": {
+      "contract_version": "0.2.0-draft.5",
+      "id": "44444444-4444-4444-8444-444444444444",
+      "knowledge_base_id": "33333333-3333-4333-8333-333333333333",
+      "original_name": "notes.txt",
+      "status": "PROCESSING",
+      "format": "txt",
+      "byte_size": 8388609,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_at": "2026-10-30T08:00:00Z",
+      "updated_at": "2026-10-30T08:00:00Z"
+    }
+  },
+  {
+    "name": "index-execution-accepted",
+    "definition": "IndexExecutionReceipt",
+    "structurally_valid": true,
+    "note": "A 202 response means Python accepted a bounded execution; it does not mean indexing succeeded.",
+    "payload": {
+      "contract_version": "0.2.0-draft.5",
+      "request_id": "request-dispatch-1",
+      "task_id": "11111111-1111-4111-8111-111111111111",
+      "index_version_id": "66666666-6666-4666-8666-666666666666",
+      "result": "ACCEPTED"
     }
   }
 ]

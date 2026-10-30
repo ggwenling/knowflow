@@ -67,7 +67,7 @@ class PostgreSqlMigrationIntegrationTest {
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
 
             var extensionVersion = queryString(
                     "SELECT extversion FROM pg_extension WHERE extname = 'vector'");
@@ -168,6 +168,18 @@ class PostgreSqlMigrationIntegrationTest {
                                 'text_range', 6, 15)
                             """);
                     assertPermissionDenied(ai, "SELECT token_sha256 FROM knowflow.user_sessions");
+                    assertPermissionDenied(ai,
+                            "SELECT count(*) FROM knowflow.index_batch_receipts");
+                    assertPermissionDenied(ai,
+                            "SELECT count(*) FROM knowflow.storage_cleanup_queue");
+                    assertPermissionDenied(ai,
+                            "SELECT count(*) FROM knowflow.index_cleanup_queue");
+                    assertPermissionDenied(ai,
+                            "SELECT count(*) FROM knowflow.execution_cancellation_queue");
+                    assertPermissionDenied(ai, "SELECT count(*) FROM knowflow.questions");
+                    assertPermissionDenied(ai,
+                            "SELECT count(*) FROM knowflow.question_scope_indexes");
+                    assertPermissionDenied(ai, "SELECT count(*) FROM knowflow.question_sources");
                 }
 
                 assertPermissionDenied(app, "CREATE TABLE knowflow.forbidden_ddl (id INTEGER)");

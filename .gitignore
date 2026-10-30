@@ -5,6 +5,7 @@
 **/.env
 **/.env.*
 !**/.env.example
+!services/api/.env.dev.example
 *.pem
 *.key
 *.p12
