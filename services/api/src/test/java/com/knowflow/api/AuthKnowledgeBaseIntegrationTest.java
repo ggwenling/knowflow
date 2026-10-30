@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.sql.Connection;
@@ -95,6 +96,18 @@ class AuthKnowledgeBaseIntegrationTest {
     @Test
     void registrationAndLoginUseHashedPasswordsAndOpaqueRevocableSessions() throws Exception {
         String password = "synthetic-user-password-123";
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(registerBody("unsupported-content-type@example.test",
+                                "synthetic-registration-password")))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(header().string(org.springframework.http.HttpHeaders.ACCEPT,
+                        org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)))
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message")
+                        .value("The request content type is not supported."));
+
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody("short@example.test", "too-short")))

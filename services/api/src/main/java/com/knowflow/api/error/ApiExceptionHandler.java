@@ -3,9 +3,9 @@ package com.knowflow.api.error;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.beans.TypeMismatchException;
@@ -51,14 +51,8 @@ public class ApiExceptionHandler {
     void methodNotSupported(HttpServletRequest request, HttpServletResponse response,
                             HttpRequestMethodNotSupportedException exception)
             throws java.io.IOException {
-        var supportedMethods = exception.getSupportedHttpMethods();
-        if (supportedMethods != null && !supportedMethods.isEmpty()) {
-            response.setHeader(HttpHeaders.ALLOW, supportedMethods.stream()
-                    .map(HttpMethod::name)
-                    .sorted()
-                    .collect(java.util.stream.Collectors.joining(", ")));
-        }
-        errors.write(request, response, HttpStatus.METHOD_NOT_ALLOWED, "INVALID_REQUEST",
+        copyHeaders(exception.getHeaders(), response);
+        errors.write(request, response, exception.getStatusCode(), "INVALID_REQUEST",
                 "The HTTP method is not supported for this endpoint.");
     }
 
@@ -66,8 +60,7 @@ public class ApiExceptionHandler {
     void notAcceptable(HttpServletRequest request, HttpServletResponse response,
                        HttpMediaTypeNotAcceptableException exception)
             throws java.io.IOException {
-        exception.getHeaders().forEach((name, values) -> values.forEach(
-                value -> response.addHeader(name, value)));
+        copyHeaders(exception.getHeaders(), response);
         var status = exception.getStatusCode();
         boolean clientError = status.is4xxClientError();
         String code = clientError ? "INVALID_REQUEST" : "INTERNAL_ERROR";
@@ -75,6 +68,19 @@ public class ApiExceptionHandler {
                 ? "The requested response media type is not acceptable."
                 : "The request could not be processed.";
         errors.write(request, response, status, code, message);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    void unsupportedContentType(HttpServletRequest request, HttpServletResponse response,
+                                HttpMediaTypeNotSupportedException exception)
+            throws java.io.IOException {
+        copyHeaders(exception.getHeaders(), response);
+        errors.write(request, response, exception.getStatusCode(), "INVALID_REQUEST",
+                "The request content type is not supported.");
+    }
+
+    private static void copyHeaders(HttpHeaders headers, HttpServletResponse response) {
+        headers.forEach((name, values) -> values.forEach(value -> response.addHeader(name, value)));
     }
 
     @ExceptionHandler(Exception.class)
