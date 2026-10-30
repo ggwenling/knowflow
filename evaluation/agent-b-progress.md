@@ -113,3 +113,24 @@ B 线工具 services/ai/tools/java_python_smoke.py 将原 Java 源码/构建输�
 B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断覆盖 str.isspace() Unicode 空白与既有 BOM allowance，保留有效文本、哈希和码点偏移；新增负例先复现 18 failed/10 passed，再全部通过。明确消费 A 的 895a1ba 发布的 draft.4 与精确 Schema 哈希 ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41，更新响应版本、样例、测试和消费记录，拒绝旧版本/额外字段/错误 Schema，不放宽校验。
 
 与 A 最新 target ec5c71c（含 406 修复）配对，干净集成候选 225124fbae8041efd67ee5e6ca5bf89fdbbe8884 上 65 项 Python、54 个契约样例、16 项模型离线回归及 8 项真实 Java/Python 集成测试通过。真实 AiInternalHealthClient 接受 Python draft.4，旧版本夹具拒绝及 5 秒总期限保持。运行前后工作区均干净，没有覆盖 contracts 或改 Java；新证据单独保存，旧 draft.2 报告保持历史。跨会话消息工具当前不可用，按远端 SHA/候选和复核包与 A 交接，不代替 A 确认或 Q 批准。详情见 python-q-review-fixes.md；任务状态仍 IN_REVIEW。
+
+## JP2 第一批 B02 / B03 开发交付（2026-10-30，Asia/Hong_Kong）
+
+按用户提供的《Java / Python 下一轮并行开发计划》推进 Python 第一批可独立工作。基线 `b598f1d62cc2367a4bfd49fccd3c31b521abff23`。B02 分段提交 `338c6329742273f01eae8f9ac2956367c9d82f60`；B03 Embedding 提交 `0e079e92280e8370e5914d06dd88ebc7da1ed979`。本记录仅覆盖 B 拥有的 Python/evaluation 文档与实现，不替 Q 或 A 更新结论。
+
+- **B02 / KF2-017 开发验证**：新增纯函数分段器，默认上限 800 Unicode 码点、重叠上限 100；优先标题/段落与句子边界，可复现 Chunk ID、profile ID、正文哈希及来源定位。文本 Chunk 可按原始码点区间切回原文；PDF 保留物理页且绝不跨页拼接。现有 15 道种子题的每条已标注证据均可在对应 Chunk 内复核。定向 11 项测试通过。详情见 `services/ai/docs/chunking.md`。
+- **B03 / KF2-018 Embedding 开发验证**：新增锁定硅基流动 `BAAI/bge-m3` / 1024 维的适配器；只接受该 HTTPS 主机和固定模型；读取显式选定环境变量；批次 1–32、单条最多 800 码点、响应上限 2 MiB、单次请求无自动重试。校验模型别名、结果数量与顺序索引、向量维数及有限非零数值；错误、响应正文与密钥均不写入证据。单测覆盖凭证选择、URL拒绝、错误模型/向量、429/超时/响应上限/重定向和不重试。详情见 `services/ai/docs/embedding.md`。
+- **真实模型冒烟**：只向硅基流动发送一条内置原创合成中文短句；本次结果为 `LIVE_EMBEDDING_PASSED`，返回模型 `BAAI/bge-m3`、1 条 1024 维有限向量，26 prompt tokens，约 2.0 秒；无自动重试。证据 `services/ai/docs/evidence/embedding-live-20261030-b03.json` 记录模型/维数/用量/延迟及代码哈希，不保存输入、向量、响应正文或凭证。用量不是实际账单；本次不做 DeepSeek 调用。
+- **回归**：Python 全量 100 passed（包括 B02/B03）；共享契约 54 个结构样例通过；既有模型离线回归 16 项通过；10 份种子文档、15 道问题及全部答案位置校验通过。另有一条现存 Starlette/httpx 上游弃用提示，不影响测试结果。
+
+## JP2 第一批双服务验证补充
+
+在 `03d2ed80f9d45404b4fd0604017ff616eb0a3c41` 上配对 A 的真实 Java 代码提交 `ec5c71c9be5a8766540fc48e174f215c0cf388ac`，使用干净工作树运行既有 `java_python_smoke.py --require-clean`。8 项真实 Spring/WebClient + Uvicorn 健康/认证/错误/请求关联/超时检查全部通过，运行前后工作树 clean；证据见 `services/ai/docs/evidence/java-python-jp2-first-batch.json`。本次模型调用 0、数据库调用 0；这只复验 draft.4 双服务健康契约，不表示 draft.5、上传、索引批次或业务问答已接通。
+
+本轮仍处第一批。远端 `java` 未变化，当前可见 HEAD 为 `894fc763b3c19a51225365f749e07cc033a4db34`，尚无计划要求的 draft.5 提交/Schema。按分工，B01 必须等 A02 发布后才能消费；B04/05/06 需要新契约中的源读取、批次、完成和取消定义，不能由 B 自行猜写。Q 最新复审所列注册接口 `Content-Type: text/plain` 的 415→500 问题归 A 修复。B02/B03 保持待独立 Q 审阅，不声称其余任务完成。
+
+## JP2 / B03 代码审查问题修复（2026-10-30）
+
+针对 B03 复审反馈修复两处边界问题：供应商 Embedding 响应的顶层及 data 行 `object` 等扩展字段不再透传，内部结果通过仓库共享 `EmbeddingResult` Schema 校验；请求现在逐次显式应用配置超时并设置 `follow_redirects=False`，对调用方注入的宽松 httpx 客户端同样有效。离线 307 测试注入 `timeout=None, follow_redirects=True` 的客户端，并验证请求只抵达原主机、正文未转发，且请求扩展携带配置超时。未调用真实模型。
+
+验证：Python 全量测试 100 passed；共享契约结构样例 54/54 通过；`git diff --check` 通过。B03 仍待独立 Q 审阅，未据此更新任务验收状态。

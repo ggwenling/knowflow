@@ -92,6 +92,12 @@ def test_unhandled_and_validation_errors_redact_inputs(app):
     @app.get('/internal/test-timeout')
     async def timeout():
         raise ProcessingError('PROCESSING_TIMEOUT', 504)
+    @app.get('/internal/test-non-retryable-model-failure')
+    async def non_retryable_model_failure():
+        raise ProcessingError('MODEL_FAILURE', 502, retryable=False)
+    @app.get('/internal/test-invalid-provider-input')
+    async def invalid_provider_input():
+        raise ProcessingError('INVALID_EMBEDDING_INPUT', 400, retryable=False)
     with TestClient(app) as client:
         r = client.post('/internal/test-validation', headers=AUTH, json={'count': 'PRIVATE', 'owner_id': 'private'})
         assert r.status_code == 400
@@ -101,6 +107,13 @@ def test_unhandled_and_validation_errors_redact_inputs(app):
         assert 'PRIVATE' not in r.text
         r = client.get('/internal/test-timeout', headers=AUTH)
         assert r.status_code == 504 and r.json()['code'] == 'PROCESSING_TIMEOUT'
+        assert r.json()['retryable'] is True
+        r = client.get('/internal/test-non-retryable-model-failure', headers=AUTH)
+        assert r.status_code == 502 and r.json()['code'] == 'AI_PROCESSING_FAILED'
+        assert r.json()['retryable'] is False
+        r = client.get('/internal/test-invalid-provider-input', headers=AUTH)
+        assert r.status_code == 400 and r.json()['code'] == 'INVALID_REQUEST'
+        assert r.json()['retryable'] is False
 
 
 def test_consumer_matches_all_shared_examples(app):
