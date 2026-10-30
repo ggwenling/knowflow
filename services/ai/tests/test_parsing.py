@@ -83,3 +83,33 @@ def test_committed_pdf_fixture_hashes():
     for fixture in json.loads((FIXTURES/'manifest.json').read_text())['fixtures']:
         raw=(FIXTURES/fixture['path']).read_bytes()
         assert len(raw)==fixture['bytes'] and sha256(raw).hexdigest()==fixture['sha256']
+
+
+@pytest.mark.parametrize('format', ['txt', 'md'])
+@pytest.mark.parametrize('text', [
+    '\u00a0', '\u3000', '\v', '\f', '\u0085', '\u2003', '\u2028', '\u2029',
+    ' \t\r\n', '\ufeff', '\ufeff \u00a0\u3000\v\f\u0085\u2028\u2029\ufeff',
+], ids=['nbsp', 'ideographic', 'vertical-tab', 'form-feed', 'next-line',
+        'em-space', 'line-separator', 'paragraph-separator', 'ascii', 'bom', 'mixed-bom'])
+def test_unicode_whitespace_only_is_empty(format, text):
+    with pytest.raises(ParseFailure) as exc:
+        parse_document(text.encode('utf-8'), format=format, **IDS)
+    assert str(exc.value) == 'EMPTY_DOCUMENT'
+
+
+@pytest.mark.parametrize('format', ['txt', 'md'])
+@pytest.mark.parametrize('padding', ['\u00a0\u3000\v\f', '\ufeff\r\n\u2028', '\u2003\t\u0085'])
+def test_unicode_whitespace_around_body_preserves_every_codepoint(format, padding):
+    body = '# 中文🙂A'
+    text = padding + body + padding
+    raw = text.encode('utf-8')
+    result = parse_document(raw, format=format, **IDS)
+    block = result.blocks[0]
+    assert block.text == text
+    assert (block.char_start, block.char_end) == (0, len(text))
+    assert result.characters == len(text)
+    assert result.file_sha256 == sha256(raw).hexdigest()
+    start = len(padding)
+    assert block.text[start:start + len(body)] == body
+    emoji = start + body.index('🙂')
+    assert block.text[emoji:emoji + 1] == '🙂'

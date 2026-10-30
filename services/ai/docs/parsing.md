@@ -4,7 +4,7 @@
 
 入口 knowflow_ai.parsing.parse_document(data: bytes, format, document_id, content_version_id, file_id, limits)。这是内部纯函数，不注册 HTTP 处理路由、不接任意 URL/磁盘路径、不读数据库、不发布索引。调用者后续必须在可信服务边界完成授权、来源哈希核验与租约检查，解析成功不等于任务有权执行或已 READY。
 
-输出 ParsedDocument 保存三个来源身份、原始文件 SHA-256、格式、parser_profile、字符总量、总页数/空页及按序 TextBlock。TXT/MD 严格 UTF-8，保留 BOM、CRLF、原始 Markdown 和 Unicode 码点；块区间从 0 起、右端不含，未经归一化。PDF 提取非空页文本，页码从 1 起，空白中间页不使后续物理页号前移；没有页面坐标时不编造。PDF 字符顺序来自 pypdf，不宣称恢复了多栏阅读顺序。
+输出 ParsedDocument 保存三个来源身份、原始文件 SHA-256、格式、parser_profile、字符总量、总页数/空页及按序 TextBlock。TXT/MD 严格 UTF-8；仅由 Python str.isspace() 认定的 Unicode 空白（包括 U+00A0、U+3000、VT/FF 等）和 BOM 构成的内容返回 EMPTY_DOCUMENT。该检测只分类，不修改正文；有效文本保留 BOM、CRLF、原始 Markdown 和 Unicode 码点；块区间从 0 起、右端不含，未经归一化。PDF 提取非空页文本，页码从 1 起，空白中间页不使后续物理页号前移；没有页面坐标时不编造。PDF 字符顺序来自 pypdf，不宣称恢复了多栏阅读顺序。
 
 固定失败代码：EMPTY_DOCUMENT、INVALID_UTF8、INVALID_TEXT、UNSUPPORTED_FORMAT、INVALID_INPUT_TYPE、INVALID_SOURCE_IDENTITY、FILE_TOO_LARGE、TEXT_TOO_LARGE、INVALID_PDF、PDF_ENCRYPTED、PDF_PAGE_LIMIT、PDF_NO_TEXT。PDF_NO_TEXT 仅表示没有可提取文字（包括扫描/图像和空白页），不能仅靠这个错误断言文件一定是扫描件。加密 PDF 即使可能用空密码打开也拒绝，不猜密码。错误不包含输入、路径或第三方异常正文；pypdf 诊断不传播到应用日志。
 

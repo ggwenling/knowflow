@@ -73,7 +73,9 @@ def parse_document(data: bytes, *, format: str, document_id: str, content_versio
             raise ParseFailure('INVALID_UTF8') from None
         if '\x00' in text:
             raise ParseFailure('INVALID_TEXT')
-        if not text.strip('\ufeff \t\r\n'):
+        # Classify Unicode whitespace (plus the existing BOM allowance) without
+        # stripping or normalizing the original text used for source offsets.
+        if not any(ch != '\ufeff' and not ch.isspace() for ch in text):
             raise ParseFailure('EMPTY_DOCUMENT')
         if len(text) > limits.max_characters:
             raise ParseFailure('TEXT_TOO_LARGE')

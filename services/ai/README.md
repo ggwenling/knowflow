@@ -12,7 +12,7 @@ uv run --project services/ai --frozen uvicorn knowflow_ai.app:create_app --facto
 
 Java 进程使用相同 KNOWFLOW_INTERNAL_SHARED_SECRET。密钥必须为 32–256 字符的 Bearer token，允许 ASCII 字母、数字及 -._~+/，末尾可有 =；不符合时启动失败，错误不回显值。禁止把密钥放进命令行参数、日志或仓库。服务不加载 .env；配置从进程环境注入。
 
-默认读取仓库 contracts/schemas/protocol.schema.json，并检查精确哈希。非 editable 安装/部署时设置 KNOWFLOW_CONTRACT_PATH 为挂载的同一只读文件。缺失/哈希变化会启动失败；A 发布新候选后须按消费清单升级，不能绕过哈希校验。当前消费 0.2.0-draft.2，详见 [契约消费与提案](docs/contract-consumption.md)。内部 health 是 JP-01 开发提案，尚待 A 发布正式健康 Schema。
+默认读取仓库 contracts/schemas/protocol.schema.json，并检查精确哈希。非 editable 安装/部署时设置 KNOWFLOW_CONTRACT_PATH 为挂载的同一只读文件。缺失/哈希变化会启动失败；A 发布新候选后须按消费清单升级，不能绕过哈希校验。当前消费 0.2.0-draft.4，详见 [契约消费与提案](docs/contract-consumption.md)。内部 health 已纳入 A 的 draft.4 候选 Schema；候选尚未正式冻结。
 
 运行依赖与传递哈希锁定于 uv.lock；requirements.lock 是无开发依赖的 hash export，可用 pip --require-hashes 安装后再安装本项目。uv.lock 同时记录测试依赖；构建后端精确固定。元数据及许可证文件哈希见 [依赖许可证记录](docs/evidence/dependency-licenses.json)，仅记录当前 Linux 环境，条件平台依赖未安装项保留未知；不是法律许可批准。外部模型凭证沿用 .env.example 的变量选择器；本骨架不会读取/调用模型，健康不保证模型或数据库可用。
 

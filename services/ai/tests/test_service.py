@@ -45,7 +45,7 @@ def test_health_no_models_and_disabled_routes(client):
     assert client.get('/health/live').json() == {'status': 'UP'}
     r = client.get('/internal/v1/health', headers={**AUTH, 'X-Request-ID': 'java-trace-01'})
     assert r.status_code == 200
-    assert r.json() == {'status': 'UP', 'contract_version': '0.2.0-draft.2', 'request_id': 'java-trace-01'}
+    assert r.json() == {'status': 'UP', 'contract_version': '0.2.0-draft.4', 'request_id': 'java-trace-01'}
     assert r.headers['x-request-id'] == 'java-trace-01'
     for path in ('/internal/v1/index-executions', '/internal/v1/answers', '/docs', '/openapi.json'):
         assert client.post(path, headers=AUTH, json={'owner_id': 'forged'}).status_code == 404
@@ -150,3 +150,30 @@ async def test_deadline_cancel_and_failure_redaction():
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+def test_health_consumes_draft4_examples_without_version_fallback(app, client):
+    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft4.json').read_text())
+    for case in cases:
+        if case['valid']:
+            app.state.contract.validate('InternalHealth', case['payload'])
+        else:
+            with pytest.raises(InvalidMessage):
+                app.state.contract.validate('InternalHealth', case['payload'])
+    response = client.get('/internal/v1/health', headers=AUTH)
+    app.state.contract.validate('InternalHealth', response.json())
+    assert response.json()['contract_version'] == '0.2.0-draft.4'
+
+
+@pytest.mark.parametrize('mutation', ['draft2', 'draft3', 'same-json-different-bytes'])
+def test_startup_rejects_old_and_modified_schema_without_bypass(tmp_path, mutation):
+    raw = (ROOT / 'contracts/schemas/protocol.schema.json').read_bytes()
+    if mutation == 'same-json-different-bytes':
+        raw += b'\n'
+    else:
+        old = b'0.2.0-draft.2' if mutation == 'draft2' else b'0.2.0-draft.3'
+        raw = raw.replace(b'0.2.0-draft.4', old)
+    path = tmp_path / 'schema.json'
+    path.write_bytes(raw)
+    with pytest.raises(ConfigurationError, match='CONTRACT_HASH_MISMATCH'):
+        create_app(Settings(SECRET, path))
