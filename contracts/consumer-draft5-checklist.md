@@ -1,8 +1,8 @@
 # draft.5 消费清单（提交前核对）
 
-状态：随 A draft.5 候选发布；B 的实际消费提交、测试结果和 Q 结论待补。不要将该清单视为消费确认。
+状态：A 候选已提交，B 尚未消费，Q 审阅待处理。不要将该清单视为消费确认。
 
-A 契约作者在本次发布后填入不可变 A commit 与 `contracts/schemas/protocol.schema.json` SHA-256。消费者必须合入该提交或其必要祖先，并记录自己的 target SHA；复制字段或只使用相同版本字符串不算消费。
+A Java 候选代码提交：`489b746f9bfa8188041f12d9135cf98fe6846611`。`contracts/schemas/protocol.schema.json` SHA-256：`3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。消费者必须合入该提交或其必要祖先，并记录自己的 target SHA；复制字段或只使用相同版本字符串不算消费。当前 `origin/python` 为 `b598f1d62cc2367a4bfd49fccd3c31b521abff23`，仍固定 draft.4 / SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`，所以 B 消费项保持未完成。
 
 ## Python / B 索引消费者
 
