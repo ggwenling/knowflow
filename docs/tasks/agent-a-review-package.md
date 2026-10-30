@@ -90,3 +90,12 @@ cd services/api
 - 真实双进程运行的 B 原有 5 项检查，加上临时增加的 2 项 Java `AiInternalHealthClient` 检查，均通过。新增检查证明 Java 严格拒绝 B 的实际 `0.2.0-draft.2` health 响应、并在慢响应下约 5 秒结束。完整过程和边界见 [JP-I1 记录](java-python-integration.md)。
 - 此通过只证明 B 当前消费版本上的传输/认证/错误/超时行为。Java 要求 `0.2.0-draft.4`（SHA `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`），B 当前仍锁定 `0.2.0-draft.2`（SHA `edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087`）。合并候选直接跑 Python 测试有 8 项因 contract hash mismatch 失败；B 原 Schema/examples 下 33 项通过。因此 JP-I1 对 draft.4 尚未兼容，不应标为 DONE。
 - 请 Q 单独复核候选契约升级/消费责任与集成报告；不把本补充当作契约批准。A 没有修改 Python 服务、消费者常量、哈希或测试。
+
+
+## Q 复核修复：406 Content Negotiation（2026-10-30）
+
+- Review base `ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434` → fix target `24a07fd85c70cab3c522118697824727bf9651fe`。
+- `Accept` 无可用表示时，Spring 抛出的 `HttpMediaTypeNotAcceptableException` 不再落入通用 500 处理器。专用 handler 使用框架 status 与 headers，并返回标准 JSON 错误体；406 对应 `INVALID_REQUEST`，响应头保留 Spring 报告的支持媒体类型。
+- 回归测试：携带有效内部凭证访问 JSON 端点并发送 `Accept: application/xml`，断言状态 406、`Accept` 包含 `application/json`、`X-Request-ID` 存在、错误体为 draft.4 JSON 且 code/message 固定脱敏值。
+- 复核命令及结果：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`（22 项通过）；`python3 contracts/validate.py`（54 项通过）；`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`（16 项通过）；`git diff --check` 通过。
+- 请 Q 复核此 target 和响应头断言；尚无批准结论。
