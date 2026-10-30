@@ -18,12 +18,12 @@
 | 顺序 | 任务 | 依赖 | 实际状态 | 当前产物或解除条件 |
 |---|---|---|---|---|
 | 1 | KF2-001 V0.2 新基线决策 | 无 | IN_REVIEW | 用户授权采用新基线；原 V1.1 及旧任务映射仍未验证，见[兼容性记录](../architecture/compatibility.md) |
-| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 候选为 draft.4；当前 B 分支仍锁定 draft.2，联调升级条件见[记录](java-python-integration.md)；M 消费确认及 Q 审阅未完成 |
+| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 与 B 已共同消费 draft.4（B target `2623a62`）；Q 审阅及 M 消费确认仍待处理，见[联调记录](java-python-integration.md) |
 | 3 | KF2-006 Java 骨架 | 004、005 | IN_REVIEW | 骨架已可启动并通过认证/health/本地 WebClient 验收；005 与契约仍待审阅 |
 | 4 | KF2-011 迁移与受限角色 | 004、005 | IN_REVIEW | Flyway/pgvector 与真实 PostgreSQL 权限测试通过；Q/M 消费确认待处理 |
 | 5 | KF2-012 认证 | 006、011 | IN_REVIEW | 注册、登录、会话撤销/过期的真实 PostgreSQL 测试通过；Q 与安全/产品缺口待审阅 |
 | 6 | KF2-013 知识库隔离 | 012 | IN_REVIEW | owner-scoped CRUD 与删除状态真实 PostgreSQL 测试通过；Q 审阅、物理清理与并发删除协调待处理 |
-| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@e4efd054` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
+| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@2623a628` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
 | 8 | KF2-015 任务租约 | 007、014 | BLOCKED | B KF2-007 服务已交付，但仍依赖被阻断的 KF2-014 上传/状态基础设施 |
 | 9 | KF2-019 索引发布 | 015、018 | PLANNED | 需 B 的真实索引写入证据 |
 | 10 | KF2-023 问答入口 | 013、022 | PLANNED | 需 B 的真实生成与证据 |
@@ -104,18 +104,15 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 通过，21 项 Java 测试；真实 PostgreSQL 16.12/pgvector 0.8.1 覆盖 V1/V2、应用 profile、注册/登录/哈希/过期/撤销、双用户 owner 隔离、owner 注入、资源 404 和删除文档/任务状态。`python contracts/validate.py` 通过 54 项；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 通过 16 项；`git diff --check` 通过。
 - 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。此记录写入时 JP-I1 仍等待 B 服务；最新双进程状态见[联调记录](java-python-integration.md)。
 
-## 2026-10-30：JP-I1 真实双进程复核
+## 2026-10-30：JP-I1 draft.4 双进程完成
 
-- 联调候选：`integration/jp-01@4c6a00032c2ca186c8278301edcc941620465e93`，汇集 Java `3b76131071b88365d14237769a7d3d5d111b873a` 与 Python `e4efd054880c506c1e57a76f28f6710e3d761016`；未合并 main，也未改动 python 分支。
-- Python 原分支消费 draft.2 / SHA `edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087`；Java 当前 draft.4 / SHA `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。合并候选直接跑 Python 测试有 8 项因精确契约哈希不符而失败；用 B 分支原 Schema 和 examples 复核，33 项全量 Python 测试通过。
-- B 脚本启动真实 Uvicorn/Spring Boot 后，5 项原有跨进程场景通过。一次性额外断言让 Java `AiInternalHealthClient` 对实际 draft.2 响应按预期拒绝版本不匹配，并在真实慢响应下约 5 秒超时；合计 7 项通过。未把临时修改留在 B 文件范围。
-- 结论：传输/认证/request ID/404/405/网络失败与超时边界已开发验证；**JP-I1 对当前 draft.4 候选仍 `BLOCKED_CONTRACT_VERSION`**，待 B 明确升级消费后重跑无覆盖的集成测试。没有放宽 Java 严格版本检查。
-- 后续 Java 任务：KF2-014 `BLOCKED`，M 的 KF2-009 在最新 Python target 中未交付；KF2-015 同样等待 KF2-014。KF2-011/012/013 仍 `IN_REVIEW`，不得在缺 Q/M 确认时转 `DONE`。
+- A Java target：`ec5c71c9be5a8766540fc48e174f215c0cf388ac`；B Python target：`2623a6282b2695a8ef96e3553a849729efd42403`；共同消费 A draft.4 提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
+- 联调候选 `integration/jp01-draft4-final@343ce4fdc2b6df72f023c9346f59a927374cdaf8`。真实 Java/Python smoke 8/8 通过，且实际通过 `AiInternalHealthClient` 验证正确版本接受、draft.2 拒绝、5 秒 deadline。清洁运行报告与哈希见[联调记录](java-python-integration.md)。
+- B 全量测试 65 项、契约 54 项、Python 离线回归 16 项通过；Q 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe` 的 Java `verify` 22 项通过。KF2-004 仍是待审候选；JP-I1 开发验证通过但不代替 Q/M 正式审批。
+- KF2-014 仍 `BLOCKED`（缺 M KF2-009）；KF2-015 仍受 KF2-014 阻断。
 
 ## 2026-10-30：Q 复核修复（406 Content Negotiation）
 
-- Q review base：`ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434`；修复 target：`24a07fd85c70cab3c522118697824727bf9651fe`。
-- `ApiExceptionHandler` 为 `HttpMediaTypeNotAcceptableException` 增加专用映射，复制 Spring 提供的状态和响应头，再写标准错误体；406 返回 `INVALID_REQUEST`，不将框架协商失败吞成 500。错误草案同步记录 406 行为。
-- 新增真实 MockMvc 回归：发送不支持的 `Accept: application/xml`，断言 406、框架支持类型 `Accept` 响应头、request ID、JSON 错误结构和 draft.4 版本。
-- 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`，22 项通过；`python3 contracts/validate.py`，54 项通过；`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`，16 项通过；`git diff --check` 通过。
-- 状态：修复已完成，提交供 Q 复核；未把 Q review 标为批准。
+- Q review base：`ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434`；代码修复 target：`24a07fd85c70cab3c522118697824727bf9651fe`；审阅记录随 Java `ec5c71c` 推送。
+- `Accept` 无可用表示时，专用处理器保留 Spring 的 406 status 与支持类型响应头，返回脱敏的 `INVALID_REQUEST` 错误体；新增 MockMvc 回归验证 status/header/request ID/body。
+- `mvnw verify` 22 项、契约样例 54 项、Python 离线回归 16 项均通过。请 Q 复核具体修复 SHA，不预填批准结论。

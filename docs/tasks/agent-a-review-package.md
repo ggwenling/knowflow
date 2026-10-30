@@ -84,13 +84,12 @@ cd services/api
 - 请 Q 检查密码 KDF 参数升级策略、session 哈希/到期/撤销、数据库 profile 的启动和过滤器边界、邮箱冲突 409 的枚举风险、owner ID 替换、软删/任务取消与删除/创建竞态。尚无登录限速、邮箱验证、密码重置、旧账户凭证补录和物理对象/向量清理；这些缺口不伪报通过。
 
 
-## JP-I1 真实双进程复核补充（2026-10-30）
+## JP-I1 draft.4 双进程复核（最终 target，2026-10-30）
 
-- 当前 A Java target：`3b76131071b88365d14237769a7d3d5d111b873a`；当前 B Python target：`e4efd054880c506c1e57a76f28f6710e3d761016`；本地联调合并 target：`4c6a00032c2ca186c8278301edcc941620465e93`。
-- 真实双进程运行的 B 原有 5 项检查，加上临时增加的 2 项 Java `AiInternalHealthClient` 检查，均通过。新增检查证明 Java 严格拒绝 B 的实际 `0.2.0-draft.2` health 响应、并在慢响应下约 5 秒结束。完整过程和边界见 [JP-I1 记录](java-python-integration.md)。
-- 此通过只证明 B 当前消费版本上的传输/认证/错误/超时行为。Java 要求 `0.2.0-draft.4`（SHA `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`），B 当前仍锁定 `0.2.0-draft.2`（SHA `edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087`）。合并候选直接跑 Python 测试有 8 项因 contract hash mismatch 失败；B 原 Schema/examples 下 33 项通过。因此 JP-I1 对 draft.4 尚未兼容，不应标为 DONE。
-- 请 Q 单独复核候选契约升级/消费责任与集成报告；不把本补充当作契约批准。A 没有修改 Python 服务、消费者常量、哈希或测试。
-
+- A Java target `ec5c71c9be5a8766540fc48e174f215c0cf388ac`（包含 406 修复 target `24a07fd85c70cab3c522118697824727bf9651fe`）；B Python target `2623a6282b2695a8ef96e3553a849729efd42403`。B 已合入确切的 A draft.4 契约提交 `895a1ba4655d9e875730d5bbeb65e570853c8d01`，Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。
+- 双进程 merge candidate `343ce4fdc2b6df72f023c9346f59a927374cdaf8`。干净 worktree 报告见 [java-python-smoke-draft4.json](java-python-smoke-draft4.json)，SHA-256 `327c0b0b18d4be2a91e485828df41584fa6a5e0b1d1482023a82f3bb0d1a8307`；报告绑定 Java target 且运行前后 clean。
+- B 全量 Python 测试 65 项、契约 54 项、离线回归 16 项通过；真实 Uvicorn + Spring Boot smoke 8/8 通过。测试实际调用 Java `AiInternalHealthClient.check()`，接受 draft.4/status/request ID，拒绝 draft.2 fixture，并验证实际 5 秒超时；同时覆盖凭证、404/405、Allow、不可达和慢响应。无模型/数据库调用，秘密未出现在日志。
+- JP-I1 开发集成验证通过；Schema 仍为 DRAFT，Q 审阅和 M 消费确认尚未完成，不记录为 APPROVED 或 DONE。
 
 ## Q 复核修复：406 Content Negotiation（2026-10-30）
 
