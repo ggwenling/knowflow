@@ -37,7 +37,9 @@
 | 18 | KF2-052 多轮契约 | 033、051 | DEFERRED | 计划默认关闭的增强项 |
 | 19 | KF2-055 DOCX 接通 | 048 | DEFERRED | 计划默认关闭的增强项 |
 
-## KF2-001 本次工作包
+KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见 [A 线 Q 审阅包](agent-a-review-package.md)。
+
+## KF2-001 初始准备记录（2026-10-29）
 
 - 目标：核实已有材料，列明原设计缺口，建立可填的映射结构；不猜测旧设计。
 - 依赖版本：V0.2 计划 `7d5095b`；V1.1 未提供。
@@ -48,7 +50,7 @@
 - 基线 SHA：`7d5095b`；目标提交由 `git log -- docs/architecture/compatibility.md docs/tasks/legacy-mapping.csv` 定位，避免把提交自身 SHA 写入提交内容。
 - Q 审阅：未执行；实际集成：未执行；最终状态：`WAITING_INPUT`。
 
-## KF2-004 草案准备包
+## KF2-004 初始草案准备包（2026-10-29）
 
 - 允许提前开展的范围：任务卡明确允许在 001 等待输入时整理提议契约；这不解除正式 Schema 的兼容性门槛。
 - 基线 SHA：`12618ef8af1f648000aadbf13818f9f71d5cfabc`；分支/目录同上；契约标识 `0.2.0-draft.1`。
@@ -58,9 +60,9 @@
 - 初次校验失败：环境的 `jsonschema` 未安装 RFC 3339 检查器，负例 `reject-time-without-zone` 未被拒绝。补齐固定版本的 `rfc3339-validator` 并增加缺检查器即失败的保护后通过；另验证缺检查器确实导致校验命令失败。
 - 未执行：真实服务/模型/数据库、租约状态机和权限测试、B/M 消费确认、Q 独立审阅、实际集成。当前仅测试结构，样例中的模型维度和摘要均为合成占位，不是 KF2-003 的实测。
 - 目标 SHA：由 `git log -- contracts docs/architecture/ADR-001-state-and-contract-draft.md` 定位；无审阅通过或正式发布记录。
-- 最终状态：`BLOCKED`，草案准备已完成；缺 001 原设计核对、002 场景确认、003 运行基线与独立审阅。
+- 当时阶段状态：`BLOCKED`，缺少 001 原设计核对、002 场景确认、003 运行基线与独立审阅。2026-10-30 用户批准采用 V0.2 新基线且 B/M 输入已合入后，契约候选更新为 `0.2.0-draft.2`；现为 `IN_REVIEW`，详见下方本轮记录。
 
-## 下一步交接
+## 初始交接计划（2026-10-29；已由下方本轮记录更新）
 
 1. 项目负责人补充 V1.1 原设计包、旧任务与版本来源，A 继续 KF2-001；若决定放弃旧基线，需要明确记录该范围变更，不能静默假定。
 2. 接收 M 的 KF2-002/005、B 的 KF2-003 交付与具体提交；A 按字段/状态差异完善 004 后交 Q 审阅。当前没有这些交付证据，也没有代替其他角色领取任务。
@@ -76,7 +78,7 @@
 - KF2-001：批准新基线决策记录在 [compatibility.md](../architecture/compatibility.md)。旧 V1.1 及旧 `KF-*` 兼容不伪报通过；任务目前 `IN_REVIEW`，等待 Q 对具体提交审阅。
 - KF2-004：输入含 B 线 1024 维 `BAAI/bge-m3`、`deepseek-flash` 别名和运行记录；别名可变、生产限制/数据条款适用性未决。Schema 升为 `0.2.0-draft.2`，增加模型请求/响应候选与合成样例；`python contracts/validate.py`：39 项结构样例通过。结构检查不验权限、模型响应的语义匹配、租约或数据库状态。
 - B 线 KF2-002/003/005 按 `origin/python@928b5d9` 的审阅包标为 `IN_REVIEW`；未代填 Q 结论，不把已合并等同获批。
-- KF2-006 正按本轮授权实现。M 的 005 已交付占位配置、工作区及所有权约定，但尚在 `IN_REVIEW`；因此本轮只做可独立启动和测试的骨架，开放业务端点与 005 的最终 DONE 仍待依赖审阅和集成。
+- KF2-006：已交付可独立编译、启动和验证的安全 Java 骨架。业务 API 与数据库接入仍待契约冻结及依赖审阅。
 - KF2-006：Java 21、Spring Boot 3.5.16、Maven 3.9.16 和 Apache Maven Wrapper 3.3.4；发行包 SHA-512 与 Maven Central 校验值匹配。由于当前环境只安装 Java 21 JRE（无 `javac`），Maven 固定使用 Eclipse Compiler 3.36.0 编译 Java 21 字节码。Maven 需使用仅在 `/tmp` 配置的云代理 settings；代理配置和凭证未提交。
 - KF2-006 验证：`./mvnw -s /tmp/knowflow-maven-settings.xml verify -q` 成功；8 项 Java 集成/配置校验通过；启动打包 JAR 后，真实 HTTP 冒烟确认 `GET /actuator/health`、敏感管理端点/业务路由关闭和启动密钥不入日志。WebClient 仅通过本地 loopback HTTP stub 测试请求 ID 与内部认证，未调用 B 服务或外部模型。
-- 当前阶段整合基线：`0a19a7a9`；工作树提交状态及每项 target SHA 在最终 Q 审阅包中补齐。未调用真实模型或读取/提交任何 API 密钥。
+- 当前阶段整合基线：`0a19a7afc80fa778dd5b2e10e7a825360538a9f9`。逐项 target SHA、复核范围和验证命令见 [A 线 Q 审阅包](agent-a-review-package.md)。本轮未调用真实模型或读取/提交任何 API 密钥。
