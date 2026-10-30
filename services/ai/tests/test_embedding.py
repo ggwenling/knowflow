@@ -1,5 +1,6 @@
 import json
 import math
+from pathlib import Path
 
 import httpx
 import pytest
@@ -7,10 +8,12 @@ import pytest
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.config import ConfigurationError
 from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
+from knowflow_ai.protocol import ContractConsumer
 
 
 KEY = "synthetic-test-key-" + "x" * 40
 REQUEST_ID = "embedding-test-01"
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def settings(**overrides):
@@ -20,8 +23,9 @@ def settings(**overrides):
 
 
 def provider_response(count=1, *, model="BAAI/bge-m3"):
-    return {"model": model,
-            "data": [{"index": index, "embedding": [0.25] + [0.5] * 1023}
+    return {"object": "list", "model": model,
+            "data": [{"object": "embedding", "index": index,
+                      "embedding": [0.25] + [0.5] * 1023}
                      for index in reversed(range(count))],
             "usage": {"prompt_tokens": count * 12, "total_tokens": count * 12}}
 
@@ -80,8 +84,12 @@ async def test_real_adapter_maps_request_and_reorders_validated_vectors():
     assert result["request_id"] == REQUEST_ID
     assert result["model"] == "BAAI/bge-m3" and result["dimensions"] == 1024
     assert [row["index"] for row in result["data"]] == [0, 1]
+    assert set(result) == {"request_id", "model", "dimensions", "data", "usage"}
+    assert all(set(row) == {"index", "embedding"} for row in result["data"])
     assert all(len(row["embedding"]) == 1024 for row in result["data"])
     assert result["usage"] == {"prompt_tokens": 24, "completion_tokens": 0, "total_tokens": 24}
+    ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json").validate(
+        "EmbeddingResult", result)
     assert KEY not in repr(result)
     await client.aclose()
 
@@ -127,10 +135,10 @@ async def test_provider_failure_is_fixed_redacted_and_never_retried():
 
 @pytest.mark.asyncio
 async def test_adapter_bounds_response_and_rejects_redirect_without_following():
-    paths = []
+    requests = []
 
     async def oversized(request):
-        paths.append(request.url.path)
+        requests.append(request)
         return httpx.Response(200, content=b" " * 1025)
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(oversized))
@@ -140,14 +148,26 @@ async def test_adapter_bounds_response_and_rejects_redirect_without_following():
     await client.aclose()
 
     async def redirect(request):
-        paths.append(request.url.path)
-        return httpx.Response(307, headers={"Location": "https://attacker.example/steal"})
+        requests.append(request)
+        if request.url.host == "api.siliconflow.cn":
+            return httpx.Response(307, headers={"Location": "https://attacker.example/steal"})
+        # If the injected client's redirect policy leaks through, the mock
+        # captures the forwarded request and makes the test fail visibly.
+        return httpx.Response(200, json=provider_response())
 
-    client = httpx.AsyncClient(transport=httpx.MockTransport(redirect), follow_redirects=False)
-    adapter = SiliconFlowEmbeddingAdapter(settings(), client)
+    client = httpx.AsyncClient(transport=httpx.MockTransport(redirect),
+                               follow_redirects=True, timeout=None)
+    adapter = SiliconFlowEmbeddingAdapter(settings(timeout_seconds=7), client)
     with pytest.raises(ProcessingError, match="MODEL_FAILURE"):
         await adapter.embed(["synthetic"], request_id=REQUEST_ID)
-    assert paths == ["/v1/embeddings", "/v1/embeddings"]
+    assert len(requests) == 2  # one oversized response, one original-host redirect response
+    assert [request.url.host for request in requests] == [
+        "api.siliconflow.cn", "api.siliconflow.cn"]
+    original = requests[1]
+    assert original.url.host == "api.siliconflow.cn"
+    assert original.url.path == "/v1/embeddings"
+    assert json.loads(original.content)["input"] == ["synthetic"]
+    assert original.extensions["timeout"]["read"] == 7
     await client.aclose()
 
 

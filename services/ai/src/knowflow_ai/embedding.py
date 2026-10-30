@@ -121,7 +121,9 @@ class SiliconFlowEmbeddingAdapter:
                     headers={"Authorization": "Bearer " + self.settings.api_key,
                              "Content-Type": "application/json",
                              "Accept": "application/json"},
-                    json=payload) as response:
+                    json=payload,
+                    timeout=self.settings.timeout_seconds,
+                    follow_redirects=False) as response:
                 if response.status_code == 429:
                     raise ProcessingError("MODEL_FAILURE", 502, retryable=True)
                 if response.status_code != 200:
@@ -155,7 +157,14 @@ class SiliconFlowEmbeddingAdapter:
         except ProcessingError:
             raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
 
-        rows = sorted(provider_result["data"], key=lambda row: row["index"])
+        # Provider rows may contain fields such as `object` that are not part
+        # of the shared internal EmbeddingResult schema. Normalize at this
+        # boundary instead of passing provider objects through unchanged.
+        rows = sorted(
+            ({"index": row["index"], "embedding": row["embedding"]}
+             for row in provider_result["data"]),
+            key=lambda row: row["index"],
+        )
         result = {"request_id": request_id, "model": self.settings.model,
                   "dimensions": self.settings.dimensions, "data": rows}
         usage = provider_result.get("usage")
