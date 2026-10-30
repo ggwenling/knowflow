@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.2",
+  "title": "KnowFlow proposed messages 0.2.0-draft.4",
   "$comment": "DRAFT: structural definitions only, no runtime authorization or lease validation. PublicQuestion maxLength is a candidate bound, not a validated model/resource limit.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.2"
+      "const": "0.2.0-draft.4"
     },
     "Identifier": {
       "type": "string",
@@ -261,6 +261,7 @@
             "AI_PROCESSING_FAILED",
             "PROCESSING_TIMEOUT",
             "ENDPOINT_UNAVAILABLE",
+            "ACCOUNT_CREATE_REJECTED",
             "INTERNAL_ERROR"
           ]
         },
@@ -272,6 +273,103 @@
         "retryable": {
           "type": "boolean"
         }
+      }
+    },
+    "InternalHealth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "status",
+        "request_id"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "status": {
+          "const": "UP"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      }
+    },
+    "RegisterRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "email", "password"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 320 },
+        "password": { "type": "string", "minLength": 12, "maxLength": 128 }
+      }
+    },
+    "LoginRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "email", "password"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 320 },
+        "password": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "AuthSession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "user_id", "email", "access_token", "token_type", "expires_at"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "user_id": { "$ref": "#/$defs/Identifier" },
+        "email": { "type": "string", "format": "email" },
+        "access_token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "token_type": { "const": "Bearer" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CurrentUser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "user_id", "email"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "user_id": { "$ref": "#/$defs/Identifier" },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "CreateKnowledgeBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "name"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 }
+      }
+    },
+    "KnowledgeBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "id", "name", "status", "created_at", "updated_at"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "id": { "$ref": "#/$defs/Identifier" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "const": "ACTIVE" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "KnowledgeBaseList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "items", "limit", "offset", "has_more"],
+      "properties": {
+        "contract_version": { "$ref": "#/$defs/ContractVersion" },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/KnowledgeBase" } },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "offset": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "has_more": { "type": "boolean" }
       }
     },
     "PublicQuestion": {

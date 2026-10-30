@@ -18,13 +18,13 @@
 | 顺序 | 任务 | 依赖 | 实际状态 | 当前产物或解除条件 |
 |---|---|---|---|---|
 | 1 | KF2-001 V0.2 新基线决策 | 无 | IN_REVIEW | 用户授权采用新基线；原 V1.1 及旧任务映射仍未验证，见[兼容性记录](../architecture/compatibility.md) |
-| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | 已合并 B/M 输入并增加模型协议 Schema；B/M 消费确认及 Q 审阅未完成 |
+| 2 | KF2-004 共享契约 | 001、002、003 | IN_REVIEW | Java 候选为 draft.4；当前 B 分支仍锁定 draft.2，联调升级条件见[记录](java-python-integration.md)；M 消费确认及 Q 审阅未完成 |
 | 3 | KF2-006 Java 骨架 | 004、005 | IN_REVIEW | 骨架已可启动并通过认证/health/本地 WebClient 验收；005 与契约仍待审阅 |
-| 4 | KF2-011 迁移与受限角色 | 004、005 | PLANNED | 等待契约/Q 审阅、B 索引角色需求及 Java 骨架集成验证 |
-| 5 | KF2-012 认证 | 006、011 | PLANNED | 依赖通过后领取 |
-| 6 | KF2-013 知识库隔离 | 012 | PLANNED | 依赖通过后领取 |
-| 7 | KF2-014 上传与状态 | 009、013 | PLANNED | 需 M 的基础设施真实交付 |
-| 8 | KF2-015 任务租约 | 007、014 | PLANNED | 需 B 的内部服务与上传接口 |
+| 4 | KF2-011 迁移与受限角色 | 004、005 | IN_REVIEW | Flyway/pgvector 与真实 PostgreSQL 权限测试通过；Q/M 消费确认待处理 |
+| 5 | KF2-012 认证 | 006、011 | IN_REVIEW | 注册、登录、会话撤销/过期的真实 PostgreSQL 测试通过；Q 与安全/产品缺口待审阅 |
+| 6 | KF2-013 知识库隔离 | 012 | IN_REVIEW | owner-scoped CRUD 与删除状态真实 PostgreSQL 测试通过；Q 审阅、物理清理与并发删除协调待处理 |
+| 7 | KF2-014 上传与状态 | 009、013 | BLOCKED | `origin/python@e4efd054` 的 `infra/README.md` 仍无 Compose/Dockerfile/CI；等待 M 的 KF2-009 真实交付 |
+| 8 | KF2-015 任务租约 | 007、014 | BLOCKED | B KF2-007 服务已交付，但仍依赖被阻断的 KF2-014 上传/状态基础设施 |
 | 9 | KF2-019 索引发布 | 015、018 | PLANNED | 需 B 的真实索引写入证据 |
 | 10 | KF2-023 问答入口 | 013、022 | PLANNED | 需 B 的真实生成与证据 |
 | 11 | KF2-024 引用与删除 | 019、023 | PLANNED | 依赖通过后领取 |
@@ -83,3 +83,31 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - KF2-006 验证：原始 8 项 Java 测试及审查修复后共 11 项 Java 测试通过；Maven `verify`、39 项契约结构样例通过。打包 JAR 冒烟确认有效 Bearer token 可启动并 health 为 `UP`，含换行密钥启动失败且不泄露密钥；404/405 集成测试核对统一错误体与 `Allow`。WebClient 只通过本地 loopback stub 测试请求 ID 和内部认证，未调用 B 服务或外部模型。
 - KF2-006 审查修复 target：`eb88cc1fe40d91f2b4fe5b992e230779ad998daa`；最新复核范围见 [A 线 Q 审阅包](agent-a-review-package.md)。任务仍待 Q 对修复 SHA 审阅及依赖集成确认。
 - 当前阶段整合基线：`0a19a7afc80fa778dd5b2e10e7a825360538a9f9`。逐项 target SHA、复核范围和验证命令见 [A 线 Q 审阅包](agent-a-review-package.md)。本轮未调用真实模型或读取/提交任何 API 密钥。
+
+## 2026-10-30：JP-01 Java 路线（KF2-011 / JP-C1 / JP-I1 Java 侧）
+
+- 仓库：`/workspace/knowflow-java`；分支：`java`；共同基线 `BASE_SHA=150cd847a5750143fb6eb2c74c762962381952fe`；Java 交付 target：`115931caaf99fe3fd9c473d2f0f1b6ebd9648ccd`。
+- KF2-011：交付 Flyway `V1`，建立 users、knowledge bases、documents、content/index versions、index tasks、chunks、`vector(1024)` 及相关唯一、外键、状态和定位约束。迁移历史在独立 `knowflow_flyway` Schema；数据库管理员引导脚本建立无默认密码的迁移、应用、AI 登录角色。AI 只有检索所需表的 SELECT，不能改状态或写 Chunk/向量；应用角色无 DDL。
+- 应用数据库配置成为可运行实现：Spring `database` profile 以 Hikari 和 `knowflow_app` 连接，默认 Java 启动仍不连接数据库；迁移使用单独 `db-migrate` profile / `--migrate-only` 命令。当前没有业务 Repository 或任务状态机。
+- JP-C1：契约候选升至 `0.2.0-draft.3`，新增内部 health 最小报文；Schema SHA-256 `1b5133ddcdac4a6accb0faf4a88f2dda7204f5932151043168473d2d8574c5c5`。Java health 客户端带内部 Bearer 与 request ID，限时 5 秒、无自动重试，并核对响应版本、状态和 ID。该候选仍待 B 消费确认、M 相关消费确认和 Q 审阅；KF2-004 未冻结。
+- KF2-011 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 成功，18 项 Java 测试通过。真实 `pgvector/pgvector:0.8.1-pg16`（镜像摘要记录于服务说明）/ PostgreSQL 16.12 覆盖 Flyway 空库与重复执行、CLI、1024 维向量、唯一/外键/检查约束、AI 无 DML、应用角色可连接但无 DDL。`python contracts/validate.py` 的 41 个结构样例通过；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 的 16 项通过；`git diff --check` 通过。
+- JP-I1：Java→Python 请求只在本地 loopback stub 上完成；真实双进程联调 `WAITING_B_SERVICE`。截至 `origin/python@150cd847a5750143fb6eb2c74c762962381952fe`，`services/ai/` 只有 README 和 `.env.example`，无 FastAPI 实现。未修改 B 所有的 `services/ai/`，未把本地 stub 说成真实集成。
+- ADR-002 提出 Java 有界批量写入网关并保留 AI 只读；B 的批大小/重试/清理需求与 Q 的 fencing 审阅未到位，方案仍为 `PROPOSED`，不开放 Python 直写，不启动 KF2-018。
+- KF2-011 / KF2-004 状态：`IN_REVIEW`；真实 Python 联调未执行；Q 审阅未执行。数据库证据只覆盖新建空库，不声称兼容未知旧库或完成租约、fencing、删除/发布竞态。
+
+## 2026-10-30：JP-01 G3 Java 后续（KF2-012/013）
+
+- 分支：`java`；base 为 JP-01 Java 交付 `f2204a52f221e1b9691824cac845d0f75c6a2f29`；target：`895a1ba4655d9e875730d5bbeb65e570853c8d01`。
+- KF2-012：`database` profile 下提供注册、登录、logout、`/me`。密码由 Spring Security PBKDF2 编码器处理；只存密码摘要。opaque bearer token 由 32 随机字节构造，有效期 8 小时，数据库只存 SHA-256；session 查询核对数据库到期时间与撤销状态。错误密码/未知账户使用相同 401；注册冲突不回显邮箱/密码，但 409 状态仍可能泄露地址冲突。未实现密码重置、refresh、多 session 撤销、邮箱验证及登录限速。
+- KF2-013：创建、分页列表、详情、删除均从已验证 principal 派生 user id；每个查询显式限制 `owner_user_id`，JSON 多余字段拒绝，含 `owner_id` 的创建请求返回 400。删除事务标记知识库/文档不可见并取消排队/运行任务、清除租约。对象和向量的物理清理仍需 KF2-014/024 的存储/清理入口；后续创建文档任务也必须与删除做状态/锁协调。
+- 契约候选升至 `0.2.0-draft.4`；Schema SHA-256 `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。包含注册、登录、会话、当前用户、知识库、分页与通用冲突错误样例；B 未消费，M 未确认，Q 未审阅，KF2-004 仍未冻结。
+- 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify` 通过，21 项 Java 测试；真实 PostgreSQL 16.12/pgvector 0.8.1 覆盖 V1/V2、应用 profile、注册/登录/哈希/过期/撤销、双用户 owner 隔离、owner 注入、资源 404 和删除文档/任务状态。`python contracts/validate.py` 通过 54 项；`python -m unittest discover -s evaluation/smoke -p 'test_*.py' -q` 通过 16 项；`git diff --check` 通过。
+- 任务状态 `IN_REVIEW`，不登记 `DONE`：Q 审阅和 M 消费确认待执行；登录限速、邮箱冲突产品决策、密码重置及对象/向量回收未实现。此记录写入时 JP-I1 仍等待 B 服务；最新双进程状态见[联调记录](java-python-integration.md)。
+
+## 2026-10-30：JP-I1 真实双进程复核
+
+- 联调候选：`integration/jp-01@4c6a00032c2ca186c8278301edcc941620465e93`，汇集 Java `3b76131071b88365d14237769a7d3d5d111b873a` 与 Python `e4efd054880c506c1e57a76f28f6710e3d761016`；未合并 main，也未改动 python 分支。
+- Python 原分支消费 draft.2 / SHA `edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087`；Java 当前 draft.4 / SHA `ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41`。合并候选直接跑 Python 测试有 8 项因精确契约哈希不符而失败；用 B 分支原 Schema 和 examples 复核，33 项全量 Python 测试通过。
+- B 脚本启动真实 Uvicorn/Spring Boot 后，5 项原有跨进程场景通过。一次性额外断言让 Java `AiInternalHealthClient` 对实际 draft.2 响应按预期拒绝版本不匹配，并在真实慢响应下约 5 秒超时；合计 7 项通过。未把临时修改留在 B 文件范围。
+- 结论：传输/认证/request ID/404/405/网络失败与超时边界已开发验证；**JP-I1 对当前 draft.4 候选仍 `BLOCKED_CONTRACT_VERSION`**，待 B 明确升级消费后重跑无覆盖的集成测试。没有放宽 Java 严格版本检查。
+- 后续 Java 任务：KF2-014 `BLOCKED`，M 的 KF2-009 在最新 Python target 中未交付；KF2-015 同样等待 KF2-014。KF2-011/012/013 仍 `IN_REVIEW`，不得在缺 Q/M 确认时转 `DONE`。
