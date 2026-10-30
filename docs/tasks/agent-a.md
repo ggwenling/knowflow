@@ -111,3 +111,11 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - B 脚本启动真实 Uvicorn/Spring Boot 后，5 项原有跨进程场景通过。一次性额外断言让 Java `AiInternalHealthClient` 对实际 draft.2 响应按预期拒绝版本不匹配，并在真实慢响应下约 5 秒超时；合计 7 项通过。未把临时修改留在 B 文件范围。
 - 结论：传输/认证/request ID/404/405/网络失败与超时边界已开发验证；**JP-I1 对当前 draft.4 候选仍 `BLOCKED_CONTRACT_VERSION`**，待 B 明确升级消费后重跑无覆盖的集成测试。没有放宽 Java 严格版本检查。
 - 后续 Java 任务：KF2-014 `BLOCKED`，M 的 KF2-009 在最新 Python target 中未交付；KF2-015 同样等待 KF2-014。KF2-011/012/013 仍 `IN_REVIEW`，不得在缺 Q/M 确认时转 `DONE`。
+
+## 2026-10-30：Q 复核修复（406 Content Negotiation）
+
+- Q review base：`ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434`；修复 target：`24a07fd85c70cab3c522118697824727bf9651fe`。
+- `ApiExceptionHandler` 为 `HttpMediaTypeNotAcceptableException` 增加专用映射，复制 Spring 提供的状态和响应头，再写标准错误体；406 返回 `INVALID_REQUEST`，不将框架协商失败吞成 500。错误草案同步记录 406 行为。
+- 新增真实 MockMvc 回归：发送不支持的 `Accept: application/xml`，断言 406、框架支持类型 `Accept` 响应头、request ID、JSON 错误结构和 draft.4 版本。
+- 验证：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`，22 项通过；`python3 contracts/validate.py`，54 项通过；`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`，16 项通过；`git diff --check` 通过。
+- 状态：修复已完成，提交供 Q 复核；未把 Q review 标为批准。
