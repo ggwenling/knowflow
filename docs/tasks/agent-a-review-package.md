@@ -131,3 +131,11 @@ cd services/api
 - 回归测试：携带有效内部凭证访问 JSON 端点并发送 `Accept: application/xml`，断言状态 406、`Accept` 包含 `application/json`、`X-Request-ID` 存在、错误体为 draft.4 JSON 且 code/message 固定脱敏值。
 - 复核命令及结果：`cd services/api && ./mvnw -s /tmp/knowflow-maven-settings.xml verify`（22 项通过）；`python3 contracts/validate.py`（54 项通过）；`python3 -m unittest discover -s evaluation/smoke -p 'test_*.py' -q`（16 项通过）；`git diff --check` 通过。
 - 请 Q 复核此 target 和响应头断言；尚无批准结论。
+
+## 审查发现修复：引用、对象存储读取与 MinIO 启动（2026-10-30）
+
+- Review base `533b1f1622accb696fdf26e90e8a8c322998ea0b` → 修复 target `806190b07e71d028dcb3327fcd663a1ff625d01b`；审阅记录在后续文档提交中单独追加。
+- 问答回答只替换完整 `[source_id]` 引用标记，正文中的普通来源 ID 保持原样，短 ID 不再影响更长 ID 的引用；契约说明同步明确引用格式。
+- S3 请求时限现在覆盖响应正文读取，默认 10 秒，可通过 `KNOWFLOW_STORAGE_REQUEST_TIMEOUT` 配置（最大 2 分钟）。文件代理和内部源读取将对象存储 I/O 移出数据库事务；下载完成后重新核对文档可见性或任务租约，避免删除/租约变化期间返回失效内容。
+- MinIO Testcontainers 等待 Bitnami 最终启动日志及 `/minio/health/ready`，避免初始化阶段的临时健康状态放行上传测试。新增慢正文超时回归，以及回答引用、心跳/文件删除并发回归。
+- 验证：`cd services/api && ./mvnw clean verify`（49 项，0 failures，0 errors，1 skipped）；`python3 contracts/validate.py`（70 个结构样例通过）；`python3 -m unittest contracts.test_index_batch_hash -v`（5 项通过）；`git diff --check` 通过。契约 Schema 未变，SHA-256 仍为 draft.5 的 `3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef`。

@@ -28,6 +28,11 @@
 
 本段 JP2 记录和 Q 审阅包以更晚的文档提交追加，不改变上述代码 target。Q 结论留空，等待独立复核。
 
+### 2026-10-30 后续审查修复
+
+- Review base `533b1f1622accb696fdf26e90e8a8c322998ea0b` → Java 修复 target `806190b07e71d028dcb3327fcd663a1ff625d01b`；引用替换、S3 总读取时限、存储 I/O 事务边界及 MinIO 最终就绪等待修复可供 Q 复核，详细验证记录见 [后续 Q 审阅包](agent-a-review-package.md)。
+- `cd services/api && ./mvnw clean verify`：49 项，0 失败、0 错误、1 项 opt-in 真实 Python smoke 跳过。契约结构校验 70 项，跨语言摘要测试 5 项通过。
+
 ## 初始准备（2026-10-29）
 
 - 日期：2026-10-29（Asia/Hong_Kong）；实际执行者：当前 Codex，角色 A。
