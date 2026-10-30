@@ -1,0 +1,2 @@
+*.cmd text eol=crlf whitespace=cr-at-eol
+*.sh text eol=lf
