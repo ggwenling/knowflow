@@ -1,0 +1,240 @@
+{
+  "date_utc": "2026-10-30",
+  "targets": {
+    "java": "26e1acac2c1faa2dd1ed972ace9e81c937c82158",
+    "java_code_fix": "806190b07e71d028dcb3327fcd663a1ff625d01b",
+    "python": "b4639408fe73dadc2ac93764249ab43a54c691bc",
+    "main": "0c3024a2b531e4a335440bbd6502839738194ab5"
+  },
+  "prior_findings": [
+    {
+      "id": "Q-B03-01",
+      "status": "FIX_VERIFIED",
+      "evidence": "Provider fields normalized; complete result passes shared schema"
+    },
+    {
+      "id": "Q-B03-02",
+      "status": "FIX_VERIFIED",
+      "evidence": "Injected timeout overridden and redirects rejected on first hop"
+    },
+    {
+      "id": "Q-JP2-J01",
+      "status": "FIX_VERIFIED",
+      "evidence": "Only bracketed source IDs replaced; ordinary text and s1/s10 preserved"
+    },
+    {
+      "id": "Q-JP2-J02",
+      "status": "FIX_VERIFIED",
+      "evidence": "Full-body deadline enforced; no database lock held while waiting"
+    },
+    {
+      "id": "Q-JP2-J03",
+      "status": "FIX_VERIFIED",
+      "evidence": "Both MinIO fixtures wait for final startup and readiness"
+    }
+  ],
+  "java_verify": {
+    "exit_code": 0,
+    "tests": 49,
+    "passed": 48,
+    "skipped": 1,
+    "failures": 0,
+    "errors": 0,
+    "suites": [
+      {
+        "name": "com.knowflow.api.ApiSecurityIntegrationTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.AuthKnowledgeBaseIntegrationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.config.AiServicePropertiesTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.config.ApplicationDatabasePropertiesTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.config.DatabaseMigrationPropertiesTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.config.RealPythonHealthSmokeTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "name": "com.knowflow.api.db.PostgreSqlMigrationIntegrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.document.DocumentApiIntegrationTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.indexing.IndexBatchDigestTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.storage.S3ObjectStoreIntegrationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.knowflow.api.storage.S3ObjectStoreTimeoutTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "log": "/workspace/scratch/q-accept-java.log"
+  },
+  "python_branch_pytest": {
+    "exit_code": 0,
+    "passed": 100,
+    "warnings": 1,
+    "log": "/workspace/scratch/q-accept-python.log"
+  },
+  "python_targeted_probe": {
+    "schema": "PASS",
+    "returned_row_keys": [
+      "embedding",
+      "index"
+    ],
+    "configured_timeout_seconds": 0.1,
+    "effective_timeout_seconds": {
+      "connect": 0.1,
+      "read": 0.1,
+      "write": 0.1,
+      "pool": 0.1
+    },
+    "redirect_request_hosts": [
+      "api.siliconflow.cn"
+    ],
+    "redirect_outcome": "MODEL_FAILURE",
+    "caller_client_ownership": "PASS",
+    "external_calls": 0
+  },
+  "independent_s3_probe": {
+    "stalled_body_timeout": "PASS",
+    "elapsed_ms": 10654,
+    "configured_seconds": 10
+  },
+  "structural_examples": {
+    "python_branch": 54,
+    "main": 70
+  },
+  "batch_hash_tests": 5,
+  "offline_model_regressions": 16,
+  "main_python_default_startup": {
+    "main_python_default_startup": "FAILED",
+    "error": "CONTRACT_HASH_MISMATCH",
+    "uses_synthetic_secret": true
+  },
+  "new_findings": [
+    {
+      "id": "Q-INT-01",
+      "priority": "P1",
+      "target": "0c3024a2b531e4a335440bbd6502839738194ab5",
+      "status": "OPEN",
+      "problem": "Merged main pairs draft.5 schema with a draft.4-pinned Python consumer; create_app fails with CONTRACT_HASH_MISMATCH",
+      "file": "services/ai/src/knowflow_ai/protocol.py",
+      "line": 31
+    }
+  ],
+  "schema_hashes": {
+    "python_branch": "ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41",
+    "main": "3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef"
+  },
+  "conclusion": {
+    "prior_five_fixes": "VERIFIED",
+    "main_integration": "BLOCKED"
+  },
+  "implementation_changed": false,
+  "remote_mutation": false,
+  "worktree_snapshot": [
+    {
+      "path": "/workspace/knowflow",
+      "changes": 24,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-accept-main",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-accept-python",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-b-next",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-java-jp2",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-java-r3",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-main",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-python-r3",
+      "changes": 2,
+      "tracked_changes": 2
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-review",
+      "changes": 0,
+      "tracked_changes": 0
+    },
+    {
+      "path": "/workspace/scratch/knowflow-q-review-r2",
+      "changes": 0,
+      "tracked_changes": 0
+    }
+  ],
+  "historical_dirty_worktree_note": "knowflow-q-python-r3 retains only two smoke evidence JSON updates: timestamps and git_head_at_run; no business source change."
+}

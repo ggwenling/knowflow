@@ -1,0 +1,137 @@
+{
+  "review_date_utc": "2026-10-30",
+  "base": "894fc763b3c19a51225365f749e07cc033a4db34",
+  "target": "533b1f1622accb696fdf26e90e8a8c322998ea0b",
+  "implementation_commit": "489b746f9bfa8188041f12d9135cf98fe6846611",
+  "schema_sha256": "3953784ab2bd2005cded12baa11caa99b6e47a79c77d5a1078b158f59f5639ef",
+  "conclusion": "CHANGES_REQUESTED",
+  "findings": [
+    "Q-JP2-J01",
+    "Q-JP2-J02",
+    "Q-JP2-J03"
+  ],
+  "checks": {
+    "contract_examples": {
+      "passed": 70
+    },
+    "batch_hash_unittests": {
+      "passed": 5
+    },
+    "git_diff_check": {
+      "exit_code": 0
+    },
+    "java_verify": {
+      "command": "./mvnw -B -ntp -s /tmp/knowflow-q-maven-settings.xml verify",
+      "exit_code": 1,
+      "tests": 46,
+      "passed": 43,
+      "failed": 2,
+      "errors": 0,
+      "skipped": 1,
+      "suites": [
+        {
+          "name": "com.knowflow.api.ApiSecurityIntegrationTest",
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.AuthKnowledgeBaseIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.config.AiServicePropertiesTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.config.ApplicationDatabasePropertiesTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.config.DatabaseMigrationPropertiesTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.config.RealPythonHealthSmokeTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1
+        },
+        {
+          "name": "com.knowflow.api.db.PostgreSqlMigrationIntegrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.document.DocumentApiIntegrationTest",
+          "tests": 17,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.indexing.IndexBatchDigestTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "com.knowflow.api.storage.S3ObjectStoreIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "raw_log": "/workspace/scratch/q-java-jp2-maven.log"
+    },
+    "disposable_fixture_and_citation_probes": {
+      "production_sources_changed": false,
+      "fixture_change": "Wait for final MinIO startup banner and HTTP health, instead of HTTP health alone",
+      "cases": [
+        {
+          "name": "qSourceIdsMustNotCorruptOrdinaryAnswerTextOrOtherMarkers",
+          "status": "FAILED"
+        },
+        {
+          "name": "completionVerifiesStoredRowsAndPublishesAtomicallyAndIdempotently",
+          "status": "PASSED"
+        },
+        {
+          "name": "retryableCompletionFailureRequeuesForANewFencedCandidate",
+          "status": "PASSED"
+        }
+      ],
+      "observed_answer_lines": [
+        "Q_CITATION_EXPECTED=data [64983827-fdb0-336b-b9bd-56e4fb286c3b] [6473c945-03e4-3709-b85b-7f4dab55de91] [ca901e4f-86fc-3f85-8d3d-be90d586e02e]",
+        "Q_CITATION_ACTUAL=d64983827-fdb0-336b-b9bd-56e4fb286c3bt64983827-fdb0-336b-b9bd-56e4fb286c3b [64983827-fdb0-336b-b9bd-56e4fb286c3b] [6473c945-03e4-3709-b85b-7f4dab55de91] [6473c945-03e4-3709-b85b-7f4dab55de910]"
+      ],
+      "raw_log": "/workspace/scratch/q-java-jp2-probes.log"
+    },
+    "s3_body_deadline_probe": {
+      "configured_request_timeout_seconds": 10,
+      "blocked_after_ms": 12209,
+      "after_release_succeeded_bytes": 2,
+      "uses_real_credentials": false
+    }
+  },
+  "integration_limit": "Actual Python draft.5 worker / answer integration not performed; A12 remains pending. No supplier model calls.",
+  "implementation_or_remote_mutation": false
+}

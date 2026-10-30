@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-10-30T17:16:48.190930+08:00",
+  "thread_id": "01a18beb-5039-74aa-8bcc-82ce04724081",
+  "target_sha": "756afae251ad8adba623940b2deda9bd576cd725",
+  "main_base": "026d2cb72c4f8036daa566d4dab38b4e01b76da9",
+  "candidate_sha": "450ef10addcb2eb9b6bb479b56106482116666a7",
+  "decision": "CHANGES_REQUESTED: Q-B03-01 and Q-B03-02",
+  "main_pushed": false,
+  "tests": {
+    "python_passed": 100,
+    "contract_cases_passed": 54,
+    "model_offline_tests_passed": 16,
+    "seed_documents": 10,
+    "seed_questions": 15
+  },
+  "targeted_reproduction": {
+    "all_http_mocked": true,
+    "external_provider_calls": 0,
+    "schema_and_timeout": {
+      "returned_row_keys": [
+        "object",
+        "index",
+        "embedding"
+      ],
+      "shared_schema_result": "INVALID_MESSAGE",
+      "configured_timeout_seconds": 0.1,
+      "effective_request_timeouts": [
+        {
+          "connect": 60,
+          "read": 60,
+          "write": 60,
+          "pool": 60
+        }
+      ]
+    },
+    "redirect": {
+      "adapter_returned_success": true,
+      "calls": [
+        {
+          "host": "api.siliconflow.cn",
+          "original_input_forwarded": true,
+          "authorization_present": true
+        },
+        {
+          "host": "outside.example",
+          "original_input_forwarded": true,
+          "authorization_present": false
+        }
+      ]
+    }
+  },
+  "reproducer_sha256": "0e9dd287cda143525235f6cfc39df4a1132c3c53fd874bedd5335d011b084a6a",
+  "official_provider_response_source": {
+    "url": "https://docs.siliconflow.cn/docs/api/embeddings-post",
+    "response_sha256": "554518ad6caf1e4757d28e18a226f189e59380ae782de68c321a062afb3ca175",
+    "data_row_fields": [
+      "object",
+      "embedding",
+      "index"
+    ],
+    "data_row_object_value": "embedding"
+  },
+  "checks": {
+    "new_range_diff_check": "PASS",
+    "tracked_json": "PASS",
+    "local_markdown_links": "PASS",
+    "bound_credentials_in_tracked_files": "not found",
+    "live_embedding_adapter_and_runner_hashes": "match target files"
+  },
+  "limitations": [
+    "All new reproductions use synthetic input, credentials and MockTransport; no external receiving host contacted.",
+    "Author real-model evidence inspected and hashes verified; Q did not repeat a paid request.",
+    "No new health integration run by Q in this round.",
+    "No production implementation or public contract changes by Q."
+  ]
+}

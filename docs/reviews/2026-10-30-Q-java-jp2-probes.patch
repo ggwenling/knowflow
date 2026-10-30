@@ -1,0 +1,55 @@
+--- a/services/api/src/test/java/com/knowflow/api/document/DocumentApiIntegrationTest.java
++++ b/services/api/src/test/java/com/knowflow/api/document/DocumentApiIntegrationTest.java
+@@ -111,7 +111,9 @@
+             .withEnv("MINIO_ROOT_USER", MINIO_ACCESS)
+             .withEnv("MINIO_ROOT_PASSWORD", MINIO_SECRET)
+             .withExposedPorts(9000)
+-            .waitingFor(Wait.forHttp("/minio/health/live").forPort(9000).forStatusCode(200));
++            .waitingFor(new org.testcontainers.containers.wait.strategy.WaitAllStrategy()
++                    .withStrategy(Wait.forLogMessage(".*\\*\\* Starting MinIO \\*\\*.*\\n", 1))
++                    .withStrategy(Wait.forHttp("/minio/health/live").forPort(9000).forStatusCode(200)));
+
+     @Autowired
+     private MockMvc mockMvc;
+@@ -933,6 +935,41 @@
+         org.assertj.core.api.Assertions.assertThatThrownBy(() -> objectStore.getObject(objectKey,
+                         1024))
+                 .isInstanceOf(com.knowflow.api.storage.ObjectStoreException.class);
++    }
++
++    @Test
++    void qSourceIdsMustNotCorruptOrdinaryAnswerTextOrOtherMarkers() throws Exception {
++        JsonNode owner = register("q-citation-owner@example.test");
++        String token = owner.path("access_token").asText();
++        String kb = createKnowledgeBase(token, "Q citation probe");
++        String evidence = "data";
++        PublishedIndex published = publishDocument(token, kb, "q.txt", evidence, "q-publish");
++        AI_RESPONSE.set(request -> {
++            TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
++            AiAnswerResponse.Locator locator = new AiAnswerResponse.Locator(
++                    "text_range", null, 0, evidence.length(), "unicode_code_point");
++            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
++                    "data [a] [s1] [s10]", true, java.util.List.of(
++                    new AiAnswerResponse.AiSource("a", scope.documentId(), scope.contentVersionId(),
++                            scope.indexVersionId(), published.chunkId(), locator, evidence),
++                    new AiAnswerResponse.AiSource("s1", scope.documentId(), scope.contentVersionId(),
++                            scope.indexVersionId(), published.chunkId(), locator, evidence),
++                    new AiAnswerResponse.AiSource("s10", scope.documentId(), scope.contentVersionId(),
++                            scope.indexVersionId(), published.chunkId(), locator, evidence)));
++        });
++        var result = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
++                .header("Authorization", "Bearer " + token)
++                .contentType(MediaType.APPLICATION_JSON)
++                .content(objectMapper.writeValueAsBytes(
++                        new com.knowflow.api.answer.PublicQuestion("What data?"))))
++                .andExpect(status().isOk()).andReturn();
++        JsonNode answer = objectMapper.readTree(result.getResponse().getContentAsByteArray());
++        String expected = "data [" + answer.path("sources").get(0).path("source_id").asText()
++                + "] [" + answer.path("sources").get(1).path("source_id").asText()
++                + "] [" + answer.path("sources").get(2).path("source_id").asText() + "]";
++        System.out.println("Q_CITATION_EXPECTED=" + expected);
++        System.out.println("Q_CITATION_ACTUAL=" + answer.path("answer").asText());
++        assertThat(answer.path("answer").asText()).isEqualTo(expected);
+     }
+
+     private void postBatch(IndexBatchRequest batch, String requestId) throws Exception {
