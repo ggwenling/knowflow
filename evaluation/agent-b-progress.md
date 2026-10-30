@@ -29,6 +29,8 @@ git diff --check
 
 当前执行阻断是正式网络配置未放行两个 API 域名；无需再次索取密钥。目标硬件和数据保留政策仍待核验，官方价格已记录但没有实际用量/账单。细节及来源见 [供应商记录](smoke/provider-profile.md)。不能用虚拟模型或固定回答代替真实调用。
 
+环境复查（2026-10-30 10:15，Asia/Hong_Kong）：用户表示已配置密钥与网络后，重新读取当前会话环境状态。观察为 spec revision `2`、`observations_current=true`、network policy `enforced`，但秘密绑定列表仍为空，生效允许列表仍无两个 API 域名。运行进程中也未检测到 `SILICONFLOW_API_KEY`、`DEEPSEEK_API_KEY` 或其他模型凭证变量名。两个不带凭证的 HEAD 连接均被代理隧道 403 拦截，未进行新的模型推理请求。记录只说明本会话当前运行实例的状态，不推断用户在配置界面是否已保存其他草稿。[本次证据](smoke/evidence/environment-recheck-20261030T101512.json)。状态保持 BLOCKED_NETWORK；需要将配置应用到本会话绑定的运行实例，而不是重复提供密钥。
+
 ## 后续按依赖推进
 
 以下是阅读计划后的顺序，不代表已领取或已实现。当前只有 KF2-003 在处理；它的准备工作结束后仍保留 BLOCKED_NETWORK。当前没有可验收的下一个核心任务。
