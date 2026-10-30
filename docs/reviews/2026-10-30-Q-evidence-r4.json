@@ -1,0 +1,129 @@
+{
+  "recorded_at": "2026-10-30T15:01:59.298289+08:00",
+  "java_target": "894fc763b3c19a51225365f749e07cc033a4db34",
+  "python_target": "b598f1d62cc2367a4bfd49fccd3c31b521abff23",
+  "candidate_sha": "80fe26a3927d9a378bbaa5a717e7c99dbe032b7a",
+  "candidate_tree": "a52112ddc7f40a03bb1b5c0764aa21b62120deef",
+  "local_candidate_branch": "review/q-main-20261030",
+  "review_result": "CHANGES_REQUESTED: unsupported Content-Type produces 500 instead of 415",
+  "remote_main_at_finish": "7d5095b8bc987c1c7e6f4106887d3355fa88d4c2",
+  "main_pushed": false,
+  "python_tests": {
+    "passed": 65,
+    "failed": 0
+  },
+  "contract_cases": 54,
+  "model_offline_tests": 16,
+  "java_verify": {
+    "exit_code": 0,
+    "suites": [
+      {
+        "name": "com.knowflow.api.config.DatabaseMigrationPropertiesTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.config.ApplicationDatabasePropertiesTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.ApiSecurityIntegrationTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.db.PostgreSqlMigrationIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.config.AiServicePropertiesTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.AuthKnowledgeBaseIntegrationTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ],
+    "log_sha256": "ae280c9992faab99cca4fcdf97f376b63dd040767c6afd8605479d596b772869"
+  },
+  "content_type_probe": {
+    "request": "POST /api/v1/auth/register",
+    "content_type": "text/plain",
+    "body": "synthetic request",
+    "expected_status": 415,
+    "actual_status": 500,
+    "actual_response": {
+      "contract_version": "0.2.0-draft.4",
+      "request_id": "e9759a41-3aba-474f-9ebb-70ded164f987",
+      "code": "INTERNAL_ERROR",
+      "message": "The request could not be processed.",
+      "retryable": false
+    },
+    "test_count": 1,
+    "failures": 1,
+    "errors": 0,
+    "test_copy": "/workspace/scratch/q-main-media-probe",
+    "test_source_sha256": "78d1a777d7189b0217e9fb4b94d0fa4764dcb7fddda75d7ce877bc3637ea44a9",
+    "log_sha256": "34ff4a31d7b3d019c4fe70c78fade784865b4625fc69c656a0686f4b60da6552"
+  },
+  "integration_first_run": {
+    "tests": 8,
+    "failures": 2,
+    "errors": 0,
+    "failure_type": "5-second waits timed out during parallel Java/database workloads",
+    "root_cause": "not established"
+  },
+  "integration_isolated_retry": {
+    "recorded_at": "2026-10-30T15:00:35.586581+08:00",
+    "git_head_at_run": "80fe26a3927d9a378bbaa5a717e7c99dbe032b7a",
+    "contract_version": "0.2.0-draft.4",
+    "java_tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "clean_worktree_before": true,
+    "clean_worktree_after": true,
+    "integration_tree": "a52112ddc7f40a03bb1b5c0764aa21b62120deef",
+    "java_target": "894fc763b3c19a51225365f749e07cc033a4db34",
+    "schema_sha256": "ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41",
+    "examples_sha256": "d92d27d05520bbf3411617f935964192f61520e0b431db607beb6a3c662625a8",
+    "consumer_sha256": "27af74730e416d0dd9f091a1dd6ef3128f76d7c66c8b8ea8229eac0cc4157aad",
+    "real_java_health_client": true,
+    "java_health_client_accepts_draft4": true,
+    "java_health_client_rejects_draft2_fixture": true,
+    "java_health_client_five_second_timeout": true,
+    "java_health_client_sha256": "b7d35f59933072e233e73260cd737b9b696a12286dbf0024265c792cc9437cfd",
+    "real_java_http_service": true,
+    "real_java_webclient": true,
+    "real_python_http_service": true,
+    "timeout_target": "Separate local slow fixture; real Java responseTimeout config, not a Python business route.",
+    "public_java_gateway_error_mapping": "Not implemented by A yet; probe validates transport and Python error bodies only.",
+    "external_model_calls": 0,
+    "database_calls": 0,
+    "secret_in_process_logs": false,
+    "app_sha256": "bed7cb636167d18e4858eda266a7e07fd0d93bc98299e20ecffef14b1190d492",
+    "java_client_config_sha256": "11d63c4fbe28d2b0cfc29eeb3ae6ceb10a013bd50e25172d0b07f59af36a8ccd",
+    "java_probe_sha256": "4a2ba8f8ac161e4b5d4138ab34fe9acc65e6156d15ddaf8725bf14d40d99f81d"
+  },
+  "source_changes_by_Q": "No production source changes; regression inserted only into disposable Java copy.",
+  "limitations": [
+    "Not a production deployment or complete project acceptance.",
+    "No external provider/model calls.",
+    "No remote main change; local work and review candidate retain merged commit for inspection."
+  ]
+}

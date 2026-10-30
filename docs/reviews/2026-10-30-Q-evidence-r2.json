@@ -1,0 +1,182 @@
+{
+  "recorded_at": "2026-10-30T11:29:20.485261+08:00",
+  "previous_target_sha": "d1213dd5538c785b9ca36e6ae749cce267751131",
+  "review_target_sha": "2da7fd3b3801253dd75d864c9a8cca4c64b5ca59",
+  "b_fix_sha": "bab4d97348b84ef025c6539fb7fd020bb9a660b0",
+  "a_java_sha": "83467d37f53e20d3262c02c441bc9efc47c846f8",
+  "python_regressions": {
+    "tests": 16,
+    "failures": 0
+  },
+  "contract_cases": {
+    "tests": 39,
+    "failures": 0,
+    "initial_missing_date_time_checker": "failed explicitly; installed pinned requirements and passed"
+  },
+  "maven_verify": {
+    "exit_code": 0,
+    "suites": [
+      {
+        "name": "com.knowflow.api.ApiSecurityIntegrationTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.config.AiServicePropertiesTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ],
+    "log_sha256": "664448b83f52e4157f0d06afd5f1eb7760dd3967d8cf97c8ce544dca4dbb7ddc"
+  },
+  "model_identity_recheck": [
+    {
+      "embedding_response_model": "different-embedding",
+      "chat_response_model": "selected-chat",
+      "status": "FAILED",
+      "exit_code": 1,
+      "embedding_model_matches": null,
+      "chat_model_matches": null
+    },
+    {
+      "embedding_response_model": "selected-embedding",
+      "chat_response_model": "different-chat",
+      "status": "FAILED",
+      "exit_code": 1,
+      "embedding_model_matches": true,
+      "chat_model_matches": null
+    },
+    {
+      "embedding_response_model": "different-embedding",
+      "chat_response_model": "different-chat",
+      "status": "FAILED",
+      "exit_code": 1,
+      "embedding_model_matches": null,
+      "chat_model_matches": null
+    }
+  ],
+  "http_probes": [
+    {
+      "variant": "valid",
+      "method": "GET",
+      "path": "/actuator/health",
+      "authenticated": false,
+      "status": 200,
+      "body": {
+        "status": "UP"
+      },
+      "request_id_header": "412b0dbc-635b-4744-a6c0-b1aa76699a27"
+    },
+    {
+      "variant": "valid",
+      "method": "POST",
+      "path": "/actuator/health",
+      "authenticated": false,
+      "status": 500,
+      "body": {
+        "contract_version": "0.2.0-draft.2",
+        "request_id": "edba380b-fba7-451c-82d7-9feac867581b",
+        "code": "INTERNAL_ERROR",
+        "message": "The request could not be processed.",
+        "retryable": false
+      },
+      "request_id_header": "edba380b-fba7-451c-82d7-9feac867581b",
+      "error_schema_valid": true
+    },
+    {
+      "variant": "valid",
+      "method": "GET",
+      "path": "/internal/route-does-not-exist",
+      "authenticated": true,
+      "status": 500,
+      "body": {
+        "contract_version": "0.2.0-draft.2",
+        "request_id": "b010ce61-75cc-4418-bd86-5d847f66d091",
+        "code": "INTERNAL_ERROR",
+        "message": "The request could not be processed.",
+        "retryable": false
+      },
+      "request_id_header": "b010ce61-75cc-4418-bd86-5d847f66d091",
+      "error_schema_valid": true
+    },
+    {
+      "variant": "valid",
+      "method": "GET",
+      "path": "/internal/route-does-not-exist",
+      "authenticated": false,
+      "status": 401,
+      "body": {
+        "contract_version": "0.2.0-draft.2",
+        "request_id": "2d34dcbd-3923-42f2-8f65-888abe521e73",
+        "code": "UNAUTHENTICATED",
+        "message": "Authentication is required.",
+        "retryable": false
+      },
+      "request_id_header": "2d34dcbd-3923-42f2-8f65-888abe521e73",
+      "error_schema_valid": true
+    },
+    {
+      "variant": "valid",
+      "method": "GET",
+      "path": "/api/v1/me",
+      "authenticated": false,
+      "status": 401,
+      "body": {
+        "contract_version": "0.2.0-draft.2",
+        "request_id": "3b22140b-5055-4155-8886-75e8540bdc87",
+        "code": "UNAUTHENTICATED",
+        "message": "Authentication is required.",
+        "retryable": false
+      },
+      "request_id_header": "3b22140b-5055-4155-8886-75e8540bdc87",
+      "error_schema_valid": true
+    },
+    {
+      "variant": "newline-secret",
+      "method": "GET",
+      "path": "/actuator/health",
+      "authenticated": false,
+      "status": 200,
+      "body": {
+        "status": "UP"
+      },
+      "request_id_header": "7c3b92c1-005c-4fb7-89bd-970f58311d75"
+    }
+  ],
+  "shared_secret_probe": {
+    "source": "QSharedSecretProbe.java",
+    "source_sha256": "611a8eaaabeb30d18c7120fd42d6cf788633bd0b567b758837d249967d3024a4",
+    "output": [
+      "configuration_accepts_newline=true",
+      "outbound_request=FAILED",
+      "cause_type=WebClientRequestException",
+      "cause_type=IllegalArgumentException",
+      "cause_type=IllegalArgumentException"
+    ],
+    "transport": "loopback HTTP stub only"
+  },
+  "source_policy": {
+    "url": "https://docs.siliconflow.cn/docs/legals/privacy-policy",
+    "previous_independent_response_sha256": "851604523a1ed42b713c40fe9108c6a820df6379f7630303d054dfc4ac802b00",
+    "date_visible_in_response": "2026 年 7 月 30 日",
+    "comparison": "Updated API inference and safety review summary agrees with independently fetched source."
+  },
+  "decisions": {
+    "KF2-001": "ACCEPTED: authorized V0.2 baseline decision only",
+    "KF2-002": "ACCEPTED: previous finding closed",
+    "KF2-003": "ACCEPTED: previous findings closed, candidate baseline scope",
+    "KF2-004": "BLOCKED: formal freeze, candidate may proceed to consumer confirmation",
+    "KF2-005": "ACCEPTED: previous task scope",
+    "KF2-006": "CHANGES_REQUESTED: Q-006-01 and Q-006-02"
+  },
+  "limitations": [
+    "No new provider requests; historical runner hash is distinct from fixed runner.",
+    "No database, Python service, frontend, or end-to-end product verification.",
+    "Formal contract freeze still needs complete interfaces and B/M consumption decisions.",
+    "No main integration or branch publishing performed by Q."
+  ]
+}

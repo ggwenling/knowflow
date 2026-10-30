@@ -1,0 +1,314 @@
+{
+  "recorded_at": "2026-10-30T12:48:45.987732+08:00",
+  "targets": {
+    "java": "ffd4d608c1c9b1d5799caef92a21e4fd9ebd2434",
+    "python": "e4efd054880c506c1e57a76f28f6710e3d761016"
+  },
+  "common_base": "150cd847a5750143fb6eb2c74c762962381952fe",
+  "decisions": {
+    "java": "CHANGES_REQUESTED",
+    "python": "CHANGES_REQUESTED",
+    "JP-I1": "BLOCKED_CONTRACT_VERSION",
+    "KF2-010": "ACCEPTED: synthetic seed data scope"
+  },
+  "java_verify": {
+    "exit_code": 0,
+    "suites": [
+      {
+        "name": "com.knowflow.api.config.DatabaseMigrationPropertiesTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.config.ApplicationDatabasePropertiesTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.ApiSecurityIntegrationTest",
+        "tests": "8",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.db.PostgreSqlMigrationIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.config.AiServicePropertiesTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.knowflow.api.AuthKnowledgeBaseIntegrationTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ],
+    "log_sha256": "50ef87abffdef75f6b0ec1a48d6a86b578d471beaca9dbb30c6e003ea290816f"
+  },
+  "python_pytest": {
+    "passed": 33,
+    "failed": 0,
+    "install": "uv sync --project services/ai --frozen; fresh isolated venv"
+  },
+  "contract_cases": {
+    "java": 54,
+    "python": 39,
+    "schema_sha256": {
+      "java": "ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41",
+      "python": "edc9ada0bb5de23ddf69f96c9172b3fc3719f4b3111d5d35718f2717efae8087"
+    }
+  },
+  "model_offline_tests": {
+    "passed": 16,
+    "failed": 0,
+    "external_model_calls": 0
+  },
+  "python_process_smoke": {
+    "recorded_at": "2026-10-30T12:44:42.496913+08:00",
+    "checks": {
+      "authenticated_health": true,
+      "request_id_header": true,
+      "missing_credential": true,
+      "wrong_credential": true,
+      "unknown_route": true,
+      "wrong_method": true,
+      "business_disabled": true,
+      "no_secret_in_process_log": true
+    },
+    "external_model_calls": 0,
+    "java_webclient_called": false,
+    "scope": "Real Python HTTP process only; Java caller separately required.",
+    "git_head_at_run": "e4efd054880c506c1e57a76f28f6710e3d761016",
+    "app_sha256": "bed7cb636167d18e4858eda266a7e07fd0d93bc98299e20ecffef14b1190d492"
+  },
+  "parser_smoke": {
+    "recorded_at": "2026-10-30T12:44:43.060358+08:00",
+    "parser_profile": "text-v1+pypdf-6.21.4",
+    "parser_sha256": "57edf9d3150c6e6c726cb44b7ca294142f2b3c7fdda62862b975e735978d1f9e",
+    "git_head_at_run": "e4efd054880c506c1e57a76f28f6710e3d761016",
+    "checks": [
+      {
+        "id": "api",
+        "status": "PASSED",
+        "source_sha256": "ca47c675c4bd8a837d3d5a2db985df5ed7c8115559e169b71c6fced7f6dd595c",
+        "characters": 141
+      },
+      {
+        "id": "chunk",
+        "status": "PASSED",
+        "source_sha256": "fe454004d06f2bad31f338c3003b224428136c70b2b83cb599ea3aca463f8f44",
+        "characters": 114
+      },
+      {
+        "id": "draft",
+        "status": "PASSED",
+        "source_sha256": "8362e40b718578db8bdd1a63dcc325ad39bdd2437d33545ad2dcb102580a3cb1",
+        "characters": 74
+      },
+      {
+        "id": "adr",
+        "status": "PASSED",
+        "source_sha256": "bde8b35afd9bafc2b1f5b69198e6c6823ebcf6444e5e6572bab29117029b185e",
+        "characters": 94
+      },
+      {
+        "id": "files",
+        "status": "PASSED",
+        "source_sha256": "51506fdb87f9ada6f5e068e2e285938b50f2fc58193c30d57f5ae89fb6e36140",
+        "characters": 119
+      },
+      {
+        "id": "access",
+        "status": "PASSED",
+        "source_sha256": "503d4cbc690bb7454bd63e3772a14d73f570fb657a6360cc49175b6b3a71c86d",
+        "characters": 115
+      },
+      {
+        "id": "publish",
+        "status": "PASSED",
+        "source_sha256": "62776eb7eafaca7d1588e70d6853ddfce37b370756ab43a6fdc35b3cb31782df",
+        "characters": 114
+      },
+      {
+        "id": "locator",
+        "status": "PASSED",
+        "source_sha256": "55da63696276a50c9e32b0e709101a64ebdb0adbf696de8bceba4a6e1c0ea9c1",
+        "characters": 131
+      },
+      {
+        "id": "outbound",
+        "status": "PASSED",
+        "source_sha256": "5e20e82abacd077a4be34e4d471ef999d78a67a420873d65f23d9e7940608f18",
+        "characters": 131
+      },
+      {
+        "id": "timeout",
+        "status": "PASSED",
+        "source_sha256": "aa50543a6c932ea08cfedb92f9426de376df99c185c09671c413ab8c1b582538",
+        "characters": 118
+      },
+      {
+        "id": "chinese-pages.pdf",
+        "status": "PASSED",
+        "observed": "PARSED",
+        "source_sha256": "426b1f6a5dd99828658f370654efdc111c30bda10bed5c4369be69f313377062"
+      },
+      {
+        "id": "blank.pdf",
+        "status": "PASSED",
+        "observed": "PDF_NO_TEXT",
+        "source_sha256": "226bdbe274d3222c3ed276db4f6736d457282e01abf7982629360f7b4f1ad77b"
+      },
+      {
+        "id": "image-only.pdf",
+        "status": "PASSED",
+        "observed": "PDF_NO_TEXT",
+        "source_sha256": "3eeba438c714cc6b607cd9ee747c17ef0495df08526d2651ae72fa8e0650b09f"
+      },
+      {
+        "id": "encrypted.pdf",
+        "status": "PASSED",
+        "observed": "PDF_ENCRYPTED",
+        "source_sha256": "89edd4ac644f4cdf5aff02cb08b66cb2209b1279fa63b1a14fa4749502e68e03"
+      },
+      {
+        "id": "malformed.pdf",
+        "status": "PASSED",
+        "observed": "INVALID_PDF",
+        "source_sha256": "c6cb54b238cfc0e0c71fafb99d10e77bbdb72c3faf660ecf0aee32984b0248d2"
+      }
+    ],
+    "external_model_calls": 0,
+    "scope": "Synthetic local samples only; no production capacity claim."
+  },
+  "contract_reproduction": {
+    "combined_schema_startup": "ConfigurationError: CONTRACT_HASH_MISMATCH",
+    "python_reported_contract": "0.2.0-draft.2",
+    "java_required_contract": "0.2.0-draft.4",
+    "production_client_output": [
+      "health_client=REJECTED",
+      "exception_type=IllegalStateException",
+      "message=AI internal health response does not match the contract"
+    ],
+    "java_source_sha256": "9b56c4e73e81cd16f7c1e020c5ab5d5b7741ec0bd146a04c0fd6b3b06815d420"
+  },
+  "java_http_probes": [
+    {
+      "method": "GET",
+      "path": "/actuator/health",
+      "accept": null,
+      "status": 200,
+      "body": "{\"status\":\"UP\"}",
+      "allow": null
+    },
+    {
+      "method": "POST",
+      "path": "/actuator/health",
+      "accept": null,
+      "status": 405,
+      "body": "{\"contract_version\":\"0.2.0-draft.4\",\"request_id\":\"132389dd-506d-4e2b-8bc7-ca4ab4075614\",\"code\":\"INVALID_REQUEST\",\"message\":\"The HTTP method is not supported for this endpoint.\",\"retryable\":false}",
+      "allow": "GET"
+    },
+    {
+      "method": "GET",
+      "path": "/actuator/health",
+      "accept": "text/plain",
+      "status": 500,
+      "body": "{\"contract_version\":\"0.2.0-draft.4\",\"request_id\":\"50f593a4-5010-4396-840b-ea7dbfca7cb4\",\"code\":\"INTERNAL_ERROR\",\"message\":\"The request could not be processed.\",\"retryable\":false}",
+      "allow": null
+    },
+    {
+      "method": "GET",
+      "path": "/internal/missing",
+      "accept": null,
+      "status": 404,
+      "body": "{\"contract_version\":\"0.2.0-draft.4\",\"request_id\":\"b3b88077-f301-4def-9107-d06e0abcf588\",\"code\":\"ENDPOINT_UNAVAILABLE\",\"message\":\"The requested endpoint is not available.\",\"retryable\":false}",
+      "allow": null
+    }
+  ],
+  "unicode_empty_reproduction": [
+    {
+      "format": "txt",
+      "codepoints": [
+        "U+00A0"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "codepoints": [
+        "U+3000"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "txt",
+      "codepoints": [
+        "U+000B",
+        "U+000C"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "codepoints": [
+        "U+00A0"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "codepoints": [
+        "U+3000"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    },
+    {
+      "format": "md",
+      "codepoints": [
+        "U+000B",
+        "U+000C"
+      ],
+      "unicode_whitespace_only": true,
+      "actual": "ACCEPTED",
+      "expected": "EMPTY_DOCUMENT"
+    }
+  ],
+  "checks": {
+    "tracked_json": "PASS",
+    "markdown_file_links": "PASS",
+    "bound_credential_values": "not found in tracked files",
+    "java_range_diff_check": "PASS",
+    "python_range_diff_check": "FAIL: generated PDF trailing whitespace only; non-PDF range passes"
+  },
+  "limitations": [
+    "No published integration merge or formal contract freeze.",
+    "No external model calls, production data, frontend or full upload/RAG loop.",
+    "B original five slow transport tests not rerun; exact current Java health client tested against actual Python HTTP.",
+    "Current code inspection and tests do not establish future lease/index concurrency correctness."
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "reviewed_at": "2026-10-30T10:54:25.930574+08:00",
+  "base_sha": "7d5095b8bc987c1c7e6f4106887d3355fa88d4c2",
+  "author_package_base_sha": "5a3d84413f69437b23f2a38fcae032a4ddf8d326",
+  "target_sha": "d1213dd5538c785b9ca36e6ae749cce267751131",
+  "offline_regressions": {
+    "command": "python -m unittest discover -s evaluation/smoke -p 'test_*.py' -v",
+    "passed": 15,
+    "failed": 0
+  },
+  "independent_checks": {
+    "latest_runner_and_fixture_hashes": "PASS",
+    "json_parse": "PASS",
+    "local_markdown_links": "PASS",
+    "git_diff_check": "PASS",
+    "ignore_and_env_examples": "PASS",
+    "bound_credential_values_in_tracked_files": "not found",
+    "pypi_published_wheel_hashes_match_evidence": "PASS"
+  },
+  "model_mismatch_reproduction": [
+    {
+      "embedding_response_model": "different-embedding",
+      "chat_response_model": "selected-chat",
+      "status": "LIVE_SMOKE_PASSED",
+      "exit_code": 0,
+      "embedding_model_matches": false,
+      "chat_model_matches": true
+    },
+    {
+      "embedding_response_model": "selected-embedding",
+      "chat_response_model": "different-chat",
+      "status": "LIVE_SMOKE_PASSED",
+      "exit_code": 0,
+      "embedding_model_matches": true,
+      "chat_model_matches": false
+    },
+    {
+      "embedding_response_model": "different-embedding",
+      "chat_response_model": "different-chat",
+      "status": "LIVE_SMOKE_PASSED",
+      "exit_code": 0,
+      "embedding_model_matches": false,
+      "chat_model_matches": false
+    }
+  ],
+  "model_mismatch_reproduction_network": "mocked only; no provider requests",
+  "sources": [
+    {
+      "url": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "response_sha256": "b856a6e93fa4793ecc8f3fd03a01bb7d8f7572f78a4739da8ce6dbdb09328d66",
+      "bytes": 26043,
+      "visible_text_excerpt": "MODEL VERSION DeepSeek-V4.1-Flash-1017 DeepSeek-V4-Pro-0813 THINKING MODE Supports both non-thinking and thinking (default) modes See Thinking Mode for how to switch CONTEXT LENGTH 1M MAX OUTPUT MAXIMUM: 384K FEATURES Json Output ✓ ✓ Tool Calls ✓ ✓ Responses API ✓ ✓ Anthropic API ✓ ✓ Chat Prefix Completion（Beta） ✓ ✓ FIM Completion（Beta） Non-thinking mode only Non-thinking mode only Vision ✓ Not supported PRICING (2) 1M INPUT TOKENS (CACHE HIT) OFF-PEAK $0.003 $0.022 PEAK $0.006 $0.044 1M INPUT TOKENS (CACHE MISS) OFF-PEAK $0.15 $0.66 PEAK $0.3 $1.32 1M OUTPUT TOKENS OFF-PEAK $0.6 $1.98 PEAK $1.2 $3.96 Concurrency Limit (3) 2500 500 (1) Use deepseek-flash as the model name. The legacy names deepseek-v4-flash and deepseek-v4-flash-vision-exp are still accepted, but the corresponding models have been retired, their requests are served by the"
+    },
+    {
+      "url": "https://docs.siliconflow.cn/docs/legals/privacy-policy",
+      "response_sha256": "851604523a1ed42b713c40fe9108c6a820df6379f7630303d054dfc4ac802b00",
+      "bytes": 249961,
+      "visible_text_excerpt": "基本业务功能四：\"大模型 API 调用与推理服务\"的个人信息收集使用规则 当您使用我们提供的大模型API服务（包括但不限于文本生成、图像生成等）时，为了完成大模型推理计算、计费扣减、并发调度及保障系统的安全与稳定性，我们需要收集您的 IP地址、调用的模型名称、Token消耗量、请求时间及请求状态码等日志信息。 【特别说明】针对大模型API加速推理服务，我们仅作为底层算力与技术提供方。对于您通过API传输的业务数据（包括输入指令及生成的输出内容），我们仅在提供当次推理计算的必要且短暂的时间内进行处理。我们不会长期存储您的任何业务输入与输出数据；不会将您的业务数据用于任何大模型的预训练、微调或其他商业用途；推理计算完成后，相关业务数据将立即从我们的计算节点中销毁或不可恢复。同时，如您作为开发者或企业客户使用我们的API服务向最终用户提供服务，您应当确保您输入的数据来源合法，并已依法获取最终用户的充分授权同意。 （五）基本业务功能五：\"平台内容安全与风控\"的个人信息收集使用规则 基于保障平台算力资源不被滥用及履行《生成式人工智能服务管理暂行办法》等相关法律法规规定的内容安全法定义务，我们会收集您的使用行为信息（包括API调用频率、并发量、异常请求日志）。同时，我们会对您的输入提示词（Prompt）和输出内容进行自动化安全审核，以识别和拦截违法违规内容。请您知悉，该等审核仅用于履行法定合规义务，我们不会将其用于模型训练或其他商业目的。 （六）基本业务功能六：改善和优化服务及保障账户安全的个人信息收集使用规则 我们提供的基本功能需要依赖部分信息才能运行，当您使用我们的产品和服务时，则需要向我们或第三方网易易盾（联系方式：【 dun.163.com 】）提供或允许收集的必要信息包括： （1）设备信息：我们收集您使用设备的设备 ID、IP 地址、手机号、操作数据、崩溃数据、设备及设备所处物理与网络环境信息、分辨率、时区和语言信息，以便了解产品对不同硬件设备适配性、确保操作环境安全、识别账号异常状态，用于分析产品的使用状况、排查崩溃原因、减少崩溃情况，以不断改进我们的产品，以及保障账号和系统安全。 （2）日志信息：当您浏览或使用本平台时，为了保障网站和服务的正常运行及运营安全，预防网络攻击、侵入风险，更准确地识别违反法律法规或本平台的相关协议、服务规则的情况，我们会收集您的IP地址、分辨率、时区和语言等设备信息、网络接入方式及类型信息、界面操作和服务请求记录。这些信息是我们提供服务和保障服务正常运行和网络安全所必须收集的基本信息。为让您体验到更好的服务，并保障您的使用安全，我们"
+    },
+    {
+      "url": "https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html",
+      "response_sha256": "339984e36a795843ee2b5b917797072ec249f3c0e9ff7cbbfe754c01caa4f069",
+      "bytes": 48935,
+      "visible_text_excerpt": "How We Use Your Personal Data We use your Personal Data to operate, provide, develop, and improve the Services, including for the following purposes. To provide, administer and maintain the Services and to enforce our terms, conditions and policies. Such as creating the accounts, deliver a fast and convenient logging-in experience, enabling you to chat with DeepSeek and provide user support. To improve and develop the Services and to train and improve our technology, such as our machine learning models and algorithms. Including by monitoring interactions and usage across your devices, analyzing how people are using it, and training and improving our technology. To communicate with you, including to notify you about changes to the Services, provide customer support to you and send you other service-related messages or commercial messages. "
+    },
+    {
+      "url": "https://siliconflow.cn/pricing",
+      "response_sha256": "795e99591e3cc879637b6a70db97b85616ae1633bf204987f1ed1062c29c232d",
+      "bytes": 829893,
+      "visible_text_excerpt": "BAAI/bge-m3 免费 - - bge-reranker-v2-m3 BAAI/bge-reranker-v2-m3 免费 - - bge-large-zh-v1.5 BAAI/bge-large-zh-v1.5 免费 - - bge-large-en-v1.5 BAAI/bge-large-en-v1.5 免费 - - bge-m3 (Pro) Pro/BAAI/bge-m3 ¥ 0.07 - - bge-reranker-v2-m3 (Pro) Pro/BAAI/bge-reranker-v2-m3 ¥ 0.07 - - 生图模型 厂商 模型 计费项 / 价格 Tongyi-MAI Z-Image-Turbo Tongyi-MAI/Z-Image-Turbo 生成图片 每图片 ¥ 0.10 Z-Image Tongyi-MAI/Z-Image 生成图片 每图片 ¥ 0.30 Qwen Qwen-Image-Edit-2509 Qwen/Qwen-Image-Edit-2509 生成图片 每图片 ¥ 0.30 Qwen-Image-Edit Qwen/Qwen-Image-Edit 生成图片 每图片 ¥ 0.30 Qwen-Image Qwen/Qwen-Image 生成图片 每图片 ¥ 0.30 Kolors Kolors Kwai-Kolors/Kolors 生成图片 每图片 免费 语音模型 厂商 模型 计费项 / 价格 ChinaTelecom XingChenGSR V1.0 XingChenAGI/XingChenGSR-V1.0 输入 UTF-8 字节 每千字符（UTF-8） 免费 XingChenASR V3.2-Ultra XingChenAGI/XingChenASR-V3.2-Ultra 输入 UTF-8 字节 每千字符（UTF-8） 免费 XingChenASR-Diarize-V3.0 XingChenAGI/XingChenASR-Dia"
+    }
+  ],
+  "limitations": [
+    "No additional live model call or account billing access.",
+    "Current policy response and excerpts are observations, not proof of account contract or backend handling.",
+    "A local commits not available as Git objects; chat evidence read, no SHA-bound approval.",
+    "No service or integrated product available at reviewed target."
+  ]
+}
