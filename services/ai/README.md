@@ -29,3 +29,12 @@ python -m unittest discover -s evaluation/smoke -p 'test_*.py' -v
 进程冒烟会启动真实 Uvicorn、生成临时测试密钥并在退出时清理进程，证据只保存断言、哈希和版本，不保存密钥/正文。开发测试使用合成数据及离线 Provider 报文，不冒充实际模型调用。当前 Starlette TestClient 对 httpx 给出上游弃用提示，测试仍有效；运行时没有使用 TestClient。
 
 职责：解析/分段/Embedding/受控检索/生成/来源映射；Java 独占业务状态和发布。本轮不接数据库；KF2-016 已交付内部纯解析组件（pypdf 6.21.4、UTF-8 TXT/MD），用法与限制见 [解析说明](docs/parsing.md)，未公开处理 HTTP 路由。开发可按 JP-01 不等 Q 复核推进，正式 DONE 仍待审阅/依赖集成。
+
+Java/Python 真实进程联调（需要 Java 21、可用 Maven 网络配置）：
+
+```sh
+uv run --project services/ai --frozen python services/ai/tools/java_python_smoke.py
+# 需要代理时在本机增加 --maven-settings /path/to/local-settings.xml
+```
+
+该 B 线脚本只复制 Java 的源码/构建输入到临时目录，启动原 Spring 服务和 Python 服务，并使用原 AiHttpClientConfiguration；不修改 Java 源码或公共契约。慢响应场景使用单独本地测试夹具验证实际 30 秒 responseTimeout，不是假造 Python 业务接口。证据见 docs/evidence/java-python-smoke.json。Java 对外网关的统一超时/上游错误映射尚无业务调用入口，仍由 A 实现和验收；本测试只证明真实服务/传输及 Python 错误体兼容。

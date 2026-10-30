@@ -95,3 +95,13 @@ KF2-007：FastAPI 可运行骨架、内部 Bearer 恒定时间认证、健康/�
 RAGFlow 研究固定 SHA 9b325bc10c423b1610a1e24596c028d0ffceb792，实际阅读 Go 路径 TextParser.ParseWithResult→charset.DecodeToUTF8→normalizeTextNewlines→NewTextJSONItem，已记录路径/函数/源码哈希和采纳差异；旧 Python 路径 404 后核对文件树，没有编造源码定位。未复制实现或运行其 OCR/版面模型。研究见 docs/research/ragflow/parse-chain.md。
 
 uv.lock 与运行依赖哈希导出同步更新，开发生成 PDF 的 ReportLab/Pillow 与运行解析 pypdf 分开。状态 IN_REVIEW（开发验证通过；Q 和最终集成未完成）。后续 KF2-017/018 不属于本 JP-01 首批开发交付，018 仍需 A 的迁移与有界写入授权。
+
+## JP-01 / 双服务开发联调（2026-10-30，Asia/Hong_Kong）
+
+Java 网络首轮失败后，读取 cloud-environment-runtime 技能和当前网络状态，使用会话代理生成 /tmp Maven settings；TLS 验证保持开启，未保存代理/模型凭证到仓库。既有 Java Maven verify 的 11 项测试全部通过。
+
+B 线工具 services/ai/tools/java_python_smoke.py 将原 Java 源码/构建输入复制到临时目录，附 B 自有测试探针，真实启动 Spring HTTP 服务、Uvicorn HTTP 服务，调用原 Java WebClient 配置。5 项集成测试通过：双方健康与 request_id、缺失/错误凭证、404/405 统一错误与 Allow、不可达连接、原 Java 30 秒 responseTimeout（慢目标为单独本地夹具）。两端日志未出现测试共享密钥；模型凭证不传入测试进程，未请求模型或数据库。证据绑定 Python app、Java 客户端配置和探针哈希；未修改 A 所有的 Java 源码、contracts、Flyway 或中央联调记录。
+
+此为 B 提供的开发联调证据，不代替 A 的正式集成候选/Q。Java 对外网关尚无调用入口，上游异常到公开 502/504 的业务边界映射仍待 A 接入；不把 transport 异常检查说成公开网关已验收。KNOWFLOW_INTERNAL_SHARED_SECRET 共享方式与内部 health 路径仍是待 A 发布的新候选约定。
+
+最终环境复现：全新虚拟环境 frozen 同步后 33 项 Python 测试通过，源码分发包和 wheel 构建成功；已有 39 项契约结构样例及 16 项模型离线回归通过。本轮所有模型线上调用次数为 0。三个 KF2 任务均 IN_REVIEW（开发验证通过），未伪报批准或正式 DONE。详细 SHA 和可复制命令见 evaluation/python-jp01-delivery.md。
