@@ -1,0 +1,404 @@
+[
+  {
+    "id": "q01",
+    "question": "创建索引任务必须传哪些字段？",
+    "answerable": true,
+    "reference_answer": "documentId（UUID）和 profileId（字符串）。",
+    "evidence": [
+      {
+        "document_id": "api",
+        "content_version_id": "content-api-ca47c675c4bd",
+        "start": 73,
+        "end": 112,
+        "unit": "unicode_code_point",
+        "quote": "必填字段为 documentId（UUID）和 profileId（字符串）。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "api",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q02",
+    "question": "索引任务创建成功的 HTTP 状态与查询标识是什么？",
+    "answerable": true,
+    "reference_answer": "HTTP 202，使用 jobId。",
+    "evidence": [
+      {
+        "document_id": "api",
+        "content_version_id": "content-api-ca47c675c4bd",
+        "start": 113,
+        "end": 140,
+        "unit": "unicode_code_point",
+        "quote": "成功响应为 HTTP 202，响应体包含 jobId。",
+        "line_start": 6,
+        "line_end": 6
+      }
+    ],
+    "split": "development",
+    "leakage_group": "api",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q03",
+    "question": "分段默认长度、允许范围和重叠长度是多少？",
+    "answerable": true,
+    "reference_answer": "默认 360，允许 180–720，默认重叠 40，单位均为 Unicode 码点。",
+    "evidence": [
+      {
+        "document_id": "chunk",
+        "content_version_id": "content-chunk-fe454004d06f",
+        "start": 27,
+        "end": 72,
+        "unit": "unicode_code_point",
+        "quote": "chunkSize 默认 360 个 Unicode 码点，允许 180–720 的整数。",
+        "line_start": 4,
+        "line_end": 4
+      },
+      {
+        "document_id": "chunk",
+        "content_version_id": "content-chunk-fe454004d06f",
+        "start": 73,
+        "end": 96,
+        "unit": "unicode_code_point",
+        "quote": "重叠区默认为 40 个 Unicode 码点。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q03",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q04",
+    "question": "重试等待用 20/60 秒还是 10/30 秒？为什么？",
+    "answerable": true,
+    "reference_answer": "默认 10 秒，上限 30 秒；ADR-017 已批准生效并明确替代未生效草案。",
+    "evidence": [
+      {
+        "document_id": "draft",
+        "content_version_id": "content-draft-8362e40b7185",
+        "start": 21,
+        "end": 35,
+        "unit": "unicode_code_point",
+        "quote": "状态：草案，未批准，不生效。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "adr",
+        "content_version_id": "content-adr-bde8b35afd9b",
+        "start": 19,
+        "end": 40,
+        "unit": "unicode_code_point",
+        "quote": "状态：已批准；2026-10-01 生效。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "adr",
+        "content_version_id": "content-adr-bde8b35afd9b",
+        "start": 41,
+        "end": 67,
+        "unit": "unicode_code_point",
+        "quote": "本 ADR 替代重试草案 v1.2 的重试等待参数。",
+        "line_start": 4,
+        "line_end": 4
+      },
+      {
+        "document_id": "adr",
+        "content_version_id": "content-adr-bde8b35afd9b",
+        "start": 68,
+        "end": 93,
+        "unit": "unicode_code_point",
+        "quote": "当前客户端重试等待默认 10 秒，上限 30 秒。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q04",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q05",
+    "question": "演示支持哪些格式，扫描 PDF 可以直接索引吗？",
+    "answerable": true,
+    "reference_answer": "UTF-8 TXT、Markdown、文本型 PDF；扫描 PDF 需要尚未实现的 OCR。",
+    "evidence": [
+      {
+        "document_id": "files",
+        "content_version_id": "content-files-51506fdb87f9",
+        "start": 19,
+        "end": 54,
+        "unit": "unicode_code_point",
+        "quote": "支持 UTF-8 TXT、Markdown 和含可提取文字的 PDF。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "files",
+        "content_version_id": "content-files-51506fdb87f9",
+        "start": 91,
+        "end": 118,
+        "unit": "unicode_code_point",
+        "quote": "扫描 PDF 需要 OCR，本演示版本未实现 OCR。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q05",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q06",
+    "question": "访问其他用户资源应该返回什么，能相信客户端 owner_id 吗？",
+    "answerable": true,
+    "reference_answer": "统一 404，owner 来自服务端验证身份，拒绝客户端 owner_id。",
+    "evidence": [
+      {
+        "document_id": "access",
+        "content_version_id": "content-access-503d4cbc690b",
+        "start": 19,
+        "end": 59,
+        "unit": "unicode_code_point",
+        "quote": "owner 只由服务端根据已验证身份生成，客户端传入 owner_id 应拒绝。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "access",
+        "content_version_id": "content-access-503d4cbc690b",
+        "start": 60,
+        "end": 93,
+        "unit": "unicode_code_point",
+        "quote": "不存在、其他用户或已经删除的资源，对外统一返回 HTTP 404。",
+        "line_start": 4,
+        "line_end": 4
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q06",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q07",
+    "question": "Python 能否自行发布活动索引，发布前要核验什么？",
+    "answerable": true,
+    "reference_answer": "只能由 Java 发布；核验有效租约、文档可见性、Chunk 清单和向量完整性，同事务切换。",
+    "evidence": [
+      {
+        "document_id": "publish",
+        "content_version_id": "content-publish-62776eb7eafa",
+        "start": 19,
+        "end": 55,
+        "unit": "unicode_code_point",
+        "quote": "只有 Java 服务可以发布活动索引版本；Python 只提交候选结果。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "publish",
+        "content_version_id": "content-publish-62776eb7eafa",
+        "start": 56,
+        "end": 89,
+        "unit": "unicode_code_point",
+        "quote": "发布前必须核验有效租约、文档可见性、Chunk 清单和向量完整性。",
+        "line_start": 4,
+        "line_end": 4
+      },
+      {
+        "document_id": "publish",
+        "content_version_id": "content-publish-62776eb7eafa",
+        "start": 90,
+        "end": 113,
+        "unit": "unicode_code_point",
+        "quote": "所有核验与活动版本切换应在同一数据库事务完成。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q07",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q08",
+    "question": "Embedding 和 LLM 分别接收什么演示内容？",
+    "answerable": true,
+    "reference_answer": "Embedding 接收获准分段；LLM 接收问题和获准检索片段；仅原创合成资料。",
+    "evidence": [
+      {
+        "document_id": "outbound",
+        "content_version_id": "content-outbound-5e20e82abacd",
+        "start": 19,
+        "end": 43,
+        "unit": "unicode_code_point",
+        "quote": "Embedding 请求发送获准的文档分段文本。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "outbound",
+        "content_version_id": "content-outbound-5e20e82abacd",
+        "start": 44,
+        "end": 66,
+        "unit": "unicode_code_point",
+        "quote": "LLM 请求发送当前问题和检索到的获准片段。",
+        "line_start": 4,
+        "line_end": 4
+      },
+      {
+        "document_id": "outbound",
+        "content_version_id": "content-outbound-5e20e82abacd",
+        "start": 67,
+        "end": 94,
+        "unit": "unicode_code_point",
+        "quote": "演示仅使用原创合成内容，不含用户文档、密钥和个人资料。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "q08",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q09",
+    "question": "TXT/MD 偏移单位及端点规则是什么，PDF 页码从几开始？",
+    "answerable": true,
+    "reference_answer": "原始文本 Unicode 码点，从 0 开始、右端不含；PDF 页码从 1 开始。",
+    "evidence": [
+      {
+        "document_id": "locator",
+        "content_version_id": "content-locator-55da63696276",
+        "start": 19,
+        "end": 62,
+        "unit": "unicode_code_point",
+        "quote": "TXT/MD 偏移以原始文本的 Unicode 码点计数，从 0 开始，区间右端不含。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "locator",
+        "content_version_id": "content-locator-55da63696276",
+        "start": 63,
+        "end": 90,
+        "unit": "unicode_code_point",
+        "quote": "PDF 页码从 1 开始，未提取到的页面坐标不得编造。",
+        "line_start": 4,
+        "line_end": 4
+      }
+    ],
+    "split": "holdout",
+    "leakage_group": "locator",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q10",
+    "question": "演示模型请求总期限和自动重试次数是多少，超时如何返回？",
+    "answerable": true,
+    "reference_answer": "18 秒，0 次自动重试；HTTP 504 / PROCESSING_TIMEOUT。",
+    "evidence": [
+      {
+        "document_id": "timeout",
+        "content_version_id": "content-timeout-aa50543a6c93",
+        "start": 19,
+        "end": 46,
+        "unit": "unicode_code_point",
+        "quote": "演示的模型请求总期限为 18 秒，自动重试次数为 0。",
+        "line_start": 3,
+        "line_end": 3
+      },
+      {
+        "document_id": "timeout",
+        "content_version_id": "content-timeout-aa50543a6c93",
+        "start": 47,
+        "end": 86,
+        "unit": "unicode_code_point",
+        "quote": "超时对外返回 HTTP 504，错误码 PROCESSING_TIMEOUT。",
+        "line_start": 4,
+        "line_end": 4
+      }
+    ],
+    "split": "development",
+    "leakage_group": "timeout",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q11",
+    "question": "取消执行可以恢复已删文档或发布活动索引吗？",
+    "answerable": true,
+    "reference_answer": "不可以，取消只释放计算资源。",
+    "evidence": [
+      {
+        "document_id": "timeout",
+        "content_version_id": "content-timeout-aa50543a6c93",
+        "start": 87,
+        "end": 117,
+        "unit": "unicode_code_point",
+        "quote": "取消只释放计算资源，不能恢复已删除文档，也不能自行发布索引。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "development",
+    "leakage_group": "timeout",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q12",
+    "question": "Embedding 实际每百万 tokens 账单价格是多少？",
+    "answerable": false,
+    "reference_answer": "资料不足，应拒答；本语料未提供实际账单价格。",
+    "evidence": [],
+    "split": "development",
+    "leakage_group": "q12",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q13",
+    "question": "该接口的 OAuth2 scope 具体名称是什么？",
+    "answerable": false,
+    "reference_answer": "资料不足，应拒答；本语料未定义 OAuth2 scope。",
+    "evidence": [],
+    "split": "development",
+    "leakage_group": "api",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q14",
+    "question": "示例串中文🙂A 中表情的码点区间是什么？",
+    "answerable": true,
+    "reference_answer": "[2,3)，不是 UTF-8 字节区间。",
+    "evidence": [
+      {
+        "document_id": "locator",
+        "content_version_id": "content-locator-55da63696276",
+        "start": 91,
+        "end": 130,
+        "unit": "unicode_code_point",
+        "quote": "示例串「中文🙂A」有 4 个 Unicode 码点；🙂 的区间是 [2,3)。",
+        "line_start": 5,
+        "line_end": 5
+      }
+    ],
+    "split": "holdout",
+    "leakage_group": "locator",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  },
+  {
+    "id": "q15",
+    "question": "生产部署机器的 GPU 型号是什么？",
+    "answerable": false,
+    "reference_answer": "资料不足，应拒答；本语料未提供生产硬件。",
+    "evidence": [],
+    "split": "holdout",
+    "leakage_group": "hardware-absent",
+    "annotation": "Author reference annotation, not a model prediction or user result."
+  }
+]

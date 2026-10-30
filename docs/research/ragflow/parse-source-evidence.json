@@ -1,0 +1,45 @@
+{
+  "repository": "https://github.com/infiniflow/ragflow",
+  "commit": "9b325bc10c423b1610a1e24596c028d0ffceb792",
+  "checked_at": "2026-10-30T12:14:16.861514+08:00",
+  "license_observed": "Apache-2.0",
+  "code_copied": false,
+  "sources": [
+    {
+      "path": "internal/parser/parser/text_parser.go",
+      "bytes": 2423,
+      "sha256": "d59e3497fc4a11bf7d6dedb134648c5cf6af25792477611c946590bd57c04033",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/internal/parser/parser/text_parser.go"
+    },
+    {
+      "path": "internal/parser/charset/charset.go",
+      "bytes": 11622,
+      "sha256": "621e1c40b519b83a8da9d9b42158e3f14b733f5d3e4ebe45ee1d763ea61f432d",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/internal/parser/charset/charset.go"
+    },
+    {
+      "path": "internal/parser/parser/parse_result.go",
+      "bytes": 4947,
+      "sha256": "df283392e9cc9a16abe121278dfc631387e70dab77466e4203cd6899fd237100",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/internal/parser/parser/parse_result.go"
+    },
+    {
+      "path": "internal/parser/parser/markdown_parser.go",
+      "bytes": 31700,
+      "sha256": "a623ef27f93a71b3bf80db66b0ea6372ec87859cb447f0cb11aafd6306809390",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/internal/parser/parser/markdown_parser.go"
+    },
+    {
+      "path": "internal/deepdoc/parser/pdf/parser.go",
+      "bytes": 27212,
+      "sha256": "5907200c4346a31b6c10fd3bd01c8778b50cf9447770f9d28b91c39f95fc0ae9",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/internal/deepdoc/parser/pdf/parser.go"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "url": "https://github.com/infiniflow/ragflow/blob/9b325bc10c423b1610a1e24596c028d0ffceb792/LICENSE"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "recorded_at": "2026-10-30T12:20:50.363713+08:00",
+  "app_sha256": "bed7cb636167d18e4858eda266a7e07fd0d93bc98299e20ecffef14b1190d492",
+  "configuration_sha256": "8cabcd024a82d37d939c8bebd0bb9a5bec4488d15b06e997af91eb80465e82db",
+  "checks": [
+    {
+      "case": "missing",
+      "nonzero_exit": true,
+      "fixed_config_error": true,
+      "no_secret_in_log": true
+    },
+    {
+      "case": "short",
+      "nonzero_exit": true,
+      "fixed_config_error": true,
+      "no_secret_in_log": true
+    },
+    {
+      "case": "control_character",
+      "nonzero_exit": true,
+      "fixed_config_error": true,
+      "no_secret_in_log": true
+    }
+  ]
+}

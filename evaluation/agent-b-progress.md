@@ -67,3 +67,49 @@ Q 审阅包需要具体 BASE_SHA → TARGET_SHA、依赖状态、测试及未执
 用户另行要求 KF2-002、003、005 在 python 分支交付并 push。KF2-002 和 KF2-005 原负责人为 M，本会话按指派接管其文件范围；KF2-003 仍为 B。场景选择“项目规范与接口查询”。由已有 Q 会话独立审阅，本会话仅准备审阅包，不代填审阅结论。
 
 执行提交及审阅 SHA 见 docs/tasks/execution-log.md 和 docs/reviews/KF2-002-003-005-review.md。KF2-002、003、005 当前均为 IN_REVIEW，未通过审阅或真实集成前不记 DONE。真实双模型冒烟在 python 分支重跑通过；合成试填不是真实用户证据。KF2-001 的 V1.1 设计包缺口未解除。
+
+## JP-01 / KF2-007 开发交付（2026-10-30，Asia/Hong_Kong）
+
+用户授权不等待现有 Q 复核，按共同计划继续 Python 开发。基线 150cd847a5750143fb6eb2c74c762962381952fe；分支 python；只写 services/ai、evaluation 和本线资料/研究目录。Java Windows wrapper 受既有换行属性影响被 Git 报差异，原始字节与 HEAD 完全一致，本线未修改或提交它。
+
+KF2-007：FastAPI 可运行骨架、内部 Bearer 恒定时间认证、健康/请求 ID/统一错误、严格消费现有共享 Schema、模型/索引/检索接口类型、超时/取消/模型 ID 与向量校验边界；业务执行入口未注册。公共契约未修改，新增健康报文由 services/ai/docs/contract-consumption.md 提给 A 发布。依赖锁、哈希导出和 Linux 安装环境许可元数据齐备。
+
+开发验证：11 项 Python 服务测试、39 个共享契约结构样例、既有 16 项模型离线回归通过；真实 Uvicorn 进程 8 项断言通过；全新 /tmp 虚拟环境按 frozen 锁安装后同一进程冒烟通过。首轮包构建因空模块尚未创建失败，补齐模块后安装成功；一次辅助脚本工作目录误设造成临时嵌套目录，已清理，未纳入提交。所有失败不冒充通过证据。
+
+真实 Python 进程证据见 services/ai/docs/evidence/process-smoke.json，记录执行时父提交及 app 哈希。依赖元数据见 dependency-licenses.json；未安装平台依赖保留未知。Java verify 首次因 Maven 未使用会话代理而网络失败，已按环境技能配置会话代理继续验证；双服务证据另补，不把本轮 Python 进程冒烟冒充 Java WebClient。未调用外部模型，未写数据库/Java 状态。
+
+状态 IN_REVIEW（开发验证通过；正式契约/Q/集成验收未完成）。KF2-007 target 由 git log -- services/ai 定位，后续交付汇总绑定具体 SHA。接下来按 JP-01 继续 KF2-010，再 KF2-016。
+
+## JP-01 / KF2-010 开发交付（2026-10-30，Asia/Hong_Kong）
+
+基于 KF2-007 提交 9f43750 顺序推进资料集。原创「青竹」合成资料 10 份（TXT/MD）、种子问题 15 道（12 有答案、3 拒答），与真实用户数据分开。每题答案要点、摘录、原始码点区间/行号、内容版本及来源哈希均可核验；资料 CC0-1.0，未引用/上传任何用户资料。作者逐题核对过原文；Q 独立抽查仍待进行。12 开发 / 3 留出，相关问题不跨分区；公开仓库留出不是盲测，质量分数未测。
+
+验证：15 题全部来源/版本/哈希/位置检查通过；5 项数据回归（包括篡改原文、偏移、版本、分区泄漏）通过；生成器重复执行字节级一致。准确复现命令及标注规则见 docs/evaluation/dataset.md。状态 IN_REVIEW（开发验证通过），前序 002/003 的复核依赖未被伪报完成；用户按 JP-01 授权继续 KF2-016。
+
+## JP-01 / KF2-016 开发交付（2026-10-30，Asia/Hong_Kong）
+
+基于 KF2-010 提交 fc98d57 实现内部纯解析函数，不开放 HTTP、不获取 URL/文件路径、不写业务状态。TXT/MD 严格 UTF-8，保留 BOM/CRLF/Markdown/emoji 与原始码点偏移；PDF 选择并锁定 pypdf 6.21.4（BSD-3-Clause）作为首轮基线，保留物理页码、空白页及来源身份/文件哈希，不安装 PyMuPDF、OCR 或伪造坐标。003 阶段的“pypdf 候选未安装”是历史；本 016 才选择安装和验证。
+
+验证：全套当前 33 项 Python 测试通过，包含 17 项解析测试场景（参数展开计数）；10 份合成资料的全部引用保持匹配、中文三页 PDF 的页码仍为 1/3 且空白页 2 被记录；扫描/图像无文本、空白、加密、损坏与大小/页数/字符限制失败样例通过。parser_smoke 保存 15 个样本的固定结果代码与哈希，不保存提取正文。资源限额是开发提议，不代表生产加固；CPU/内存展开与并发隔离留 KF2-035。
+
+RAGFlow 研究固定 SHA 9b325bc10c423b1610a1e24596c028d0ffceb792，实际阅读 Go 路径 TextParser.ParseWithResult→charset.DecodeToUTF8→normalizeTextNewlines→NewTextJSONItem，已记录路径/函数/源码哈希和采纳差异；旧 Python 路径 404 后核对文件树，没有编造源码定位。未复制实现或运行其 OCR/版面模型。研究见 docs/research/ragflow/parse-chain.md。
+
+uv.lock 与运行依赖哈希导出同步更新，开发生成 PDF 的 ReportLab/Pillow 与运行解析 pypdf 分开。状态 IN_REVIEW（开发验证通过；Q 和最终集成未完成）。后续 KF2-017/018 不属于本 JP-01 首批开发交付，018 仍需 A 的迁移与有界写入授权。
+
+## JP-01 / 双服务开发联调（2026-10-30，Asia/Hong_Kong）
+
+Java 网络首轮失败后，读取 cloud-environment-runtime 技能和当前网络状态，使用会话代理生成 /tmp Maven settings；TLS 验证保持开启，未保存代理/模型凭证到仓库。既有 Java Maven verify 的 11 项测试全部通过。
+
+B 线工具 services/ai/tools/java_python_smoke.py 将原 Java 源码/构建输入复制到临时目录，附 B 自有测试探针，真实启动 Spring HTTP 服务、Uvicorn HTTP 服务，调用原 Java WebClient 配置。5 项集成测试通过：双方健康与 request_id、缺失/错误凭证、404/405 统一错误与 Allow、不可达连接、原 Java 30 秒 responseTimeout（慢目标为单独本地夹具）。两端日志未出现测试共享密钥；模型凭证不传入测试进程，未请求模型或数据库。证据绑定 Python app、Java 客户端配置和探针哈希；未修改 A 所有的 Java 源码、contracts、Flyway 或中央联调记录。
+
+此为 B 提供的开发联调证据，不代替 A 的正式集成候选/Q。Java 对外网关尚无调用入口，上游异常到公开 502/504 的业务边界映射仍待 A 接入；不把 transport 异常检查说成公开网关已验收。KNOWFLOW_INTERNAL_SHARED_SECRET 共享方式与内部 health 路径仍是待 A 发布的新候选约定。
+
+最终环境复现：全新虚拟环境 frozen 同步后 33 项 Python 测试通过，源码分发包和 wheel 构建成功；已有 39 项契约结构样例及 16 项模型离线回归通过。本轮所有模型线上调用次数为 0。三个 KF2 任务均 IN_REVIEW（开发验证通过），未伪报批准或正式 DONE。详细 SHA 和可复制命令见 evaluation/python-jp01-delivery.md。
+
+补充真实启动失败验证：缺失、过短、含控制字符的内部密钥均使 Uvicorn 工厂非零退出，错误固定 INTERNAL_SECRET_INVALID、日志不含测试密钥；证据 startup-failures.json。本轮累计代码审阅 target 7a99ddfe3b524ef47c4500a41db46fc0ae4c5f1f，逐任务 SHA 及未执行项见 python-jp01-delivery.md。
+
+## Q 对 python@e4efd05 的修复（2026-10-30，Asia/Hong_Kong）
+
+B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断覆盖 str.isspace() Unicode 空白与既有 BOM allowance，保留有效文本、哈希和码点偏移；新增负例先复现 18 failed/10 passed，再全部通过。明确消费 A 的 895a1ba 发布的 draft.4 与精确 Schema 哈希 ca66965155ff3e23209de18a44823a74429a8590df5adbd458571ef52b524e41，更新响应版本、样例、测试和消费记录，拒绝旧版本/额外字段/错误 Schema，不放宽校验。
+
+与 A 最新 target ec5c71c（含 406 修复）配对，干净集成候选 225124fbae8041efd67ee5e6ca5bf89fdbbe8884 上 65 项 Python、54 个契约样例、16 项模型离线回归及 8 项真实 Java/Python 集成测试通过。真实 AiInternalHealthClient 接受 Python draft.4，旧版本夹具拒绝及 5 秒总期限保持。运行前后工作区均干净，没有覆盖 contracts 或改 Java；新证据单独保存，旧 draft.2 报告保持历史。跨会话消息工具当前不可用，按远端 SHA/候选和复核包与 A 交接，不代替 A 确认或 Q 批准。详情见 python-q-review-fixes.md；任务状态仍 IN_REVIEW。
