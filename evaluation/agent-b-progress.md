@@ -67,3 +67,15 @@ Q 审阅包需要具体 BASE_SHA → TARGET_SHA、依赖状态、测试及未执
 用户另行要求 KF2-002、003、005 在 python 分支交付并 push。KF2-002 和 KF2-005 原负责人为 M，本会话按指派接管其文件范围；KF2-003 仍为 B。场景选择“项目规范与接口查询”。由已有 Q 会话独立审阅，本会话仅准备审阅包，不代填审阅结论。
 
 执行提交及审阅 SHA 见 docs/tasks/execution-log.md 和 docs/reviews/KF2-002-003-005-review.md。KF2-002、003、005 当前均为 IN_REVIEW，未通过审阅或真实集成前不记 DONE。真实双模型冒烟在 python 分支重跑通过；合成试填不是真实用户证据。KF2-001 的 V1.1 设计包缺口未解除。
+
+## JP-01 / KF2-007 开发交付（2026-10-30，Asia/Hong_Kong）
+
+用户授权不等待现有 Q 复核，按共同计划继续 Python 开发。基线 150cd847a5750143fb6eb2c74c762962381952fe；分支 python；只写 services/ai、evaluation 和本线资料/研究目录。Java Windows wrapper 受既有换行属性影响被 Git 报差异，原始字节与 HEAD 完全一致，本线未修改或提交它。
+
+KF2-007：FastAPI 可运行骨架、内部 Bearer 恒定时间认证、健康/请求 ID/统一错误、严格消费现有共享 Schema、模型/索引/检索接口类型、超时/取消/模型 ID 与向量校验边界；业务执行入口未注册。公共契约未修改，新增健康报文由 services/ai/docs/contract-consumption.md 提给 A 发布。依赖锁、哈希导出和 Linux 安装环境许可元数据齐备。
+
+开发验证：11 项 Python 服务测试、39 个共享契约结构样例、既有 16 项模型离线回归通过；真实 Uvicorn 进程 8 项断言通过；全新 /tmp 虚拟环境按 frozen 锁安装后同一进程冒烟通过。首轮包构建因空模块尚未创建失败，补齐模块后安装成功；一次辅助脚本工作目录误设造成临时嵌套目录，已清理，未纳入提交。所有失败不冒充通过证据。
+
+真实 Python 进程证据见 services/ai/docs/evidence/process-smoke.json，记录执行时父提交及 app 哈希。依赖元数据见 dependency-licenses.json；未安装平台依赖保留未知。Java verify 首次因 Maven 未使用会话代理而网络失败，已按环境技能配置会话代理继续验证；双服务证据另补，不把本轮 Python 进程冒烟冒充 Java WebClient。未调用外部模型，未写数据库/Java 状态。
+
+状态 IN_REVIEW（开发验证通过；正式契约/Q/集成验收未完成）。KF2-007 target 由 git log -- services/ai 定位，后续交付汇总绑定具体 SHA。接下来按 JP-01 继续 KF2-010，再 KF2-016。
