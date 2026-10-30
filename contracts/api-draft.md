@@ -1,6 +1,6 @@
-# KF2-004 候选 API 目录
+# KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.4`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
+状态：`DRAFT 0.2.0-draft.5`。此版本是后端开发候选，需 B 精确消费提交和 Schema 哈希，并由 Q 审阅；不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
 
 ## 公开入口：浏览器 → Java
 
@@ -11,7 +11,7 @@
 | `GET /api/v1/me` | 当前用户 | 身份只来自服务器验证后的凭证 |
 | `POST /api/v1/knowledge-bases`、`GET /api/v1/knowledge-bases` | 创建/分页列表 | `CreateKnowledgeBase` 不接受 owner；列表只返回当前所有者资源 |
 | `GET/DELETE /api/v1/knowledge-bases/{kb_id}` | 详情/逻辑删除 | 不存在、他人或已删统一 404；删除知识库同步撤销其文档可见性 |
-| `POST /api/v1/knowledge-bases/{kb_id}/documents` | 202，文档与任务标识 | TXT/MD/文本 PDF；大小、页数、字符等限额等待 B 实测；对象路径由 Java 生成 |
+| `POST /api/v1/knowledge-bases/{kb_id}/documents` | 202，文档与任务标识 | TXT/MD/文本 PDF；文件 8 MiB、PDF 200 页、文本 200,000 码点开发上限；对象路径由 Java 生成 |
 | `GET /api/v1/documents/{document_id}` | 文档状态、当前活动索引与处理中任务 | 上传成功不等于 READY；更新失败时旧活动版本继续可用 |
 | `DELETE /api/v1/documents/{document_id}` | 提交逻辑失效，安排清理 | 返回成功前提交逻辑删除；清理失败不恢复可见性 |
 | `POST /api/v1/documents/{document_id}/rebuilds` | 202，新任务与候选索引版本 | KF2-004 冻结代次与幂等键前不可公开；重建不能直接切换活动版本 |
@@ -21,6 +21,10 @@
 | `GET /api/v1/sources/{source_id}` | 当前可访问的原文定位 | 验证 source→记录→所有者及文档/内容/索引/Chunk 对应关系，不能靠 ID 存在即放行 |
 | `GET /api/v1/documents/{document_id}/contents/{content_version_id}/file` | 鉴权代理读取 | 版本必须属于该文档，禁止长期公开对象地址，限制 Range 读取 |
 | `GET /api/v1/questions`、`GET/DELETE /api/v1/questions/{question_id}` | 所有者历史 | 失败/取消不标成功；每次提问独立检索，不把历史当多轮上下文 |
+
+上传使用 `multipart/form-data` 的单一 `file` 部分，成功返回 `202` 和 `DocumentUploadAccepted`。开发限额为文件 8 MiB、PDF 200 页、TXT/MD 200,000 Unicode 码点。Java 忽略客户端路径和媒体声明，按文件名扩展名与文件签名匹配 `txt`、`md`、`pdf`；对象键由 Java 随机生成。失败时不留下可见文档、任务或孤儿对象；补偿删除失败写入可重试清理队列。
+
+文档列表为 `GET /api/v1/knowledge-bases/{kb_id}/documents?limit=50&offset=0`；文档状态为 `GET /api/v1/documents/{document_id}`；任务状态为 `GET /api/v1/tasks/{task_id}`。列表只包含当前用户、活动知识库下未删除文档。上传提交后任务为 `QUEUED`；只有已发布索引才显示 `READY`，候选版本成功或 Worker 自报完成都不表示 `READY`。状态响应不返回执行令牌、对象键、原文、向量或内部凭证。
 
 所有输出前检查以当前可见性为准。历史答案文本可能包含删除前已经显示的内容；不可借其来源访问已失效原文件。源版本保留期限待确认，不能无限保留或直接承诺固定天数。
 
@@ -39,21 +43,39 @@
 | Java 内部调度器，数据库事务 | 原子领取候选任务，建立执行租约 | 仅一个当前有效租约；每次重试递增 fencing，写入新令牌哈希；不向 Python 开放通用领取权限 |
 | Java → Python `GET /internal/v1/health` | 验证服务进程可接收内部 HTTP 请求 | 要求服务认证；返回 `InternalHealth`，回传 `X-Request-ID`；不触发模型、数据库或业务依赖探测 |
 | Java → Python `POST /internal/v1/index-executions` | 派发已有租约的索引任务 | `IndexDispatch`；B 校验服务身份、执行范围和超时；文件通过受限服务读取，不接收任意 URL/本地路径 |
+| Python → Java `POST /internal/v1/tasks/{task_id}/source` | 读取当前执行绑定的原始对象 | 请求体为 `SourceReadRequest`；路由 ID 必须匹配租约任务；成功响应为原始字节流及契约版本、格式、摘要、长度头，不返回 bucket/object key；最大 8 MiB |
+| Python → Java `POST /internal/v1/tasks/{task_id}/index-batches` | 写入有界候选 Chunk/向量批次 | `IndexBatch`；最多 32 条且 JSON 请求体不超过 1 MiB；响应 `IndexBatchReceipt`；授权检查和全部写入在同一事务 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/heartbeat` | 延长当前租约 | `Heartbeat`；任务/版本/令牌/fencing/当前有效期均匹配；过期拒绝，延长值由 Java 决定 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/completion` | 提交成功或失败结果 | `Completion`；Java 自行核实索引数据，不信任结果计数；已删拒绝；相同已接收结果幂等应答 |
+| Java → Python `POST /internal/v1/index-executions/{task_id}/cancel` | 取消指定的执行代次 | `CancelExecution` 必须匹配当前或刚被撤销的执行令牌、lease 与 fencing；旧取消不能影响后续代次；幂等返回 |
 | Java → Python `POST /internal/v1/answers` | 使用可信快照检索/生成 | `TrustedScope` 只由 Java 构建；Python 在 SQL 层联合校验知识库、owner、文档可见性与活动版本 |
 | Java → Python `POST /internal/v1/answers/stream` | 同一范围下流式生成 | 事件字段/顺序见下文；输出前 Java 复核，不信任 Python 自报“可访问” |
-| Java → Python 执行取消（路径待 B 确认） | 断开/删除/超时后释放资源 | 取消幂等且有界；取消只是资源回收，最终发布仍由 Java 的租约/可见性检查限制 |
 
 B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认候选 `BAAI/bge-m3` 和实测向量 1024 维；DeepSeek 请求别名为 `deepseek-flash`，不是不可变后端版本。模型标识/维度约束和合成报文会加入 Schema。生产超时、容量及文件限制仍不由短冒烟推导。
 
-向 Python 发放的索引写权限必须绑定当前文档、候选版本和有效执行，禁止修改业务状态。只限定“可写 Chunk 表”不足以防止旧 Worker 修改已发布版本；应由受控 SQL/执行上下文或 Java 批量写入网关保证版本和 fencing，具体机制由 A/B/Q 在 DDL 前确认。
+向 Python 不发放数据库写权限。索引写入由 Java 受控网关执行，每次事务绑定当前文档、候选版本和有效执行；Java 校验与所有行写入处于同一 PostgreSQL 事务，阻止旧 Worker 写已发布或替换的索引。
+
+### draft.5 批次摘要与写入语义
+
+`IndexBatch` 的每条 Chunk 包含 1024 个有限 JSON 数值、最多 800 个 Unicode 码点的原始文本、其 UTF-8 SHA-256 和精确 locator。Java 校验维度、有限性、文本摘要、范围形状、当前任务/文档/内容版本/候选索引、租约、执行令牌、fencing 和未过期时间；校验与批次写入处于同一 PostgreSQL 事务。Python 没有数据库写凭证。
+
+批次序号从 1 开始连续递增；`chunk.sequence_no` 在同一候选索引内从 1 全局连续。一个执行的 `batch_id` 与批次序号永久绑定到摘要。相同执行身份、批次 ID、序号和摘要重放返回 `ALREADY_ACCEPTED`，不重复插入；同 ID/序号但摘要不同、重复序号或跳号返回 `409 BATCH_CONFLICT`。租约失效、文档删除或 fencing 不匹配返回 `409 LEASE_REJECTED` / `DOCUMENT_UNAVAILABLE`，不得修改任何行。
+
+跨语言摘要向量固定为 `contracts/examples/protocol-cases.json` 的 `index-batch`。算法使用 SHA-256，输入为 UTF-8 字节：先写 `knowflow-index-batch-v1\n`，再按下列顺序写每个字段的 `十进制 UTF-8 字节数:字段值\n`：task、owner、knowledge base、document、content version、index version、lease、fencing、batch ID、batch sequence、chunk count；随后按 chunk sequence 写每项的 chunk ID、sequence、文本 SHA-256、locator kind、locator 的页码或 start/end/unit，最后写 1024 个向量值。向量值先以十进制精度量化到 6 位小数、`HALF_EVEN`，再格式化为固定 6 位小数字符串；Java 必须持久化同一量化值。request ID、执行令牌和 `batch_sha256` 本身不进入摘要。执行令牌不写日志或审计记录。
+
+`Completion.outcome=SUCCEEDED` 只触发 Java 验收：Java 查询实际 Chunk 与向量数、连续序号、维度及批次清单摘要，不能采信 Worker 自报数量。验收通过后，在同一事务锁定文档和任务、核对未删除/当前内容版本/当前 fencing、将候选标记为 `READY` 并切换活动版本；旧活动版本随后标为 `RETIRED`。失败不得破坏已有活动版本。相同 completion 结果摘要可幂等应答但不再次发布，不同结果冲突。
+
+租约默认 60 秒、心跳 15 秒、最多 3 次执行；服务器数据库时间是唯一租约时钟。排队失败按 5 秒、30 秒退避，耗尽后进入 `FAILED`。每次领取将 fencing 原子递增、替换 lease/令牌哈希；过期执行的写入、心跳和完成都被拒绝。崩溃重领创建新的候选索引版本，隔离前次部分 Chunk；当前活动索引保持可检索。
+
+`SourceReadRequest` 仅携带路由 task ID 和完整 `LeaseContext`，不接受 object key、URL 或本机路径。Java 在一次读取中验证内部服务身份、任务范围、有效租约、执行令牌/fencing、文档/内容版本归属及未删除状态。成功响应是原始文件字节，使用 `X-Contract-Version`、`X-Request-ID`、`X-Source-Format`、`X-Source-SHA256` 和 `Content-Length` 描述，禁止重定向或返回存储凭据。
+
+问答公开请求只包含问题。Java 从认证主体查询所有者知识库的 `READY` 活动索引，构造 `TrustedScope` 并调用 Python；客户端不能提交 owner、snapshot、索引范围或向量。Python 仅使用只读身份，按 owner/kb/document/content/index 联合过滤。回答最多 5 条引用；有答案必须有至少一个来源，无证据时返回 `has_answer=false` 和空来源。Java 在响应前重新核对来源仍可见，已删除或切换的索引不能返回原文。
 
 ## 错误与幂等提议
 
 | 情形 | HTTP / code | 语义 |
 |---|---|---|
-| 请求结构不符 | 400 / INVALID_REQUEST | 不回显敏感输入 |
+| 请求结构或 Content-Type 不支持 | 400 / INVALID_REQUEST；415 / INVALID_REQUEST | 不回显敏感输入；415 保留框架 `Accept` 支持类型头 |
 | 请求的 Accept 表示不受支持 | 406 / INVALID_REQUEST | 保留框架提供的支持类型 `Accept` 响应头 |
 | 未认证或服务认证失败 | 401 / UNAUTHENTICATED | 无内部凭证细节 |
 | 内部范围不符 | 403 / SCOPE_DENIED | 外部不可用资源仍统一 404 |

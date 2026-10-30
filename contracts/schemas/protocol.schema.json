@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.4",
-  "$comment": "DRAFT: structural definitions only, no runtime authorization or lease validation. PublicQuestion maxLength is a candidate bound, not a validated model/resource limit.",
+  "title": "KnowFlow proposed messages 0.2.0-draft.5",
+  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.4"
+      "const": "0.2.0-draft.5"
     },
     "Identifier": {
       "type": "string",
@@ -262,7 +262,10 @@
             "PROCESSING_TIMEOUT",
             "ENDPOINT_UNAVAILABLE",
             "ACCOUNT_CREATE_REJECTED",
-            "INTERNAL_ERROR"
+            "INTERNAL_ERROR",
+            "BATCH_CONFLICT",
+            "INDEX_INTEGRITY_FAILED",
+            "SOURCE_UNAVAILABLE"
           ]
         },
         "message": {
@@ -298,78 +301,196 @@
     "RegisterRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "email", "password"],
+      "required": [
+        "contract_version",
+        "email",
+        "password"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 320 },
-        "password": { "type": "string", "minLength": 12, "maxLength": 128 }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 320
+        },
+        "password": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 128
+        }
       }
     },
     "LoginRequest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "email", "password"],
+      "required": [
+        "contract_version",
+        "email",
+        "password"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 320 },
-        "password": { "type": "string", "minLength": 1, "maxLength": 128 }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 320
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
       }
     },
     "AuthSession": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "user_id", "email", "access_token", "token_type", "expires_at"],
+      "required": [
+        "contract_version",
+        "user_id",
+        "email",
+        "access_token",
+        "token_type",
+        "expires_at"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "user_id": { "$ref": "#/$defs/Identifier" },
-        "email": { "type": "string", "format": "email" },
-        "access_token": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
-        "token_type": { "const": "Bearer" },
-        "expires_at": { "type": "string", "format": "date-time" }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "user_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "access_token": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        },
+        "token_type": {
+          "const": "Bearer"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "CurrentUser": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "user_id", "email"],
+      "required": [
+        "contract_version",
+        "user_id",
+        "email"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "user_id": { "$ref": "#/$defs/Identifier" },
-        "email": { "type": "string", "format": "email" }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "user_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
       }
     },
     "CreateKnowledgeBase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "name"],
+      "required": [
+        "contract_version",
+        "name"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "name": { "type": "string", "minLength": 1, "maxLength": 200 }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
       }
     },
     "KnowledgeBase": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "id", "name", "status", "created_at", "updated_at"],
+      "required": [
+        "contract_version",
+        "id",
+        "name",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "id": { "$ref": "#/$defs/Identifier" },
-        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "status": { "const": "ACTIVE" },
-        "created_at": { "type": "string", "format": "date-time" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "status": {
+          "const": "ACTIVE"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "KnowledgeBaseList": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["contract_version", "items", "limit", "offset", "has_more"],
+      "required": [
+        "contract_version",
+        "items",
+        "limit",
+        "offset",
+        "has_more"
+      ],
       "properties": {
-        "contract_version": { "$ref": "#/$defs/ContractVersion" },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/KnowledgeBase" } },
-        "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
-        "offset": { "type": "integer", "minimum": 0, "maximum": 1000000 },
-        "has_more": { "type": "boolean" }
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KnowledgeBase"
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "has_more": {
+          "type": "boolean"
+        }
       }
     },
     "PublicQuestion": {
@@ -802,6 +923,399 @@
         "total_tokens": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "BatchChunk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chunk_id",
+        "sequence_no",
+        "text",
+        "text_sha256",
+        "locator",
+        "embedding"
+      ],
+      "properties": {
+        "chunk_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sequence_no": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "text_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "locator": {
+          "$ref": "#/$defs/Locator"
+        },
+        "embedding": {
+          "type": "array",
+          "minItems": 1024,
+          "maxItems": 1024,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "IndexBatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "lease",
+        "batch_id",
+        "batch_sequence",
+        "batch_sha256",
+        "chunks"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lease": {
+          "$ref": "#/$defs/LeaseContext"
+        },
+        "batch_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "batch_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "batch_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "chunks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/BatchChunk"
+          }
+        }
+      }
+    },
+    "IndexBatchReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "task_id",
+        "index_version_id",
+        "batch_id",
+        "batch_sha256",
+        "result",
+        "chunk_count"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "index_version_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "batch_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "batch_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "result": {
+          "enum": [
+            "ACCEPTED",
+            "ALREADY_ACCEPTED"
+          ]
+        },
+        "chunk_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        }
+      }
+    },
+    "SourceReadRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "lease"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lease": {
+          "$ref": "#/$defs/LeaseContext"
+        }
+      }
+    },
+    "SourceReadMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "task_id",
+        "document_id",
+        "content_version_id",
+        "format",
+        "sha256",
+        "byte_size"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "document_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "content_version_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "format": {
+          "enum": [
+            "txt",
+            "md",
+            "pdf"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8388608
+        }
+      }
+    },
+    "CancelExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "lease"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "lease": {
+          "$ref": "#/$defs/LeaseContext"
+        }
+      }
+    },
+    "TrustedAnswerRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "question",
+        "scope"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16000
+        },
+        "scope": {
+          "$ref": "#/$defs/TrustedScope"
+        }
+      }
+    },
+    "AnswerResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "request_id",
+        "answer",
+        "has_answer",
+        "sources"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "answer": {
+          "type": "string",
+          "maxLength": 16000
+        },
+        "has_answer": {
+          "type": "boolean"
+        },
+        "sources": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/Source"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "has_answer": {
+                "const": true
+              }
+            },
+            "required": [
+              "has_answer"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "has_answer": {
+                "const": false
+              }
+            },
+            "required": [
+              "has_answer"
+            ]
+          },
+          "then": {
+            "properties": {
+              "sources": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DocumentUploadAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "document_id",
+        "task_id",
+        "status"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "document_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "status": {
+          "const": "QUEUED"
+        }
+      }
+    },
+    "TaskStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "task_id",
+        "document_id",
+        "status",
+        "attempt_count",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "document_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "status": {
+          "enum": [
+            "QUEUED",
+            "RUNNING",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED"
+          ]
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "failure_code": {
+          "enum": [
+            "UNSUPPORTED_CONTENT",
+            "EMPTY_CONTENT",
+            "RESOURCE_LIMIT",
+            "MODEL_TIMEOUT",
+            "MODEL_FAILURE",
+            "INDEX_WRITE_FAILED",
+            "EXECUTION_CANCELLED"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }

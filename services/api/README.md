@@ -21,7 +21,7 @@ export KNOWFLOW_INTERNAL_SHARED_SECRET="$(python -c 'import secrets; print(secre
 
 首次数据库准备由管理员执行 `psql -X -v ON_ERROR_STOP=1 -h localhost -U <admin> -d knowflow -f services/api/src/main/resources/db/bootstrap-roles.sql`，然后通过安全凭据管理分别设置迁移、应用和 AI 角色密码。在 `services/api` 目录执行迁移：设置 `KNOWFLOW_MIGRATION_DATABASE_URL`、`KNOWFLOW_MIGRATION_DATABASE_USERNAME`、`KNOWFLOW_MIGRATION_DATABASE_PASSWORD`，再运行 `java -jar target/knowflow-api-0.2.0-SNAPSHOT.jar --migrate-only`（开发时可用 `./mvnw spring-boot:run -Dspring-boot.run.main-class=com.knowflow.api.db.DatabaseMigrationApplication`）。迁移历史位于独立 `knowflow_flyway` Schema；迁移不自动清库。
 
-应用进程连接数据库前，设置 `KNOWFLOW_DATABASE_URL`、`KNOWFLOW_DATABASE_USERNAME=knowflow_app`、`KNOWFLOW_DATABASE_PASSWORD`，并启用 profile：`SPRING_PROFILES_ACTIVE=database ./mvnw spring-boot:run`。测试用 API：`POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout`、`GET /api/v1/me`、`GET/POST /api/v1/knowledge-bases`、`GET/DELETE /api/v1/knowledge-bases/{id}`。注册/登录 JSON 使用契约版本 `0.2.0-draft.4`。不要将迁移角色凭据用于应用连接。
+应用进程连接数据库前，设置 `KNOWFLOW_DATABASE_URL`、`KNOWFLOW_DATABASE_USERNAME=knowflow_app`、`KNOWFLOW_DATABASE_PASSWORD`，并启用 profile：`SPRING_PROFILES_ACTIVE=database ./mvnw spring-boot:run`。测试用 API：`POST /api/v1/auth/register`、`POST /api/v1/auth/login`、`POST /api/v1/auth/logout`、`GET /api/v1/me`、`GET/POST /api/v1/knowledge-bases`、`GET/DELETE /api/v1/knowledge-bases/{id}`。注册/登录 JSON 使用契约版本 `0.2.0-draft.5`。不要将迁移角色凭据用于应用连接。
 
 `./mvnw verify` 会启动真实的 `pgvector/pgvector:0.8.1-pg16` 测试容器（镜像摘要 `sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337`），因此构建环境需要可用的 Docker daemon。
 
