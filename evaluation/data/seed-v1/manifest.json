@@ -1,0 +1,128 @@
+{
+  "dataset_id": "qingzhu-seed-v1",
+  "synthetic": true,
+  "license": "CC0-1.0",
+  "description": "Original synthetic evaluation only; all numerical limits refer to fictional 青竹, not KnowFlow.",
+  "documents": [
+    {
+      "id": "api",
+      "path": "documents/索引接口.md",
+      "content_version_id": "content-api-ca47c675c4bd",
+      "sha256": "ca47c675c4bd8a837d3d5a2db985df5ed7c8115559e169b71c6fced7f6dd595c",
+      "format": "md",
+      "bytes": 255,
+      "characters": 141,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "chunk",
+      "path": "documents/分段策略.md",
+      "content_version_id": "content-chunk-fe454004d06f",
+      "sha256": "fe454004d06f2bad31f338c3003b224428136c70b2b83cb599ea3aca463f8f44",
+      "format": "md",
+      "bytes": 222,
+      "characters": 114,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "draft",
+      "path": "documents/重试草案.md",
+      "content_version_id": "content-draft-8362e40b7185",
+      "sha256": "8362e40b718578db8bdd1a63dcc325ad39bdd2437d33545ad2dcb102580a3cb1",
+      "format": "md",
+      "bytes": 162,
+      "characters": 74,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "adr",
+      "path": "documents/ADR-017.md",
+      "content_version_id": "content-adr-bde8b35afd9b",
+      "sha256": "bde8b35afd9bafc2b1f5b69198e6c6823ebcf6444e5e6572bab29117029b185e",
+      "format": "md",
+      "bytes": 194,
+      "characters": 94,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "files",
+      "path": "documents/文件边界.md",
+      "content_version_id": "content-files-51506fdb87f9",
+      "sha256": "51506fdb87f9ada6f5e068e2e285938b50f2fc58193c30d57f5ae89fb6e36140",
+      "format": "md",
+      "bytes": 233,
+      "characters": 119,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "access",
+      "path": "documents/资源隔离.txt",
+      "content_version_id": "content-access-503d4cbc690b",
+      "sha256": "503d4cbc690bb7454bd63e3772a14d73f570fb657a6360cc49175b6b3a71c86d",
+      "format": "txt",
+      "bytes": 271,
+      "characters": 115,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "publish",
+      "path": "documents/索引发布.md",
+      "content_version_id": "content-publish-62776eb7eafa",
+      "sha256": "62776eb7eafaca7d1588e70d6853ddfce37b370756ab43a6fdc35b3cb31782df",
+      "format": "md",
+      "bytes": 284,
+      "characters": 114,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "locator",
+      "path": "documents/来源定位.md",
+      "content_version_id": "content-locator-55da63696276",
+      "sha256": "55da63696276a50c9e32b0e709101a64ebdb0adbf696de8bceba4a6e1c0ea9c1",
+      "format": "md",
+      "bytes": 283,
+      "characters": 131,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "outbound",
+      "path": "documents/数据出站.txt",
+      "content_version_id": "content-outbound-5e20e82abacd",
+      "sha256": "5e20e82abacd077a4be34e4d471ef999d78a67a420873d65f23d9e7940608f18",
+      "format": "txt",
+      "bytes": 347,
+      "characters": 131,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    },
+    {
+      "id": "timeout",
+      "path": "documents/超时取消.md",
+      "content_version_id": "content-timeout-aa50543a6c93",
+      "sha256": "aa50543a6c932ea08cfedb92f9426de376df99c185c09671c413ab8c1b582538",
+      "format": "md",
+      "bytes": 266,
+      "characters": 118,
+      "origin": "Original synthetic 青竹 corpus authored for KnowFlow evaluation; not product limits or observed users.",
+      "license": "CC0-1.0",
+      "external_api_allowed": true
+    }
+  ]
+}
