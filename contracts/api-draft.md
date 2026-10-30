@@ -1,6 +1,6 @@
 # KF2-004 候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.1`。以下路径、枚举、状态码仍需 V1.1 核对及 B/M/Q 确认；不是完整 OpenAPI，也不声称已实现。
+状态：`DRAFT 0.2.0-draft.2`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
 
 ## 公开入口：浏览器 → Java
 
@@ -13,7 +13,7 @@
 | `POST /api/v1/knowledge-bases/{kb_id}/documents` | 202，文档与任务标识 | TXT/MD/文本 PDF；大小、页数、字符等限额等待 B 实测；对象路径由 Java 生成 |
 | `GET /api/v1/documents/{document_id}` | 文档状态、当前活动索引与处理中任务 | 上传成功不等于 READY；更新失败时旧活动版本继续可用 |
 | `DELETE /api/v1/documents/{document_id}` | 提交逻辑失效，安排清理 | 返回成功前提交逻辑删除；清理失败不恢复可见性 |
-| `POST /api/v1/documents/{document_id}/rebuilds` | 202，新任务与候选索引版本 | 幂等键冲突及内容更新入口待原设计核对；重建不能直接切换活动版本 |
+| `POST /api/v1/documents/{document_id}/rebuilds` | 202，新任务与候选索引版本 | KF2-004 冻结代次与幂等键前不可公开；重建不能直接切换活动版本 |
 | `GET /api/v1/tasks/{task_id}` | 状态、脱敏失败原因、尝试次数 | 经文档/知识库关联检查所有者；不返回执行令牌 |
 | `POST /api/v1/knowledge-bases/{kb_id}/questions` | 单轮答案、证据、版本信息 | 仅 `question` 和服务器支持的选项；未知/owner/范围字段拒绝；返回前再次检查可见性 |
 | `POST /api/v1/knowledge-bases/{kb_id}/questions/stream` | SSE | 与非流式同一权限规则，每事件发送前复核，断开传播取消 |
@@ -36,6 +36,8 @@
 | Java → Python `POST /internal/v1/answers` | 使用可信快照检索/生成 | `TrustedScope` 只由 Java 构建；Python 在 SQL 层联合校验知识库、owner、文档可见性与活动版本 |
 | Java → Python `POST /internal/v1/answers/stream` | 同一范围下流式生成 | 事件字段/顺序见下文；输出前 Java 复核，不信任 Python 自报“可访问” |
 | Java → Python 执行取消（路径待 B 确认） | 断开/删除/超时后释放资源 | 取消幂等且有界；取消只是资源回收，最终发布仍由 Java 的租约/可见性检查限制 |
+
+B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认候选 `BAAI/bge-m3` 和实测向量 1024 维；DeepSeek 请求别名为 `deepseek-flash`，不是不可变后端版本。模型标识/维度约束和合成报文会加入 Schema。生产超时、容量及文件限制仍不由短冒烟推导。
 
 向 Python 发放的索引写权限必须绑定当前文档、候选版本和有效执行，禁止修改业务状态。只限定“可写 Chunk 表”不足以防止旧 Worker 修改已发布版本；应由受控 SQL/执行上下文或 Java 批量写入网关保证版本和 fencing，具体机制由 A/B/Q 在 DDL 前确认。
 
@@ -67,4 +69,4 @@ Java 在每个事件发送前检查整个快照/实际使用文档的当前可�
 
 ## 尚待决定
 
-公开认证的令牌存放/刷新/退出与 CSRF 策略；完整分页与资源响应；B 的模型维度/版本/超时/上限；内部认证的具体凭证轮换；索引写入 fencing 机制；快照与版本保留/清理；内容更新上传协议；SSE 可见性检查与取消；完整问答持久化幂等与费用记录。上述未决项阻断契约冻结。
+公开认证的令牌存放/刷新/退出与 CSRF 策略；完整分页与资源响应；B 的生产超时/容量；内部认证凭证轮换；索引写入 fencing 机制；快照与版本保留/清理；内容更新上传协议；SSE 可见性检查与取消；完整问答持久化幂等与费用记录。以上阻断 KF2-004 正式冻结，但不阻断独立运行的 KF2-006 骨架。

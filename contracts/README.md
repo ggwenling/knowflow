@@ -1,6 +1,6 @@
 # KnowFlow 公共契约（V0.2 重建基线；提议草案）
 
-**状态：DRAFT，未冻结、未发布；不能用于生产兼容性验收。**
+**状态：DRAFT 0.2.0-draft.2，未冻结、未发布；不能用于生产兼容性验收。**
 
 A 单写共享 API、错误码、身份与资源范围、任务租约、索引版本发布、证据定位、删除失效及历史来源语义。B/M 可提交消费场景、字段提议和样例，不另行发布不兼容版本。
 
@@ -10,6 +10,7 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 - [候选 API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
+- [A 线执行记录](../docs/tasks/agent-a.md)记录 V0.2 基线决策、KF2-001/004/006 进度和各提交 SHA。
 - [B 线运行基线](../docs/architecture/runtime-profile.md)：真实调用已验证 `BAAI/bge-m3` 的 1024 维和 `deepseek-flash` 中文输出；提供商别名和生产容量仍按原记录说明。
 
 ## 本地验证
