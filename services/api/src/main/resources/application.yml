@@ -23,6 +23,15 @@ management:
       show-details: never
 
 knowflow:
+  database:
+    application:
+      url: ${KNOWFLOW_DATABASE_URL:}
+      username: ${KNOWFLOW_DATABASE_USERNAME:}
+      password: ${KNOWFLOW_DATABASE_PASSWORD:}
+    migration:
+      url: ${KNOWFLOW_MIGRATION_DATABASE_URL:}
+      username: ${KNOWFLOW_MIGRATION_DATABASE_USERNAME:}
+      password: ${KNOWFLOW_MIGRATION_DATABASE_PASSWORD:}
   ai:
     base-url: ${KNOWFLOW_AI_BASE_URL:http://localhost:8000}
     internal-shared-secret: ${KNOWFLOW_INTERNAL_SHARED_SECRET:}

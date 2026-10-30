@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.2",
+  "title": "KnowFlow proposed messages 0.2.0-draft.3",
   "$comment": "DRAFT: structural definitions only, no runtime authorization or lease validation. PublicQuestion maxLength is a candidate bound, not a validated model/resource limit.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.2"
+      "const": "0.2.0-draft.3"
     },
     "Identifier": {
       "type": "string",
@@ -271,6 +271,26 @@
         },
         "retryable": {
           "type": "boolean"
+        }
+      }
+    },
+    "InternalHealth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "status",
+        "request_id"
+      ],
+      "properties": {
+        "contract_version": {
+          "$ref": "#/$defs/ContractVersion"
+        },
+        "status": {
+          "const": "UP"
+        },
+        "request_id": {
+          "$ref": "#/$defs/Identifier"
         }
       }
     },

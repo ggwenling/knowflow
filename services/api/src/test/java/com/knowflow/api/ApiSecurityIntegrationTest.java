@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import com.knowflow.api.ai.AiInternalHealthClient;
 import com.knowflow.api.security.RequestIdFilter;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,9 @@ class ApiSecurityIntegrationTest {
     @Autowired
     private WebClient aiServiceWebClient;
 
+    @Autowired
+    private AiInternalHealthClient aiInternalHealthClient;
+
     @DynamicPropertySource
     static void aiServiceProperties(DynamicPropertyRegistry properties) {
         properties.add("knowflow.ai.base-url", () -> "http://127.0.0.1:"
@@ -82,7 +86,7 @@ class ApiSecurityIntegrationTest {
         var response = mockMvc.perform(get("/internal/test-auth")
                         .header(RequestIdFilter.HEADER, "caller-controlled-id"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.2"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.3"))
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
                 .andReturn();
 
@@ -116,7 +120,7 @@ class ApiSecurityIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET))
                 .andExpect(status().isNotFound())
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.2"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.3"))
                 .andExpect(jsonPath("$.code").value("ENDPOINT_UNAVAILABLE"))
                 .andExpect(jsonPath("$.message").value("The requested endpoint is not available."));
     }
@@ -128,7 +132,7 @@ class ApiSecurityIntegrationTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(header().string(HttpHeaders.ALLOW, org.hamcrest.Matchers.containsString("GET")))
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.2"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.3"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message")
                         .value("The HTTP method is not supported for this endpoint."));
@@ -161,10 +165,27 @@ class ApiSecurityIntegrationTest {
         assertThat(RECEIVED_REQUEST_ID.get()).isEqualTo("request-example-transport");
     }
 
+    @Test
+    void internalHealthClientChecksVersionStatusAndRequestIdAgainstTheLocalStub() {
+        RECEIVED_AUTHORIZATION.set(null);
+        RECEIVED_REQUEST_ID.set(null);
+
+        var response = aiInternalHealthClient.check("request-health-integration")
+                .block(Duration.ofSeconds(3));
+
+        assertThat(response).isNotNull();
+        assertThat(response.contract_version()).isEqualTo("0.2.0-draft.3");
+        assertThat(response.status()).isEqualTo("UP");
+        assertThat(response.request_id()).isEqualTo("request-health-integration");
+        assertThat(RECEIVED_AUTHORIZATION.get()).isEqualTo("Bearer " + INTERNAL_SECRET);
+        assertThat(RECEIVED_REQUEST_ID.get()).isEqualTo("request-health-integration");
+    }
+
     private static HttpServer startAiStub() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/transport-probe", ApiSecurityIntegrationTest::respondFromStub);
+            server.createContext("/internal/v1/health", ApiSecurityIntegrationTest::respondHealth);
             server.start();
             return server;
         } catch (IOException exception) {
@@ -180,6 +201,20 @@ class ApiSecurityIntegrationTest {
         exchange.sendResponseHeaders(200, body.length);
         try (var output = exchange.getResponseBody()) {
             output.write(body);
+        }
+    }
+
+    private static void respondHealth(HttpExchange exchange) throws IOException {
+        RECEIVED_AUTHORIZATION.set(exchange.getRequestHeaders().getFirst(HttpHeaders.AUTHORIZATION));
+        String requestId = exchange.getRequestHeaders().getFirst(RequestIdFilter.HEADER);
+        RECEIVED_REQUEST_ID.set(requestId);
+        String body = "{\"contract_version\":\"0.2.0-draft.3\",\"status\":\"UP\","
+                + "\"request_id\":\"" + requestId + "\"}";
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.sendResponseHeaders(200, bytes.length);
+        try (var output = exchange.getResponseBody()) {
+            output.write(bytes);
         }
     }
 

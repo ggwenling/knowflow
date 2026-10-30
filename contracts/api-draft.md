@@ -1,6 +1,6 @@
 # KF2-004 候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.2`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
+状态：`DRAFT 0.2.0-draft.3`。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。以下路径、枚举与状态码仍需 B/M 消费确认和 Q 审阅；不是生产 API，也不声称已实现。
 
 ## 公开入口：浏览器 → Java
 
@@ -30,6 +30,7 @@
 | 方向 / 候选入口 | 作用 | 校验与失败 |
 |---|---|---|
 | Java 内部调度器，数据库事务 | 原子领取候选任务，建立执行租约 | 仅一个当前有效租约；每次重试递增 fencing，写入新令牌哈希；不向 Python 开放通用领取权限 |
+| Java → Python `GET /internal/v1/health` | 验证服务进程可接收内部 HTTP 请求 | 要求服务认证；返回 `InternalHealth`，回传 `X-Request-ID`；不触发模型、数据库或业务依赖探测 |
 | Java → Python `POST /internal/v1/index-executions` | 派发已有租约的索引任务 | `IndexDispatch`；B 校验服务身份、执行范围和超时；文件通过受限服务读取，不接收任意 URL/本地路径 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/heartbeat` | 延长当前租约 | `Heartbeat`；任务/版本/令牌/fencing/当前有效期均匹配；过期拒绝，延长值由 Java 决定 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/completion` | 提交成功或失败结果 | `Completion`；Java 自行核实索引数据，不信任结果计数；已删拒绝；相同已接收结果幂等应答 |
