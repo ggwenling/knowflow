@@ -28,12 +28,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import javax.sql.DataSource;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zaxxer.hikari.HikariDataSource;
 import com.knowflow.api.ai.AiInternalHealthClient;
 import com.knowflow.api.ai.InternalHealth;
 import com.knowflow.api.answer.AiAnswerResponse;
@@ -144,6 +146,9 @@ class DocumentApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private DataSource applicationDataSource;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -471,6 +476,63 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    void deletingDocumentDuringAnswerGenerationPreventsAnswerAndSourcePublication() throws Exception {
+        JsonNode owner = register("question-delete-during-generation@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Delete during generation");
+        String evidence = "This evidence must not escape after deletion.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "evidence.txt", evidence, "question-delete-during-generation-index");
+        AI_RESPONSE.set(request -> {
+            TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                    "Secret answer [deleted-source].", true,
+                    java.util.List.of(new AiAnswerResponse.AiSource("deleted-source",
+                            scope.documentId(), scope.contentVersionId(), scope.indexVersionId(),
+                            published.chunkId(), new AiAnswerResponse.Locator("text_range",
+                            null, 0, evidence.codePointCount(0, evidence.length()),
+                            "unicode_code_point"), evidence)));
+        });
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(
+                                new com.knowflow.api.answer.PublicQuestion("What is private?"))))
+                .andReturn();
+        try {
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            mockMvc.perform(delete("/api/v1/documents/{documentId}",
+                            published.lease().documentId())
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isNoContent());
+        } finally {
+            responseGate.countDown();
+        }
+
+        var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+        assertThat(result.getResponse().getStatus()).isEqualTo(409);
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("Secret answer", evidence, "deleted-source");
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code, answer_text FROM knowflow.questions
+                 ORDER BY created_at DESC LIMIT 1
+                """);
+        assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("DOCUMENT_UNAVAILABLE");
+        assertThat(failedQuestion.get("answer_text")).isNull();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM knowflow.question_sources qs
+                  JOIN knowflow.questions q ON q.id = qs.question_id
+                 WHERE q.request_id = ?
+                """, Integer.class, AI_RECEIVED_REQUEST_ID.get())).isZero();
+    }
+
+    @Test
     void forwardsQuestionsThroughTheSharedContractLengthLimit() throws Exception {
         JsonNode owner = register("question-length-owner@example.test");
         String token = owner.path("access_token").asText();
@@ -607,6 +669,7 @@ class DocumentApiIntegrationTest {
                     .andReturn();
             assertThat(initial.getRequest().isAsyncStarted()).isTrue();
             assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(initial.getAsyncResult(5_000)).isNotNull();
             result = mockMvc.perform(asyncDispatch(initial)).andReturn();
         } finally {
             responseGate.countDown();
@@ -626,6 +689,190 @@ class DocumentApiIntegrationTest {
                 """);
         assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
         assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+    }
+
+    @Test
+    void finalAnswerTransactionUsesRemainingDeadlineAndCannotCommitAfterLockWaitTimeout()
+            throws Exception {
+        JsonNode owner = register("question-writeback-timeout@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Answer writeback timeout");
+        publishDocument(token, knowledgeBaseId,
+                "evidence.txt", "Writeback lock evidence.", "writeback-timeout-index");
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+        int originalBudget = questionProperties.getTotalBudgetSeconds();
+        questionProperties.setTotalBudgetSeconds(5);
+        CountDownLatch lockHeld = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        var lockExecutor = Executors.newSingleThreadExecutor();
+        java.util.concurrent.Future<?> lockTask = null;
+        UUID questionId = null;
+        try {
+            var initial = mockMvc.perform(post(
+                            "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(
+                                    new com.knowflow.api.answer.PublicQuestion(
+                                            "What is the evidence?"))))
+                    .andReturn();
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            questionId = jdbc.queryForObject("""
+                    SELECT id FROM knowflow.questions ORDER BY created_at DESC LIMIT 1
+                    """, UUID.class);
+            UUID lockedQuestionId = questionId;
+            lockTask = lockExecutor.submit(() -> transactions.executeWithoutResult(status -> {
+                jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE id = ? FOR UPDATE",
+                        UUID.class, lockedQuestionId);
+                lockHeld.countDown();
+                try {
+                    releaseLock.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(interrupted);
+                }
+            }));
+            assertThat(lockHeld.await(5, TimeUnit.SECONDS)).isTrue();
+            responseGate.countDown();
+            awaitQuestionWritebackLockWait();
+            awaitQuestionWritebackLockWaitEnded();
+            releaseLock.countDown();
+            lockTask.get(5, TimeUnit.SECONDS);
+            assertThat(initial.getAsyncResult(5_000)).isNotNull();
+            var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+            assertThat(result.getResponse().getStatus())
+                    .withFailMessage("Timeout response: %s", result.getResponse().getContentAsString())
+                    .isEqualTo(504);
+        } finally {
+            responseGate.countDown();
+            questionProperties.setTotalBudgetSeconds(originalBudget);
+            releaseLock.countDown();
+            if (lockTask != null) {
+                lockTask.get(5, TimeUnit.SECONDS);
+            }
+            lockExecutor.shutdownNow();
+        }
+
+        awaitQuestionStatus(questionId, "FAILED");
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code, answer_text FROM knowflow.questions
+                 WHERE id = ?
+                """, questionId);
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(failedQuestion.get("answer_text")).isNull();
+    }
+
+    @Test
+    void snapshotCreationUsesRequestDeadlineAndRollsBackWhenForeignKeyLockWaits()
+            throws Exception {
+        JsonNode owner = register("question-snapshot-timeout@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Snapshot lock timeout");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Snapshot timeout evidence.",
+                "snapshot-timeout-index");
+        UUID knowledgeBaseUuid = UUID.fromString(knowledgeBaseId);
+        CountDownLatch lockHeld = new CountDownLatch(1);
+        CountDownLatch releaseLock = new CountDownLatch(1);
+        var lockExecutor = Executors.newSingleThreadExecutor();
+        var lockTask = lockExecutor.submit(() -> transactions.executeWithoutResult(status -> {
+            jdbc.queryForObject("SELECT id FROM knowflow.knowledge_bases WHERE id = ? FOR UPDATE",
+                    UUID.class, knowledgeBaseUuid);
+            lockHeld.countDown();
+            try {
+                releaseLock.await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(interrupted);
+            }
+        }));
+        assertThat(lockHeld.await(5, TimeUnit.SECONDS)).isTrue();
+        int originalBudget = questionProperties.getTotalBudgetSeconds();
+        questionProperties.setTotalBudgetSeconds(1);
+        try {
+            var initial = mockMvc.perform(post(
+                            "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(
+                                    new com.knowflow.api.answer.PublicQuestion(
+                                            "Wait before snapshot?"))))
+                    .andReturn();
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(initial.getAsyncResult(5_000)).isNotNull();
+            var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+            assertThat(result.getResponse().getStatus())
+                    .withFailMessage("Timeout response: %s", result.getResponse().getContentAsString())
+                    .isEqualTo(504);
+        } finally {
+            questionProperties.setTotalBudgetSeconds(originalBudget);
+            releaseLock.countDown();
+            lockTask.get(5, TimeUnit.SECONDS);
+            lockExecutor.shutdownNow();
+        }
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM knowflow.questions WHERE knowledge_base_id = ?
+                """, Integer.class, knowledgeBaseUuid)).isZero();
+    }
+
+    @Test
+    void timeoutCleanupWaitsForConnectionAfterInterruptInsteadOfLeavingQuestionProcessing()
+            throws Exception {
+        JsonNode owner = register("question-pool-timeout@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Question pool timeout");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Pool timeout evidence.",
+                "pool-timeout-index");
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+        int originalBudget = questionProperties.getTotalBudgetSeconds();
+        questionProperties.setTotalBudgetSeconds(1);
+        List<Connection> heldConnections = new ArrayList<>();
+        var connectionReleaser = Executors.newSingleThreadScheduledExecutor();
+
+        org.springframework.test.web.servlet.MvcResult initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(
+                                new com.knowflow.api.answer.PublicQuestion("Pool pressure test"))))
+                .andReturn();
+        try {
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            int poolSize = ((HikariDataSource) applicationDataSource).getMaximumPoolSize();
+            for (int index = 0; index < poolSize; index++) {
+                heldConnections.add(applicationDataSource.getConnection());
+            }
+            responseGate.countDown();
+            connectionReleaser.schedule(() -> {
+                try {
+                    heldConnections.getFirst().close();
+                } catch (java.sql.SQLException failure) {
+                    throw new IllegalStateException(failure);
+                }
+            }, 1_100, TimeUnit.MILLISECONDS);
+            assertThat(initial.getAsyncResult(5_000)).isNotNull();
+            var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+            assertThat(result.getResponse().getStatus())
+                    .withFailMessage("Timeout response: %s", result.getResponse().getContentAsString())
+                    .isEqualTo(504);
+        } finally {
+            responseGate.countDown();
+            connectionReleaser.shutdownNow();
+            for (Connection connection : heldConnections) {
+                connection.close();
+            }
+            questionProperties.setTotalBudgetSeconds(originalBudget);
+        }
+        awaitQuestionStatus("FAILED");
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code, answer_text FROM knowflow.questions
+                 ORDER BY created_at DESC LIMIT 1
+                """);
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(failedQuestion.get("answer_text")).isNull();
     }
 
     @Test
@@ -1529,6 +1776,52 @@ class DocumentApiIntegrationTest {
             Thread.sleep(20);
         }
         assertThat(current).isEqualTo(expected);
+    }
+
+    private void awaitQuestionStatus(UUID questionId, String expected) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        String current = null;
+        while (System.nanoTime() < deadline) {
+            current = jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId);
+            if (expected.equals(current)) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(current).isEqualTo(expected);
+    }
+
+    private void awaitQuestionWritebackLockWait() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbc.queryForObject("""
+                    SELECT count(*) FROM pg_stat_activity
+                     WHERE wait_event_type = 'Lock'
+                       AND query ILIKE 'UPDATE knowflow.questions%status = ''SUCCEEDED''%'
+                    """, Integer.class);
+            if (waiting != null && waiting > 0) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(false).as("question final UPDATE should wait on the held question row").isTrue();
+    }
+
+    private void awaitQuestionWritebackLockWaitEnded() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbc.queryForObject("""
+                    SELECT count(*) FROM pg_stat_activity
+                     WHERE wait_event_type = 'Lock'
+                       AND query ILIKE 'UPDATE knowflow.questions%status = ''SUCCEEDED''%'
+                    """, Integer.class);
+            if (waiting != null && waiting == 0) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(false).as("question final UPDATE should stop waiting at its deadline").isTrue();
     }
 
     private static IndexBatchRequest createBatch(LeaseContext lease, String requestId,
