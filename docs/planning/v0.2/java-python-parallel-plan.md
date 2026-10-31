@@ -202,3 +202,11 @@ Q 可并行复核已有提交；本计划不要求作者停工等排期，也不
 **Python / B：**
 
 > 阅读本 JP-01 计划、当前模型/隐私基线及 A 的候选 contracts；以同一共同提交为基线，使用 python 独立工作区。主任务领取 KF2-007，交付 FastAPI、依赖锁、内部认证、统一错误、请求 ID、健康与适配器边界；不依赖 Java 数据库/登录才能启动。先在本服务 docs 提供字段/角色需求，由 A 发布公共契约；不要独立改 contracts/Flyway。与真实 Java 做 HTTP 联调，然后进入 KF2-010 和 KF2-016。无需等当前 Q 复核才开始开发，状态仍如实记录候选依赖；不伪造任务执行或模型成功，不改 Java 业务状态、不合并 main。
+
+## 2026-10-31：最新审查问题复验结果
+
+依最新代码审查修复 Python 只读数据库查询在取消/截止时间时可能遗留线程、以及 `chunk_max_codepoints=1` 令边界扫描平方级并阻塞事件循环的问题。Python 作者分支提交 `c2ceede` 已合入本地集成分支 `codex/integration-20261031`，集成 HEAD `b4f538065451275452daa9b9cede64c245418c46`；未推送或合并 `main`。
+
+验收：Python 全量 **187 passed**、Schema **70 cases**、离线回归 **16 passed**、parser smoke **15/15**、Python HTTP process smoke **8/8**；真实 Java WebClient ↔ Python health **9/9**。真实本机 Java/Python/PostgreSQL/pgvector/MinIO 的合成上传、索引 READY、只读问答、活动取消和清理 E2E 通过；取消后无 Chunk/Embedding 迟到写入，outbox 排空。详见 `services/ai/docs/evidence/java-python-smoke-draft8-p2.json` 与 `services/ai/docs/evidence/local-backend-e2e-draft8-p2.json`。外部模型调用 0，Compose 已停止且数据卷保留。
+
+本次没有修改 Java 源码或重跑 Java Maven 全量；此前 Java draft.8 target 的 Maven/Testcontainers **61 tests，0 failures/errors，1 个 opt-in skip**仍是原 target 的验证结果。Q 审阅、M 消费确认、真实 provider 排名/回答质量与费用测量仍待完成。

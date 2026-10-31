@@ -66,3 +66,12 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - Compose 读取工作区外的既有本机开发配置，未复制或记录配置值；运行后停止本次启动的 KnowFlow 容器并保留 PostgreSQL/MinIO 数据卷，8000/8080 均无残留 listener。Embedding/LLM 凭证缺失，未调用 provider。结构 Schema 校验本身不执行权限、租约时效或数据库状态迁移语义检查。
 - 业务 E2E 运行于集成 HEAD `860798a6a01aede62f73a79db3dbac86e8009821`、tree `367a1df8f64ed00e241dcc322ff6163104c0eac9`；报告 SHA-256 `9ebebb896e4451b2b3f57a3f07edede8388e7dc9311ceca8753ef8d6b2a4459e`，并绑定 draft.8 Schema 与 replay/worker/cancel/Java deletion outbox 源码哈希。
 - 独立 Q 审阅/M 消费确认待完成；KF2-038 仍依赖 KF2-031 SSE 与 KF2-037 质量基线。draft.8 的内容更新/重建是候选协议说明，本次没有实现或验收对应业务端点。
+
+## 2026-10-31：最新审查两项 P2 修复
+
+- Python 作者分支 `python` 提交 `c2ceede` 修复数据库取消/截止时间无界等待，以及小分段配置阻塞事件循环；本地集成分支 `codex/integration-20261031` 合入提交为 `b4f538065451275452daa9b9cede64c245418c46`。Java 源码未改动。
+- 数据库回归使用真实 psycopg 连接本地 PostgreSQL 协议黑洞，覆盖 1.2 秒 deadline、数据库不响应/无 cancel channel、单次与重复任务取消、连接阶段取消；所有数据库工作线程均在清理后退出，连接由查询线程关闭。
+- 分段回归保留 boundary 语义与 golden Chunk/profile ID；16,000 字符、`chunk_max_codepoints=1` 的 worker 在 64 Chunk 间隔让出事件循环，真实测试心跳可续租、取消可及时停止后续工作。边界定位改为优先级索引上的二分查询；固定 golden 和 100 组随机逐 Chunk 对照均一致。
+- 合并后复验：Python 全量 **187 passed**；Schema **70** cases；离线回归 **16 passed**；parser smoke **15/15**；Python HTTP process smoke **8/8**。Java Spring/WebClient ↔ Python Uvicorn health **9/9**，报告 `services/ai/docs/evidence/java-python-smoke-draft8-p2.json`，SHA-256 `e73e70d4fdfdded01de281a9d8b35313ac6593e1f94ce7d1a4219fbc174495ae`；报告绑定集成 HEAD `b4f538065451275452daa9b9cede64c245418c46`，clean before/after，数据库和模型调用 0。
+- 本机 Java/Python/PostgreSQL/pgvector/MinIO 合成 E2E 通过，覆盖上传、索引 READY、只读检索/引用问答、活动取消、无迟到 Chunk/Embedding 写入、物理清理及 outbox 排空。报告 `services/ai/docs/evidence/local-backend-e2e-draft8-p2.json`，SHA-256 `891b58d4da5d33ebd61af421f4ba30135be08c01f561984c85f7f1a4a07ad025`；外部模型调用 0。合成账户仍留在本机开发库，KnowFlow Compose 容器已停止且数据卷保留，8000/8080 无残留 listener。
+- 本次不重跑 Java 全量 Maven/Testcontainers（Java 文件未改）；此前 draft.8 Java 全量 61 tests、0 failures/errors、1 个 opt-in skip 的结果仍对应原 Java target。独立 Q 审阅、M 消费确认、真实 provider 质量/费用评测状态不变；未推送或合并 `main`。
