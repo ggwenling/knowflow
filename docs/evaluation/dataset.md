@@ -64,7 +64,7 @@ python evaluation/data/tools/validate_seed.py
 python evaluation/runner/runner.py --predictions path/to/predictions.json --split development --output path/to/report.json
 ```
 
-报告含按题 ID 的分类结果和分母计数、answerability accuracy、原文证据跨度召回/完整覆盖、不可回答题拒答率、引用与标注跨度重合、外部人工支持判断的覆盖率/通过率，以及输入延迟的 nearest-rank p50/p95。引用存在不等于语义支持；答案支持判断由预测文件中的人工标注提供，runner 不会根据引用字符串自动判定。当前没有登记质量门槛，因此脚本不输出质量 pass/fail。
+报告含按题 ID 的分类结果和分母计数、answerability accuracy、原文证据跨度召回/完整覆盖、不可回答题拒答率、引用与标注跨度重合、外部人工支持判断的覆盖率/通过率，以及输入延迟的 nearest-rank p50/p95。人工支持率和审阅覆盖率以所有已生成答案为分母，包括不可回答题上的幻觉；可回答题回答率仍单独统计。引用存在不等于语义支持；答案支持判断由预测文件中的人工标注提供，runner 不会根据引用字符串自动判定。当前没有登记质量门槛，因此脚本不输出质量 pass/fail。
 
 `evaluation/data/tools/split_candidates.py` 用固定 seed 将候选题按 `leakage_group` 整组分到 40/20，只有能精确满足两个数量时才生成划分；它同时校验“candidate”记录未混入半成品答案标签，以及“reviewed”标注的原文、版本、行号和码点偏移。示例命令：
 
