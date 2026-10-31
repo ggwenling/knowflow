@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,6 +40,7 @@ import com.knowflow.api.answer.AiAnswerResponse;
 import com.knowflow.api.answer.TrustedAnswerRequest;
 import com.knowflow.api.auth.AuthService;
 import com.knowflow.api.config.IndexingProperties;
+import com.knowflow.api.config.QuestionProperties;
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.indexing.ClaimedIndexTask;
 import com.knowflow.api.indexing.LeaseContext;
@@ -103,6 +105,8 @@ class DocumentApiIntegrationTest {
             .setPropertyNamingStrategy(com.fasterxml.jackson.databind.PropertyNamingStrategies.SNAKE_CASE);
     private static final AtomicReference<String> AI_RECEIVED_AUTHORIZATION = new AtomicReference<>();
     private static final AtomicReference<String> AI_RECEIVED_REQUEST_ID = new AtomicReference<>();
+    private static final AtomicReference<CountDownLatch> AI_REQUEST_RECEIVED =
+            new AtomicReference<>(new CountDownLatch(1));
     private static final AtomicReference<String> AI_HANDLER_FAILURE = new AtomicReference<>();
     private static final AtomicReference<Integer> AI_HTTP_STATUS = new AtomicReference<>(200);
     private static final AtomicReference<CountDownLatch> AI_RESPONSE_GATE =
@@ -165,6 +169,9 @@ class DocumentApiIntegrationTest {
     @Autowired
     private IndexingProperties indexingProperties;
 
+    @Autowired
+    private QuestionProperties questionProperties;
+
     @DynamicPropertySource
     static void serviceProperties(DynamicPropertyRegistry properties) {
         properties.add("knowflow.database.application.url", DATABASE::getJdbcUrl);
@@ -211,9 +218,11 @@ class DocumentApiIntegrationTest {
                 java.util.List.of()));
         AI_RECEIVED_AUTHORIZATION.set(null);
         AI_RECEIVED_REQUEST_ID.set(null);
+        AI_REQUEST_RECEIVED.set(new CountDownLatch(1));
         AI_HANDLER_FAILURE.set(null);
         AI_HTTP_STATUS.set(200);
         AI_RESPONSE_GATE.set(new CountDownLatch(0));
+        questionProperties.setTotalBudgetSeconds(30);
         try (Connection connection = DriverManager.getConnection(
                 DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword());
              Statement statement = connection.createStatement()) {
@@ -400,6 +409,7 @@ class DocumentApiIntegrationTest {
                         .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
                                 "What evidence is stored?"))))
                 .andReturn();
+        answerResult = dispatchAsync(answerResult);
         assertThat(answerResult.getResponse().getStatus())
                 .withFailMessage("AI HTTP fixture failed: %s", AI_HANDLER_FAILURE.get())
                 .isEqualTo(200);
@@ -482,6 +492,7 @@ class DocumentApiIntegrationTest {
                             .content(objectMapper.writeValueAsBytes(
                                     new com.knowflow.api.answer.PublicQuestion("问".repeat(length)))))
                     .andReturn();
+            result = dispatchAsync(result);
 
             assertThat(result.getResponse().getStatus())
                     .withFailMessage("AI HTTP fixture failed: %s", AI_HANDLER_FAILURE.get())
@@ -505,14 +516,17 @@ class DocumentApiIntegrationTest {
                         new AiAnswerResponse.Locator("text_range", null, 0, 8,
                                 "unicode_code_point"), "not stored"))));
 
-        mockMvc.perform(post("/api/v1/knowledge-bases/{knowledgeBaseId}/questions",
+        var unsupportedResult = mockMvc.perform(post("/api/v1/knowledge-bases/{knowledgeBaseId}/questions",
                         knowledgeBaseId)
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
                                 "What does the document say?"))))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.code").value("AI_PROCESSING_FAILED"));
+                .andReturn();
+        unsupportedResult = dispatchAsync(unsupportedResult);
+        assertThat(unsupportedResult.getResponse().getStatus()).isEqualTo(502);
+        assertThat(objectMapper.readTree(unsupportedResult.getResponse().getContentAsByteArray())
+                .path("code").asText()).isEqualTo("AI_PROCESSING_FAILED");
         assertThat(AI_HANDLER_FAILURE.get()).isNull();
         assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions ORDER BY created_at DESC LIMIT 1",
                 String.class)).isEqualTo("FAILED");
@@ -527,6 +541,7 @@ class DocumentApiIntegrationTest {
                         .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
                                 "What does the document say?"))))
                 .andReturn();
+        refusalResult = dispatchAsync(refusalResult);
         assertThat(refusalResult.getResponse().getStatus())
                 .withFailMessage("AI HTTP fixture failed: %s", AI_HANDLER_FAILURE.get())
                 .isEqualTo(200);
@@ -551,6 +566,7 @@ class DocumentApiIntegrationTest {
                         .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
                                 "What is the evidence?"))))
                 .andReturn();
+        result = dispatchAsync(result);
 
         assertThat(result.getResponse().getStatus()).isEqualTo(502);
         JsonNode error = objectMapper.readTree(result.getResponse().getContentAsByteArray());
@@ -576,10 +592,12 @@ class DocumentApiIntegrationTest {
                 "ai-timeout-index");
         CountDownLatch responseGate = new CountDownLatch(1);
         AI_RESPONSE_GATE.set(responseGate);
+        int originalBudget = questionProperties.getTotalBudgetSeconds();
+        questionProperties.setTotalBudgetSeconds(1);
 
         org.springframework.test.web.servlet.MvcResult result;
         try {
-            result = mockMvc.perform(post(
+            var initial = mockMvc.perform(post(
                             "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
                             .header("Authorization", "Bearer " + token)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -587,8 +605,12 @@ class DocumentApiIntegrationTest {
                                     new com.knowflow.api.answer.PublicQuestion(
                                             "What is the evidence?"))))
                     .andReturn();
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            result = mockMvc.perform(asyncDispatch(initial)).andReturn();
         } finally {
             responseGate.countDown();
+            questionProperties.setTotalBudgetSeconds(originalBudget);
         }
 
         assertThat(result.getResponse().getStatus()).isEqualTo(504);
@@ -604,6 +626,41 @@ class DocumentApiIntegrationTest {
                 """);
         assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
         assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+    }
+
+    @Test
+    void asyncQuestionCompletionCancelsProviderCallAndMarksHistoryCancelled() throws Exception {
+        JsonNode owner = register("question-disconnect@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Question disconnect");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Local cancellation evidence.",
+                "question-disconnect-index");
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(
+                                new com.knowflow.api.answer.PublicQuestion("Cancel this query"))))
+                .andReturn();
+        try {
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            initial.getRequest().getAsyncContext().complete();
+            responseGate.countDown();
+
+            awaitQuestionStatus("CANCELLED");
+            var cancelled = jdbc.queryForMap("""
+                    SELECT status, failure_code, answer_text FROM knowflow.questions
+                     ORDER BY created_at DESC LIMIT 1
+                    """);
+            assertThat(cancelled.get("failure_code")).isNull();
+            assertThat(cancelled.get("answer_text")).isNull();
+        } finally {
+            responseGate.countDown();
+        }
     }
 
     @Test
@@ -1399,6 +1456,7 @@ class DocumentApiIntegrationTest {
             respond(exchange, 405, "{}");
             return;
         }
+        AI_REQUEST_RECEIVED.get().countDown();
         try {
             TrustedAnswerRequest request = AI_MAPPER.readValue(exchange.getRequestBody(),
                     TrustedAnswerRequest.class);
@@ -1450,6 +1508,27 @@ class DocumentApiIntegrationTest {
                    SET lease_expires_at = clock_timestamp() - INTERVAL '1 second'
                  WHERE id = ? AND status = 'RUNNING'
                 """, taskId);
+    }
+
+    private org.springframework.test.web.servlet.MvcResult dispatchAsync(
+            org.springframework.test.web.servlet.MvcResult result) throws Exception {
+        assertThat(result.getRequest().isAsyncStarted()).isTrue();
+        return mockMvc.perform(asyncDispatch(result)).andReturn();
+    }
+
+    private void awaitQuestionStatus(String expected) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        String current = null;
+        while (System.nanoTime() < deadline) {
+            current = jdbc.queryForObject("""
+                    SELECT status FROM knowflow.questions ORDER BY created_at DESC LIMIT 1
+                    """, String.class);
+            if (expected.equals(current)) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(current).isEqualTo(expected);
     }
 
     private static IndexBatchRequest createBatch(LeaseContext lease, String requestId,
