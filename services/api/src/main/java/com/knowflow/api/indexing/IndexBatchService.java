@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
+import com.knowflow.api.config.IndexingProperties;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,12 +21,14 @@ public class IndexBatchService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final LeaseAuthorizer leases;
+    private final IndexingProperties properties;
 
     public IndexBatchService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                             LeaseAuthorizer leases) {
+                             LeaseAuthorizer leases, IndexingProperties properties) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.leases = leases;
+        this.properties = properties;
     }
 
     public IndexBatchReceipt write(UUID routeTaskId, IndexBatchRequest request) {
@@ -35,6 +38,11 @@ public class IndexBatchService {
             throw ApiFailure.invalidRequest();
         }
         IndexBatchDigest.ValidatedBatch validated = IndexBatchDigest.validateAndDigest(request);
+        if (request.chunks().size() > properties.getMaxBatchChunks()
+                || request.chunks().stream().anyMatch(chunk -> chunk.text()
+                .codePointCount(0, chunk.text().length()) > properties.getChunkMaxCodepoints())) {
+            throw ApiFailure.resourceLimit();
+        }
         try {
             IndexBatchReceipt receipt = transactions.execute(status -> {
                 LeaseAuthorizer.AuthorizedExecution execution =

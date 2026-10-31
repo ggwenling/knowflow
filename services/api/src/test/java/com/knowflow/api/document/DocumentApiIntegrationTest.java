@@ -18,7 +18,9 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -36,6 +38,7 @@ import com.knowflow.api.ai.InternalHealth;
 import com.knowflow.api.answer.AiAnswerResponse;
 import com.knowflow.api.answer.TrustedAnswerRequest;
 import com.knowflow.api.auth.AuthService;
+import com.knowflow.api.config.IndexingProperties;
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.indexing.ClaimedIndexTask;
 import com.knowflow.api.indexing.LeaseContext;
@@ -44,6 +47,7 @@ import com.knowflow.api.indexing.IndexBatchDigest;
 import com.knowflow.api.indexing.IndexBatchRequest;
 import com.knowflow.api.indexing.CompletionRequest;
 import com.knowflow.api.indexing.HeartbeatRequest;
+import com.knowflow.api.indexing.IndexDispatch;
 import com.knowflow.api.indexing.IndexManifestDigest;
 import com.knowflow.api.indexing.SourceReadRequest;
 import com.knowflow.api.indexing.AiExecutionCancellationClient;
@@ -158,6 +162,9 @@ class DocumentApiIntegrationTest {
     @Autowired
     private IndexingTaskQueue indexingTasks;
 
+    @Autowired
+    private IndexingProperties indexingProperties;
+
     @DynamicPropertySource
     static void serviceProperties(DynamicPropertyRegistry properties) {
         properties.add("knowflow.database.application.url", DATABASE::getJdbcUrl);
@@ -232,7 +239,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/tasks/")))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.6"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.7"))
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andReturn();
         JsonNode response = objectMapper.readTree(uploaded.getResponse().getContentAsByteArray());
@@ -623,6 +630,8 @@ class DocumentApiIntegrationTest {
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId()).isEqualTo(taskId);
         assertThat(first.lease().fencing()).isEqualTo(1);
+        assertThat(first.dispatch().runtimeProfile()).isEqualTo(new IndexDispatch.RuntimeProfile(
+                "knowflow-index-v1", 800, 100, 16, 32, 1_048_576));
         assertThat(jdbc.queryForObject("""
                 SELECT execution_token_hash FROM knowflow.indexing_tasks WHERE id = ?
                 """, String.class, taskId)).isEqualTo(AuthService.sha256(
@@ -656,6 +665,132 @@ class DocumentApiIntegrationTest {
                  WHERE document_id = ? AND content_version_id = ?
                 """, Integer.class, UUID.fromString(uploaded.path("document_id").asText()),
                 second.lease().contentVersionId())).isEqualTo(3);
+    }
+
+    @Test
+    void doesNotDispatchCandidateWithPipelineProfileOutsideRegisteredRuntime() throws Exception {
+        JsonNode owner = register("pipeline-mismatch@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Pipeline mismatch");
+        JsonNode uploaded = upload(token, knowledgeBaseId, "profile.txt", "profile test");
+        UUID taskId = UUID.fromString(uploaded.path("task_id").asText());
+
+        jdbc.update("""
+                UPDATE knowflow.index_versions iv
+                   SET pipeline_profile_id = 'unregistered-pipeline-v2'
+                  FROM knowflow.indexing_tasks t
+                 WHERE t.id = ? AND iv.id = t.index_version_id
+                """, taskId);
+
+        assertThat(indexingTasks.claimNext()).isEmpty();
+        assertThat(jdbc.queryForObject("""
+                SELECT status || ':' || failure_code FROM knowflow.indexing_tasks WHERE id = ?
+                """, String.class, taskId)).isEqualTo("FAILED:INDEX_WRITE_FAILED");
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM knowflow.index_versions
+                 WHERE id = (SELECT index_version_id FROM knowflow.indexing_tasks WHERE id = ?)
+                """, String.class, taskId)).isEqualTo("FAILED");
+        assertThat(jdbc.queryForObject("""
+                SELECT lease_id IS NULL FROM knowflow.indexing_tasks WHERE id = ?
+                """, Boolean.class, taskId)).isTrue();
+    }
+
+    @Test
+    void dispatchesAndEnforcesSmallerRegisteredBatchLimits() throws Exception {
+        String originalPipeline = indexingProperties.getPipelineProfileId();
+        int originalChunkMax = indexingProperties.getChunkMaxCodepoints();
+        int originalOverlap = indexingProperties.getOverlapCodepoints();
+        int originalEmbeddingLimit = indexingProperties.getEmbeddingMaxBatchItems();
+        int originalChunkLimit = indexingProperties.getMaxBatchChunks();
+        try {
+            indexingProperties.setPipelineProfileId("knowflow-index-v2");
+            indexingProperties.setChunkMaxCodepoints(700);
+            indexingProperties.setOverlapCodepoints(50);
+            indexingProperties.setEmbeddingMaxBatchItems(8);
+            indexingProperties.setMaxBatchChunks(1);
+
+            JsonNode owner = register("smaller-profile@example.test");
+            String token = owner.path("access_token").asText();
+            String knowledgeBaseId = createKnowledgeBase(token, "Smaller profile");
+            upload(token, knowledgeBaseId, "smaller.txt", "bounded index batch");
+            ClaimedIndexTask claim = indexingTasks.claimNext().orElseThrow();
+            JsonNode dispatch = objectMapper.valueToTree(claim.dispatch());
+            assertThat(dispatch.path("runtime_profile_id").asText()).isEqualTo("runtime-default");
+            assertThat(dispatch.path("runtime_profile").path("pipeline_profile_id").asText())
+                    .isEqualTo(claim.lease().pipelineProfileId());
+            assertThat(dispatch.path("runtime_profile").path("chunk_max_codepoints").asInt())
+                    .isEqualTo(700);
+            assertThat(dispatch.path("runtime_profile").path("overlap_codepoints").asInt())
+                    .isEqualTo(50);
+            assertThat(dispatch.path("runtime_profile").path("embedding_max_batch_items").asInt())
+                    .isEqualTo(8);
+            assertThat(dispatch.path("runtime_profile").path("index_max_batch_chunks").asInt())
+                    .isEqualTo(1);
+
+            String requestId = "small-batch-profile";
+            IndexBatchRequest oneChunk = createBatch(claim.lease(), requestId, UUID.randomUUID(),
+                    List.of("one chunk"));
+            postBatch(oneChunk, requestId);
+
+            IndexBatchRequest longChunk = createBatch(claim.lease(), requestId, UUID.randomUUID(),
+                    "x".repeat(701));
+            mockMvc.perform(post("/internal/v1/tasks/{taskId}/index-batches",
+                            claim.lease().taskId())
+                            .header("Authorization", "Bearer " + AI_SECRET)
+                            .header("X-Request-ID", requestId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(longChunk)))
+                    .andExpect(status().isPayloadTooLarge())
+                    .andExpect(jsonPath("$.code").value("RESOURCE_LIMIT"));
+
+            IndexBatchRequest twoChunks = createBatch(claim.lease(), requestId, UUID.randomUUID(),
+                    List.of("first chunk", "second chunk"));
+            mockMvc.perform(post("/internal/v1/tasks/{taskId}/index-batches",
+                            claim.lease().taskId())
+                            .header("Authorization", "Bearer " + AI_SECRET)
+                            .header("X-Request-ID", requestId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(twoChunks)))
+                    .andExpect(status().isPayloadTooLarge())
+                    .andExpect(jsonPath("$.code").value("RESOURCE_LIMIT"));
+        } finally {
+            indexingProperties.setChunkMaxCodepoints(originalChunkMax);
+            indexingProperties.setOverlapCodepoints(originalOverlap);
+            indexingProperties.setEmbeddingMaxBatchItems(originalEmbeddingLimit);
+            indexingProperties.setMaxBatchChunks(originalChunkLimit);
+            indexingProperties.setPipelineProfileId(originalPipeline);
+        }
+    }
+
+    @Test
+    void appliesSmallerConfiguredIndexBatchBodyLimit() throws Exception {
+        int originalLimit = indexingProperties.getMaxBatchBytes();
+        try {
+            indexingProperties.setMaxBatchBytes(128);
+
+            JsonNode owner = register("small-body-profile@example.test");
+            String token = owner.path("access_token").asText();
+            String knowledgeBaseId = createKnowledgeBase(token, "Small body profile");
+            upload(token, knowledgeBaseId, "small-body.txt", "bounded request body");
+            ClaimedIndexTask claim = indexingTasks.claimNext().orElseThrow();
+            assertThat(claim.dispatch().runtimeProfile().indexMaxBatchBytes()).isEqualTo(128);
+
+            String requestId = "small-body-profile";
+            IndexBatchRequest batch = createBatch(claim.lease(), requestId, UUID.randomUUID(),
+                    "one chunk");
+            byte[] body = objectMapper.writeValueAsBytes(batch);
+            assertThat(body.length).isGreaterThan(128);
+            mockMvc.perform(post("/internal/v1/tasks/{taskId}/index-batches",
+                            claim.lease().taskId())
+                            .header("Authorization", "Bearer " + AI_SECRET)
+                            .header("X-Request-ID", requestId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isPayloadTooLarge())
+                    .andExpect(jsonPath("$.code").value("RESOURCE_LIMIT"));
+        } finally {
+            indexingProperties.setMaxBatchBytes(originalLimit);
+        }
     }
 
     @Test
@@ -762,7 +897,7 @@ class DocumentApiIntegrationTest {
         assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         String requestId = "source-read-regression";
         byte[] request = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.6", requestId, claim.lease()));
+                "0.2.0-draft.7", requestId, claim.lease()));
 
         var response = mockMvc.perform(post("/internal/v1/tasks/{taskId}/source",
                         claim.lease().taskId())
@@ -772,7 +907,7 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.APPLICATION_OCTET_STREAM)
                         .content(request))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.6"))
+                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.7"))
                 .andExpect(header().string("X-Request-ID", requestId))
                 .andExpect(header().string("X-Source-Format", "md"))
                 .andExpect(header().string("X-Source-SHA256",
@@ -788,7 +923,7 @@ class DocumentApiIntegrationTest {
                 claim.lease().pipelineProfileId(), claim.lease().leaseId(),
                 claim.lease().fencing(), "x".repeat(43));
         byte[] forgedRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.6", requestId, forged));
+                "0.2.0-draft.7", requestId, forged));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
                         .header("Authorization", "Bearer document-test-internal-secret-long-enough")
                         .header("X-Request-ID", requestId)
@@ -953,7 +1088,7 @@ class DocumentApiIntegrationTest {
                         "BAAI/bge-m3", 1024),
                 1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
                         1, batch.batchId(), batch.batchSha256(), 1)));
-        CompletionRequest completion = new CompletionRequest("0.2.0-draft.6", requestId,
+        CompletionRequest completion = new CompletionRequest("0.2.0-draft.7", requestId,
                 claim.lease(), "SUCCEEDED",
                 new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
         byte[] body = objectMapper.writeValueAsBytes(completion);
@@ -1001,7 +1136,7 @@ class DocumentApiIntegrationTest {
         JsonNode uploaded = upload(token, knowledgeBaseId, "retry.txt", "retry this task");
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
-        CompletionRequest failure = new CompletionRequest("0.2.0-draft.6", "retryable-failure",
+        CompletionRequest failure = new CompletionRequest("0.2.0-draft.7", "retryable-failure",
                 first.lease(), "FAILED", null,
                 new CompletionRequest.Failure("MODEL_TIMEOUT", "model request timed out", true));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion", first.lease().taskId())
@@ -1319,13 +1454,25 @@ class DocumentApiIntegrationTest {
 
     private static IndexBatchRequest createBatch(LeaseContext lease, String requestId,
                                                   UUID batchId, String text) {
-        String hash = sha256(text.getBytes(StandardCharsets.UTF_8));
-        IndexBatchRequest.Chunk chunk = new IndexBatchRequest.Chunk(UUID.randomUUID(), 1, text,
-                hash, new IndexBatchRequest.Locator("text_range", null, 0,
-                text.codePointCount(0, text.length()), "unicode_code_point"),
-                java.util.Collections.nCopies(1024, BigDecimal.ZERO));
-        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.6", requestId, lease,
-                batchId, 1, "0".repeat(64), java.util.List.of(chunk));
+        return createBatch(lease, requestId, batchId, List.of(text));
+    }
+
+    private static IndexBatchRequest createBatch(LeaseContext lease, String requestId,
+                                                  UUID batchId, List<String> texts) {
+        List<IndexBatchRequest.Chunk> chunks = new ArrayList<>();
+        int start = 0;
+        for (int index = 0; index < texts.size(); index++) {
+            String text = texts.get(index);
+            int end = start + text.codePointCount(0, text.length());
+            chunks.add(new IndexBatchRequest.Chunk(UUID.randomUUID(), index + 1, text,
+                    sha256(text.getBytes(StandardCharsets.UTF_8)),
+                    new IndexBatchRequest.Locator("text_range", null, start, end,
+                            "unicode_code_point"),
+                    java.util.Collections.nCopies(1024, BigDecimal.ZERO)));
+            start = end;
+        }
+        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.7", requestId, lease,
+                batchId, 1, "0".repeat(64), chunks);
         String digest = IndexBatchDigest.calculate(candidate).sha256();
         return new IndexBatchRequest(candidate.contractVersion(), candidate.requestId(),
                 candidate.lease(), candidate.batchId(), candidate.batchSequence(), digest,
@@ -1371,7 +1518,7 @@ class DocumentApiIntegrationTest {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.6","email":"%s",
+                                {"contract_version":"0.2.0-draft.7","email":"%s",
                                  "password":"synthetic-document-password"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
@@ -1383,7 +1530,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.6","name":"%s"}
+                                {"contract_version":"0.2.0-draft.7","name":"%s"}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());
