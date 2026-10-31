@@ -176,3 +176,10 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - manifest digest 的序列化字段和值顺序保持不变；批次数量由轻量摘要中的 `chunk_count` 提供，公共契约和 Java 接口未改。
 - 新增 512 个单字符 Chunk 的 `tracemalloc` 回归，每个 Chunk 使用独立 1024 维向量；修复前复现峰值 **17,525,103 bytes**，修复后断言低于 **16 MiB**，并核验 8 个摘要只包含 manifest 所需四项。
 - Python 全量 **188 passed**；Schema **70** cases；离线回归 **16 passed**；worker 定向 **12 passed**。新摘要经真实 Java manifest 验收 E2E，集成分支报告 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`，结果 `DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS`，SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`。取消后 Chunk/Embedding 行数和清理 outbox 均为 0；外部模型调用 0，Q/M 状态不变。
+
+## 2026-10-31：local draft.9 真流式与评测准备
+
+- Python 服务消费 `0.2.0-draft.9`，Schema SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`。新增 `/internal/v1/answers/stream`，向 provider 发 `stream=true`，有界增量解析 JSON answer，仅在完整答案/引用/可信 scope 校验后发送 sources；截止、超限、断连和取消关闭 provider/retrieval 操作。
+- Python 只读查询按 Java 提供的固定 snapshot tuples 读取未清理的 READY/RETIRED 版本，同时要求 owner、知识库和文档仍可见。新增标注模板与 pending 状态验证；当前数据仍是 10 份合成文档、12 道开发题和 3 道公开留出题，非 60 题、非盲测、未完成人工独立审核。
+- 验证：Python 全量 **219 passed**（1 条既有 Starlette/httpx 弃用警告）；相关 streaming/evaluation/service 定向 **67 passed**；Schema **79 structural cases**；离线 provider 回归 **16 passed**。无真实模型凭证，本轮 provider 网络调用为 0。
+- 真实 provider 的 SSE 兼容、向量排名/答案质量和费用数据仍待配置及独立评测；不据此宣称 KF2-037 完成或质量达标。

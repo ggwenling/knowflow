@@ -182,3 +182,11 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - 集成候选 `54c5713cb7f04fa9ab323be227e9a7dcacae16e3` 上 Java Maven/Testcontainers 全量：61 项，0 failures、0 errors、1 opt-in real-Python smoke 跳过；本地真实双进程 smoke 另行 9/9 通过。Testcontainers 使用 PostgreSQL 16.12、pgvector 0.8.1 与 MinIO。
 - 在共同 draft.8 候选上重放本机 Java/Python/PostgreSQL/pgvector/MinIO 合成 E2E：上传、任务 READY、只读检索、来源校验/持久化、活动取消及队列清理均通过；无迟到 Chunk/向量，三种相关清理队列均为 0。报告 `services/ai/docs/evidence/local-backend-e2e-draft8-replay.json`，外部模型调用 0。测试后已停止本次启动的 KnowFlow Compose 容器并保留数据卷。
 - 变更仍待独立 Q 审阅与 M 消费确认；不据此标记 KF2-004 或有关业务任务为 DONE。真实 provider 质量、内容更新/重建运行时尚未验证。
+
+## 2026-10-31：local draft.9 内容版本与 SSE 前置
+
+- 本地 `local` 分支从集成基线 `493112dfa0b7f939041ef456ff39e7ff734445d3` 开始。draft.9 Schema SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`，增加 AnswerStreamEvent 并定义当前版/前一成功发布版保留语义。
+- KF2-028 实现候选内容更新与同内容重建 API，原子 pending 创建与完成发布，失败/取消清除对应候选，更新期间旧活动版本继续供新问答使用；相同进行中重建复用任务。
+- KF2-029 按最近两个成功 ready_at 保留来源、Chunk/向量与原文件；保护运行任务和 PROCESSING 问答快照，清理后 source/file 返回 404，保留问答文本和轻量版本审计行。
+- Java test-compile 通过；SSE 状态/来源映射单测 7/7 通过。3 个更新、失败、重建幂等及保留窗口 Testcontainers 场景已新增并编译，但本机 Docker Engine 未启动，无法执行数据库场景。KF2-031 只交付真实上游 SSE client、事件顺序校验、逐事件可见性取消桥接和有界引用映射；公开 SSE API 与最终持久化仍待完成。
+- 当前状态为开发候选，等待 Docker 可用后运行真实迁移/发布/清理测试和完成公开 SSE 闭环；Q/M 验收未执行，不标 DONE。

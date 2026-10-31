@@ -1,6 +1,6 @@
 # JP-01 Java → Python 开发联调记录
 
-状态：JP-I1 draft.4 和 draft.6 本地 E2E 均为历史证据。2026-10-31 Java/Python 已共同消费 draft.8，真实 health 双进程通过；候选 Schema 仍待 Q 审阅/M 消费确认，真实模型质量与 draft.8 的内容更新/重建运行时不在本次验证范围内。历史版本记录保留。
+状态：JP-I1 draft.4/draft.6 和 2026-10-31 draft.8 本机 E2E 均为历史证据。当前 `local` 候选升级为 draft.9；Python 全量与 Schema 验证通过，Java 内容更新/重建已编译且 SSE 内部组件单测通过。Java Testcontainers 场景因 Docker Engine 缺失未执行；公开 Java SSE API/问答持久化未完成。候选 Schema 仍待 Q 审阅/M 消费确认，真实模型质量仍未验证。
 
 ## 固定的提交与契约
 
@@ -83,3 +83,11 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - 新增 512 个单字符 Chunk 的 `tracemalloc` 回归，每条 Chunk 携带独立 1024 维向量。修复前回归复现 **17,525,103 bytes** 峰值并失败；修复后峰值断言低于 **16 MiB**，同时验证 8 个批次摘要仅含 manifest 所需四项。
 - 合并后 Python 全量 **188 passed**，Schema 校验 **70 structural cases**，离线 provider 回归 **16 passed**；worker 定向 **12 passed**。真实 Java/Python/PostgreSQL/pgvector/MinIO 合成业务 E2E 通过，确认 Java 接受轻量摘要生成的 manifest；证据 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`，SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`。取消后 Chunk/Embedding 均为 0，清理 outbox 排空。
 - E2E 仅使用本地确定性合成 adapter，外部模型调用 **0**；测试知识库已删除、会话已注销，合成账户保留在本地开发数据库。KnowFlow Compose 已停止且数据卷保留。未改 Java 源码，因此没有重跑 Java Maven；此前 61 tests 的结论仍只对应原 Java target。Q/M 与真实 provider 质量/费用测量状态不变；未推送或合并 `main`。
+
+## 2026-10-31：local draft.9 并行开发
+
+- 开发基线：`local` 从 `codex/integration-20261031@493112dfa0b7f939041ef456ff39e7ff734445d3` 快进。共享 Schema draft.9 SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`；AnswerStreamEvent 序号从 1 开始，事件为 started/delta/sources/completed 或唯一 error/cancelled。
+- Java 交付内容更新/同内容重建、pending 原子发布、两次成功发布保留/旧载荷清理和 retired snapshot 访问。test-compile 通过，SSE 协议与引用映射 7/7 通过。Testcontainers 场景无法启动：本机 Docker Desktop Linux engine pipe 不存在。
+- Python 交付真实 provider SSE 消费、answer JSON 增量解析、取消/超时/断连收尾、retired snapshot 只读访问及评测空白标注模板。Python 全量 219 passed；Schema 79 structural cases；离线回归 16 passed。真实 provider 调用 0。
+- KF2-031 为部分完成：Java 内部 SSE 客户端、严格事件状态机、可见性取消桥接和 citation mapper 已实现及单测通过；Java 公开 SSE endpoint 和问答最终持久化未接通。未把内部单测描述为端到端 SSE 完成。
+- KF2-037 仅完成工具/标注准备；仍无 60 道独立人工核验题、真实模型质量结果或费用数据。Q/M 审阅未执行，本轮不推送或合并 main。
