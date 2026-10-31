@@ -1,5 +1,6 @@
 import copy
 import asyncio
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import importlib.util
 import json
@@ -10,6 +11,7 @@ import pytest
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.embedding import EmbeddingSettings
 from knowflow_ai.java_client import JavaGatewayError
+from knowflow_ai.parsing import ParseFailure
 from knowflow_ai.protocol import ContractConsumer
 from knowflow_ai.worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
@@ -215,6 +217,8 @@ async def test_cancelling_active_execution_stops_processing_before_closing_embed
     worker = IndexWorker(gateway, embedding_factory=lambda: embedding,
                          heartbeat_seconds=3600)
     dispatch = _dispatch(source)
+    dispatch["lease_expires_at"] = (
+        datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
     lease = dispatch["lease"]
 
     await worker.start()
@@ -232,6 +236,30 @@ async def test_cancelling_active_execution_stops_processing_before_closing_embed
     assert worker._active == {}
     assert worker._heartbeats == {}
     await worker.close()
+
+
+@pytest.mark.asyncio
+async def test_parser_process_unavailable_is_reported_as_retryable_infrastructure_failure(
+        monkeypatch):
+    import knowflow_ai.worker as worker_module
+
+    source = b"parser process unavailable"
+    contract = ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
+    gateway = FakeGateway(contract, source)
+
+    async def unavailable(*_args, **_kwargs):
+        raise ParseFailure("PARSER_UNAVAILABLE")
+
+    monkeypatch.setattr(worker_module, "parse_document_isolated", unavailable)
+    worker = IndexWorker(gateway, embedding_factory=FakeEmbedding)
+    heartbeat = asyncio.create_task(asyncio.Event().wait())
+    await worker._execute(_dispatch(source), heartbeat)
+
+    assert gateway.completions[0]["failure"] == {
+        "code": "INDEX_WRITE_FAILED",
+        "message": "INDEX_WRITE_FAILED",
+        "retryable": True,
+    }
 
 
 @pytest.mark.asyncio

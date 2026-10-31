@@ -12,7 +12,8 @@ from .chunking import ChunkingConfig, ChunkingFailure, chunk_document
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .java_client import JavaGateway, JavaGatewayError
-from .parsing import ParseFailure, parse_document
+from .parser_process import parse_document_isolated
+from .parsing import ParseFailure
 from .protocol import CONTRACT_VERSION
 
 
@@ -176,7 +177,10 @@ class IndexWorker:
                 return
             await self._report_failure(lease, self._failure_code(error), error.retryable)
         except ParseFailure as error:
-            await self._report_failure(lease, self._parse_failure_code(str(error)), False)
+            parse_code = str(error)
+            await self._report_failure(
+                lease, self._parse_failure_code(parse_code),
+                parse_code == "PARSER_UNAVAILABLE")
         except ConfigurationError:
             await self._report_failure(lease, "MODEL_FAILURE", False)
         except ProcessingError as error:
@@ -208,10 +212,11 @@ class IndexWorker:
         profile = dispatch["runtime_profile"]
         chunking = validate_runtime_profile(dispatch)
         source = await self._gateway.read_source(dispatch)
-        parsed = parse_document(source, format=dispatch["source"]["format"],
-                                document_id=lease["document_id"],
-                                content_version_id=lease["content_version_id"],
-                                file_id=dispatch["source"]["file_id"])
+        parsed = await parse_document_isolated(
+            source, format=dispatch["source"]["format"],
+            document_id=lease["document_id"],
+            content_version_id=lease["content_version_id"],
+            file_id=dispatch["source"]["file_id"])
         if parsed.file_sha256 != dispatch["source"]["sha256"]:
             raise ProcessingError("SOURCE_UNAVAILABLE", 502, retryable=False)
         chunks = chunk_document(parsed, chunking)
@@ -301,7 +306,11 @@ class IndexWorker:
     def _parse_failure_code(code: str) -> str:
         if code in {"EMPTY_DOCUMENT", "PDF_NO_TEXT"}:
             return "EMPTY_CONTENT"
-        if code in {"FILE_TOO_LARGE", "TEXT_TOO_LARGE", "PDF_PAGE_LIMIT"}:
+        if code == "PARSER_UNAVAILABLE":
+            return "INDEX_WRITE_FAILED"
+        if code in {"FILE_TOO_LARGE", "TEXT_TOO_LARGE", "PDF_PAGE_LIMIT",
+                    "PARSER_TIMEOUT", "PARSER_MEMORY_LIMIT",
+                    "PARSER_RESOURCE_LIMIT", "PARSER_RESOURCE_LIMIT_UNAVAILABLE"}:
             return "RESOURCE_LIMIT"
         if code == "PDF_ENCRYPTED":
             return "UNSUPPORTED_CONTENT"

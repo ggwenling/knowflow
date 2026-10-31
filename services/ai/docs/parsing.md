@@ -8,7 +8,7 @@
 
 固定失败代码：EMPTY_DOCUMENT、INVALID_UTF8、INVALID_TEXT、UNSUPPORTED_FORMAT、INVALID_INPUT_TYPE、INVALID_SOURCE_IDENTITY、FILE_TOO_LARGE、TEXT_TOO_LARGE、INVALID_PDF、PDF_ENCRYPTED、PDF_PAGE_LIMIT、PDF_NO_TEXT。PDF_NO_TEXT 仅表示没有可提取文字（包括扫描/图像和空白页），不能仅靠这个错误断言文件一定是扫描件。加密 PDF 即使可能用空密码打开也拒绝，不猜密码。错误不包含输入、路径或第三方异常正文；pypdf 诊断不传播到应用日志。
 
-开发默认上限沿用待验证提议：8 MiB / 200 PDF 页 / 200,000 码点。测试覆盖边界拒绝，不把它当目标机器的容量承诺；PDF 展开、CPU/内存隔离、并发与硬超时尚未加固，属于 KF2-035。Python 内部索引路由会调用本解析器，但该路由不接收浏览器上传、不负责授权、任务状态或索引发布。解析器本身不提供 OCR 或 DOCX；分段、Embedding、检索和生成由 worker 后续组件负责。
+开发默认上限沿用待验证提议：8 MiB / 200 PDF 页 / 200,000 码点。KF2-035 增加了可终止子进程隔离：索引 worker 对解析子进程实施 15 秒墙钟限时，父进程限制输出最多 4 MiB，并在超时、请求取消或输出超限时杀死并回收子进程。Windows 使用 Job Object 限制子进程内存；其他平台使用 `RLIMIT_AS` 限制虚拟地址空间，若操作系统不支持限制则失败关闭。当前 Windows 开发机已实测 512 MiB Job Object 限制会使 600 MiB 分配触发 `MemoryError`，并测试了超时、取消、超限输出时的子进程清理，以及 TXT/PDF 隔离解析与原解析器结果一致。15 秒和 512 MiB 是本轮候选开发限额，不是生产容量或吞吐承诺；未在部署目标 Linux 主机验证 `RLIMIT_AS`，也未对生产文档、并发负载或目标硬件作测量。Python 内部索引路由不接收浏览器上传、不负责授权、任务状态或索引发布。解析器本身不提供 OCR 或 DOCX；分段、Embedding、检索和生成由 worker 后续组件负责。
 
 回归使用全部 10 份种子文档核验偏移/答案摘录，并使用 5 个完全原创 CC0 PDF：中文三页（中间空白）、空白、图像、加密、损坏。生成源和 SHA 清单位于 tests/fixtures/pdf 和 tools/build_pdf_fixtures.py；加密包含随机性，提交的文件哈希是该样本版本，不宣称重复生成加密文件字节一致。ReportLab/Pillow 仅用于开发样本生成，不是运行解析依赖。
 
