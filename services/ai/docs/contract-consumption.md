@@ -1,6 +1,6 @@
 # B 线契约消费及 A 交接（JP-01 / KF2-007）
 
-当前 Python `python` 分支已合入 A 的 draft.7 契约提交，并更新严格消费者；B2 runtime profile 消费正在实现。draft.6 的本机联调记载保留为历史证据，不代表当前契约版本。
+当前 Python `python` 分支已合入 A 的 draft.8 契约提交，并更新严格消费者。draft.6/7 的本机联调记载保留为历史证据，不代表当前契约版本。
 
 ## JP-01 / draft.4 历史消费快照
 
@@ -50,3 +50,7 @@ A 已将内部健康响应纳入 InternalHealth Schema，B 使用该定义验证
 ## 2026-10-31：Python 分支消费 draft.7
 
 合入 A 的精确提交 `bd6c8df51548ed3887b2b36d03fdb969f41aa010`，版本为 `0.2.0-draft.7`，Schema SHA-256 为 `58c4ae3e5d7052abd29e819295a783afe90e0a3104a2ad2a8220407ee2945f9f`。消费者拒绝 draft.6 及其他旧版本和任意不同字节的 Schema；索引工作包消费项与测试结果随 Python B2 提交补记。该 draft 仍是候选，未声称契约冻结或完成 Q 审阅。
+
+## 2026-10-31：Python 分支消费 draft.8
+
+合入 A 的精确提交 `a68239b82e5885ad8aec559fb574dce6b70f95d8`，版本为 `0.2.0-draft.8`，Schema SHA-256 为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。严格消费者固定版本与原始 Schema 字节哈希；启动拒绝 draft.7 及更早版本、任意 Schema 字节变化和未知字段。Python health 消费夹具已升至 draft.8 并保留 draft.7 拒绝用例；answers/index worker 响应使用同一版本常量。Java/Python health 双进程 smoke 也已改为验证 draft.8 并拒绝 draft.7，但尚未在最终 integration HEAD 运行或生成新 evidence。该 draft 仍为候选，未声称契约冻结、Q 审阅完成或真实 Java/Python 业务双进程联调通过。

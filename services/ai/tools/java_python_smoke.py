@@ -53,9 +53,9 @@ class SlowFixture(BaseHTTPRequestHandler):
             self.send_header('Content-Length',str(len(body)))
             self.end_headers(); self.wfile.write(body)
             return
-        if self.headers.get('X-Request-ID') == 'java-draft5-fixture':
-            body = json.dumps({'status':'UP', 'contract_version':'0.2.0-draft.5',
-                               'request_id':'java-draft5-fixture'}).encode()
+        if self.headers.get('X-Request-ID') == 'java-draft7-fixture':
+            body = json.dumps({'status':'UP', 'contract_version':'0.2.0-draft.7',
+                               'request_id':'java-draft7-fixture'}).encode()
             self.send_response(200)
             self.send_header('Content-Type','application/json')
             self.send_header('Content-Length',str(len(body)))
@@ -120,14 +120,14 @@ if args.require_clean and not clean_after:
 report={'recorded_at':datetime.now(ZoneInfo('Asia/Hong_Kong')).isoformat(),
         'git_head_at_run':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,
                                                   text=True,encoding='utf-8').strip(),
-        'contract_version':'0.2.0-draft.6','java_tests':9,'failures':0,'errors':0,
+        'contract_version':'0.2.0-draft.8','java_tests':9,'failures':0,'errors':0,
         'clean_worktree_before':clean_before, 'clean_worktree_after':clean_after,
         'integration_tree':git('rev-parse','HEAD^{tree}'), 'java_target':java_target,
         'schema_sha256':sha256((repo/'contracts/schemas/protocol.schema.json').read_bytes()).hexdigest(),
         'examples_sha256':sha256((repo/'contracts/examples/protocol-cases.json').read_bytes()).hexdigest(),
         'consumer_sha256':sha256((root/'src/knowflow_ai/protocol.py').read_bytes()).hexdigest(),
-        'real_java_health_client':True, 'java_health_client_accepts_draft6':True,
-        'java_health_client_rejects_draft2_fixture':True, 'java_health_client_rejects_draft5_fixture':True,
+        'real_java_health_client':True, 'java_health_client_accepts_draft8':True,
+        'java_health_client_rejects_draft2_fixture':True, 'java_health_client_rejects_draft7_fixture':True,
         'java_health_client_five_second_timeout':True,
         'java_health_client_sha256':sha256((repo/'services/api/src/main/java/com/knowflow/api/ai/AiInternalHealthClient.java').read_bytes()).hexdigest(),
         'real_java_http_service':True,'real_java_webclient':True,'real_python_http_service':True,

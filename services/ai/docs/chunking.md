@@ -1,6 +1,6 @@
 # KF2-017：可复现分段与来源定位
 
-状态：分段器已接入 `IndexWorker`；Python `python` 分支正在消费 draft.7 派发的 runtime profile 配置。独立 Q 审阅和 M 消费确认仍待完成。此模块本身是纯 Python 处理代码，不是 HTTP 入口或数据库写入者；lease-scoped 调度由 worker 执行，Chunk/向量写入经 Java gateway 完成。
+状态：分段器已接入 `IndexWorker`；Python `python` 分支消费 draft.8 派发的 runtime profile 配置。独立 Q 审阅和 M 消费确认仍待完成。此模块本身是纯 Python 处理代码，不是 HTTP 入口或数据库写入者；lease-scoped 调度由 worker 执行，Chunk/向量写入经 Java gateway 完成。
 
 ## 配置与不变量
 

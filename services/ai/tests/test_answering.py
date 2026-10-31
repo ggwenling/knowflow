@@ -17,7 +17,7 @@ from knowflow_ai.answering import (
 )
 from knowflow_ai.config import ConfigurationError
 from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
-from knowflow_ai.protocol import ContractConsumer, InvalidMessage
+from knowflow_ai.protocol import CONTRACT_VERSION, ContractConsumer, InvalidMessage
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -45,7 +45,7 @@ class FakeLlm:
 
 
 def _request():
-    return {"contract_version": "0.2.0-draft.7", "request_id": "answer-test-01",
+    return {"contract_version": CONTRACT_VERSION, "request_id": "answer-test-01",
             "question": "索引何时可检索？", "scope": {
                 "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
                 "snapshot_id": "snapshot-example-1", "indexes": [{
