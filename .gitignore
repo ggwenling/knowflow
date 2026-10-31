@@ -41,3 +41,7 @@ pilot-raw/
 .idea/
 *.swp
 *.log
+
+# 示例文件不含密钥，允许提交（否则上方的 .env.* 会误伤 .env.example）
+!.env.example
+!**/.env.example
