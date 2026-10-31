@@ -50,6 +50,24 @@ public class DocumentController {
                 .body(response);
     }
 
+    @PostMapping(path = "/api/v1/documents/{documentId}/contents",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    ResponseEntity<DocumentUploadAccepted> updateContent(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID documentId,
+            @RequestParam("file") MultipartFile file) {
+        DocumentUploadAccepted response = documents.updateContent(user, documentId, file);
+        return ResponseEntity.accepted().location(URI.create("/api/v1/tasks/" + response.taskId()))
+                .body(response);
+    }
+
+    @PostMapping("/api/v1/documents/{documentId}/rebuilds")
+    ResponseEntity<DocumentUploadAccepted> rebuild(
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID documentId) {
+        DocumentUploadAccepted response = documents.rebuild(user, documentId);
+        return ResponseEntity.accepted().location(URI.create("/api/v1/tasks/" + response.taskId()))
+                .body(response);
+    }
+
     @GetMapping("/api/v1/knowledge-bases/{knowledgeBaseId}/documents")
     DocumentListResponse list(
             @AuthenticationPrincipal AuthenticatedUser user,

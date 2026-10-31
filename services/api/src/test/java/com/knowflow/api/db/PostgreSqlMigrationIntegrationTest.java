@@ -67,7 +67,7 @@ class PostgreSqlMigrationIntegrationTest {
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
 
             var extensionVersion = queryString(
                     "SELECT extversion FROM pg_extension WHERE extname = 'vector'");
@@ -77,12 +77,12 @@ class PostgreSqlMigrationIntegrationTest {
                 insertValidKnowledgeGraph(app);
                 assertConstraintViolation(app, """
                         INSERT INTO knowflow.content_versions
-                            (id, document_id, version_no, source_sha256, source_format, object_key, byte_size)
+                            (id, document_id, version_no, source_sha256, source_format, object_key, byte_size, original_name)
                         VALUES (
                             '00000000-0000-0000-0000-000000000202',
                             '00000000-0000-0000-0000-000000000102', 2,
                             'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-                            'txt', 'objects/doc-102/content-201', 42)
+                            'txt', 'objects/doc-102/content-201', 42, 'notes.txt')
                         """, "23505");
                 assertConstraintViolation(app, """
                         INSERT INTO knowflow.users (id, email)
@@ -243,11 +243,11 @@ class PostgreSqlMigrationIntegrationTest {
                 """);
         execute(app, """
                 INSERT INTO knowflow.content_versions
-                    (id, document_id, version_no, source_sha256, source_format, object_key, byte_size)
+                    (id, document_id, version_no, source_sha256, source_format, object_key, byte_size, original_name)
                 VALUES ('00000000-0000-0000-0000-000000000201',
                         '00000000-0000-0000-0000-000000000102', 1,
                         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-                        'txt', 'objects/doc-102/content-201', 42)
+                        'txt', 'objects/doc-102/content-201', 42, 'notes.txt')
                 """);
         execute(app, """
                 UPDATE knowflow.documents

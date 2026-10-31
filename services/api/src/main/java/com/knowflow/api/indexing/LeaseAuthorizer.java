@@ -29,7 +29,7 @@ public final class LeaseAuthorizer {
 
         List<DocumentState> documents = jdbc.query("""
                 SELECT d.id, d.owner_user_id, d.knowledge_base_id, d.status AS document_status,
-                       d.current_content_version_id, kb.status AS knowledge_base_status,
+                       d.current_content_version_id, d.pending_content_version_id, kb.status AS knowledge_base_status,
                        cv.object_key, cv.byte_size, cv.source_sha256, cv.source_format
                   FROM knowflow.documents d
                   JOIN knowflow.indexing_tasks t ON t.document_id = d.id
@@ -45,6 +45,7 @@ public final class LeaseAuthorizer {
                 result.getObject("knowledge_base_id", UUID.class),
                 result.getString("document_status"),
                 result.getObject("current_content_version_id", UUID.class),
+                result.getObject("pending_content_version_id", UUID.class),
                 result.getString("knowledge_base_status"),
                 result.getString("object_key"),
                 result.getLong("byte_size"),
@@ -108,7 +109,8 @@ public final class LeaseAuthorizer {
                 || !document.id().equals(task.documentId())
                 || !document.ownerId().equals(task.ownerId())
                 || !document.knowledgeBaseId().equals(task.knowledgeBaseId())
-                || !task.contentVersionId().equals(document.currentContentVersionId())) {
+                || !task.contentVersionId().equals(document.currentContentVersionId())
+                && !task.contentVersionId().equals(document.pendingContentVersionId())) {
             throw ApiFailure.leaseRejected();
         }
         return new AuthorizedExecution(task.id(), task.ownerId(), task.knowledgeBaseId(),
@@ -126,7 +128,7 @@ public final class LeaseAuthorizer {
                                       String sourceFormat) {}
 
     private record DocumentState(UUID id, UUID ownerId, UUID knowledgeBaseId,
-                                 String documentStatus, UUID currentContentVersionId,
+                                 String documentStatus, UUID currentContentVersionId, UUID pendingContentVersionId,
                                  String knowledgeBaseStatus, String objectKey, long byteSize,
                                  String sourceSha256, String sourceFormat) {}
 

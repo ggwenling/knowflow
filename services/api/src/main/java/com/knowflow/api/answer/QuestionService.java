@@ -154,11 +154,12 @@ public class QuestionService {
         QuestionSnapshot snapshot = transactions.execute(status -> {
             registerDeadlineCheck(requestStartedAt, cancellation);
             setStatementTimeout(requestStartedAt, cancellation);
-            Integer ownerCount = jdbc.queryForObject("""
-                    SELECT count(*) FROM knowflow.knowledge_bases
+            List<UUID> ownedKnowledgeBases = jdbc.query("""
+                    SELECT id FROM knowflow.knowledge_bases
                      WHERE id = ? AND owner_user_id = ? AND status = 'ACTIVE'
-                    """, Integer.class, knowledgeBaseId, user.id());
-            if (ownerCount == null || ownerCount != 1) {
+                     FOR SHARE
+                    """, (row, index) -> row.getObject(1, UUID.class), knowledgeBaseId, user.id());
+            if (ownedKnowledgeBases.isEmpty()) {
                 throw ApiFailure.resourceNotFound();
             }
             setStatementTimeout(requestStartedAt, cancellation);
@@ -171,9 +172,9 @@ public class QuestionService {
                        AND iv.document_id = d.id
                        AND iv.content_version_id = d.current_content_version_id
                      WHERE d.knowledge_base_id = ? AND d.owner_user_id = ?
-                       AND d.status = 'ACTIVE' AND iv.status = 'READY'
+                       AND d.status = 'ACTIVE' AND iv.status = 'READY' AND iv.cleaned_at IS NULL
                      ORDER BY d.id
-                     LIMIT ?
+                     LIMIT ? FOR SHARE OF d
                     """, (result, row) -> new IndexRef(
                     result.getObject("document_id", UUID.class),
                     result.getObject("current_content_version_id", UUID.class),
@@ -223,12 +224,13 @@ public class QuestionService {
             setStatementTimeout(requestStartedAt, cancellation);
             List<Boolean> stillVisible = jdbc.query("""
                     SELECT d.status = 'ACTIVE' AND kb.status = 'ACTIVE'
-                           AND d.current_content_version_id = ?
-                           AND d.active_index_version_id = ? AND iv.status = 'READY'
+                           AND iv.status IN ('READY', 'RETIRED')
+                           AND iv.cleaned_at IS NULL
                       FROM knowflow.documents d
                       JOIN knowflow.knowledge_bases kb
                         ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
-                      JOIN knowflow.index_versions iv ON iv.id = d.active_index_version_id
+                      JOIN knowflow.index_versions iv ON iv.document_id = d.id
+                       AND iv.content_version_id = ? AND iv.id = ?
                      WHERE d.id = ? AND d.knowledge_base_id = ? AND d.owner_user_id = ?
                      FOR UPDATE OF d
                     """, (result, row) -> result.getBoolean(1), index.contentVersionId(),
@@ -312,9 +314,11 @@ public class QuestionService {
                   JOIN knowflow.knowledge_bases kb
                     ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
                    AND kb.status = 'ACTIVE'
+                  JOIN knowflow.index_versions iv ON iv.id = ch.index_version_id
+                   AND iv.document_id = ch.document_id AND iv.content_version_id = ch.content_version_id
+                   AND iv.status IN ('READY', 'RETIRED') AND iv.cleaned_at IS NULL
                  WHERE ch.id = ? AND ch.document_id = ? AND ch.content_version_id = ?
-                   AND ch.index_version_id = ? AND d.current_content_version_id = ?
-                   AND d.active_index_version_id = ch.index_version_id
+                   AND ch.index_version_id = ?
                 """, (result, row) -> new StoredChunk(result.getString("text_content"),
                 new AiAnswerResponse.Locator(result.getString("locator_kind"),
                         (Integer) result.getObject("source_page"),
@@ -323,8 +327,7 @@ public class QuestionService {
                         "text_range".equals(result.getString("locator_kind"))
                                 ? "unicode_code_point" : null)),
                 snapshot.knowledgeBaseId(), snapshot.ownerId(), source.chunkId(),
-                allowed.documentId(), allowed.contentVersionId(), allowed.indexVersionId(),
-                allowed.contentVersionId());
+                allowed.documentId(), allowed.contentVersionId(), allowed.indexVersionId());
         if (rows.isEmpty()) {
             throw ApiFailure.aiProcessingFailed();
         }

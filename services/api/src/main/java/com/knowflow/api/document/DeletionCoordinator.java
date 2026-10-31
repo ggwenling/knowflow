@@ -123,7 +123,7 @@ public class DeletionCoordinator {
         jdbc.update("""
                 UPDATE knowflow.documents
                    SET status = 'DELETED', deleted_at = CURRENT_TIMESTAMP,
-                       active_index_version_id = NULL, updated_at = CURRENT_TIMESTAMP
+                       active_index_version_id = NULL, pending_content_version_id = NULL, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND status = 'ACTIVE'
                 """, documentId);
     }

@@ -57,7 +57,8 @@ public class IndexingTaskQueue {
                     continue;
                 }
                 if (!"ACTIVE".equals(document.status())
-                        || !task.contentVersionId().equals(document.currentContentVersionId())) {
+                        || !task.contentVersionId().equals(document.currentContentVersionId())
+                        && !task.contentVersionId().equals(document.pendingContentVersionId())) {
                     cancelObsoleteTask(task);
                     continue;
                 }
@@ -141,6 +142,7 @@ public class IndexingTaskQueue {
             }
             failCandidate(task.indexVersionId(), "MODEL_FAILURE");
             if (task.attemptCount() >= properties.getMaxAttempts()) {
+                clearPending(task);
                 jdbc.update("""
                         UPDATE knowflow.indexing_tasks
                            SET status = 'FAILED', failure_code = 'MODEL_FAILURE',
@@ -167,14 +169,15 @@ public class IndexingTaskQueue {
 
     private DocumentLock lockDocument(UUID taskId) {
         List<DocumentLock> rows = jdbc.query("""
-                SELECT d.id, d.status, d.current_content_version_id
+                SELECT d.id, d.status, d.current_content_version_id, d.pending_content_version_id
                   FROM knowflow.documents d
                   JOIN knowflow.indexing_tasks t ON t.document_id = d.id
                  WHERE t.id = ?
                  FOR UPDATE OF d SKIP LOCKED
                 """, (result, row) -> new DocumentLock(
                 result.getObject("id", UUID.class), result.getString("status"),
-                result.getObject("current_content_version_id", UUID.class)), taskId);
+                result.getObject("current_content_version_id", UUID.class),
+                result.getObject("pending_content_version_id", UUID.class)), taskId);
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
@@ -244,6 +247,7 @@ public class IndexingTaskQueue {
 
     private void cancelObsoleteTask(TaskRow task) {
         failCandidate(task.indexVersionId(), "EXECUTION_CANCELLED");
+        clearPending(task);
         jdbc.update("""
                 UPDATE knowflow.indexing_tasks
                    SET status = 'CANCELLED', failure_code = NULL,
@@ -255,6 +259,7 @@ public class IndexingTaskQueue {
 
     private void failExhaustedTask(TaskRow task, String failureCode) {
         failCandidate(task.indexVersionId(), failureCode);
+        clearPending(task);
         jdbc.update("""
                 UPDATE knowflow.indexing_tasks
                    SET status = 'FAILED', failure_code = ?, lease_id = NULL,
@@ -262,6 +267,13 @@ public class IndexingTaskQueue {
                        finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND status IN ('QUEUED', 'RUNNING')
                 """, failureCode, task.id());
+    }
+
+    private void clearPending(TaskRow task) {
+        jdbc.update("""
+                UPDATE knowflow.documents SET pending_content_version_id = NULL
+                 WHERE id = ? AND pending_content_version_id = ?
+                """, task.documentId(), task.contentVersionId());
     }
 
     private void failCandidate(UUID indexVersionId, String failureCode) {
@@ -289,7 +301,8 @@ public class IndexingTaskQueue {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private record DocumentLock(UUID id, String status, UUID currentContentVersionId) {}
+    private record DocumentLock(UUID id, String status, UUID currentContentVersionId,
+                                UUID pendingContentVersionId) {}
 
     private record TaskRow(UUID id, UUID ownerId, UUID knowledgeBaseId, UUID documentId,
                            UUID contentVersionId, UUID indexVersionId, String status,

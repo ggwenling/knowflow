@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 import com.knowflow.api.auth.AuthService;
+import com.knowflow.api.document.VersionRetentionService;
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
 import com.knowflow.api.config.IndexingProperties;
@@ -33,13 +34,16 @@ public class CompletionService {
     private final TransactionTemplate transactions;
     private final LeaseAuthorizer leases;
     private final IndexingProperties properties;
+    private final VersionRetentionService retention;
 
     public CompletionService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                             LeaseAuthorizer leases, IndexingProperties properties) {
+                             LeaseAuthorizer leases, IndexingProperties properties,
+                             VersionRetentionService retention) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.leases = leases;
         this.properties = properties;
+        this.retention = retention;
     }
 
     public CompletionReceipt complete(UUID routeTaskId, CompletionRequest request) {
@@ -143,7 +147,7 @@ public class CompletionService {
         int updatedIndex = jdbc.update("""
                 UPDATE knowflow.index_versions
                    SET status = 'READY', chunk_count = ?, embedding_count = ?,
-                       manifest_sha256 = ?, ready_at = CURRENT_TIMESTAMP, failure_code = NULL
+                       manifest_sha256 = ?, ready_at = clock_timestamp(), failure_code = NULL
                  WHERE id = ? AND status = 'BUILDING'
                 """, actual.chunkCount(), actual.embeddingCount(), manifestHash,
                 execution.indexVersionId());
@@ -155,11 +159,13 @@ public class CompletionService {
                 """, UUID.class, execution.documentId());
         int updatedDocument = jdbc.update("""
                 UPDATE knowflow.documents
-                   SET active_index_version_id = ?, updated_at = CURRENT_TIMESTAMP
+                   SET active_index_version_id = ?, current_content_version_id = ?,
+                       original_name = (SELECT original_name FROM knowflow.content_versions WHERE id = ?),
+                       pending_content_version_id = NULL, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND status = 'ACTIVE'
-                   AND current_content_version_id = ?
-                """, execution.indexVersionId(), execution.documentId(),
-                execution.contentVersionId());
+                   AND (current_content_version_id = ? OR pending_content_version_id = ?)
+                """, execution.indexVersionId(), execution.contentVersionId(), execution.contentVersionId(),
+                execution.documentId(), execution.contentVersionId(), execution.contentVersionId());
         if (updatedDocument != 1) {
             throw ApiFailure.documentUnavailable();
         }
@@ -170,6 +176,7 @@ public class CompletionService {
                     """, previousActive, execution.documentId());
         }
         acceptCompletion(request, execution, resultHash, "SUCCEEDED", null, false, 0);
+        retention.cleanDocument(execution.documentId());
         return response(request, execution.indexVersionId(), "ACCEPTED");
     }
 
@@ -185,6 +192,12 @@ public class CompletionService {
                 < properties.getMaxAttempts();
         int backoff = retry ? BACKOFF_SECONDS.get(Math.min(requestAttemptCount(execution.taskId()) - 1,
                 BACKOFF_SECONDS.size() - 1)) : 0;
+        if (!retry) {
+            jdbc.update("""
+                    UPDATE knowflow.documents SET pending_content_version_id = NULL
+                     WHERE id = ? AND pending_content_version_id = ?
+                    """, execution.documentId(), execution.contentVersionId());
+        }
         acceptCompletion(request, execution, resultHash, retry ? "QUEUED" : "FAILED",
                 retry ? null : failure.code(), retry, backoff);
         return response(request, execution.indexVersionId(), "ACCEPTED");

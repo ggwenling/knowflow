@@ -34,9 +34,13 @@ public class SourceService {
                   JOIN knowflow.knowledge_bases kb
                     ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
                    AND kb.status = 'ACTIVE'
+                  JOIN knowflow.index_versions iv ON iv.id = qs.index_version_id
+                   AND iv.document_id = qs.document_id AND iv.content_version_id = qs.content_version_id
+                   AND iv.status IN ('READY', 'RETIRED') AND iv.cleaned_at IS NULL
                  WHERE qs.source_id = ? AND qs.owner_user_id = ?
-                   AND d.current_content_version_id = qs.content_version_id
-                   AND d.active_index_version_id = qs.index_version_id
+                   AND iv.id IN (SELECT kept.id FROM knowflow.index_versions kept
+                       WHERE kept.document_id = d.id AND kept.ready_at IS NOT NULL
+                       ORDER BY kept.ready_at DESC, kept.id DESC LIMIT 2)
                 """, (result, row) -> new SourceResponse(ApiError.CONTRACT_VERSION,
                 result.getObject("source_id", UUID.class),
                 result.getObject("document_id", UUID.class),

@@ -253,7 +253,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/tasks/")))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.8"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.9"))
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andReturn();
         JsonNode response = objectMapper.readTree(uploaded.getResponse().getContentAsByteArray());
@@ -1201,7 +1201,7 @@ class DocumentApiIntegrationTest {
         assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         String requestId = "source-read-regression";
         byte[] request = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.8", requestId, claim.lease()));
+                "0.2.0-draft.9", requestId, claim.lease()));
 
         var response = mockMvc.perform(post("/internal/v1/tasks/{taskId}/source",
                         claim.lease().taskId())
@@ -1211,7 +1211,7 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.APPLICATION_OCTET_STREAM)
                         .content(request))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.8"))
+                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.9"))
                 .andExpect(header().string("X-Request-ID", requestId))
                 .andExpect(header().string("X-Source-Format", "md"))
                 .andExpect(header().string("X-Source-SHA256",
@@ -1227,7 +1227,7 @@ class DocumentApiIntegrationTest {
                 claim.lease().pipelineProfileId(), claim.lease().leaseId(),
                 claim.lease().fencing(), "x".repeat(43));
         byte[] forgedRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.8", requestId, forged));
+                "0.2.0-draft.9", requestId, forged));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
                         .header("Authorization", "Bearer document-test-internal-secret-long-enough")
                         .header("X-Request-ID", requestId)
@@ -1392,7 +1392,7 @@ class DocumentApiIntegrationTest {
                         "BAAI/bge-m3", 1024),
                 1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
                         1, batch.batchId(), batch.batchSha256(), 1)));
-        CompletionRequest completion = new CompletionRequest("0.2.0-draft.8", requestId,
+        CompletionRequest completion = new CompletionRequest("0.2.0-draft.9", requestId,
                 claim.lease(), "SUCCEEDED",
                 new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
         byte[] body = objectMapper.writeValueAsBytes(completion);
@@ -1440,7 +1440,7 @@ class DocumentApiIntegrationTest {
         JsonNode uploaded = upload(token, knowledgeBaseId, "retry.txt", "retry this task");
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
-        CompletionRequest failure = new CompletionRequest("0.2.0-draft.8", "retryable-failure",
+        CompletionRequest failure = new CompletionRequest("0.2.0-draft.9", "retryable-failure",
                 first.lease(), "FAILED", null,
                 new CompletionRequest.Failure("MODEL_TIMEOUT", "model request timed out", true));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion", first.lease().taskId())
@@ -1601,6 +1601,140 @@ class DocumentApiIntegrationTest {
                 .isInstanceOf(com.knowflow.api.storage.ObjectStoreException.class);
     }
 
+    @Test
+    void contentUpdatePublishesAtomicallyAndRetainsOnlyTwoSuccessfulGenerations() throws Exception {
+        String token = register("update-owner@example.test").path("access_token").asText();
+        String kb = createKnowledgeBase(token, "Updates");
+        PublishedIndex first = publishDocument(token, kb, "first.txt", "First evidence.", "first-publish");
+        UUID document = first.lease().documentId();
+        AI_RESPONSE.set(request -> new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                "Answer [s1]", true, List.of(new AiAnswerResponse.AiSource("s1", document,
+                first.lease().contentVersionId(), first.lease().indexVersionId(), first.chunkId(),
+                new AiAnswerResponse.Locator("text_range", null, 0, 15, "unicode_code_point"),
+                "First evidence."))));
+        var asking = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
+                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"question\":\"What is the evidence?\"}")).andReturn();
+        JsonNode answer = objectMapper.readTree(mockMvc.perform(asyncDispatch(asking))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
+        String sourceId = answer.path("sources").get(0).path("source_id").asText();
+        JsonNode secondTask = updateContent(token, document, "second.md", "Second evidence.");
+        assertThat(jdbc.queryForObject("SELECT current_content_version_id FROM knowflow.documents WHERE id = ?",
+                UUID.class, document)).isEqualTo(first.lease().contentVersionId());
+        assertThat(jdbc.queryForObject("SELECT active_index_version_id FROM knowflow.documents WHERE id = ?",
+                UUID.class, document)).isEqualTo(first.lease().indexVersionId());
+        mockMvc.perform(multipart("/api/v1/documents/{id}/contents", document)
+                .file(new MockMultipartFile("file", "duplicate.txt", "text/plain", "Duplicate".getBytes(StandardCharsets.UTF_8)))
+                .header("Authorization", "Bearer " + token)).andExpect(status().isConflict());
+        PublishedIndex second = publishQueued(secondTask, "Second evidence.", "second-publish");
+        mockMvc.perform(get("/api/v1/sources/{id}", sourceId)
+                .header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.index_version_id").value(first.lease().indexVersionId().toString()));
+        mockMvc.perform(get("/api/v1/documents/{id}/contents/{version}/file", document,
+                first.lease().contentVersionId()).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                        org.hamcrest.Matchers.containsString("first.txt")));
+        publishQueued(updateContent(token, document, "third.txt", "Third evidence."), "Third evidence.", "third-publish");
+        mockMvc.perform(get("/api/v1/sources/{id}", sourceId)
+                .header("Authorization", "Bearer " + token)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/documents/{id}/contents/{version}/file", document,
+                first.lease().contentVersionId()).header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.chunks WHERE index_version_id = ?",
+                Integer.class, first.lease().indexVersionId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.questions WHERE status = 'SUCCEEDED'",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT cleaned_at IS NULL FROM knowflow.index_versions WHERE id = ?",
+                Boolean.class, second.lease().indexVersionId())).isTrue();
+    }
+
+    @Test
+    void failedUpdatePreservesOldAnswersAndRebuildRetriesReuseTheOriginalTask() throws Exception {
+        String token = register("update-failure@example.test").path("access_token").asText();
+        String other = register("update-other@example.test").path("access_token").asText();
+        String kb = createKnowledgeBase(token, "Failed update");
+        PublishedIndex first = publishDocument(token, kb, "first.txt", "Old evidence.", "old-publish");
+        UUID document = first.lease().documentId();
+        JsonNode pending = updateContent(token, document, "bad.txt", "Bad evidence.");
+        ClaimedIndexTask failed = indexingTasks.claimNext().orElseThrow();
+        assertThat(failed.lease().taskId().toString()).isEqualTo(pending.path("task_id").asText());
+        CompletionRequest failure = new CompletionRequest(ApiError.CONTRACT_VERSION, "update-failure",
+                failed.lease(), "FAILED", null,
+                new CompletionRequest.Failure("EMPTY_CONTENT", "No evidence", false));
+        mockMvc.perform(post("/internal/v1/tasks/{id}/completion", failed.lease().taskId())
+                .header("Authorization", "Bearer " + AI_SECRET).header("X-Request-ID", "update-failure")
+                .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsBytes(failure)))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT pending_content_version_id FROM knowflow.documents WHERE id = ?",
+                UUID.class, document)).isNull();
+        assertThat(jdbc.queryForObject("SELECT active_index_version_id FROM knowflow.documents WHERE id = ?",
+                UUID.class, document)).isEqualTo(first.lease().indexVersionId());
+        AI_RESPONSE.set(request -> {
+            assertThat(request.scope().indexes().getFirst().indexVersionId())
+                    .isEqualTo(first.lease().indexVersionId());
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(), "No answer", false, List.of());
+        });
+        var asking = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
+                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"question\":\"Is the old index usable?\"}")).andReturn();
+        mockMvc.perform(asyncDispatch(asking)).andExpect(status().isOk());
+        JsonNode rebuild = rebuild(token, document);
+        ClaimedIndexTask running = indexingTasks.claimNext().orElseThrow();
+        assertThat(rebuild(token, document).path("task_id").asText()).isEqualTo(rebuild.path("task_id").asText());
+        assertThat(running.lease().contentVersionId()).isEqualTo(first.lease().contentVersionId());
+        mockMvc.perform(post("/api/v1/documents/{id}/rebuilds", document)
+                .header("Authorization", "Bearer " + other)).andExpect(status().isNotFound());
+        mockMvc.perform(multipart("/api/v1/documents/{id}/contents", document)
+                .file(new MockMultipartFile("file", "other.txt", "text/plain", "Other".getBytes(StandardCharsets.UTF_8)))
+                .header("Authorization", "Bearer " + other)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void acceptedQuestionCompletesFromRetiredSnapshotEvenAfterTwoMorePublications() throws Exception {
+        String token = register("snapshot-update@example.test").path("access_token").asText();
+        String kb = createKnowledgeBase(token, "Snapshot");
+        PublishedIndex first = publishDocument(token, kb, "first.txt", "First evidence.", "snapshot-first");
+        UUID document = first.lease().documentId();
+        CountDownLatch gate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(gate);
+        AI_RESPONSE.set(request -> new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                "Answer [s1]", true, List.of(new AiAnswerResponse.AiSource("s1", document,
+                first.lease().contentVersionId(), first.lease().indexVersionId(), first.chunkId(),
+                new AiAnswerResponse.Locator("text_range", null, 0, 15, "unicode_code_point"),
+                "First evidence."))));
+        var asking = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
+                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"question\":\"Use the accepted snapshot\"}")).andReturn();
+        try {
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            publishQueued(updateContent(token, document, "second.txt", "Second evidence."),
+                    "Second evidence.", "snapshot-second");
+            publishQueued(updateContent(token, document, "third.txt", "Third evidence."),
+                    "Third evidence.", "snapshot-third");
+            assertThat(jdbc.queryForObject("SELECT cleaned_at IS NULL FROM knowflow.index_versions WHERE id = ?",
+                    Boolean.class, first.lease().indexVersionId())).isTrue();
+        } finally {
+            gate.countDown();
+        }
+        mockMvc.perform(asyncDispatch(asking)).andExpect(status().isOk());
+        new VersionRetentionService(jdbc, transactions, indexingProperties).cleanDocument(document);
+        assertThat(jdbc.queryForObject("SELECT cleaned_at IS NOT NULL FROM knowflow.index_versions WHERE id = ?",
+                Boolean.class, first.lease().indexVersionId())).isTrue();
+    }
+
+    private JsonNode updateContent(String token, UUID document, String name, String text) throws Exception {
+        return objectMapper.readTree(mockMvc.perform(multipart("/api/v1/documents/{id}/contents", document)
+                .file(new MockMultipartFile("file", name, "text/plain", text.getBytes(StandardCharsets.UTF_8)))
+                .header("Authorization", "Bearer " + token)).andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsByteArray());
+    }
+
+    private JsonNode rebuild(String token, UUID document) throws Exception {
+        return objectMapper.readTree(mockMvc.perform(post("/api/v1/documents/{id}/rebuilds", document)
+                .header("Authorization", "Bearer " + token)).andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsByteArray());
+    }
+
     private void postBatch(IndexBatchRequest batch, String requestId) throws Exception {
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/index-batches",
                         batch.lease().taskId())
@@ -1615,6 +1749,10 @@ class DocumentApiIntegrationTest {
     private PublishedIndex publishDocument(String token, String knowledgeBaseId, String filename,
                                            String text, String requestId) throws Exception {
         JsonNode uploaded = upload(token, knowledgeBaseId, filename, text);
+        return publishQueued(uploaded, text, requestId);
+    }
+
+    private PublishedIndex publishQueued(JsonNode uploaded, String text, String requestId) throws Exception {
         ClaimedIndexTask claimed = indexingTasks.claimNext().orElseThrow();
         assertThat(claimed.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         IndexBatchRequest batch = createBatch(claimed.lease(), requestId, UUID.randomUUID(), text);
@@ -1843,7 +1981,7 @@ class DocumentApiIntegrationTest {
                     java.util.Collections.nCopies(1024, BigDecimal.ZERO)));
             start = end;
         }
-        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.8", requestId, lease,
+        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.9", requestId, lease,
                 batchId, 1, "0".repeat(64), chunks);
         String digest = IndexBatchDigest.calculate(candidate).sha256();
         return new IndexBatchRequest(candidate.contractVersion(), candidate.requestId(),
@@ -1890,7 +2028,7 @@ class DocumentApiIntegrationTest {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.8","email":"%s",
+                                {"contract_version":"0.2.0-draft.9","email":"%s",
                                  "password":"synthetic-document-password"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
@@ -1902,7 +2040,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.8","name":"%s"}
+                                {"contract_version":"0.2.0-draft.9","name":"%s"}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());
