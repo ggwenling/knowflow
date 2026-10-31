@@ -1,4 +1,6 @@
 """Deterministic, source-preserving text segmentation for KF2-017."""
+from bisect import bisect_left, bisect_right
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from hashlib import sha256
 import re
@@ -70,52 +72,71 @@ def _boundaries(text: str) -> tuple[tuple[int, int], ...]:
     return tuple(sorted(found.items()))
 
 
+def _index_boundaries(boundaries: tuple[tuple[int, int], ...]) -> tuple[tuple[int, ...], ...]:
+    positions = ([], [], [])
+    for position, priority in boundaries:
+        positions[priority - 1].append(position)
+    return tuple(tuple(group) for group in positions)
+
+
 def _choose_end(text: str, start: int, hard_end: int,
-                boundaries: tuple[tuple[int, int], ...]) -> int:
+                boundaries: tuple[tuple[int, int], ...],
+                indexed: tuple[tuple[int, ...], ...] | None = None) -> int:
     if hard_end == len(text):
         return hard_end
     floor = start + max(1, (hard_end - start) // 2)
-    candidates = [(position, priority) for position, priority in boundaries
-                  if floor <= position <= hard_end]
-    if not candidates:
-        return hard_end
+    if indexed is None:
+        indexed = _index_boundaries(boundaries)
     # Prefer paragraph/title, sentence, and whitespace boundaries in that order.
-    priority = max(score for _, score in candidates)
-    return max(position for position, score in candidates if score == priority)
+    for positions in reversed(indexed):
+        left = bisect_left(positions, floor)
+        right = bisect_right(positions, hard_end)
+        if left < right:
+            return positions[right - 1]
+    return hard_end
 
 
 def _choose_overlap_start(end: int, start: int, text_length: int, overlap: int,
-                          boundaries: tuple[tuple[int, int], ...]) -> int:
+                          boundaries: tuple[tuple[int, int], ...],
+                          indexed: tuple[tuple[int, ...], ...] | None = None) -> int:
     if overlap == 0:
         return end
     target = max(start + 1, end - overlap)
     # Snap forward to a nearby meaningful boundary so chunks do not start inside
     # a paragraph or sentence. This keeps the overlap at or below its configured cap.
-    nearby = [position for position, priority in boundaries
-              if target <= position < end and priority >= 2]
+    if indexed is None:
+        indexed = _index_boundaries(boundaries)
+    nearby = []
+    for positions in indexed[1:]:
+        index = bisect_left(positions, target)
+        if index < len(positions) and positions[index] < end:
+            nearby.append(positions[index])
     return min(nearby) if nearby else target
 
 
-def _split_text(text: str, maximum: int, overlap: int) -> tuple[tuple[int, int], ...]:
+def _iter_split_text(text: str, maximum: int, overlap: int) -> Iterator[tuple[int, int]]:
     if not text:
-        return ()
+        return
     boundaries = _boundaries(text)
-    spans: list[tuple[int, int]] = []
+    indexed = _index_boundaries(boundaries)
     start = 0
     while start < len(text):
         hard_end = min(start + maximum, len(text))
-        end = _choose_end(text, start, hard_end, boundaries)
+        end = _choose_end(text, start, hard_end, boundaries, indexed)
         if end <= start:
             raise ChunkingFailure("CHUNKING_NO_PROGRESS")
-        spans.append((start, end))
+        yield start, end
         if end == len(text):
             break
-        next_start = _choose_overlap_start(end, start, len(text), overlap, boundaries)
+        next_start = _choose_overlap_start(end, start, len(text), overlap, boundaries, indexed)
         if next_start <= start or next_start >= end:
             # Very short final intervals may not contain the configured overlap.
             next_start = end
         start = next_start
-    return tuple(spans)
+
+
+def _split_text(text: str, maximum: int, overlap: int) -> tuple[tuple[int, int], ...]:
+    return tuple(_iter_split_text(text, maximum, overlap))
 
 
 def _block_locator(block: TextBlock, start: int, end: int, source_format: str) -> dict[str, int | str]:
@@ -130,16 +151,18 @@ def _block_locator(block: TextBlock, start: int, end: int, source_format: str) -
             "unit": "unicode_code_point"}
 
 
-def chunk_document(document: ParsedDocument, config: ChunkingConfig | None = None) -> tuple[Chunk, ...]:
-    """Split parsed source blocks without normalizing or losing source positions."""
+def _iter_document_chunks(document: ParsedDocument,
+                          config: ChunkingConfig | None = None) -> Iterator[Chunk]:
+    """Yield chunks in source order without normalizing source positions."""
     config = config or ChunkingConfig()
     if document.format not in ("txt", "md", "pdf"):
         raise ChunkingFailure("UNSUPPORTED_SOURCE_FORMAT")
-    results: list[Chunk] = []
+    sequence = 0
     for block in document.blocks:
         if not block.text:
             continue
-        for start, end in _split_text(block.text, config.max_codepoints, config.overlap_codepoints):
+        for start, end in _iter_split_text(
+                block.text, config.max_codepoints, config.overlap_codepoints):
             text = block.text[start:end]
             locator = _block_locator(block, start, end, document.format)
             identity = "\0".join((
@@ -149,10 +172,15 @@ def chunk_document(document: ParsedDocument, config: ChunkingConfig | None = Non
                 sha256(text.encode("utf-8")).hexdigest(),
             ))
             chunk_id = "chunk-" + sha256(identity.encode("utf-8")).hexdigest()
-            results.append(Chunk(
-                chunk_id=chunk_id, sequence=len(results), document_id=document.document_id,
+            yield Chunk(
+                chunk_id=chunk_id, sequence=sequence, document_id=document.document_id,
                 content_version_id=document.content_version_id, file_id=document.file_id,
                 parser_profile=document.parser_profile, chunking_profile_id=config.profile_id,
                 text=text, text_sha256=sha256(text.encode("utf-8")).hexdigest(), locator=locator,
-            ))
-    return tuple(results)
+            )
+            sequence += 1
+
+
+def chunk_document(document: ParsedDocument, config: ChunkingConfig | None = None) -> tuple[Chunk, ...]:
+    """Split parsed source blocks without normalizing or losing source positions."""
+    return tuple(_iter_document_chunks(document, config))

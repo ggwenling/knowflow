@@ -25,43 +25,57 @@ class _DatabaseQueryCancelled(Exception):
     pass
 
 
+class _DatabaseDeadlineExceeded(Exception):
+    pass
+
+
 class _DatabaseCancellation:
     def __init__(self):
-        self._lock = threading.Lock()
-        self._connection = None
-        self._cancelled = False
-
-    def register(self, connection):
-        with self._lock:
-            cancelled = self._cancelled
-            if not cancelled:
-                self._connection = connection
-        if cancelled:
-            self._cancel_connection(connection)
-
-    def unregister(self, connection):
-        with self._lock:
-            if self._connection is connection:
-                self._connection = None
+        self._event = threading.Event()
 
     def is_cancelled(self):
-        with self._lock:
-            return self._cancelled
+        return self._event.is_set()
 
     def cancel(self):
-        with self._lock:
-            self._cancelled = True
-            connection = self._connection
-        if connection is not None:
-            self._cancel_connection(connection)
+        self._event.set()
 
-    @staticmethod
-    def _cancel_connection(connection):
-        try:
-            connection.cancel_safe(timeout=1.0)
-        except psycopg.Error:
-            # The query retains its server-side statement timeout as a fallback.
-            return
+
+class _CancellableConnection(psycopg.Connection):
+    def set_request_control(self, cancellation, deadline):
+        self._cancellation = cancellation
+        self._deadline = deadline
+
+    def wait(self, gen, interval=0.1, timeout=None):
+        cancellation = getattr(self, "_cancellation", None)
+        deadline = getattr(self, "_deadline", None)
+        if cancellation is None and deadline is None:
+            return super().wait(gen, interval=interval, timeout=timeout)
+
+        def check_request_control():
+            if cancellation is not None and cancellation.is_cancelled():
+                raise _DatabaseQueryCancelled
+            if deadline is not None and time.monotonic() >= deadline:
+                raise _DatabaseDeadlineExceeded
+
+        def checked_generator():
+            try:
+                try:
+                    ready = next(gen)
+                except StopIteration as result:
+                    return result.value
+                while True:
+                    check_request_control()
+                    received = yield ready
+                    check_request_control()
+                    try:
+                        ready = gen.send(received)
+                    except StopIteration as result:
+                        return result.value
+            finally:
+                gen.close()
+
+        return super().wait(checked_generator(), interval=min(interval, 0.05),
+                            timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -205,13 +219,11 @@ class ReadOnlyRetriever:
                 raise TimeoutError
             options = ("-c default_transaction_read_only=on "
                        f"-c statement_timeout={initial_statement_timeout_ms}")
-        with psycopg.connect(
-                database_url,
-                options=options, connect_timeout=connect_timeout) as conn, \
-                conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
-            if cancellation is not None:
-                cancellation.register(conn)
-            try:
+        conn = _CancellableConnection.connect(
+            database_url, options=options, connect_timeout=connect_timeout)
+        conn.set_request_control(cancellation, deadline)
+        try:
+            with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
                 if cancellation is not None and cancellation.is_cancelled():
                     raise _DatabaseQueryCancelled
                 if deadline is not None:
@@ -227,9 +239,9 @@ class ReadOnlyRetriever:
                     raise _DatabaseQueryCancelled
                 cursor.execute(query, params)
                 return cursor.fetchall()
-            finally:
-                if cancellation is not None:
-                    cancellation.unregister(conn)
+        finally:
+            # close() discards the client connection without a network commit/rollback.
+            conn.close()
 
     @staticmethod
     def _statement_timeout_ms(deadline: float) -> int:
@@ -310,8 +322,17 @@ class ReadOnlyRetriever:
             rows = await asyncio.shield(database_task)
         except TimeoutError:
             raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
+        except _DatabaseDeadlineExceeded:
+            raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
         except asyncio.CancelledError:
-            await asyncio.to_thread(cancellation.cancel)
+            cancellation.cancel()
+            while not database_task.done():
+                try:
+                    await asyncio.shield(database_task)
+                except asyncio.CancelledError:
+                    cancellation.cancel()
+                except Exception:
+                    break
             await asyncio.gather(database_task, return_exceptions=True)
             raise
         except _DatabaseQueryCancelled:

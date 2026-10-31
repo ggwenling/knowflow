@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import knowflow_ai.chunking as chunking
 from knowflow_ai.chunking import ChunkingConfig, ChunkingFailure, chunk_document
 from knowflow_ai.parsing import parse_document
 
@@ -106,3 +107,61 @@ def test_chunk_identity_changes_when_content_version_or_profile_changes():
     assert chunk_document(changed_version)[0].chunk_id != original.chunk_id
     assert changed_profile.chunking_profile_id != original.chunking_profile_id
     assert changed_profile.chunk_id != original.chunk_id
+
+
+def test_chunk_outputs_match_pre_fix_golden_vectors():
+    cases = [
+        ("txt", "First sentence. Next sentence!🙂\n\nSecond paragraph with 中文 and emoji🙂.",
+         ChunkingConfig(), "59c5c241fa7c97134921167ebd707129b77bbd73f3af683077f279660af8d547"),
+        ("md", "# 标题🙂\n\n第一段有中文。" + "甲乙丙丁" * 7
+         + "\n\n## 下一节\r\n内容保持原样。", ChunkingConfig(16, 4),
+         "f423c0e79fe3169430e500b731ff59451f3d8823b183f2d357c2e2641296ae6a"),
+        ("txt", "x x🙂", ChunkingConfig(1, 0),
+         "9283a3a90c2efb29918984065858eb70f752ca0e5a59f2dec2f8dca5499662d7"),
+    ]
+    for format, text, config, expected in cases:
+        parsed = parse_document(text.encode("utf-8"), format=format, **IDS)
+        chunks = chunk_document(parsed, config)
+        payload = [{"chunk_id": chunk.chunk_id, "sequence": chunk.sequence,
+                    "text": chunk.text, "text_sha256": chunk.text_sha256,
+                    "locator": chunk.locator,
+                    "chunking_profile_id": chunk.chunking_profile_id} for chunk in chunks]
+        digest = sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                                   separators=(",", ":")).encode()).hexdigest()
+        assert digest == expected
+
+    parsed_pdf = parse_document(
+        (ROOT / "services/ai/tests/fixtures/pdf/chinese-pages.pdf").read_bytes(),
+        format="pdf", **IDS)
+    chunks = chunk_document(parsed_pdf, ChunkingConfig(8, 2))
+    payload = [{"chunk_id": chunk.chunk_id, "sequence": chunk.sequence,
+                "text": chunk.text, "text_sha256": chunk.text_sha256,
+                "locator": chunk.locator,
+                "chunking_profile_id": chunk.chunking_profile_id} for chunk in chunks]
+    digest = sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                               separators=(",", ":")).encode()).hexdigest()
+    assert digest == "c8ec0c1422d95b81ea568ec5e3e3392dea1f8d666ef585c627e2f8c1edc7e69b"
+
+
+def test_one_codepoint_profile_uses_indexed_boundary_lookups(monkeypatch):
+    calls = 0
+    original_left = chunking.bisect_left
+    original_right = chunking.bisect_right
+
+    def count_calls(function):
+        def counted(*args):
+            nonlocal calls
+            calls += 1
+            return function(*args)
+        return counted
+
+    monkeypatch.setattr(chunking, "bisect_left", count_calls(original_left))
+    monkeypatch.setattr(chunking, "bisect_right", count_calls(original_right))
+    text = "x " * 8_000
+    parsed = parse_document(text.encode(), format="txt", **IDS)
+
+    chunks = chunk_document(parsed, ChunkingConfig(1, 0))
+
+    assert len(chunks) == len(text)
+    assert 0 < calls <= len(chunks) * 6
+    assert [chunk.sequence for chunk in chunks] == list(range(len(text)))

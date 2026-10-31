@@ -8,7 +8,7 @@ import uuid
 
 from .adapters import ProcessingError
 from .batch_digest import batch_sha256, manifest_sha256
-from .chunking import ChunkingConfig, ChunkingFailure, chunk_document
+from .chunking import ChunkingConfig, ChunkingFailure, _iter_document_chunks
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .java_client import JavaGateway, JavaGatewayError
@@ -219,9 +219,7 @@ class IndexWorker:
             file_id=dispatch["source"]["file_id"])
         if parsed.file_sha256 != dispatch["source"]["sha256"]:
             raise ProcessingError("SOURCE_UNAVAILABLE", 502, retryable=False)
-        chunks = chunk_document(parsed, chunking)
-        if not chunks:
-            raise ParseFailure("EMPTY_DOCUMENT")
+        chunks = _iter_document_chunks(parsed, chunking)
         batches: list[dict] = []
         model_profile = "BAAI/bge-m3"
         chunk_namespace = uuid.uuid5(uuid.NAMESPACE_URL, lease["index_version_id"])
@@ -263,8 +261,9 @@ class IndexWorker:
                 pending = candidate
 
         embedding_batch_size = profile["embedding_max_batch_items"]
-        for start in range(0, len(chunks), embedding_batch_size):
-            source_chunks = chunks[start:start + embedding_batch_size]
+        chunk_count = 0
+
+        async def embed_batch(source_chunks):
             result = await embedding.embed([chunk.text for chunk in source_chunks],
                                            request_id=str(uuid.uuid4()))
             for chunk, vector in zip(source_chunks, result["data"], strict=True):
@@ -276,13 +275,26 @@ class IndexWorker:
                     "locator": dict(chunk.locator),
                     "embedding": vector["embedding"],
                 })
+        source_chunks = []
+        for chunk in chunks:
+            source_chunks.append(chunk)
+            chunk_count += 1
+            if len(source_chunks) == embedding_batch_size:
+                await embed_batch(source_chunks)
+                source_chunks = []
+            if chunk_count % 64 == 0:
+                await asyncio.sleep(0)
+        if source_chunks:
+            await embed_batch(source_chunks)
+        if chunk_count == 0:
+            raise ParseFailure("EMPTY_DOCUMENT")
         if pending:
             await write_batch(pending)
 
         manifest = {
-            "chunk_count": len(chunks), "embedding_count": len(chunks),
+            "chunk_count": chunk_count, "embedding_count": chunk_count,
             "embedding_dimensions": 1024, "embedding_model_profile_id": model_profile,
-            "manifest_sha256": manifest_sha256(lease, model_profile, batches, len(chunks)),
+            "manifest_sha256": manifest_sha256(lease, model_profile, batches, chunk_count),
         }
         completion = {"contract_version": CONTRACT_VERSION, "request_id": str(uuid.uuid4()),
                       "lease": lease, "outcome": "SUCCEEDED", "manifest": manifest}

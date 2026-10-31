@@ -1,8 +1,8 @@
 {
-  "recorded_at": "2026-10-30T12:14:17.281629+08:00",
+  "recorded_at": "2026-10-31T12:43:16.136454+08:00",
   "parser_profile": "text-v1+pypdf-6.21.4",
-  "parser_sha256": "57edf9d3150c6e6c726cb44b7ca294142f2b3c7fdda62862b975e735978d1f9e",
-  "git_head_at_run": "fc98d575d1a1b3095adaff867c5fa7a2edd1010f",
+  "parser_sha256": "3db7efc136e8d9db0122bd65e6877610517edbd82df4412cb23a2e5ea1976f64",
+  "git_head_at_run": "15b09b9701ab9ff33c61da439f008058ba95ad24",
   "checks": [
     {
       "id": "api",
