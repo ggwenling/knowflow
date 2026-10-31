@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.6`；当前 Schema SHA-256 `d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`。`local` 分支从 `main` 建立，包含 Java 与 Python 的未提交集成开发；draft.6 对模型配置标识的语法作了版本化修正。Java/Python 单测与真实双进程结果仍按本地验收记录更新；本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
+状态：`DRAFT 0.2.0-draft.7`；Schema SHA-256 `58c4ae3e5d7052abd29e819295a783afe90e0a3104a2ad2a8220407ee2945f9f`。draft.7 增加 `IndexDispatch.runtime_profile` 的有效配置上限，并要求 Java 按候选 `pipeline_profile_id` 派发匹配配置；Python 严格消费者须合入本契约提交并更新版本及 Schema 哈希后才算完成消费。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
 
 ## 公开入口：浏览器 → Java
 
@@ -40,13 +40,17 @@ Java 已实现的文件代理为 `GET /api/v1/documents/{document_id}/contents/{
 
 内部接口不公开给浏览器；服务认证需在读取任务范围前验证。以下结构统一携带契约版本。
 
+### draft.7 索引运行配置
+
+`IndexDispatch.runtime_profile_id` 与 `runtime_profile` 由 Java 部署配置 `knowflow.indexing.*` 注册，后者传递该次派发的有效配置：`pipeline_profile_id`、`chunk_max_codepoints`、`overlap_codepoints`、`embedding_max_batch_items`、`index_max_batch_chunks` 和 `index_max_batch_bytes`。当前默认值依次为 `runtime-default`、`knowflow-index-v1`、800、100、16、32 和 1,048,576 字节；各上限可在 Schema 允许范围内调小。Java 在创建候选与派发前都使用同一 pipeline profile 配置，并拒绝候选与派发身份不一致；Python 应拒绝未注册的运行配置、pipeline 身份不一致或超出任一派发上限的索引操作。调整分段语义必须注册新的 pipeline profile；这些数值是本次派发允许使用的上限，不表示实际容量基准。
+
 | 方向 / 候选入口 | 作用 | 校验与失败 |
 |---|---|---|
 | Java 内部调度器，数据库事务 | 原子领取候选任务，建立执行租约 | 仅一个当前有效租约；每次重试递增 fencing，写入新令牌哈希；不向 Python 开放通用领取权限 |
 | Java → Python `GET /internal/v1/health` | 验证服务进程可接收内部 HTTP 请求 | 要求服务认证；返回 `InternalHealth`，回传 `X-Request-ID`；不触发模型、数据库或业务依赖探测 |
-| Java → Python `POST /internal/v1/index-executions` | 派发已有租约的索引任务 | `IndexDispatch`；Python 接受后返回 `202 IndexExecutionReceipt`；文件通过受限服务读取，不接收任意 URL/本地路径 |
+| Java → Python `POST /internal/v1/index-executions` | 派发已有租约的索引任务 | `IndexDispatch` 携带已注册的 `runtime_profile_id` 与 `runtime_profile` 有效上限；Java 确认候选 pipeline 与配置一致，Python 仅按这些上限处理；返回 `202 IndexExecutionReceipt`；不接收任意 URL/本地路径 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/source` | 读取当前执行绑定的原始对象 | 请求体为 `SourceReadRequest`；路由 ID 必须匹配租约任务；成功响应为原始字节流及契约版本、格式、摘要、长度头，不返回 bucket/object key；最大 8 MiB |
-| Python → Java `POST /internal/v1/tasks/{task_id}/index-batches` | 写入有界候选 Chunk/向量批次 | `IndexBatch`；最多 32 条且 JSON 请求体不超过 1 MiB；响应 `IndexBatchReceipt`；授权检查和全部写入在同一事务 |
+| Python → Java `POST /internal/v1/tasks/{task_id}/index-batches` | 写入有界候选 Chunk/向量批次 | `IndexBatch`；条数与 JSON 请求体字节数均不得超过派发的 `runtime_profile` 上限（全局最大 32 条 / 1 MiB）；响应 `IndexBatchReceipt`；授权检查和全部写入在同一事务 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/heartbeat` | 延长当前租约 | `Heartbeat`；任务/版本/令牌/fencing/当前有效期均匹配；过期拒绝，延长值由 Java 决定；成功返回 `HeartbeatReceipt` 和数据库计算的新到期时间 |
 | Python → Java `POST /internal/v1/tasks/{task_id}/completion` | 提交成功或失败结果 | `Completion`；Java 自行核实索引数据，不信任结果计数；已删拒绝；相同已接收结果幂等应答 |
 | Java → Python `POST /internal/v1/index-executions/{task_id}/cancel` | 取消指定的执行代次 | `CancelExecution` 只包含 task、lease 与 fencing，不传执行密钥；B 按精确代次取消，旧取消不能影响后续代次；幂等返回 |

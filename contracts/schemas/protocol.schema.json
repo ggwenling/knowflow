@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.6",
-  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md.",
+  "title": "KnowFlow proposed messages 0.2.0-draft.7",
+  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.6"
+      "const": "0.2.0-draft.7"
     },
     "Identifier": {
       "type": "string",
@@ -134,6 +134,48 @@
         }
       }
     },
+    "RuntimeProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pipeline_profile_id",
+        "chunk_max_codepoints",
+        "overlap_codepoints",
+        "embedding_max_batch_items",
+        "index_max_batch_chunks",
+        "index_max_batch_bytes"
+      ],
+      "properties": {
+        "pipeline_profile_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "chunk_max_codepoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 800
+        },
+        "overlap_codepoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 799
+        },
+        "embedding_max_batch_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "index_max_batch_chunks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "index_max_batch_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        }
+      }
+    },
     "IndexDispatch": {
       "type": "object",
       "additionalProperties": false,
@@ -143,7 +185,8 @@
         "lease",
         "lease_expires_at",
         "source",
-        "runtime_profile_id"
+        "runtime_profile_id",
+        "runtime_profile"
       ],
       "properties": {
         "contract_version": {
@@ -185,6 +228,9 @@
         },
         "runtime_profile_id": {
           "$ref": "#/$defs/Identifier"
+        },
+        "runtime_profile": {
+          "$ref": "#/$defs/RuntimeProfile"
         }
       }
     },

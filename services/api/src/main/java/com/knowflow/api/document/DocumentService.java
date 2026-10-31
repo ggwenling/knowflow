@@ -11,6 +11,7 @@ import java.util.UUID;
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
 import com.knowflow.api.security.AuthenticatedUser;
+import com.knowflow.api.config.IndexingProperties;
 import com.knowflow.api.storage.ObjectStoreException;
 import com.knowflow.api.storage.ObjectStore;
 import org.springframework.context.annotation.Profile;
@@ -27,20 +28,22 @@ public class DocumentService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DocumentService.class);
     private static final int MAX_LIMIT = 100;
     private static final int MAX_OFFSET = 1_000_000;
-    private static final String PIPELINE_PROFILE = "knowflow-index-v1";
     private static final String EMBEDDING_PROFILE = "BAAI/bge-m3";
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ObjectStore objectStore;
     private final DeletionCoordinator deletions;
+    private final IndexingProperties indexingProperties;
 
     public DocumentService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                           ObjectStore objectStore, DeletionCoordinator deletions) {
+                           ObjectStore objectStore, DeletionCoordinator deletions,
+                           IndexingProperties indexingProperties) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.objectStore = objectStore;
         this.deletions = deletions;
+        this.indexingProperties = indexingProperties;
     }
 
     public DocumentUploadAccepted upload(AuthenticatedUser user, UUID knowledgeBaseId,
@@ -112,7 +115,7 @@ public class DocumentService {
                              generation, embedding_model_profile_id)
                         VALUES (?, ?, ?, ?, 1, ?)
                         """, indexVersionId, documentId, contentVersionId,
-                        PIPELINE_PROFILE, EMBEDDING_PROFILE);
+                        indexingProperties.getPipelineProfileId(), EMBEDDING_PROFILE);
                 jdbc.update("""
                         INSERT INTO knowflow.indexing_tasks
                             (id, owner_user_id, knowledge_base_id, document_id,
