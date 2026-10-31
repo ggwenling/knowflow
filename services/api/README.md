@@ -12,6 +12,8 @@ KF2-011 使用 Flyway、PostgreSQL 16 和 pgvector 0.8.1。先由数据库管理
 
 从仓库根启动：
 
+非流式问答采用 30 秒整请求预算（含索引快照和 AI 调用）；AI HTTP 调用只使用剩余时间。问答通过有界后台池异步执行，超时返回 504 并记录失败，异步请求完成/断开时取消 Java 下游请求，并将已创建记录标为取消。
+
 ```sh
 cd services/api
 export KNOWFLOW_INTERNAL_SHARED_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"

@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.7`；Schema SHA-256 `58c4ae3e5d7052abd29e819295a783afe90e0a3104a2ad2a8220407ee2945f9f`。draft.7 增加 `IndexDispatch.runtime_profile` 的有效配置上限，并要求 Java 按候选 `pipeline_profile_id` 派发匹配配置；Python 严格消费者须合入本契约提交并更新版本及 Schema 哈希后才算完成消费。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
+状态：`DRAFT 0.2.0-draft.8`；Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。draft.8 延续 draft.7 的 `IndexDispatch.runtime_profile` 配置上限，并定义内容更新及同内容索引重建的原子发布 API。所有共享报文的 `contract_version` 升至 draft.8；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
 
 ## 公开入口：浏览器 → Java
 
@@ -12,9 +12,10 @@
 | `POST /api/v1/knowledge-bases`、`GET /api/v1/knowledge-bases` | 创建/分页列表 | `CreateKnowledgeBase` 不接受 owner；列表只返回当前所有者资源 |
 | `GET/DELETE /api/v1/knowledge-bases/{kb_id}` | 详情/逻辑删除 | 不存在、他人或已删统一 404；删除知识库同步撤销其文档可见性 |
 | `POST /api/v1/knowledge-bases/{kb_id}/documents` | 202，文档与任务标识 | TXT/MD/文本 PDF；文件 8 MiB、PDF 200 页、文本 200,000 码点开发上限；对象路径由 Java 生成 |
+| `POST /api/v1/documents/{document_id}/contents` | 202，新内容版本与索引任务标识 | 单文件 `multipart/form-data`；仅所有者；现有活动内容及索引在候选发布前继续服务；同一文档有待发布内容时返回 409 `DOCUMENT_UNAVAILABLE` |
+| `POST /api/v1/documents/{document_id}/rebuilds` | 202，候选索引版本任务标识 | 仅所有者；索引当前内容的新代次；现有活动索引在候选发布前继续服务；相同重建重试复用进行中的任务 |
 | `GET /api/v1/documents/{document_id}` | 文档状态、当前活动索引与处理中任务 | 上传成功不等于 READY；更新失败时旧活动版本继续可用 |
 | `DELETE /api/v1/documents/{document_id}` | 提交逻辑失效，安排清理 | 返回成功前提交逻辑删除；清理失败不恢复可见性 |
-| `POST /api/v1/documents/{document_id}/rebuilds` | 202，新任务与候选索引版本 | KF2-004 冻结代次与幂等键前不可公开；重建不能直接切换活动版本 |
 | `GET /api/v1/tasks/{task_id}` | 状态、脱敏失败原因、尝试次数 | 经文档/知识库关联检查所有者；不返回执行令牌 |
 | `POST /api/v1/knowledge-bases/{kb_id}/questions` | 单轮答案、证据、版本信息 | 仅 `question` 和服务器支持的选项；未知/owner/范围字段拒绝；返回前再次检查可见性 |
 | `POST /api/v1/knowledge-bases/{kb_id}/questions/stream` | SSE | 与非流式同一权限规则，每事件发送前复核，断开传播取消 |
@@ -25,6 +26,10 @@
 Java 已实现的文件代理为 `GET /api/v1/documents/{document_id}/contents/{content_version_id}/file`，要求认证用户拥有当前活动文档及该内容版本。支持单个 `Range: bytes=start-end` 或 suffix range，合法范围返回 `206`、`Content-Range`、`Accept-Ranges` 和 `Cache-Control: no-store`；无效、多段或越界范围返回 `416` 及 `Content-Range: bytes */size`。每次读取重新校验存储对象的长度与 SHA-256，最大读入 8 MiB。
 
 上传使用 `multipart/form-data` 的单一 `file` 部分，成功返回 `202` 和 `DocumentUploadAccepted`。开发限额为文件 8 MiB、PDF 200 页、TXT/MD 200,000 Unicode 码点。Java 忽略客户端路径和媒体声明，按文件名扩展名与文件签名匹配 `txt`、`md`、`pdf`；对象键由 Java 随机生成。失败时不留下可见文档、任务或孤儿对象；补偿删除失败写入可重试清理队列。
+
+内容更新使用 `POST /api/v1/documents/{document_id}/contents`，请求和接受响应沿用上传的单文件格式与 `DocumentUploadAccepted`。Java 将候选内容版本、索引代次及任务写入同一事务，并通过 `pending_content_version_id` 标记待发布版本。待构建期间，读取和问答仍使用旧 `current_content_version_id` 及 `active_index_version_id`；成功 completion 在一个事务中同时提升当前内容和活动索引并清除 pending 指针。失败或取消只清除对应 pending 指针，旧 READY 索引继续可用。每个文档同时只允许一个待发布内容版本。
+
+同内容重建使用 `POST /api/v1/documents/{document_id}/rebuilds`，无请求体，成功返回 `202` 和 `DocumentUploadAccepted`。候选使用当前内容与下一个 generation；发布前保留旧活动索引。成功后仅替换活动索引；失败不影响旧索引。对于正在进行中的相同内容/管线重建，重试返回原任务，避免重复候选。
 
 文档列表为 `GET /api/v1/knowledge-bases/{kb_id}/documents?limit=50&offset=0`；文档状态为 `GET /api/v1/documents/{document_id}`；任务状态为 `GET /api/v1/tasks/{task_id}`。列表只包含当前用户、活动知识库下未删除文档。上传提交后任务为 `QUEUED`；只有已发布索引才显示 `READY`，候选版本成功或 Worker 自报完成都不表示 `READY`。状态响应不返回执行令牌、对象键、原文、向量或内部凭证。
 
