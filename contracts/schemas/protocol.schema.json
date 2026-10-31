@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.7",
+  "title": "KnowFlow proposed messages 0.2.0-draft.8",
   "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.7"
+      "const": "0.2.0-draft.8"
     },
     "Identifier": {
       "type": "string",
