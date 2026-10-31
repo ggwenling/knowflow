@@ -180,4 +180,5 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - A3 将端到端期限覆盖快照建立、AI 请求和最终回答持久化；数据库锁等待受剩余期限约束，超时后用独立有界事务收尾失败状态。新增最终成功写回锁等待跨过 deadline 后回滚、池占满/中断清理、快照锁等待以及生成期间删除的回归。`DocumentApiIntegrationTest` 30/30 通过；最终状态 FAILED/无答案、删除不发布来源等断言通过。
 - draft.8 Schema SHA-256：`f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Java 公共 contract version 已升为 draft.8；health client 接受真实 draft.8 并拒绝 draft.7。draft.8 内容更新/重建仍是契约候选，Java 业务端点实现不包含在本次交付中。
 - 集成候选 `54c5713cb7f04fa9ab323be227e9a7dcacae16e3` 上 Java Maven/Testcontainers 全量：61 项，0 failures、0 errors、1 opt-in real-Python smoke 跳过；本地真实双进程 smoke 另行 9/9 通过。Testcontainers 使用 PostgreSQL 16.12、pgvector 0.8.1 与 MinIO。
+- 在共同 draft.8 候选上重放本机 Java/Python/PostgreSQL/pgvector/MinIO 合成 E2E：上传、任务 READY、只读检索、来源校验/持久化、活动取消及队列清理均通过；无迟到 Chunk/向量，三种相关清理队列均为 0。报告 `services/ai/docs/evidence/local-backend-e2e-draft8-replay.json`，外部模型调用 0。测试后已停止本次启动的 KnowFlow Compose 容器并保留数据卷。
 - 变更仍待独立 Q 审阅与 M 消费确认；不据此标记 KF2-004 或有关业务任务为 DONE。真实 provider 质量、内容更新/重建运行时尚未验证。

@@ -31,9 +31,9 @@
 ### 2026-10-31 当日实际执行结果
 
 - A：修复问答 deadline/cancel 和事务收尾竞态；Java consumer 升至 draft.8。`DocumentApiIntegrationTest` 30/30，Java Maven/Testcontainers 全量 61 项（0 failure/error、1 opt-in real-Python smoke skip）。
-- B：完成长问题 adapter 覆盖、dispatch runtime profile 执行、deadline/断连清理、隔离解析进程、离线评测统计/划分工具；Python consumer 升至 draft.8。Python 全量 173 passed、契约结构 70 项、离线回归 16 项、解析 smoke 15 项、真实 Python HTTP process smoke 8 项。
+- B：完成长问题 adapter 覆盖、dispatch runtime profile 执行、deadline/断连清理、隔离解析进程、离线评测统计/划分工具；Python consumer 升至 draft.8。最新 Python 全量 181 passed、契约结构 70 项、离线回归 16 项、解析 smoke 15 项、真实 Python HTTP process smoke 8 项。
 - 双端在 Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a` 的 draft.8 候选上完成真实 Java↔Python health smoke 9/9。结构校验不代表权限、租约、数据库语义通过；真实质量/费用报告仍等待 KF2-031 和 KF2-037。
-- 工作树未配置本地 Compose `.env` 或 Embedding/LLM 凭证，因此没有把 10/30 的合成业务 E2E 计作 10/31 当天证据，也未调用 provider。代码分支提交与本地集成细节见 [A 记录](../../tasks/agent-a.md)、[B 记录](../../../evaluation/agent-b-progress.md)和[联调记录](../../tasks/java-python-integration.md)。
+- 工作树未保存本地 Compose `.env`，通过本机既有开发配置启动 KnowFlow 专用 Compose PostgreSQL/pgvector 与 MinIO，并在 10/31 重放 draft.8 合成业务 E2E；报告 `services/ai/docs/evidence/local-backend-e2e-draft8-replay.json`。上传、READY、只读检索/引用问答、活动取消与清理队列验收通过；用后停止容器、保留数据卷。Embedding/LLM 凭证未配置，provider 调用 0；不把合成适配器结果当模型质量。代码分支提交与集成详情见 [A 记录](../../tasks/agent-a.md)、[B 记录](../../../evaluation/agent-b-progress.md)和[联调记录](../../tasks/java-python-integration.md)。
 
 ### 每日完成门槛
 
