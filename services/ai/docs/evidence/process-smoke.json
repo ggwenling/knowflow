@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-10-30T22:49:46.199090+08:00",
+  "recorded_at": "2026-10-31T11:57:42.388838+08:00",
   "checks": {
     "authenticated_health": true,
     "request_id_header": true,
@@ -13,6 +13,6 @@
   "external_model_calls": 0,
   "java_webclient_called": false,
   "scope": "Real Python HTTP process only; Java caller separately required.",
-  "git_head_at_run": "dd3abd4aa003fe5b6b88ce649b8806d9b82b8631",
-  "app_sha256": "b350937330ffa33dc12cc806ec508fab2b37f01c317c383f29e25e24b1abd923"
+  "git_head_at_run": "54c5713cb7f04fa9ab323be227e9a7dcacae16e3",
+  "app_sha256": "8ddcde8df5789d1f84040a3d86a65e85e85efed57460882ac0336ec217403d50"
 }

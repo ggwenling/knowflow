@@ -173,3 +173,11 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - `./services/api/mvnw.cmd -B -f services/api/pom.xml test`：**51 项，0 failure、0 error、1 skip，BUILD SUCCESS**，包含 Testcontainers 迁移、租约/fencing、删除和迟到 completion 回归；跳过项为未配置真实 Python 服务的独立 smoke，另以真实双进程 health **9/9** 验证。
 - 本地 Compose V1–V5、pgvector 0.8.1 和角色权限复核通过。真实 Java/Python/PostgreSQL/MinIO 合成索引、问答及活动取消重放见 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`。测试服务已退出、三种清理队列为空；本次无外部模型调用。
 - 这是 10/30 提前复验，未声称 10/31 当天复跑；工作树仍为未提交的 `local` 候选，Q/M 结论不变。
+
+## 2026-10-31：问答 deadline/cancel 边界与 draft.8 Java 消费
+
+- Java 分支基于 `8e7f7fc`，A3 follow-up 提交 `32cc15050262a86f41db4676b60f922b466aa840`；draft.8 内容更新/同内容重建候选契约提交 `a68239b82e5885ad8aec559fb574dce6b70f95d8`；Java consumer 提交 `a70ce15f5d50e3a9923b37540b06504e14097dba`。
+- A3 将端到端期限覆盖快照建立、AI 请求和最终回答持久化；数据库锁等待受剩余期限约束，超时后用独立有界事务收尾失败状态。新增最终成功写回锁等待跨过 deadline 后回滚、池占满/中断清理、快照锁等待以及生成期间删除的回归。`DocumentApiIntegrationTest` 30/30 通过；最终状态 FAILED/无答案、删除不发布来源等断言通过。
+- draft.8 Schema SHA-256：`f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Java 公共 contract version 已升为 draft.8；health client 接受真实 draft.8 并拒绝 draft.7。draft.8 内容更新/重建仍是契约候选，Java 业务端点实现不包含在本次交付中。
+- 集成候选 `54c5713cb7f04fa9ab323be227e9a7dcacae16e3` 上 Java Maven/Testcontainers 全量：61 项，0 failures、0 errors、1 opt-in real-Python smoke 跳过；本地真实双进程 smoke 另行 9/9 通过。Testcontainers 使用 PostgreSQL 16.12、pgvector 0.8.1 与 MinIO。
+- 变更仍待独立 Q 审阅与 M 消费确认；不据此标记 KF2-004 或有关业务任务为 DONE。真实 provider 质量、内容更新/重建运行时尚未验证。

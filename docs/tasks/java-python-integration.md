@@ -1,6 +1,6 @@
 # JP-01 Java → Python 开发联调记录
 
-状态：JP-I1 draft.4 的历史证据仍有效；JP2 draft.6 在本机 `local` 工作树完成开发联调和合成后端 E2E，真实模型调用为 0。当前候选 Schema 尚待 Q 审阅/M 消费确认；本机证据不替代正式验收或真实模型质量评测。此前 draft.5/旧 B target 的状态保留在历史记录中。
+状态：JP-I1 draft.4 和 draft.6 本地 E2E 均为历史证据。2026-10-31 Java/Python 已共同消费 draft.8，真实 health 双进程通过；候选 Schema 仍待 Q 审阅/M 消费确认，真实模型质量与 draft.8 的内容更新/重建运行时不在本次验证范围内。历史版本记录保留。
 
 ## 固定的提交与契约
 
@@ -55,3 +55,12 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - Java 公开问答边界补测：本地 AI HTTP fixture 返回上游 `503` 并携带私有错误标记；`DocumentApiIntegrationTest` 确认公开 API 返回可重试 `502 AI_PROCESSING_FAILED`，不泄漏上游正文，数据库问题记录进入 `FAILED/AI_PROCESSING_FAILED`。该用例类 **20 passed**，更新后的全量 Maven/Testcontainers **50 项，0 failure、0 error、1 skip，BUILD SUCCESS**。
 - 超时边界复验：AI HTTP fixture 阻塞响应，触发 Java 配置的 30 秒响应时限；公开 API 返回脱敏可重试 `504 PROCESSING_TIMEOUT`，数据库问题记录为 `FAILED/PROCESSING_TIMEOUT`。`DocumentApiIntegrationTest` **21/21** 通过；含上游 503 与 timeout 回归的全量 Maven/Testcontainers **51 项，0 failure、0 error、1 skip，BUILD SUCCESS**。ReadTimeout 日志来自故意阻塞的测试 fixture。
 - 2026-10-30 22:56（香港时间）提前复验下一日检查点：真实双进程 health **9/9**，真实 Java/Python/PostgreSQL/MinIO 合成上传→READY→只读检索/问答→活动删除取消通过；确认取消被送达活动执行、embedding 取消后 adapter 关闭，相关任务和清理队列无迟到写入并排空。修复重放工具的 Windows Java 子进程泄漏和清理等待，进程/队列复查通过；证据为 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json` 与 `java-python-smoke-local-draft6-replay.json`。Java 全量 **51 项（1 skip）**、Python **132 passed**；所选模型凭证缺失，provider 评测 `SKIPPED_NO_CREDENTIALS`，本次外部调用 0。Q/M 状态不变。
+
+## 2026-10-31：draft.8 两分支消费与集成验收
+
+- A Java target：`a70ce15f5d50e3a9923b37540b06504e14097dba`（A3 fix `32cc15050262a86f41db4676b60f922b466aa840`，draft.8 契约 `a68239b82e5885ad8aec559fb574dce6b70f95d8`）；B Python target：`1d0c26ab4f7c273a9913e47b9011a76b325dee0f`。集成候选 code HEAD：`54c5713cb7f04fa9ab323be227e9a7dcacae16e3`，tree `985056592b5899f6f1765af82356cf687195cfb9`。
+- 契约 `0.2.0-draft.8` Schema SHA-256：`f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Java 和 Python consumer 均已升版，Python 严格校验精确哈希并拒绝 draft.7；Java health client 通过真实 draft.8、拒绝 draft.7 fixture。
+- Java：`./services/api/mvnw.cmd -B -f services/api/pom.xml test`，61 tests，0 failures/errors，1 opt-in smoke skipped；覆盖 PostgreSQL 16.12、pgvector 0.8.1、MinIO Testcontainers。Python：`uv run --project services/ai --frozen pytest services/ai/tests -q`，173 passed（1 条 Starlette/httpx 上游弃用警告）；`python contracts/validate.py`，70 structural cases；离线回归 16 passed。
+- Python parser smoke 15/15、真实 HTTP process smoke 8/8；真实 Java Spring/WebClient ↔ Python Uvicorn health smoke 9/9。报告 `services/ai/docs/evidence/java-python-smoke-draft8-verified.json`、`parser-smoke.json`、`process-smoke.json` 仅记录脱敏断言与文件哈希；health smoke 不触发数据库或外部模型。
+- schema validation 明确没有执行权限、租约时效或数据库状态迁移语义检查。当前 worktree 没有 `services/api/.env`、`services/ai/.env`，Embedding/LLM 环境变量也未配置，因此本日未重放依赖项目 Compose 配置的业务 E2E、未调用 provider；此前 10/30 的 Compose 合成 E2E 保留为历史记录，不冒充今日执行。
+- 独立 Q 审阅/M 消费确认待完成；KF2-038 仍依赖 KF2-031 SSE 与 KF2-037 质量基线。draft.8 的内容更新/重建是候选协议说明，本次没有实现或验收对应业务端点。

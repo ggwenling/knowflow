@@ -153,3 +153,10 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 可重放本机闭环的 `services/ai/tools/local_backend_e2e.py` 现验证活动取消送达及 adapter 收尾、等待相关物理清理，Windows 上清理 Java 进程树，并拒绝在已有未完成任务或清理队列的数据库启动。实际真实服务合成重放通过，证据 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`；合成账户记录留在本地数据库，知识库已删除且会话已退出。
 - 当前所选 Embedding/LLM 凭证均不存在，开发集真实模型评测记录为 `SKIPPED_NO_CREDENTIALS`（`services/ai/docs/evidence/development-evaluation-local-draft6-skipped.json`），本次外部模型调用 0；向量排序与生成质量仍未测，不能用合成 adapter 冒充。Q/M 正式验收仍待独立执行。
 - 提交前复验发现 Windows `taskkill` 偶尔在目标进程已退出后返回错误码；重放工具现仅在进程仍存活时传播该错误，并在清理后检查服务端口。两种错误码分支、进程树测试及真实服务合成重放均通过，Python 全量 **134 passed**；这次重放仍使用合成 adapter，外部模型调用 0。
+
+## 2026-10-31：Python 消费 draft.8 与边界回归
+
+- Python 分支 target：`1d0c26ab4f7c273a9913e47b9011a76b325dee0f`；消费 Java draft.8 精确提交 `a68239b82e5885ad8aec559fb574dce6b70f95d8`，Schema SHA-256 固定为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。strict consumer 拒绝 draft.7/其他字节不同 Schema；HTTP health fixture、消费说明和 Java/Python health smoke 一并升版。
+- Python 全量 **173 passed**；契约结构校验 **70 cases**；离线 provider/模型回归 **16 passed**。解析器 smoke **15 项**、真实 Python HTTP process smoke **8 项**通过；真实 Java WebClient ↔ Python HTTP health smoke **9/9** 通过，证据见 `services/ai/docs/evidence/java-python-smoke-draft8-verified.json`。
+- B1 长问题 801/16000 码点穿过 answer adapters；B2 按 dispatch runtime profile 限制分段、Embedding 数量和 JSON body 字节；B3 deadline/disconnect 中断及只读 DB 同步线程取消收尾；B5 候选解析放入可终止、有限内存进程；B7 离线评测按题记录结果并提供候选分组工具，修正人工支持率遗漏无答案题幻觉的问题。以上实现有本地测试，不等于真实 provider 质量通过。
+- 当前未配置 Embedding/LLM 凭证，真实模型调用 **0**。KF2-038 资源/延迟/费用测量继续等待 KF2-031 流式链路及 KF2-037 质量基线；没有实际 60 题盲测集合、真实向量排名或生成质量分数。Q 审阅和 M 消费确认待独立执行。

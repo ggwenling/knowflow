@@ -4,6 +4,8 @@
 
 本计划由用户要求制定：不等待当前 Q 复核，继续安排 Codex-A Java 与 Codex-B Python 开发，并明确覆盖今天和明天。用户后续指定在本机创建从 `main` 派生的 `local` 分支并在该分支实施；本轮据此将 `local` 作为集成开发分支，保留 A/B 文件所有权。它不表示代码已合入 `main`、契约已冻结或得到 Q 批准。原始 KF2 任务编号和规划文件保留。
 
+2026-10-31 执行补充：用户再次明确要求 Java 与 Python 在各自 `java` / `python` 分支并行开发，并要求提交代码；这覆盖此前“只在 `local` 工作且不提交”的本轮执行限制。当天采用独立 worktree 和本地 `codex/integration-20261031` 集成候选；已提交 A/B 作者分支并合入本地集成候选，但未推送、未合并 `main`，Q/M 状态不变。
+
 ## 0.1 今天与明天的执行计划（Asia/Hong_Kong）
 
 | 日期 | Codex-A / Java | Codex-B / Python | 集成验收与交付 |
@@ -24,7 +26,14 @@
 | 11:30–13:00 | 对已发布索引、删除知识库、迟到 completion 和来源落库做边界复核；删除后提交正确摘要的迟到 completion 用例已于 10/30 通过。 | 使用已通过的空检索拒答、伪造引用拒绝和 locator 测试；复核 Chunk 证据覆盖报告：开发 12 题/21 个证据区间、留出 3 题/3 个区间均可复核。复跑 heartbeat `LEASE_REJECTED` 与满队列 `503` 两项回归；两者分别已于 10/30 连续 10/10 和定向/全量测试通过。删除 outbox→Python cancel 与无迟到写入已于 10/30 通过真实服务复验；次日复核变更后回归。 | 报告只证明证据进入 Chunk；不把它表述成向量排名或答案质量评测，留出集不参与调参。 |
 | 14:00–15:00 | 配合观察 Java 侧状态和调用量；无凭证时不启动外部模型测试。 | 截至 2026-10-30 已确认当前环境没有 Embedding/LLM 凭证；只有次日凭证可用时才从开发题选不超过 10 题，每题各最多一次请求，累计各不超过 10 次，不重试。 | 有凭证才记录真实调用数、账单可得性/响应元数据和引用准确性；无凭证则明确记 `SKIPPED_NO_CREDENTIALS`，真实模型质量保持待验。 |
 | 15:00–16:30 | 修复并复验真实集成暴露的 Java 缺陷。 | 修复并复验 Python adapter、只读检索、引用边界缺陷。 | 相关单测、全量回归和真实本地链路均通过，或明确保留 blocker。 |
-| 16:30–17:30 | 更新 A 交付记录与联调证据。 | 更新 B 消费记录、评测状态与服务说明。 | 更新 handoff；工作仍留在 `local`，未提交、未推送、未合并；Q/M 状态不变。 |
+| 16:30–17:30 | 更新 A 交付记录与联调证据。 | 更新 B 消费记录、评测状态与服务说明。 | 更新 handoff；提交到 `java` / `python` 作者分支并在本地集成候选验证；不推送、不合并 `main`；Q/M 状态不变。 |
+
+### 2026-10-31 当日实际执行结果
+
+- A：修复问答 deadline/cancel 和事务收尾竞态；Java consumer 升至 draft.8。`DocumentApiIntegrationTest` 30/30，Java Maven/Testcontainers 全量 61 项（0 failure/error、1 opt-in real-Python smoke skip）。
+- B：完成长问题 adapter 覆盖、dispatch runtime profile 执行、deadline/断连清理、隔离解析进程、离线评测统计/划分工具；Python consumer 升至 draft.8。Python 全量 173 passed、契约结构 70 项、离线回归 16 项、解析 smoke 15 项、真实 Python HTTP process smoke 8 项。
+- 双端在 Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a` 的 draft.8 候选上完成真实 Java↔Python health smoke 9/9。结构校验不代表权限、租约、数据库语义通过；真实质量/费用报告仍等待 KF2-031 和 KF2-037。
+- 工作树未配置本地 Compose `.env` 或 Embedding/LLM 凭证，因此没有把 10/30 的合成业务 E2E 计作 10/31 当天证据，也未调用 provider。代码分支提交与本地集成细节见 [A 记录](../../tasks/agent-a.md)、[B 记录](../../../evaluation/agent-b-progress.md)和[联调记录](../../tasks/java-python-integration.md)。
 
 ### 每日完成门槛
 
