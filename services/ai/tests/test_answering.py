@@ -14,7 +14,7 @@ from knowflow_ai.answering import (
     ReadOnlyRetriever,
 )
 from knowflow_ai.config import ConfigurationError
-from knowflow_ai.embedding import EmbeddingSettings
+from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from knowflow_ai.protocol import ContractConsumer, InvalidMessage
 
 
@@ -200,6 +200,94 @@ async def test_retriever_batches_full_question_and_combines_vectors_by_segment_l
     assert rows == []
     assert embedded_batches == [["abc", "def"], ["ghi", "j"]]
     assert captured["params"][0] == "[3.4," + ",".join(["3.4"] * 1023) + "]"
+
+
+@pytest.mark.parametrize("length", [801, 16000])
+@pytest.mark.asyncio
+async def test_long_question_runs_through_embedding_http_and_llm_without_truncation(
+        length, monkeypatch):
+    question = "问" * 799 + "😀" + "问" * (length - 800)
+    embedding_batches = []
+    generated_questions = []
+    evidence = _evidence()
+
+    async def embedding_handler(request):
+        payload = json.loads(request.content)
+        embedding_batches.append(payload["input"])
+        return httpx.Response(200, json={
+            "model": "BAAI/bge-m3",
+            "data": [{"index": index, "embedding": [0.125] * 1024}
+                     for index, _ in enumerate(payload["input"])],
+        })
+
+    async def llm_handler(request):
+        payload = json.loads(request.content)
+        user_payload = json.loads(payload["messages"][1]["content"])
+        generated_questions.append(user_payload["question"])
+        source_id = user_payload["evidence"][0]["source_id"]
+        return httpx.Response(200, json={
+            "model": "deepseek-flash",
+            "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+                "answer": f"有证据。[{source_id}]", "has_answer": True,
+                "source_ids": [source_id],
+            })}}],
+        })
+
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(
+        lambda _url, _query, _params: [{
+            "chunk_id": evidence[0]["chunk_id"],
+            "document_id": evidence[0]["document_id"],
+            "content_version_id": evidence[0]["content_version_id"],
+            "index_version_id": evidence[0]["index_version_id"],
+            "text_content": evidence[0]["text_content"],
+            "text_sha256": "0" * 64,
+            "locator_kind": "text_range",
+            "source_page": None,
+            "source_start": 12,
+            "source_end": 32,
+        }]))
+    embedding_client = httpx.AsyncClient(transport=httpx.MockTransport(embedding_handler))
+    llm_client = httpx.AsyncClient(transport=httpx.MockTransport(llm_handler))
+    settings = EmbeddingSettings(api_key=EMBEDDING_KEY, max_batch_items=4)
+    embedding = SiliconFlowEmbeddingAdapter(settings, embedding_client)
+    llm = DeepSeekAdapter(LlmSettings(api_key=KEY), llm_client)
+    closed = {"embedding": False, "llm": False}
+    embedding_aclose = embedding.aclose
+    llm_aclose = llm.aclose
+
+    async def close_embedding():
+        closed["embedding"] = True
+        await embedding_aclose()
+
+    async def close_llm():
+        closed["llm"] = True
+        await llm_aclose()
+
+    embedding.aclose = close_embedding
+    llm.aclose = close_llm
+    retriever = ReadOnlyRetriever(
+        "postgresql://readonly.invalid/db",
+        embedding_factory=lambda: embedding,
+        embedding_settings=settings)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: llm,
+                            retriever=retriever)
+    request = _request()
+    request["question"] = question
+
+    try:
+        response = await service.answer(request)
+
+        assert response["has_answer"] is True
+        assert "".join(segment for batch in embedding_batches for segment in batch) == question
+        assert all(len(segment) <= settings.max_text_codepoints
+                   for batch in embedding_batches for segment in batch)
+        assert [len(batch) for batch in embedding_batches] == (
+            [2] if length == 801 else [4, 4, 4, 4, 4])
+        assert generated_questions == [question]
+        assert closed == {"embedding": True, "llm": True}
+    finally:
+        await embedding_client.aclose()
+        await llm_client.aclose()
 
 
 @pytest.mark.asyncio
