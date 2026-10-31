@@ -89,5 +89,12 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - 开发基线：`local` 从 `codex/integration-20261031@493112dfa0b7f939041ef456ff39e7ff734445d3` 快进。共享 Schema draft.9 SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`；AnswerStreamEvent 序号从 1 开始，事件为 started/delta/sources/completed 或唯一 error/cancelled。
 - Java 交付内容更新/同内容重建、pending 原子发布、两次成功发布保留/旧载荷清理和 retired snapshot 访问。test-compile 通过，SSE 协议与引用映射 7/7 通过。Testcontainers 场景无法启动：本机 Docker Desktop Linux engine pipe 不存在。
 - Python 交付真实 provider SSE 消费、answer JSON 增量解析、取消/超时/断连收尾、retired snapshot 只读访问及评测空白标注模板。Python 全量 219 passed；Schema 79 structural cases；离线回归 16 passed。真实 provider 调用 0。
-- KF2-031 为部分完成：Java 内部 SSE 客户端、严格事件状态机、可见性取消桥接和 citation mapper 已实现及单测通过；Java 公开 SSE endpoint 和问答最终持久化未接通。未把内部单测描述为端到端 SSE 完成。
+- KF2-031 的实现与事务持久化已接通；其 Testcontainers 端到端场景尚未运行，见下一节的 Docker 环境阻断记录。
 - KF2-037 仅完成工具/标注准备；仍无 60 道独立人工核验题、真实模型质量结果或费用数据。Q/M 审阅未执行，本轮不推送或合并 main。
+
+## 2026-10-31：Java 公开 SSE 网关完成
+
+- `POST /api/v1/knowledge-bases/{knowledge_base_id}/questions/stream` 已接通 Java `SseEmitter`、Python draft.9 SSE client 和现有问答持久化事务。Java 发送前逐事件检查快照可见性；sources 事件完成引用/Chunk/locator 校验和问题/来源原子保存后才发送，completed 不重复答案正文。
+- 浏览器断连或超时会取消上游订阅并将 PROCESSING 问题标记为 `CANCELLED`；上游异常、非法事件、删除/版本清理和超时会发送唯一脱敏 error。跨 delta 引用标记由 bounded mapper 映射为公开 source UUID，内部 source ID 不出现在 SSE。
+- 新增 `DocumentApiIntegrationTest.publicAnswerStreamForwardsValidatedEventsAndPersistsTheAnswer`，覆盖事件顺序、内部引用 ID 脱敏和 `SUCCEEDED` 持久化。该 Testcontainers 测试已编译，但当前 Docker Engine 缺失，执行在容器启动阶段阻断。
+- 无容器 Java 编译与 SSE/citation 单测仍通过：test-compile SUCCESS，7/7 passed。公开 SSE 代码提交为 `e949c19`；整体 `local` 后续需在 Docker 可用时补跑集成测试。
