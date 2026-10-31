@@ -298,7 +298,12 @@ async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
     assert calls["options"] == (
         "-c default_transaction_read_only=on -c statement_timeout=5000")
     assert calls["connect_timeout"] == 5
-    assert "d.active_index_version_id = c.index_version_id" in calls["query"]
+    assert "iv.status IN ('READY', 'RETIRED')" in calls["query"]
+    assert "iv.cleaned_at IS NULL" in calls["query"]
+    assert "d.active_index_version_id = c.index_version_id" not in calls["query"]
+    assert "d.current_content_version_id = c.content_version_id" not in calls["query"]
+    assert "kb.status = 'ACTIVE'" in calls["query"]
+    assert "d.status = 'ACTIVE'" in calls["query"]
     assert evidence[0]["text_content"] == "verified source text"
     assert evidence[0]["locator"]["unit"] == "unicode_code_point"
 

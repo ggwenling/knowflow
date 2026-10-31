@@ -1,6 +1,6 @@
 # Python AI 服务（Codex-B 所有）
 
-Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.6`（Schema SHA-256：`d64f9521b2d1b753f918d74906ea162337a4938490976cf4223a824ef107ccb1`）。契约仍是候选版本；Q 独立审阅、M 页面消费确认和正式冻结未完成。
+Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.9`（Schema SHA-256：`fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`）。契约仍是候选版本；Q 独立审阅、M 页面消费确认和正式冻结未完成。
 
 ## 当前能力
 
@@ -8,7 +8,8 @@ Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.6`（
 - `POST /internal/v1/index-executions`：接收 Java 创建的 lease-fenced 派发，排入单进程有界队列；按 task/lease/fencing 去重，后台每 10 秒 heartbeat。
 - IndexWorker 只经 Java 内部接口读取原文件、续租、写入最多 16 条的批次和提交 completion。Java 是唯一业务状态及向量写入者；Python 不连接 Java 写库凭据。Java 完成数据库事实验收后才发布 READY。
 - `POST /internal/v1/index-executions/{task_id}/cancel`：按 task、lease、fencing 精确取消当前执行。
-- `POST /internal/v1/answers`：只接受 Java 提供的可信快照范围；使用只读 PostgreSQL 账号和 READY 索引检索证据，并在调用 DeepSeek 前再核对每条检索记录的 document/content/index 三元组属于该快照。生成后校验来源 ID 与实际检索证据。空检索或越界检索都不会调用生成模型。浏览器不能调用此内部入口或自行指定 owner。
+- `POST /internal/v1/answers`：只接受 Java 提供的可信快照范围；使用只读 PostgreSQL 账号检索快照内仍保留的 READY/RETIRED 索引证据，要求知识库与文档仍 ACTIVE、索引尚未清理；并在调用 DeepSeek 前再核对每条检索记录的 document/content/index 三元组属于该快照。生成后校验来源 ID 与实际检索证据。空检索或越界检索都不会调用生成模型。浏览器不能调用此内部入口或自行指定 owner。
+- `POST /internal/v1/answers/stream`：使用 DeepSeek 的真实 SSE `stream=true`，增量解析 JSON 中的 answer；最终引用与范围验证后才发送 sources/completed。事件顺序、限额与断连行为见 [流式回答](docs/answer-streaming.md)。
 - 模型凭证/数据库配置缺失时，业务入口明确返回受控不可用错误，不伪造索引或回答。默认使用 SiliconFlow `BAAI/bge-m3`（1024 维）与 DeepSeek `deepseek-flash`；请求超时、有界响应、模型 ID/维度校验和错误脱敏均由适配器执行。
 
 ## Windows 本地开发

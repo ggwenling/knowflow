@@ -1,5 +1,6 @@
 """Read-only, snapshot-scoped retrieval and evidence-checked generation."""
 import asyncio
+from contextlib import aclosing
 from dataclasses import dataclass, field
 import json
 import math
@@ -126,7 +127,7 @@ class DeepSeekAdapter:
         if self._owns_client:
             await self._client.aclose()
 
-    async def generate(self, question: str, evidence: list[dict], *, request_id: str) -> dict:
+    def _payload(self, question: str, evidence: list[dict]) -> dict:
         context = [{"source_id": item["source_id"],
                     "text": item["text_content"]} for item in evidence]
         payload = {
@@ -147,6 +148,16 @@ class DeepSeekAdapter:
             "thinking": {"type": "disabled"},
             "response_format": {"type": "json_object"},
         }
+        return payload
+
+    async def stream_content(self, question, evidence, *, request_id):
+        from .streaming import provider_content
+        async with aclosing(provider_content(self, question, evidence, request_id=request_id)) as content:
+            async for fragment in content:
+                yield fragment
+
+    async def generate(self, question: str, evidence: list[dict], *, request_id: str) -> dict:
+        payload = self._payload(question, evidence)
         try:
             async with self._client.stream(
                     "POST", self.settings.base_url.rstrip("/") + "/chat/completions",
@@ -309,8 +320,8 @@ class ReadOnlyRetriever:
                 ON iv.id = c.index_version_id AND iv.document_id = c.document_id
                AND iv.content_version_id = c.content_version_id
              WHERE kb.owner_user_id = %s AND kb.id = %s AND kb.status = 'ACTIVE'
-               AND d.status = 'ACTIVE' AND d.current_content_version_id = c.content_version_id
-               AND d.active_index_version_id = c.index_version_id AND iv.status = 'READY'
+               AND d.status = 'ACTIVE' AND iv.status IN ('READY', 'RETIRED')
+               AND iv.cleaned_at IS NULL
                AND ({scope_predicates})
              ORDER BY e.embedding <=> %s::public.vector, c.id
              LIMIT 5
@@ -377,7 +388,13 @@ class AnswerService:
         except TimeoutError:
             raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
 
-    async def _answer(self, request: dict, deadline: float) -> dict:
+    async def stream(self, request: dict):
+        from .streaming import answer_events
+        async with aclosing(answer_events(self, request)) as events:
+            async for event in events:
+                yield event
+
+    async def _retrieve_evidence(self, request, deadline):
         evidence = await self._retriever.retrieve(
             request["question"], request["scope"], request["request_id"],
             deadline=deadline)
@@ -392,6 +409,10 @@ class AnswerService:
                     item.get("document_id"), item.get("content_version_id"),
                     item.get("index_version_id")) not in allowed_indexes:
                 raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False)
+        return evidence
+
+    async def _answer(self, request: dict, deadline: float) -> dict:
+        evidence = await self._retrieve_evidence(request, deadline)
         if not evidence:
             response = {"contract_version": CONTRACT_VERSION,
                         "request_id": request["request_id"],
@@ -405,6 +426,9 @@ class AnswerService:
                                              request_id=request["request_id"])
         finally:
             await model.aclose()
+        return self._response_from_generated(request, evidence, generated)
+
+    def _response_from_generated(self, request, evidence, generated):
         if (not isinstance(generated, dict)
                 or set(generated) != {"answer", "has_answer", "source_ids"}
                 or type(generated["has_answer"]) is not bool

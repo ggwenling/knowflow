@@ -18,11 +18,13 @@ import uuid
 import httpx
 import psycopg
 
+from knowflow_ai.protocol import CONTRACT_VERSION
+
 
 AI_ROOT = Path(__file__).resolve().parents[1]
 REPO = AI_ROOT.parents[1]
-VERSION = "0.2.0-draft.8"
-DEFAULT_OUTPUT = AI_ROOT / "docs/evidence/local-backend-e2e-draft8-replay.json"
+VERSION = CONTRACT_VERSION
+DEFAULT_OUTPUT = AI_ROOT / f"docs/evidence/local-backend-e2e-draft{VERSION.rsplit('.', 1)[1]}-replay.json"
 INTEGRATION_BRANCH_PREFIX = "codex/integration-"
 BLOCK_MARKER = "KNOWFLOW_SYNTHETIC_BLOCK_FOR_CANCELLATION"
 

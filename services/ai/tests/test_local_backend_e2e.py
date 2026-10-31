@@ -21,8 +21,8 @@ def test_e2e_version_and_report_name_match_shared_contract():
     schema = json.loads((e2e.REPO / "contracts/schemas/protocol.schema.json").read_text(
         encoding="utf-8"))
 
-    assert e2e.VERSION == schema["$defs"]["ContractVersion"]["const"] == "0.2.0-draft.8"
-    assert e2e.DEFAULT_OUTPUT == e2e.AI_ROOT / "docs/evidence/local-backend-e2e-draft8-replay.json"
+    assert e2e.VERSION == schema["$defs"]["ContractVersion"]["const"] == "0.2.0-draft.9"
+    assert e2e.DEFAULT_OUTPUT == e2e.AI_ROOT / "docs/evidence/local-backend-e2e-draft9-replay.json"
 
 
 @pytest.mark.parametrize(("branch", "allowed"), [

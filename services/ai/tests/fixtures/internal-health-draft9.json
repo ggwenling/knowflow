@@ -1,0 +1,65 @@
+[
+  {
+    "name": "accept-draft9",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.9",
+      "request_id": "java-health-draft9"
+    },
+    "valid": true
+  },
+  {
+    "name": "reject-0.2.0-draft.2",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.2",
+      "request_id": "java-health-draft9"
+    },
+    "valid": false
+  },
+  {
+    "name": "reject-0.2.0-draft.3",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.3",
+      "request_id": "java-health-draft9"
+    },
+    "valid": false
+  },
+  {
+    "name": "reject-draft7",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.7",
+      "request_id": "java-health-draft9"
+    },
+    "valid": false
+  },
+  {
+    "name": "reject-extra",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.9",
+      "request_id": "java-health-draft9",
+      "extra": "unsupported"
+    },
+    "valid": false
+  },
+  {
+    "name": "reject-missing-request-id",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.9"
+    },
+    "valid": false
+  },
+  {
+    "name": "reject-draft8",
+    "payload": {
+      "status": "UP",
+      "contract_version": "0.2.0-draft.8",
+      "request_id": "java-health-draft9"
+    },
+    "valid": false
+  }
+]

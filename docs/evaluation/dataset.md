@@ -74,4 +74,12 @@ python evaluation/data/tools/split_candidates.py --input path/to/candidates.json
 
 候选输入记录用 `annotation_status: "candidate"` 表示尚未核验；核对过的结构记录可使用 `annotation_status: "reviewed"`，但工具只能验证格式和原文位置，不能证明核验者身份或独立性。划分文件明确标为非盲留出，须先由独立评测者管理 holdout 题与答案，公开仓库中的留出题不构成盲测。
 
+创建空白标注工作包可使用同一工具；它仅导出当前已登记的来源清单、内容版本和未完成的题目字段，不生成答案、可回答性或引用：
+
+```sh
+python evaluation/data/tools/split_candidates.py --annotation-template --input path/to/candidates.json --dataset evaluation/data/seed-v1 --output path/to/annotation-template.json
+```
+
+工作包中的 `pending` 状态和空 evidence 只是待人工核验的占位。必须按原文独立填写引用摘录与 Unicode 码点范围、内容版本和行号，并填写答案要点后，逐题改为 `reviewed`；原有候选验证器会拒绝把 pending 记录送入划分步骤。保留评审者、审核日期和独立性记录在受控标注流程中，不能由模板或 runner 推断。
+
 当前仍只有 10 份原创合成文档、12 道开发题和 3 道留出题；没有建立 60 道题集、人工独立验证或检索/回答质量分数。上述 40/20 工具只提供候选集流程，不会把现有 12+3 题重新命名为 60 道人工题。

@@ -194,10 +194,10 @@ async def test_client_disconnect_cancels_answer_operation():
     assert cancelled.is_set()
 
 
-def test_health_consumes_draft8_examples_without_version_fallback(app, client):
-    assert CONTRACT_VERSION == '0.2.0-draft.8'
-    assert SCHEMA_SHA256 == 'f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a'
-    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft8.json').read_text(encoding='utf-8'))
+def test_health_consumes_draft9_examples_without_version_fallback(app, client):
+    assert CONTRACT_VERSION == '0.2.0-draft.9'
+    assert SCHEMA_SHA256 == 'fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935'
+    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft9.json').read_text(encoding='utf-8'))
     for case in cases:
         if case['valid']:
             app.state.contract.validate('InternalHealth', case['payload'])
@@ -209,7 +209,7 @@ def test_health_consumes_draft8_examples_without_version_fallback(app, client):
     assert response.json()['contract_version'] == CONTRACT_VERSION
 
 
-@pytest.mark.parametrize('mutation', ['draft2', 'draft3', 'draft4', 'draft5', 'draft6', 'draft7', 'same-json-different-bytes'])
+@pytest.mark.parametrize('mutation', ['draft2', 'draft3', 'draft4', 'draft5', 'draft6', 'draft7', 'draft8', 'same-json-different-bytes'])
 def test_startup_rejects_old_and_modified_schema_without_bypass(tmp_path, mutation):
     raw = (ROOT / 'contracts/schemas/protocol.schema.json').read_bytes()
     if mutation == 'same-json-different-bytes':
@@ -217,8 +217,8 @@ def test_startup_rejects_old_and_modified_schema_without_bypass(tmp_path, mutati
     else:
         old = {'draft2': b'0.2.0-draft.2', 'draft3': b'0.2.0-draft.3',
                'draft4': b'0.2.0-draft.4', 'draft5': b'0.2.0-draft.5',
-               'draft6': b'0.2.0-draft.6', 'draft7': b'0.2.0-draft.7'}[mutation]
-        raw = raw.replace(b'0.2.0-draft.8', old)
+               'draft6': b'0.2.0-draft.6', 'draft7': b'0.2.0-draft.7', 'draft8': b'0.2.0-draft.8'}[mutation]
+        raw = raw.replace(CONTRACT_VERSION.encode(), old)
     path = tmp_path / 'schema.json'
     path.write_bytes(raw)
     with pytest.raises(ConfigurationError, match='CONTRACT_HASH_MISMATCH'):
@@ -342,7 +342,8 @@ def test_index_dispatch_without_embedding_credential_is_not_accepted(client, app
 
 
 @pytest.mark.parametrize('missing_credential', ['embedding', 'llm'])
-def test_answer_without_model_credential_does_not_construct_service(monkeypatch, missing_credential):
+@pytest.mark.parametrize('path', ['/internal/v1/answers', '/internal/v1/answers/stream'])
+def test_answer_without_model_credential_does_not_construct_service(monkeypatch, missing_credential, path):
     monkeypatch.delenv('KNOWFLOW_EMBEDDING_KEY_ENV', raising=False)
     monkeypatch.delenv('EMBEDING_KEY', raising=False)
     monkeypatch.delenv('KNOWFLOW_LLM_KEY_ENV', raising=False)
@@ -374,7 +375,7 @@ def test_answer_without_model_credential_does_not_construct_service(monkeypatch,
     monkeypatch.setattr(ai_app, 'AnswerService', record_construction)
     answer_app = create_app(Settings(SECRET, ai_database_url='postgresql://unused.invalid/knowflow'))
     with TestClient(answer_app) as answer_client:
-        response = answer_client.post('/internal/v1/answers',
+        response = answer_client.post(path,
                                        headers={**AUTH, 'X-Request-ID': payload['request_id']},
                                        json=payload)
 

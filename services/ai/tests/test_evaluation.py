@@ -157,6 +157,21 @@ def test_candidate_annotation_must_match_original_source_and_version():
         candidate_tool.validate_candidate_questions([reviewed], DATASET)
 
 
+def test_annotation_template_is_explicitly_unreviewed_and_cannot_be_split():
+    template = candidate_tool.annotation_template([
+        {"id": "new-q01", "question": "索引何时可读？", "leakage_group": "index",
+         "annotation_status": "candidate"}], DATASET)
+    assert template["question_count"] == 1
+    assert template["questions_marked_reviewed_count"] == 0
+    assert template["status"] == "pending_annotations_not_a_blind_holdout"
+    assert template["annotations"][0]["annotation_status"] == "pending"
+    assert template["annotations"][0]["answerable"] is None
+    assert template["annotations"][0]["evidence"] == []
+    with pytest.raises(ValueError, match="INVALID_CANDIDATE"):
+        candidate_tool.prepare(template["annotations"], DATASET,
+                               development_count=1, holdout_count=0)
+
+
 def test_candidate_split_rejects_groups_that_cannot_fill_exact_holdout():
     questions = [{"id": f"c{index:02}", "question": f"候选题 {index}",
                   "leakage_group": f"group-{index // 6}",

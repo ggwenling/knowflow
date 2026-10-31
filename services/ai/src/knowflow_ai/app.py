@@ -1,14 +1,15 @@
 """Authenticated internal AI service for lease-fenced indexing and answers."""
 import asyncio
-from contextlib import asynccontextmanager
+from contextlib import aclosing, asynccontextmanager
 import hmac
+import json
 import re
 import uuid
 from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 from .config import ConfigurationError, Settings
 from .protocol import CONTRACT_VERSION, ContractConsumer, ErrorBody, InvalidMessage
 from .adapters import ProcessingError
@@ -18,6 +19,22 @@ from .java_client import JavaGateway
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
+
+
+class ClosingStreamingResponse(StreamingResponse):
+    async def __call__(self, scope, receive, send):
+        streaming = asyncio.create_task(self.stream_response(send))
+        disconnect = asyncio.create_task(self.listen_for_disconnect(receive))
+        try:
+            await asyncio.wait((streaming, disconnect), return_when=asyncio.FIRST_COMPLETED)
+            if streaming.done():
+                streaming.result()
+        finally:
+            for task in (streaming, disconnect):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(streaming, disconnect, return_exceptions=True)
+            await self.body_iterator.aclose()
 
 
 async def await_answer_or_disconnect(request: Request, operation):
@@ -186,5 +203,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service = AnswerService(settings.ai_database_url, contract,
                                 embedding_settings=embedding_settings)
         return await await_answer_or_disconnect(request, lambda: service.answer(payload))
+
+    @app.post('/internal/v1/answers/stream')
+    async def stream_answer(request: Request, payload: dict[str, Any]):
+        contract.validate('TrustedAnswerRequest', payload)
+        if payload['request_id'] != request.state.request_id:
+            raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
+        if not settings.ai_database_url:
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        embedding_settings = EmbeddingSettings.from_environment()
+        LlmSettings.from_environment()
+        service = AnswerService(settings.ai_database_url, contract,
+                                embedding_settings=embedding_settings)
+
+        async def frames():
+            async with aclosing(service.stream(payload)) as events:
+                async for event in events:
+                    data = json.dumps(event, ensure_ascii=False, separators=(',', ':'))
+                    yield f"event: {event['event']}\ndata: {data}\n\n"
+
+        return ClosingStreamingResponse(frames(), media_type='text/event-stream',
+                                        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
     return app

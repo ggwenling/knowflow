@@ -128,19 +128,46 @@ def prepare(questions, dataset_root, *, development_count=40,
     }
 
 
+def annotation_template(candidate_questions, dataset_root):
+    """Prepare blank annotations; the unfinished records fail split validation."""
+    root = Path(dataset_root).resolve()
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    validate_candidate_questions(candidate_questions, dataset_root)
+    return {
+        "template_version": 1,
+        "status": "pending_annotations_not_a_blind_holdout",
+        "dataset_id": manifest["dataset_id"],
+        "source_manifest_sha256": sha256((root / "manifest.json").read_bytes()).hexdigest(),
+        "question_count": len(candidate_questions),
+        "questions_marked_reviewed_count": 0,
+        "source_catalog": [{key: item[key] for key in
+                            ("id", "path", "content_version_id", "sha256")}
+                           for item in manifest["documents"]],
+        "annotations": [{"id": item["id"], "question": item["question"],
+                         "leakage_group": item["leakage_group"],
+                         "annotation_status": "pending", "answerable": None,
+                         "reference_answer": "", "evidence": []}
+                        for item in candidate_questions],
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=20261031)
+    parser.add_argument("--annotation-template", action="store_true")
     args = parser.parse_args()
     questions = json.loads(args.input.read_text(encoding="utf-8"))
-    result = prepare(questions, args.dataset, seed=args.seed)
+    result = (annotation_template(questions, args.dataset) if args.annotation_template
+              else prepare(questions, args.dataset, seed=args.seed))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf-8")
-    print(json.dumps(result["validation"], ensure_ascii=False))
+    summary = ({"question_count": result["question_count"], "status": result["status"]}
+               if args.annotation_template else result["validation"])
+    print(json.dumps(summary, ensure_ascii=False))
 
 
 if __name__ == "__main__":
