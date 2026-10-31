@@ -21,7 +21,9 @@ import psycopg
 
 AI_ROOT = Path(__file__).resolve().parents[1]
 REPO = AI_ROOT.parents[1]
-VERSION = "0.2.0-draft.6"
+VERSION = "0.2.0-draft.8"
+DEFAULT_OUTPUT = AI_ROOT / "docs/evidence/local-backend-e2e-draft8-replay.json"
+INTEGRATION_BRANCH_PREFIX = "codex/integration-"
 BLOCK_MARKER = "KNOWFLOW_SYNTHETIC_BLOCK_FOR_CANCELLATION"
 
 
@@ -319,15 +321,21 @@ def write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def is_allowed_integration_branch(branch: str) -> bool:
+    return branch == "local" or (
+        branch.startswith(INTEGRATION_BRANCH_PREFIX)
+        and len(branch) > len(INTEGRATION_BRANCH_PREFIX))
+
+
 def run(args) -> None:
-    env_path = args.env_file.resolve()
-    dotenv = read_env_file(env_path)
     branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=REPO, text=True).strip()
-    if branch != "local":
-        raise RuntimeError("EXPECTED_LOCAL_BRANCH")
+    if not is_allowed_integration_branch(branch):
+        raise RuntimeError("UNSUPPORTED_INTEGRATION_BRANCH")
     subprocess.run(["git", "merge-base", "--is-ancestor", "main", "HEAD"],
                    cwd=REPO, check=True)
     base_commit = subprocess.check_output(["git", "merge-base", "main", "HEAD"], cwd=REPO, text=True).strip()
+    env_path = args.env_file.resolve()
+    dotenv = read_env_file(env_path)
     for port in (8000, 8080):
         if not can_bind(port):
             raise RuntimeError(f"LOCAL_PORT_{port}_ALREADY_IN_USE")
@@ -558,8 +566,7 @@ def main() -> None:
     parser.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--env-file", type=Path, default=REPO / "services/api/.env")
     parser.add_argument("--maven-settings", type=Path)
-    parser.add_argument("--output", type=Path,
-                        default=AI_ROOT / "docs/evidence/local-backend-e2e-draft6-replay.json")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     if args.serve:
         serve_python()
