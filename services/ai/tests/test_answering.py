@@ -1,6 +1,8 @@
+import asyncio
 import json
 from pathlib import Path
 import threading
+import time
 
 import httpx
 import psycopg
@@ -27,7 +29,7 @@ class FakeRetriever:
     def __init__(self, rows):
         self.rows = rows
 
-    async def retrieve(self, question, scope, request_id):
+    async def retrieve(self, question, scope, request_id, *, deadline=None):
         return self.rows
 
 
@@ -167,6 +169,107 @@ async def test_answer_service_leaves_over_limit_rejection_to_shared_contract():
         await service.answer(request)
 
 
+@pytest.mark.parametrize("stage", ["retrieve", "generate"])
+@pytest.mark.asyncio
+async def test_answer_deadline_cancels_every_stage_and_closes_model(monkeypatch, stage):
+    from knowflow_ai import answering
+
+    monkeypatch.setattr(answering, "ANSWER_DEADLINE_SECONDS", 0.01)
+    cancelled = asyncio.Event()
+
+    class SlowRetriever:
+        async def retrieve(self, question, scope, request_id, *, deadline=None):
+            if stage == "retrieve":
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    cancelled.set()
+            return _evidence()
+
+    class SlowLlm:
+        async def generate(self, question, evidence, *, request_id):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        async def aclose(self):
+            closed.set()
+
+    closed = asyncio.Event()
+    service = AnswerService("unused", _contract(), llm_factory=SlowLlm,
+                            retriever=SlowRetriever())
+
+    with pytest.raises(ProcessingError, match="PROCESSING_TIMEOUT"):
+        await service.answer(_request())
+
+    assert cancelled.is_set()
+    assert closed.is_set() is (stage == "generate")
+
+
+@pytest.mark.asyncio
+async def test_database_statement_timeout_uses_remaining_answer_deadline(monkeypatch):
+    from knowflow_ai import answering
+
+    deadline = time.monotonic() + 2.5
+    captured = {}
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def execute(self, query, params):
+            if query.startswith("SELECT set_config"):
+                captured["statement_timeout"] = int(params[0][:-2])
+                captured["configured_at"] = time.monotonic()
+            elif captured.get("cancel_query"):
+                raise psycopg.errors.QueryCanceled("statement timeout")
+
+        def fetchall(self):
+            return []
+
+    class FakeConnection:
+        def __enter__(self):
+            time.sleep(0.02)
+            return self
+
+        def __exit__(self, *args):
+            captured["closed"] = True
+
+        def cursor(self, *, row_factory):
+            return FakeCursor()
+
+    def connect(database_url, *, options, connect_timeout):
+        captured["options"] = options
+        captured["connect_timeout"] = connect_timeout
+        return FakeConnection()
+
+    monkeypatch.setattr(answering.psycopg, "connect", connect)
+
+    rows = ReadOnlyRetriever._fetch_rows("postgresql://readonly.invalid/db",
+                                         "SELECT 1", [], deadline)
+
+    assert rows == []
+    assert captured["options"].startswith(
+        "-c default_transaction_read_only=on -c statement_timeout=")
+    assert captured["connect_timeout"] == 2
+    initial_timeout = int(captured["options"].rsplit("=", 1)[1])
+    assert 0 < initial_timeout <= 500
+    remaining_ms = int((deadline - captured["configured_at"]) * 1000)
+    assert 0 < captured["statement_timeout"] <= min(5000, remaining_ms)
+    assert captured["closed"] is True
+
+    captured["cancel_query"] = True
+    captured["closed"] = False
+    with pytest.raises(psycopg.errors.QueryCanceled):
+        ReadOnlyRetriever._fetch_rows("postgresql://readonly.invalid/db",
+                                      "SELECT 1", [], time.monotonic() + 2.5)
+    assert captured["closed"] is True
+
+
 @pytest.mark.asyncio
 async def test_retriever_batches_full_question_and_combines_vectors_by_segment_length(monkeypatch):
     embedded_batches = []
@@ -182,7 +285,7 @@ async def test_retriever_batches_full_question_and_combines_vectors_by_segment_l
 
     captured = {}
     monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows",
-                        staticmethod(lambda _url, _query, params:
+                        staticmethod(lambda _url, _query, params, _deadline=None:
                                      captured.setdefault("params", params) and []))
     settings = EmbeddingSettings(api_key=EMBEDDING_KEY, max_text_codepoints=3,
                                  max_batch_items=2)
@@ -234,7 +337,7 @@ async def test_long_question_runs_through_embedding_http_and_llm_without_truncat
         })
 
     monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(
-        lambda _url, _query, _params: [{
+        lambda _url, _query, _params, _deadline=None: [{
             "chunk_id": evidence[0]["chunk_id"],
             "document_id": evidence[0]["document_id"],
             "content_version_id": evidence[0]["content_version_id"],

@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import time
 from urllib.parse import urlsplit
 import uuid
 
@@ -15,6 +16,8 @@ from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .protocol import CONTRACT_VERSION
+
+ANSWER_DEADLINE_SECONDS = 28.0
 
 
 @dataclass(frozen=True)
@@ -141,16 +144,36 @@ class ReadOnlyRetriever:
             lambda: SiliconFlowEmbeddingAdapter(self._embedding_settings))
 
     @staticmethod
-    def _fetch_rows(database_url: str, query: str, params: list) -> list[dict]:
+    def _fetch_rows(database_url: str, query: str, params: list,
+                    deadline: float | None = None) -> list[dict]:
+        connect_timeout = 5
+        options = "-c default_transaction_read_only=on -c statement_timeout=5000"
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            connect_timeout = min(5, int(remaining - 0.1))
+            if connect_timeout < 1:
+                raise TimeoutError
+            initial_statement_timeout_ms = int((remaining - connect_timeout) * 1000) - 50
+            if initial_statement_timeout_ms < 1:
+                raise TimeoutError
+            options = ("-c default_transaction_read_only=on "
+                       f"-c statement_timeout={initial_statement_timeout_ms}")
         with psycopg.connect(
                 database_url,
-                options="-c default_transaction_read_only=on -c statement_timeout=5000",
-                connect_timeout=5) as conn:
-            with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
-                cursor.execute(query, params)
-                return cursor.fetchall()
+                options=options, connect_timeout=connect_timeout) as conn, \
+                conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+            if deadline is not None:
+                remaining_ms = int((deadline - time.monotonic()) * 1000) - 50
+                statement_timeout_ms = min(5000, remaining_ms)
+                if statement_timeout_ms < 1:
+                    raise TimeoutError
+                cursor.execute("SELECT set_config('statement_timeout', %s, true)",
+                               (f"{statement_timeout_ms}ms",))
+            cursor.execute(query, params)
+            return cursor.fetchall()
 
-    async def retrieve(self, question: str, scope: dict, request_id: str) -> list[dict]:
+    async def retrieve(self, question: str, scope: dict, request_id: str,
+                       *, deadline: float | None = None) -> list[dict]:
         embedding = self._embedding_factory()
         try:
             maximum = self._embedding_settings.max_text_codepoints
@@ -175,8 +198,12 @@ class ReadOnlyRetriever:
                     raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
                 return combined
 
-            vector = await within_deadline(embed_question,
-                                           self._embedding_settings.timeout_seconds)
+            embedding_timeout = self._embedding_settings.timeout_seconds
+            if deadline is not None:
+                embedding_timeout = min(embedding_timeout, deadline - time.monotonic())
+                if embedding_timeout <= 0:
+                    raise ProcessingError("PROCESSING_TIMEOUT", 504)
+            vector = await within_deadline(embed_question, embedding_timeout)
         finally:
             await embedding.aclose()
         vector_text = "[" + ",".join(format(value, ".9g") for value in vector) + "]"
@@ -211,9 +238,16 @@ class ReadOnlyRetriever:
              LIMIT 5
         """
         try:
-            rows = await asyncio.to_thread(self._fetch_rows, self._database_url, query, params)
+            rows = await asyncio.to_thread(self._fetch_rows, self._database_url,
+                                           query, params, deadline)
+        except TimeoutError:
+            raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
         except asyncio.CancelledError:
             raise
+        except psycopg.errors.QueryCanceled:
+            if deadline is not None and deadline - time.monotonic() <= 0.1:
+                raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
+            raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
         except psycopg.Error:
             raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
         evidence = []
@@ -243,8 +277,17 @@ class AnswerService:
 
     async def answer(self, request: dict) -> dict:
         self._contract.validate("TrustedAnswerRequest", request)
-        evidence = await self._retriever.retrieve(request["question"], request["scope"],
-                                                  request["request_id"])
+        deadline = time.monotonic() + ANSWER_DEADLINE_SECONDS
+        try:
+            async with asyncio.timeout(ANSWER_DEADLINE_SECONDS):
+                return await self._answer(request, deadline)
+        except TimeoutError:
+            raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
+
+    async def _answer(self, request: dict, deadline: float) -> dict:
+        evidence = await self._retriever.retrieve(
+            request["question"], request["scope"], request["request_id"],
+            deadline=deadline)
         allowed_indexes = [
             (item["document_id"], item["content_version_id"], item["index_version_id"])
             for item in request["scope"]["indexes"]

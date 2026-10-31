@@ -7,7 +7,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ConfigDict
 import knowflow_ai.app as ai_app
-from knowflow_ai.app import create_app
+from knowflow_ai.app import await_answer_or_disconnect, create_app
 from knowflow_ai.config import Settings, ConfigurationError
 from knowflow_ai.protocol import ContractConsumer, InvalidMessage
 from knowflow_ai.adapters import ProcessingError, validate_provider_result, within_deadline
@@ -168,6 +168,30 @@ async def test_deadline_cancel_and_failure_redaction():
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
+
+
+@pytest.mark.asyncio
+async def test_client_disconnect_cancels_answer_operation():
+    cancelled = asyncio.Event()
+
+    class DisconnectingRequest:
+        def __init__(self):
+            self.checks = 0
+
+        async def is_disconnected(self):
+            self.checks += 1
+            return self.checks > 1
+
+    async def slow_answer():
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await await_answer_or_disconnect(DisconnectingRequest(), slow_answer)
+
+    assert cancelled.is_set()
 
 
 def test_health_consumes_draft6_examples_without_version_fallback(app, client):
