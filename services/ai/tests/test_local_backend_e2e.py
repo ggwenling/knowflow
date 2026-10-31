@@ -1,5 +1,6 @@
 import asyncio
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -14,6 +15,27 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools/local_backend_e2e.py"
 spec = importlib.util.spec_from_file_location("local_backend_e2e", SCRIPT)
 e2e = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(e2e)
+
+
+def test_e2e_version_and_report_name_match_shared_contract():
+    schema = json.loads((e2e.REPO / "contracts/schemas/protocol.schema.json").read_text(
+        encoding="utf-8"))
+
+    assert e2e.VERSION == schema["$defs"]["ContractVersion"]["const"] == "0.2.0-draft.8"
+    assert e2e.DEFAULT_OUTPUT == e2e.AI_ROOT / "docs/evidence/local-backend-e2e-draft8-replay.json"
+
+
+@pytest.mark.parametrize(("branch", "allowed"), [
+    ("local", True),
+    ("codex/integration-20261031", True),
+    ("codex/integration-jp01", True),
+    ("codex/integration-", False),
+    ("main", False),
+    ("python", False),
+    ("codex/feature-work", False),
+])
+def test_e2e_allows_only_local_or_named_integration_branches(branch, allowed):
+    assert e2e.is_allowed_integration_branch(branch) is allowed
 
 
 @pytest.mark.parametrize(("unfinished", "cleanup", "error"), [
