@@ -1,12 +1,12 @@
-# draft.8 消费清单（提交前核对）
+# draft.9 消费清单（提交前核对）
 
-状态：draft.8 消费尚未完成；Java 与 Python 消费者均须合入本契约并更新版本、精确 Schema 哈希和测试后确认。Q 审阅与真实业务双进程验收待完成。本清单不是正式冻结或独立消费确认。
+状态：draft.9 消费尚未完成；Java 与 Python 消费者均须合入本契约并更新版本、精确 Schema 哈希和测试后确认。Q 审阅与真实业务双进程验收待完成。本清单不是正式冻结或独立消费确认。
 
-共享 Schema SHA-256：`f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Java 常量、派发 DTO、运行配置校验和候选 pipeline 运行时检查固定 `0.2.0-draft.8`；Python 必须固定同一 Schema 哈希、拒绝未知字段及不匹配 profile。两分支各自提交 SHA 后仍需独立复核；复制字段或只使用相同版本字符串不算消费。
+共享 Schema SHA-256：`fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`。Java 常量、派发 DTO、运行配置校验和候选 pipeline 运行时检查固定 `0.2.0-draft.9`；Python 必须固定同一 Schema 哈希、拒绝未知字段及不匹配 profile。两分支各自提交 SHA 后仍需独立复核；复制字段或只使用相同版本字符串不算消费。
 
 ## Python / B 索引消费者
 
-- 把 `contract_version` 固定为 `0.2.0-draft.8`；未知字段拒绝。内部 Bearer 只证明服务身份，`LeaseContext` 才授权具体执行。
+- 把 `contract_version` 固定为 `0.2.0-draft.9`；未知字段拒绝。内部 Bearer 只证明服务身份，`LeaseContext` 才授权具体执行。
 - `embedding_model_profile_id` 使用独立标识规则，允许 `BAAI/bge-m3` 中的 `/`；其他普通资源 ID 仍不因此放宽。
 - `IndexDispatch` 中不接受任意 URL、本地路径或客户端对象键。按 task ID 和 lease 调用 Java `POST /internal/v1/tasks/{task_id}/source`，校验响应版本、task、document、content version、格式、SHA-256 和长度。
 - 消费 `IndexDispatch.runtime_profile`，拒绝未知 runtime profile 或其 `pipeline_profile_id` 与 lease 不一致；分段、Embedding、批次数和批次 JSON body 不得超过消息中的有效上限（`runtime-default`：800/100/16/32/1 MiB）。
@@ -32,4 +32,4 @@
 
 ## 尚未由契约结构验证的事项
 
-Schema 不验证来源归属、租约时效、批次摘要与真实数据库内容一致、原子发布、模型证据支持或删除竞态。以上必须由运行时代码和指定真实依赖测试证明。Q 未复核前，draft.8 保持 DRAFT。
+Schema 不验证来源归属、租约时效、批次摘要与真实数据库内容一致、原子发布、模型证据支持或删除竞态。以上必须由运行时代码和指定真实依赖测试证明。Q 未复核前，draft.9 保持 DRAFT。

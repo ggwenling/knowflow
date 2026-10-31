@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.8`；Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。draft.8 延续 draft.7 的 `IndexDispatch.runtime_profile` 配置上限，并定义内容更新及同内容索引重建的原子发布 API。所有共享报文的 `contract_version` 升至 draft.8；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
+状态：`DRAFT 0.2.0-draft.9`；Schema SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`。draft.9 延续 draft.7 的 `IndexDispatch.runtime_profile` 配置上限，并定义内容更新及同内容索引重建的原子发布 API。所有共享报文的 `contract_version` 升至 draft.9；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
 
 ## 公开入口：浏览器 → Java
 
@@ -108,11 +108,15 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 
 错误结构中的 `retryable` 表示当前请求是否适合重试，不授权 Python 自行创建业务重试任务；重试上限与退避属于 Java。
 
-## SSE 与证据
+## draft.9 SSE 与证据
 
-候选事件：`started` → `delta`（零到多次）→ `sources` → `completed`；异常终止为 `error` 或 `cancelled`，只能有一个终态。所有事件关联 `request_id` 与单调 `sequence`。无答案可有零来源；有事实结论的成功回答需要可核验证据。首版不承诺 EventSource 断点重放，客户端不得因断线自动新建付费请求；重连/持久化策略在 KF2-031/033 前固定。
+`POST /internal/v1/answers/stream` 使用现有 `TrustedAnswerRequest`，响应为 `text/event-stream`。每条 SSE data 是一个通过 `AnswerStreamEvent` 校验的 JSON 对象：`started → delta* → sources → completed`，或以唯一 `error` / `cancelled` 终止。所有事件带 draft.9 `contract_version`、原 `request_id` 和从 1 开始递增的 `sequence`。`delta` 仅含答案文本；`sources` 带经范围与引用核验的 `has_answer` 和来源；`completed` 不重复答案，消费者拼接 delta。拒答发标准拒答文本与空来源。
 
-Java 在每个事件发送前检查整个快照/实际使用文档的当前可见性；删除后只可发送不含片段的终止事件。非流式在返回前做同一检查。删除前已到达客户端的数据无法撤回，检查与网络写出之间的并发语义需在实现和竞态测试中明确。
+Python 请求供应商 `stream=true`，只增量解析 JSON answer 字段；provider 完整 JSON、source IDs、引用集合及可信快照检查成功后才发 sources。截断、畸形或伪造引用必须以脱敏 error 终止。请求有端到端 deadline 与响应/答案大小上限；断连取消检索或模型请求并关闭流。真实 provider 流式行为需要可用凭证才能验证。
+
+Java 在每个事件输出前复核当前可见性；删除后不再发送正文或来源。来源 ID 沿用现有按 question/source 确定性映射；跨 delta 的引用标记须有界缓冲后再公开，避免暴露内部 source ID。最终来源校验和问题持久化通过后才发 completed。首版不承诺 EventSource 断点重放，断线不自动重试付费请求。已发送的 delta 无法撤回。
+
+成功发布的索引按 `ready_at` 倒序保留当前版和前一版；同内容重建也占用一代，失败候选不占位。超出窗口时，先保护仍在运行的索引任务和 PROCESSING 问答快照，再删除旧 question_sources、终态 scope 记录、Chunk、向量，并将不再被保留版本引用的原文件加入现有 storage cleanup queue。问答文本、终态和轻量版本审计行保留；清理后 source ID 与文件访问统一 404。版本窗口不是已发送内容撤回承诺。
 
 证据标识保留 document/content/index/Chunk；PDF 页码从 1 起，TXT/MD 字符区间按 Unicode 码点计数，从 0 起、右端不含。MD 偏移针对原始保存文本，不针对渲染 HTML。PDF 文本片段与页面文本映射由 B 提供，不编造坐标。Schema 可检查形状，`end > start`、片段与原文相符和版本归属必须运行时核验。
 
