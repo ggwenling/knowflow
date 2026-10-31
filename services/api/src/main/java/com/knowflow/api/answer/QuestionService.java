@@ -5,12 +5,16 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.Duration;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 import com.knowflow.api.error.ApiError;
 import com.knowflow.api.error.ApiFailure;
+import com.knowflow.api.config.QuestionProperties;
 import com.knowflow.api.security.AuthenticatedUser;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
@@ -27,15 +31,22 @@ public class QuestionService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final AiAnswerClient client;
+    private final QuestionProperties properties;
 
     public QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                           AiAnswerClient client) {
+                           AiAnswerClient client, QuestionProperties properties) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.client = client;
+        this.properties = properties;
     }
 
     public AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input) {
+        return ask(user, knowledgeBaseId, input, System.nanoTime(), new QuestionCancellation());
+    }
+
+    AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
+                       long requestStartedAt, QuestionCancellation cancellation) {
         String question = validateQuestion(input);
         String requestId = UUID.randomUUID().toString();
         QuestionSnapshot snapshot = createSnapshot(user, knowledgeBaseId, question, requestId);
@@ -47,21 +58,36 @@ public class QuestionService {
 
         AiAnswerResponse response;
         try {
-            response = client.answer(request);
+            if (cancellation.reason() != null) {
+                throw new CancellationException("Question request was cancelled");
+            }
+            response = client.answer(request, remainingBudget(requestStartedAt));
             validateAnswer(response);
+            if (cancellation.reason() != null) {
+                throw new CancellationException("Question request was cancelled");
+            }
+            remainingBudget(requestStartedAt);
+        } catch (CancellationException cancelled) {
+            return cancelQuestion(snapshot.questionId(), cancellation);
         } catch (RuntimeException failure) {
-            boolean timeout = isTimeout(failure);
+            boolean timeout = cancellation.reason() == QuestionCancellation.Reason.TIMEOUT
+                    || isTimeout(failure);
+            if (cancellation.reason() == QuestionCancellation.Reason.CLIENT_DISCONNECTED) {
+                return cancelQuestion(snapshot.questionId(), cancellation);
+            }
             markFailed(snapshot.questionId(), timeout ? "PROCESSING_TIMEOUT" : "AI_PROCESSING_FAILED");
             throw timeout ? ApiFailure.processingTimeout() : ApiFailure.aiProcessingFailed();
         }
 
         try {
             AnswerResponse saved = transactions.execute(status -> saveAnswer(user, snapshot,
-                    requestId, response));
+                    requestId, response, cancellation));
             if (saved == null) {
                 throw new IllegalStateException("Question persistence did not return a response");
             }
             return saved;
+        } catch (CancellationException cancelled) {
+            return cancelQuestion(snapshot.questionId(), cancellation);
         } catch (ApiFailure failure) {
             markFailed(snapshot.questionId(), "DOCUMENT_UNAVAILABLE".equals(failure.code())
                     ? "DOCUMENT_UNAVAILABLE" : "AI_PROCESSING_FAILED");
@@ -131,7 +157,9 @@ public class QuestionService {
     }
 
     private AnswerResponse saveAnswer(AuthenticatedUser user, QuestionSnapshot snapshot,
-                                      String requestId, AiAnswerResponse response) {
+                                      String requestId, AiAnswerResponse response,
+                                      QuestionCancellation cancellation) {
+        requireNotCancelled(cancellation);
         lockKnowledgeBase(user.id(), snapshot.knowledgeBaseId());
         for (IndexRef index : snapshot.indexes()) {
             List<Boolean> stillVisible = jdbc.query("""
@@ -156,6 +184,7 @@ public class QuestionService {
         Set<String> upstreamSourceIds = new HashSet<>();
         String publicAnswer = response.answer();
         for (AiAnswerResponse.AiSource source : response.sources()) {
+            requireNotCancelled(cancellation);
             if (source == null || source.sourceId() == null
                     || !IDENTIFIER.matcher(source.sourceId()).matches()
                     || !upstreamSourceIds.add(source.sourceId()) || source.documentId() == null
@@ -196,6 +225,7 @@ public class QuestionService {
             publicAnswer = publicAnswer.replace("[" + source.sourceId() + "]",
                     "[" + publicSourceId + "]");
         }
+        requireNotCancelled(cancellation);
         jdbc.update("""
                 UPDATE knowflow.questions
                    SET status = 'SUCCEEDED', answer_text = ?, has_answer = ?,
@@ -260,6 +290,48 @@ public class QuestionService {
                     """, failureCode, questionId);
         } catch (DataAccessException ignored) {
             // A database outage cannot be repaired synchronously; the row remains PROCESSING.
+        }
+    }
+
+    private AnswerResponse cancelQuestion(UUID questionId, QuestionCancellation cancellation) {
+        boolean interrupted = Thread.interrupted();
+        try {
+            if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT) {
+                markFailed(questionId, "PROCESSING_TIMEOUT");
+                throw ApiFailure.processingTimeout();
+            }
+            markCancelled(questionId);
+            return null;
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void markCancelled(UUID questionId) {
+        jdbc.update("""
+                UPDATE knowflow.questions
+                   SET status = 'CANCELLED', answer_text = NULL, has_answer = NULL,
+                       failure_code = NULL, finished_at = CURRENT_TIMESTAMP,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ? AND status = 'PROCESSING'
+                """, questionId);
+    }
+
+    private Duration remainingBudget(long requestStartedAt) {
+        long totalNanos = TimeUnit.SECONDS.toNanos(properties.getTotalBudgetSeconds());
+        long remainingNanos = totalNanos - (System.nanoTime() - requestStartedAt);
+        if (remainingNanos <= 0) {
+            throw new IllegalStateException("Question budget exhausted",
+                    new java.util.concurrent.TimeoutException());
+        }
+        return Duration.ofNanos(remainingNanos);
+    }
+
+    private static void requireNotCancelled(QuestionCancellation cancellation) {
+        if (cancellation.reason() != null) {
+            throw new CancellationException("Question request was cancelled");
         }
     }
 
