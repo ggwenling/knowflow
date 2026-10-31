@@ -11,10 +11,9 @@ import uuid
 import httpx
 import psycopg
 
-from .adapters import ProcessingError
+from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
-from .embedding import (DEFAULT_MAX_TEXT_CODEPOINTS, EmbeddingSettings,
-                        SiliconFlowEmbeddingAdapter)
+from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .protocol import CONTRACT_VERSION
 
 
@@ -132,12 +131,14 @@ class DeepSeekAdapter:
 
 
 class ReadOnlyRetriever:
-    def __init__(self, database_url: str, embedding_factory=None):
+    def __init__(self, database_url: str, embedding_factory=None,
+                 embedding_settings: EmbeddingSettings | None = None):
         if not database_url:
             raise ConfigurationError("AI_DATABASE_UNAVAILABLE")
         self._database_url = database_url
+        self._embedding_settings = embedding_settings or EmbeddingSettings.from_environment()
         self._embedding_factory = embedding_factory or (
-            lambda: SiliconFlowEmbeddingAdapter(EmbeddingSettings.from_environment()))
+            lambda: SiliconFlowEmbeddingAdapter(self._embedding_settings))
 
     @staticmethod
     def _fetch_rows(database_url: str, query: str, params: list) -> list[dict]:
@@ -152,10 +153,32 @@ class ReadOnlyRetriever:
     async def retrieve(self, question: str, scope: dict, request_id: str) -> list[dict]:
         embedding = self._embedding_factory()
         try:
-            result = await embedding.embed([question], request_id=request_id)
+            maximum = self._embedding_settings.max_text_codepoints
+            segments = [question[start:start + maximum]
+                        for start in range(0, len(question), maximum)]
+
+            async def embed_question():
+                vectors = []
+                batch_size = self._embedding_settings.max_batch_items
+                for start in range(0, len(segments), batch_size):
+                    result = await embedding.embed(segments[start:start + batch_size],
+                                                   request_id=request_id)
+                    vectors.extend(row["embedding"] for row in result["data"])
+                if len(vectors) == 1:
+                    return vectors[0]
+                weights = [len(segment) / len(question) for segment in segments]
+                combined = [math.fsum(weight * vector[index]
+                                      for weight, vector in zip(weights, vectors, strict=True))
+                            for index in range(self._embedding_settings.dimensions)]
+                if (not any(combined)
+                        or any(not math.isfinite(value) for value in combined)):
+                    raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+                return combined
+
+            vector = await within_deadline(embed_question,
+                                           self._embedding_settings.timeout_seconds)
         finally:
             await embedding.aclose()
-        vector = result["data"][0]["embedding"]
         vector_text = "[" + ",".join(format(value, ".9g") for value in vector) + "]"
         indexes = scope["indexes"]
         scope_predicates = " OR ".join(
@@ -212,16 +235,14 @@ class AnswerService:
 
     def __init__(self, database_url: str, contract, embedding_factory=None,
                  llm_factory=None, retriever=None,
-                 max_question_codepoints: int = DEFAULT_MAX_TEXT_CODEPOINTS):
+                 embedding_settings: EmbeddingSettings | None = None):
         self._contract = contract
-        self._retriever = retriever or ReadOnlyRetriever(database_url, embedding_factory)
+        self._retriever = retriever or ReadOnlyRetriever(
+            database_url, embedding_factory, embedding_settings)
         self._llm_factory = llm_factory or (lambda: DeepSeekAdapter(LlmSettings.from_environment()))
-        self._max_question_codepoints = max_question_codepoints
 
     async def answer(self, request: dict) -> dict:
         self._contract.validate("TrustedAnswerRequest", request)
-        if len(request["question"]) > self._max_question_codepoints:
-            raise ProcessingError("INVALID_REQUEST", 400, retryable=False)
         evidence = await self._retriever.retrieve(request["question"], request["scope"],
                                                   request["request_id"])
         allowed_indexes = [

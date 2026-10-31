@@ -14,11 +14,13 @@ from knowflow_ai.answering import (
     ReadOnlyRetriever,
 )
 from knowflow_ai.config import ConfigurationError
-from knowflow_ai.protocol import ContractConsumer
+from knowflow_ai.embedding import EmbeddingSettings
+from knowflow_ai.protocol import ContractConsumer, InvalidMessage
 
 
 ROOT = Path(__file__).resolve().parents[3]
 KEY = "synthetic-deepseek-key-" + "x" * 32
+EMBEDDING_KEY = "synthetic-embedding-key-" + "x" * 32
 
 
 class FakeRetriever:
@@ -122,7 +124,8 @@ async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
 
     main_thread_id = threading.get_ident()
     retriever = ReadOnlyRetriever(
-        "postgresql://readonly.invalid/db", embedding_factory=FakeEmbedding)
+        "postgresql://readonly.invalid/db", embedding_factory=FakeEmbedding,
+        embedding_settings=EmbeddingSettings(api_key=EMBEDDING_KEY))
     evidence = await retriever.retrieve("question", {
         "owner_id": "user-example-a",
         "knowledge_base_id": "kb-example-a",
@@ -140,6 +143,63 @@ async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
     assert "d.active_index_version_id = c.index_version_id" in calls["query"]
     assert evidence[0]["text_content"] == "verified source text"
     assert evidence[0]["locator"]["unit"] == "unicode_code_point"
+
+
+@pytest.mark.parametrize("length", [800, 801, 16000])
+@pytest.mark.asyncio
+async def test_answer_service_accepts_questions_up_to_shared_contract_limit(length):
+    service = AnswerService("unused", _contract(), retriever=FakeRetriever([]))
+    request = _request()
+    request["question"] = "问" * length
+
+    response = await service.answer(request)
+
+    assert response["has_answer"] is False
+
+
+@pytest.mark.asyncio
+async def test_answer_service_leaves_over_limit_rejection_to_shared_contract():
+    service = AnswerService("unused", _contract(), retriever=FakeRetriever([]))
+    request = _request()
+    request["question"] = "问" * 16001
+
+    with pytest.raises(InvalidMessage):
+        await service.answer(request)
+
+
+@pytest.mark.asyncio
+async def test_retriever_batches_full_question_and_combines_vectors_by_segment_length(monkeypatch):
+    embedded_batches = []
+    vectors = iter([1.0, 3.0, 5.0, 7.0])
+
+    class FakeEmbedding:
+        async def embed(self, texts, *, request_id):
+            embedded_batches.append(texts)
+            return {"data": [{"embedding": [next(vectors)] * 1024} for _ in texts]}
+
+        async def aclose(self):
+            return None
+
+    captured = {}
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows",
+                        staticmethod(lambda _url, _query, params:
+                                     captured.setdefault("params", params) and []))
+    settings = EmbeddingSettings(api_key=EMBEDDING_KEY, max_text_codepoints=3,
+                                 max_batch_items=2)
+    retriever = ReadOnlyRetriever("postgresql://readonly.invalid/db",
+                                  embedding_factory=FakeEmbedding,
+                                  embedding_settings=settings)
+
+    rows = await retriever.retrieve("abcdefghij", {
+        "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
+        "indexes": [{"document_id": "doc-example-1",
+                     "content_version_id": "content-example-1",
+                     "index_version_id": "index-example-1"}],
+    }, "answer-test-01")
+
+    assert rows == []
+    assert embedded_batches == [["abc", "def"], ["ghi", "j"]]
+    assert captured["params"][0] == "[3.4," + ",".join(["3.4"] * 1023) + "]"
 
 
 @pytest.mark.asyncio

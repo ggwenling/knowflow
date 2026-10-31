@@ -102,6 +102,34 @@ async def test_worker_writes_draft6_batches_and_manifest_then_completes():
 
 
 @pytest.mark.asyncio
+async def test_chunk_ids_are_deterministic_and_isolated_by_string_index_version():
+    source = ("Index versions require distinct chunk primary keys. " * 45).encode("utf-8")
+    contract = ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
+    dispatch = _dispatch(source)
+    first_gateway = FakeGateway(contract, source)
+    second_gateway = FakeGateway(contract, source)
+    first = IndexWorker(first_gateway, embedding_factory=FakeEmbedding)
+    second = IndexWorker(second_gateway, embedding_factory=FakeEmbedding)
+    other_version = copy.deepcopy(dispatch)
+    other_version["lease"]["index_version_id"] = "index-version-two"
+
+    await first._index(dispatch, FakeEmbedding())
+    first_batch_count = len(first_gateway.batches)
+    await first._index(dispatch, FakeEmbedding())
+    await second._index(other_version, FakeEmbedding())
+
+    first_ids = [chunk["chunk_id"] for batch in first_gateway.batches[:first_batch_count]
+                 for chunk in batch["chunks"]]
+    replay_ids = [chunk["chunk_id"] for batch in first_gateway.batches[first_batch_count:]
+                  for chunk in batch["chunks"]]
+    other_ids = [chunk["chunk_id"] for batch in second_gateway.batches
+                 for chunk in batch["chunks"]]
+    assert first_ids == replay_ids
+    assert len(first_ids) == len(other_ids)
+    assert set(first_ids).isdisjoint(other_ids)
+
+
+@pytest.mark.asyncio
 async def test_worker_deduplicates_an_accepted_lease_and_cancels_its_heartbeat():
     contract = ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
     gateway = FakeGateway(contract, b"")

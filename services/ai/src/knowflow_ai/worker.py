@@ -186,7 +186,7 @@ class IndexWorker:
             raise ParseFailure("EMPTY_DOCUMENT")
         batches: list[dict] = []
         model_profile = "BAAI/bge-m3"
-        chunk_namespace = uuid.UUID(lease["index_version_id"])
+        chunk_namespace = uuid.uuid5(uuid.NAMESPACE_URL, lease["index_version_id"])
         for start in range(0, len(chunks), 16):
             source_chunks = chunks[start:start + 16]
             vectors = await embedding.embed([chunk.text for chunk in source_chunks],
