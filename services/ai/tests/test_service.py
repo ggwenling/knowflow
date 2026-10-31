@@ -235,7 +235,8 @@ def test_full_index_queue_returns_retryable_503_not_accepted(client, app, monkey
     async def reject_when_full(_dispatch):
         raise WorkerUnavailable('INDEX_QUEUE_FULL')
 
-    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: None))
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment',
+                        staticmethod(lambda: EmbeddingSettings(api_key='e' * 40)))
     monkeypatch.setattr(app.state.index_worker, 'accept', reject_when_full)
     response = client.post('/internal/v1/index-executions',
                            headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
@@ -246,6 +247,68 @@ def test_full_index_queue_returns_retryable_503_not_accepted(client, app, monkey
     assert response.json()['request_id'] == dispatch['request_id']
     assert response.json()['retryable'] is True
     assert 'result' not in response.json()
+
+
+def test_index_dispatch_accepts_effective_smaller_runtime_profile(client, app, monkeypatch):
+    cases = json.loads((ROOT / 'contracts/examples/protocol-cases.json').read_text(encoding='utf-8'))
+    dispatch = copy.deepcopy(next(case['payload'] for case in cases
+                                  if case['definition'] == 'IndexDispatch'
+                                  and case['structurally_valid']))
+    dispatch['request_id'] = 'smaller-profile-request'
+    dispatch['runtime_profile_id'] = 'runtime-default'
+    dispatch['runtime_profile'].update(
+        chunk_max_codepoints=400, overlap_codepoints=50, embedding_max_batch_items=8,
+        index_max_batch_chunks=4, index_max_batch_bytes=64_000)
+    settings = EmbeddingSettings(api_key='e' * 40, max_text_codepoints=400,
+                                 max_batch_items=8)
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: settings))
+    accepted = []
+
+    async def record_acceptance(payload):
+        accepted.append(payload)
+
+    monkeypatch.setattr(app.state.index_worker, 'accept', record_acceptance)
+    response = client.post('/internal/v1/index-executions',
+                           headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
+                           json=dispatch)
+
+    assert response.status_code == 202
+    assert accepted == [dispatch]
+
+
+@pytest.mark.parametrize('mismatch', ['pipeline', 'overlap', 'text-limit', 'batch-limit'])
+def test_index_dispatch_rejects_runtime_profile_that_cannot_be_executed(
+        client, app, monkeypatch, mismatch):
+    cases = json.loads((ROOT / 'contracts/examples/protocol-cases.json').read_text(encoding='utf-8'))
+    dispatch = copy.deepcopy(next(case['payload'] for case in cases
+                                  if case['definition'] == 'IndexDispatch'
+                                  and case['structurally_valid']))
+    dispatch['request_id'] = 'invalid-profile-request'
+    dispatch['runtime_profile_id'] = 'runtime-default'
+    settings = EmbeddingSettings(api_key='e' * 40)
+    if mismatch == 'pipeline':
+        dispatch['runtime_profile']['pipeline_profile_id'] = 'different-pipeline'
+    elif mismatch == 'overlap':
+        dispatch['runtime_profile'].update(chunk_max_codepoints=100,
+                                           overlap_codepoints=100)
+    elif mismatch == 'text-limit':
+        settings = EmbeddingSettings(api_key='e' * 40, max_text_codepoints=400)
+    else:
+        settings = EmbeddingSettings(api_key='e' * 40, max_batch_items=8)
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: settings))
+    accepted = []
+
+    async def record_acceptance(payload):
+        accepted.append(payload)
+
+    monkeypatch.setattr(app.state.index_worker, 'accept', record_acceptance)
+    response = client.post('/internal/v1/index-executions',
+                           headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
+                           json=dispatch)
+
+    assert response.status_code == 400
+    assert response.json()['code'] == 'INVALID_REQUEST'
+    assert accepted == []
 
 
 def test_index_dispatch_without_embedding_credential_is_not_accepted(client, app, monkeypatch):

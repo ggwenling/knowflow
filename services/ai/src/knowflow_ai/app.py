@@ -15,7 +15,7 @@ from .adapters import ProcessingError
 from .answering import AnswerService, LlmSettings
 from .embedding import EmbeddingSettings
 from .java_client import JavaGateway
-from .worker import IndexWorker, WorkerUnavailable
+from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
 
@@ -157,7 +157,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
         if payload['runtime_profile_id'] != settings.runtime_profile_id:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
-        EmbeddingSettings.from_environment()
+        embedding_settings = EmbeddingSettings.from_environment()
+        validate_runtime_profile(payload, embedding_settings)
         await request.app.state.index_worker.accept(payload)
         receipt = {'contract_version': CONTRACT_VERSION, 'request_id': payload['request_id'],
                    'task_id': payload['lease']['task_id'],
