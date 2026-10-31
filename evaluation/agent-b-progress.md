@@ -153,3 +153,9 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 可重放本机闭环的 `services/ai/tools/local_backend_e2e.py` 现验证活动取消送达及 adapter 收尾、等待相关物理清理，Windows 上清理 Java 进程树，并拒绝在已有未完成任务或清理队列的数据库启动。实际真实服务合成重放通过，证据 `services/ai/docs/evidence/local-backend-e2e-draft6-replay.json`；合成账户记录留在本地数据库，知识库已删除且会话已退出。
 - 当前所选 Embedding/LLM 凭证均不存在，开发集真实模型评测记录为 `SKIPPED_NO_CREDENTIALS`（`services/ai/docs/evidence/development-evaluation-local-draft6-skipped.json`），本次外部模型调用 0；向量排序与生成质量仍未测，不能用合成 adapter 冒充。Q/M 正式验收仍待独立执行。
 - 提交前复验发现 Windows `taskkill` 偶尔在目标进程已退出后返回错误码；重放工具现仅在进程仍存活时传播该错误，并在清理后检查服务端口。两种错误码分支、进程树测试及真实服务合成重放均通过，Python 全量 **134 passed**；这次重放仍使用合成 adapter，外部模型调用 0。
+
+## 2026-10-31：draft.8 本机合成 E2E 实际验证
+
+在集成分支 `codex/integration-20261031`、基线 `6297956be29584d90e5ffea037afd550b60746de` 上完成 draft.8 本机 Java/Python/PostgreSQL/pgvector/MinIO 重放，Schema SHA-256 为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。结果 `DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS`：上传、索引 READY、只读检索、带来源合成问答、活动取消送达、adapter 收尾、无迟到 Chunk/Embedding 写入、知识库删除及清理队列排空均为 true。完整报告见 [draft.8 E2E evidence](../services/ai/docs/evidence/local-backend-e2e-draft8-replay.json)。
+
+本次 Embedding/LLM 使用本地确定性合成 adapter，外部 provider 调用 0；该验证证明本机集成流程，不证明真实模型质量、检索排序或生产性能。会话已注销、知识库已删除、清理队列已排空；合成账户记录留在本地数据库，Compose 容器已停止且数据卷保留。Q 审阅与 M 消费确认仍未完成。
