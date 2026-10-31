@@ -102,6 +102,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
     supported_answers = reviewed_answers = 0
     unanswerable_count = unanswerable_refused = 0
     cited_total = cited_gold_overlap = 0
+    question_results = []
     for prediction in payload["predictions"]:
         if (not isinstance(prediction, dict)
                 or set(prediction) != {"question_id", "has_answer", "retrieved_evidence",
@@ -147,12 +148,28 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         else:
             unanswerable_count += 1
             unanswerable_refused += not prediction["has_answer"]
-        answerability_correct += prediction["has_answer"] == question["answerable"]
+        correct_answerability = prediction["has_answer"] == question["answerable"]
+        answerability_correct += correct_answerability
+        cited_hits = 0
         for index in citations:
             cited_total += 1
-            cited_gold_overlap += any(_covered(item, [retrieved[index]]) for item in gold)
+            cited_hits += any(_covered(item, [retrieved[index]]) for item in gold)
+        cited_gold_overlap += cited_hits
         latencies.append(float(latency))
         received[prediction["question_id"]] = True
+        question_results.append({
+            "question_id": question["id"],
+            "answerable": question["answerable"],
+            "has_answer": prediction["has_answer"],
+            "answerability_correct": correct_answerability,
+            "gold_evidence_hits": hits,
+            "gold_evidence_count": len(gold),
+            "complete_gold_evidence_retrieved": bool(gold) and hits == len(gold),
+            "support_judgement": judgement,
+            "cited_gold_span_overlaps": cited_hits,
+            "citation_count": len(citations),
+            "latency_ms": float(latency),
+        })
 
     missing = set(expected) - set(received)
     if missing:
@@ -164,17 +181,27 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         "dataset_provenance": "synthetic authored seed; not human-user evaluation",
         "split": split,
         "sample_count": len(selected),
+        "question_results": sorted(question_results, key=lambda item: item["question_id"]),
         "metrics": {
+            "answerable_question_count": answerable_count,
+            "unanswerable_question_count": unanswerable_count,
             "answerability_accuracy": round(answerability_correct / len(selected), 4),
+            "gold_evidence_span_count": evidence_total,
+            "gold_evidence_span_hit_count": evidence_hits,
             "gold_evidence_span_recall": round(evidence_hits / evidence_total, 4)
             if evidence_total else None,
+            "answerable_questions_with_evidence_count": sum(
+                bool(item["evidence"]) for item in selected),
             "complete_gold_evidence_question_rate": round(
                 full_evidence_questions / sum(bool(item["evidence"]) for item in selected), 4)
             if any(item["evidence"] for item in selected) else None,
+            "answerable_questions_answered_count": answerable_answered,
             "answerable_answer_rate": round(answerable_answered / answerable_count, 4)
             if answerable_count else None,
+            "unanswerable_questions_refused_count": unanswerable_refused,
             "unanswerable_refusal_rate": round(unanswerable_refused / unanswerable_count, 4)
             if unanswerable_count else None,
+            "human_support_reviewed_answer_count": reviewed_answers,
             "human_support_review_coverage": round(reviewed_answers / answerable_answered, 4)
             if answerable_answered else None,
             "human_supported_answer_rate": round(supported_answers / reviewed_answers, 4)

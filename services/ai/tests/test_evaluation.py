@@ -58,6 +58,9 @@ def test_runner_scores_saved_predictions_and_keeps_human_judgement_explicit(tmp_
     assert report["metrics"]["unanswerable_refusal_rate"] == 1.0
     assert report["metrics"]["human_support_review_coverage"] == 1.0
     assert report["metrics"]["human_supported_answer_rate"] == 1.0
+    assert report["metrics"]["answerable_question_count"] == 10
+    assert report["metrics"]["unanswerable_question_count"] == 2
+    assert len(report["question_results"]) == 12
     assert report["metrics"]["latency_ms"] == {
         "sample_count": 12, "p50_nearest_rank": 6.0, "p95_nearest_rank": 12.0}
     assert report["interpretation"]["acceptance_threshold"].startswith("not registered")
