@@ -166,3 +166,9 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 分段边界按优先级预索引并使用二分查找，分段结果以生成器流式提供给 worker；每处理 64 个 Chunk 主动让出事件循环，租约 heartbeat 和取消可以继续运行。`chunk_document()` 的 tuple API、边界选择、原文定位及 Chunk/profile ID 均保持不变。
 - 回归覆盖 PostgreSQL 协议黑洞下的 deadline、单次/重复取消、连接阶段取消；16,000 字符、`chunk_max_codepoints=1` 配置下的事件循环心跳与取消；固定 txt/Markdown/PDF golden 输出及边界查找次数。随机输入与修复前实现另做 100 组逐 Chunk 比对，结果一致。
 - 验证：Python 全量 **187 passed**；Schema **70** 个结构样例；离线回归 **16 passed**；parser smoke **15** 项、Python HTTP process smoke **8/8**。此记录不代表 Java↔Python health 或本机业务 E2E 已在本次修复提交上复验；这些会在合入集成候选后单独记录。未调用真实 Embedding/LLM provider，Q/M 验收状态不变。
+
+## 2026-10-31：索引批次历史内存修复
+
+- `IndexWorker` 在 Java gateway 确认批次写入后，只将 `batch_sequence`、`batch_id`、`batch_sha256`、`chunk_count` 留在 manifest 历史列表；批次请求体及其 Chunk 文本/1024 维向量可释放。manifest 摘要序列化仍使用相同的批次数量与字段顺序。
+- 新增 512 个单字符 Chunk 的 `tracemalloc` 回归；每条 Embedding 都是独立 1024 维列表。修复前测试测得峰值 **17,525,103 bytes** 并失败；修复后要求峰值低于 **16 MiB**，同时验证 8 个批次摘要只包含所需四个字段且 manifest 总数正确。
+- 验证：Python 全量 **188 passed**；Schema **70** 个结构样例；离线回归 **16 passed**；worker 定向 **12 passed**。此前的提交/集成测试仍需针对新摘要表示重跑业务 E2E，以确认 Java 端 manifest 验收兼容。真实模型调用为 0，Q/M 状态不变。

@@ -220,7 +220,7 @@ class IndexWorker:
         if parsed.file_sha256 != dispatch["source"]["sha256"]:
             raise ProcessingError("SOURCE_UNAVAILABLE", 502, retryable=False)
         chunks = _iter_document_chunks(parsed, chunking)
-        batches: list[dict] = []
+        batches: list[dict[str, int | str]] = []
         model_profile = "BAAI/bge-m3"
         chunk_namespace = uuid.uuid5(uuid.NAMESPACE_URL, lease["index_version_id"])
 
@@ -240,7 +240,12 @@ class IndexWorker:
             batch["batch_sha256"] = batch_sha256(batch)
             self._gateway._contract.validate("IndexBatch", batch)
             await self._gateway.write_batch(batch)
-            batches.append(batch)
+            batches.append({
+                "batch_sequence": sequence,
+                "batch_id": batch["batch_id"],
+                "batch_sha256": batch["batch_sha256"],
+                "chunk_count": len(batch_rows),
+            })
 
         pending = []
         async def add_row(row: dict):
@@ -290,6 +295,7 @@ class IndexWorker:
             raise ParseFailure("EMPTY_DOCUMENT")
         if pending:
             await write_batch(pending)
+            pending = []
 
         manifest = {
             "chunk_count": chunk_count, "embedding_count": chunk_count,
