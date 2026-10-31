@@ -1,4 +1,5 @@
 """Authenticated internal AI service for lease-fenced indexing and answers."""
+import asyncio
 from contextlib import asynccontextmanager
 import hmac
 import re
@@ -14,9 +15,26 @@ from .adapters import ProcessingError
 from .answering import AnswerService, LlmSettings
 from .embedding import EmbeddingSettings
 from .java_client import JavaGateway
-from .worker import IndexWorker, WorkerUnavailable
+from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
+
+
+async def await_answer_or_disconnect(request: Request, operation):
+    task = asyncio.create_task(operation())
+    try:
+        while not task.done():
+            if await request.is_disconnected():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+                raise asyncio.CancelledError
+            await asyncio.wait((task,), timeout=0.1)
+        return task.result()
+    except BaseException:
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        raise
 
 
 def failure(request_id, status, code, *, headers=None, retryable=None):
@@ -139,7 +157,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
         if payload['runtime_profile_id'] != settings.runtime_profile_id:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
-        EmbeddingSettings.from_environment()
+        embedding_settings = EmbeddingSettings.from_environment()
+        validate_runtime_profile(payload, embedding_settings)
         await request.app.state.index_worker.accept(payload)
         receipt = {'contract_version': CONTRACT_VERSION, 'request_id': payload['request_id'],
                    'task_id': payload['lease']['task_id'],
@@ -166,6 +185,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         LlmSettings.from_environment()
         service = AnswerService(settings.ai_database_url, contract,
                                 embedding_settings=embedding_settings)
-        return await service.answer(payload)
+        return await await_answer_or_disconnect(request, lambda: service.answer(payload))
 
     return app

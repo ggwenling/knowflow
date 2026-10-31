@@ -1,6 +1,6 @@
 # B 线契约消费及 A 交接（JP-01 / KF2-007）
 
-当前本机 `local` 已消费 `0.2.0-draft.6`，Python 已启用 lease-scoped 索引、取消和可信快照问答入口；当前版本、行为和测试证据见本文末尾“本机 local 消费 draft.6”。下方 JP-01 / draft.4 章节保留为历史记录，不代表当前路由或能力。
+当前 Python `python` 分支已合入 A 的 draft.7 契约提交，并更新严格消费者；B2 runtime profile 消费正在实现。draft.6 的本机联调记载保留为历史证据，不代表当前契约版本。
 
 ## JP-01 / draft.4 历史消费快照
 
@@ -46,3 +46,7 @@ A 已将内部健康响应纳入 InternalHealth Schema，B 使用该定义验证
 - Python 完整测试最新 **123 passed**；Schema **70** 个结构样例；`evaluation/smoke` **16 passed**；真实 Python HTTP process smoke **8 passed**。heartbeat `LEASE_REJECTED` fencing 回归连续 10/10 通过；有界队列满载拒收与 HTTP 可重试 503 回归通过。Windows 只读检索走 `asyncio.to_thread` 中的同步 psycopg，使用 5 秒 connect/statement 上限及只读事务。问答把每条检索返回的 document/content/index 三元组再与可信快照核对，越界时在 LLM 调用前拒绝。活动索引取消会取消并等待 processing 子任务后再关闭 embedding adapter。
 - Python worker 通过有界 Java gateway 读取源文件、heartbeat、写批次并提交完成；问答仅接收 Java 快照 scope，AI 使用 `knowflow_ai` 只读连接检索 READY 向量。Python 在发送任何检索文本给 LLM 前核验 document/content/index 三元组属于快照；Java 再验证来源属于快照、引用存在于当前 Chunk、定位一致后才持久化。真实 PostgreSQL/pgvector、MinIO、Java 与 Python 进程的合成索引及问答闭环证据见 `docs/evidence/local-backend-e2e-draft6-verified.json`。
 - 本地闭环使用合成 Embedding/LLM adapter，**外部模型调用 0**。添加 scope guard 后的真实索引/问答报告见 `docs/evidence/local-backend-e2e-draft6-verified.json`；真实 deletion outbox→Python HTTP cancel、活动 worker 中断和无迟到写入报告见 `docs/evidence/cancellation-e2e-local-draft6-verified.json`。完整 Java/Python health 联调报告见 `docs/evidence/java-python-smoke-local-draft6-verified.json`。当前本机 AI 角色只读权限报告见 `docs/evidence/local-db-role-audit-draft6.json`。所有结果是 `local` 开发验证，不表示 Q 已批准、M 已消费确认、契约已冻结或真实模型质量已通过。
+
+## 2026-10-31：Python 分支消费 draft.7
+
+合入 A 的精确提交 `bd6c8df51548ed3887b2b36d03fdb969f41aa010`，版本为 `0.2.0-draft.7`，Schema SHA-256 为 `58c4ae3e5d7052abd29e819295a783afe90e0a3104a2ad2a8220407ee2945f9f`。消费者拒绝 draft.6 及其他旧版本和任意不同字节的 Schema；索引工作包消费项与测试结果随 Python B2 提交补记。该 draft 仍是候选，未声称契约冻结或完成 Q 审阅。

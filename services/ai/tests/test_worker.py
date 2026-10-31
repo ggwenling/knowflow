@@ -7,9 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from knowflow_ai.adapters import ProcessingError
+from knowflow_ai.embedding import EmbeddingSettings
 from knowflow_ai.java_client import JavaGatewayError
 from knowflow_ai.protocol import ContractConsumer
-from knowflow_ai.worker import IndexWorker, WorkerUnavailable
+from knowflow_ai.worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -77,7 +79,7 @@ def _dispatch(source: bytes):
 
 
 @pytest.mark.asyncio
-async def test_worker_writes_draft6_batches_and_manifest_then_completes():
+async def test_worker_writes_batches_and_manifest_then_completes():
     source = ("KnowFlow verifies each citation against its original source. " * 45).encode("utf-8")
     contract = ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
     gateway = FakeGateway(contract, source)
@@ -99,6 +101,61 @@ async def test_worker_writes_draft6_batches_and_manifest_then_completes():
     assert completion["manifest"]["chunk_count"] == sum(
         len(batch["chunks"]) for batch in gateway.batches)
     contract.validate("Completion", completion)
+
+
+@pytest.mark.parametrize(("max_batch_chunks", "max_batch_bytes", "expected_max_chunks"), [
+    (2, 100_000, 2),
+    (32, 9_000, 1),
+])
+@pytest.mark.asyncio
+async def test_worker_applies_dispatch_chunk_embedding_and_write_limits(
+        max_batch_chunks, max_batch_bytes, expected_max_chunks):
+    source = ("😀" * 2_000).encode("utf-8")
+    contract = ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
+    gateway = FakeGateway(contract, source)
+    calls = []
+
+    class RecordingEmbedding(FakeEmbedding):
+        async def embed(self, texts, *, request_id):
+            calls.append([len(text) for text in texts])
+            return await super().embed(texts, request_id=request_id)
+
+    dispatch = _dispatch(source)
+    dispatch["runtime_profile"].update(
+        chunk_max_codepoints=120,
+        overlap_codepoints=20,
+        embedding_max_batch_items=3,
+        index_max_batch_chunks=max_batch_chunks,
+        index_max_batch_bytes=max_batch_bytes,
+    )
+    worker = IndexWorker(gateway, embedding_factory=RecordingEmbedding)
+
+    await worker._index(dispatch, RecordingEmbedding())
+
+    assert calls and all(len(call) <= 3 for call in calls)
+    assert max(len(call) for call in calls) == 3
+    written = [chunk for batch in gateway.batches for chunk in batch["chunks"]]
+    assert written and all(len(chunk["text"]) <= 120 for chunk in written)
+    assert all(len(batch["chunks"]) <= max_batch_chunks for batch in gateway.batches)
+    assert max(len(batch["chunks"]) for batch in gateway.batches) == expected_max_chunks
+    assert all(len(json.dumps(batch, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+               <= max_batch_bytes for batch in gateway.batches)
+    assert gateway.completions[0]["outcome"] == "SUCCEEDED"
+
+
+def test_runtime_profile_must_match_lease_and_embedding_limits():
+    dispatch = _dispatch(b"source")
+    settings = EmbeddingSettings(api_key="e" * 40)
+    validate_runtime_profile(dispatch, settings)
+
+    with pytest.raises(ProcessingError, match="INVALID_REQUEST"):
+        validate_runtime_profile(
+            dispatch, EmbeddingSettings(api_key="e" * 40, max_batch_items=8))
+
+    dispatch = _dispatch(b"source")
+    dispatch["runtime_profile"]["pipeline_profile_id"] = "other-pipeline"
+    with pytest.raises(ProcessingError, match="INVALID_REQUEST"):
+        validate_runtime_profile(dispatch)
 
 
 @pytest.mark.asyncio

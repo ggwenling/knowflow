@@ -3,11 +3,12 @@ import asyncio
 from collections import OrderedDict
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 import uuid
 
 from .adapters import ProcessingError
 from .batch_digest import batch_sha256, manifest_sha256
-from .chunking import chunk_document
+from .chunking import ChunkingConfig, ChunkingFailure, chunk_document
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .java_client import JavaGateway, JavaGatewayError
@@ -22,6 +23,36 @@ class WorkerUnavailable(RuntimeError):
 def _execution_key(message: dict) -> tuple[str, str, int]:
     lease = message["lease"]
     return lease["task_id"], lease["lease_id"], lease["fencing"]
+
+
+def validate_runtime_profile(dispatch: dict, embedding_settings=None) -> ChunkingConfig:
+    profile = dispatch["runtime_profile"]
+    if profile["pipeline_profile_id"] != dispatch["lease"]["pipeline_profile_id"]:
+        raise ProcessingError("INVALID_REQUEST", 400, retryable=False)
+    try:
+        chunking = ChunkingConfig(profile["chunk_max_codepoints"],
+                                  profile["overlap_codepoints"])
+    except (KeyError, ChunkingFailure):
+        raise ProcessingError("INVALID_REQUEST", 400, retryable=False) from None
+    if embedding_settings is not None and (
+            profile["chunk_max_codepoints"] > embedding_settings.max_text_codepoints
+            or profile["embedding_max_batch_items"] > embedding_settings.max_batch_items):
+        raise ProcessingError("INVALID_REQUEST", 400, retryable=False)
+    return chunking
+
+
+def _batch_wire_size(lease: dict, rows: list[dict], sequence: int) -> int:
+    payload = {
+        "contract_version": CONTRACT_VERSION,
+        "request_id": "0" * 36,
+        "lease": lease,
+        "batch_id": "0" * 36,
+        "batch_sequence": sequence,
+        "batch_sha256": "0" * 64,
+        "chunks": rows,
+    }
+    return len(json.dumps(payload, ensure_ascii=False,
+                          separators=(",", ":")).encode("utf-8"))
 
 
 class IndexWorker:
@@ -174,6 +205,8 @@ class IndexWorker:
 
     async def _index(self, dispatch: dict, embedding):
         lease = dispatch["lease"]
+        profile = dispatch["runtime_profile"]
+        chunking = validate_runtime_profile(dispatch)
         source = await self._gateway.read_source(dispatch)
         parsed = parse_document(source, format=dispatch["source"]["format"],
                                 document_id=lease["document_id"],
@@ -181,40 +214,65 @@ class IndexWorker:
                                 file_id=dispatch["source"]["file_id"])
         if parsed.file_sha256 != dispatch["source"]["sha256"]:
             raise ProcessingError("SOURCE_UNAVAILABLE", 502, retryable=False)
-        chunks = chunk_document(parsed)
+        chunks = chunk_document(parsed, chunking)
         if not chunks:
             raise ParseFailure("EMPTY_DOCUMENT")
         batches: list[dict] = []
         model_profile = "BAAI/bge-m3"
         chunk_namespace = uuid.uuid5(uuid.NAMESPACE_URL, lease["index_version_id"])
-        for start in range(0, len(chunks), 16):
-            source_chunks = chunks[start:start + 16]
-            vectors = await embedding.embed([chunk.text for chunk in source_chunks],
-                                            request_id=str(uuid.uuid4()))
-            rows = []
-            for offset, (chunk, vector) in enumerate(zip(source_chunks, vectors["data"], strict=True)):
-                locator = dict(chunk.locator)
-                rows.append({
-                    "chunk_id": str(uuid.uuid5(chunk_namespace, chunk.chunk_id)),
-                    "sequence_no": chunk.sequence + 1,
-                    "text": chunk.text,
-                    "text_sha256": chunk.text_sha256,
-                    "locator": locator,
-                    "embedding": vector["embedding"],
-                })
+
+        async def write_batch(batch_rows: list[dict]):
+            sequence = len(batches) + 1
+            if _batch_wire_size(lease, batch_rows, sequence) > profile["index_max_batch_bytes"]:
+                raise ProcessingError("INDEX_WRITE_FAILED", 502, retryable=False)
             batch = {
                 "contract_version": CONTRACT_VERSION,
                 "request_id": str(uuid.uuid4()),
                 "lease": lease,
                 "batch_id": str(uuid.uuid4()),
-                "batch_sequence": len(batches) + 1,
+                "batch_sequence": sequence,
                 "batch_sha256": "0" * 64,
-                "chunks": rows,
+                "chunks": batch_rows,
             }
             batch["batch_sha256"] = batch_sha256(batch)
             self._gateway._contract.validate("IndexBatch", batch)
             await self._gateway.write_batch(batch)
             batches.append(batch)
+
+        pending = []
+        async def add_row(row: dict):
+            nonlocal pending
+            candidate = pending + [row]
+            over_chunk_limit = len(candidate) > profile["index_max_batch_chunks"]
+            over_byte_limit = not over_chunk_limit and (
+                _batch_wire_size(lease, candidate, len(batches) + 1)
+                > profile["index_max_batch_bytes"])
+            if over_chunk_limit or over_byte_limit:
+                if not pending:
+                    raise ProcessingError("INDEX_WRITE_FAILED", 502, retryable=False)
+                await write_batch(pending)
+                pending = [row]
+                if _batch_wire_size(lease, pending, len(batches) + 1) > profile["index_max_batch_bytes"]:
+                    raise ProcessingError("INDEX_WRITE_FAILED", 502, retryable=False)
+            else:
+                pending = candidate
+
+        embedding_batch_size = profile["embedding_max_batch_items"]
+        for start in range(0, len(chunks), embedding_batch_size):
+            source_chunks = chunks[start:start + embedding_batch_size]
+            result = await embedding.embed([chunk.text for chunk in source_chunks],
+                                           request_id=str(uuid.uuid4()))
+            for chunk, vector in zip(source_chunks, result["data"], strict=True):
+                await add_row({
+                    "chunk_id": str(uuid.uuid5(chunk_namespace, chunk.chunk_id)),
+                    "sequence_no": chunk.sequence + 1,
+                    "text": chunk.text,
+                    "text_sha256": chunk.text_sha256,
+                    "locator": dict(chunk.locator),
+                    "embedding": vector["embedding"],
+                })
+        if pending:
+            await write_batch(pending)
 
         manifest = {
             "chunk_count": len(chunks), "embedding_count": len(chunks),

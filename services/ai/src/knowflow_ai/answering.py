@@ -5,6 +5,8 @@ import json
 import math
 import os
 import re
+import threading
+import time
 from urllib.parse import urlsplit
 import uuid
 
@@ -15,6 +17,51 @@ from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .protocol import CONTRACT_VERSION
+
+ANSWER_DEADLINE_SECONDS = 28.0
+
+
+class _DatabaseQueryCancelled(Exception):
+    pass
+
+
+class _DatabaseCancellation:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._connection = None
+        self._cancelled = False
+
+    def register(self, connection):
+        with self._lock:
+            cancelled = self._cancelled
+            if not cancelled:
+                self._connection = connection
+        if cancelled:
+            self._cancel_connection(connection)
+
+    def unregister(self, connection):
+        with self._lock:
+            if self._connection is connection:
+                self._connection = None
+
+    def is_cancelled(self):
+        with self._lock:
+            return self._cancelled
+
+    def cancel(self):
+        with self._lock:
+            self._cancelled = True
+            connection = self._connection
+        if connection is not None:
+            self._cancel_connection(connection)
+
+    @staticmethod
+    def _cancel_connection(connection):
+        try:
+            connection.cancel_safe(timeout=1.0)
+        except psycopg.Error:
+            # The query retains its server-side statement timeout as a fallback.
+            return
 
 
 @dataclass(frozen=True)
@@ -141,16 +188,58 @@ class ReadOnlyRetriever:
             lambda: SiliconFlowEmbeddingAdapter(self._embedding_settings))
 
     @staticmethod
-    def _fetch_rows(database_url: str, query: str, params: list) -> list[dict]:
+    def _fetch_rows(database_url: str, query: str, params: list,
+                    deadline: float | None = None,
+                    cancellation: _DatabaseCancellation | None = None) -> list[dict]:
+        if cancellation is not None and cancellation.is_cancelled():
+            raise _DatabaseQueryCancelled
+        connect_timeout = 5
+        options = "-c default_transaction_read_only=on -c statement_timeout=5000"
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            connect_timeout = min(5, int(remaining - 0.1))
+            if connect_timeout < 1:
+                raise TimeoutError
+            initial_statement_timeout_ms = int((remaining - connect_timeout) * 1000) - 50
+            if initial_statement_timeout_ms < 1:
+                raise TimeoutError
+            options = ("-c default_transaction_read_only=on "
+                       f"-c statement_timeout={initial_statement_timeout_ms}")
         with psycopg.connect(
                 database_url,
-                options="-c default_transaction_read_only=on -c statement_timeout=5000",
-                connect_timeout=5) as conn:
-            with conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+                options=options, connect_timeout=connect_timeout) as conn, \
+                conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
+            if cancellation is not None:
+                cancellation.register(conn)
+            try:
+                if cancellation is not None and cancellation.is_cancelled():
+                    raise _DatabaseQueryCancelled
+                if deadline is not None:
+                    statement_timeout_ms = ReadOnlyRetriever._statement_timeout_ms(deadline)
+                    cursor.execute("SELECT set_config('statement_timeout', %s, true)",
+                                   (f"{statement_timeout_ms}ms",))
+                    # Recheck after connection setup and immediately before the retrieval query.
+                    statement_timeout_ms = min(statement_timeout_ms,
+                                               ReadOnlyRetriever._statement_timeout_ms(deadline))
+                    cursor.execute("SELECT set_config('statement_timeout', %s, true)",
+                                   (f"{statement_timeout_ms}ms",))
+                if cancellation is not None and cancellation.is_cancelled():
+                    raise _DatabaseQueryCancelled
                 cursor.execute(query, params)
                 return cursor.fetchall()
+            finally:
+                if cancellation is not None:
+                    cancellation.unregister(conn)
 
-    async def retrieve(self, question: str, scope: dict, request_id: str) -> list[dict]:
+    @staticmethod
+    def _statement_timeout_ms(deadline: float) -> int:
+        statement_timeout_ms = min(5000, int((deadline - time.monotonic()) * 1000) - 50)
+        if statement_timeout_ms < 1:
+            raise TimeoutError
+        return statement_timeout_ms
+
+    async def retrieve(self, question: str, scope: dict, request_id: str,
+                       *, deadline: float | None = None) -> list[dict]:
         embedding = self._embedding_factory()
         try:
             maximum = self._embedding_settings.max_text_codepoints
@@ -175,8 +264,12 @@ class ReadOnlyRetriever:
                     raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
                 return combined
 
-            vector = await within_deadline(embed_question,
-                                           self._embedding_settings.timeout_seconds)
+            embedding_timeout = self._embedding_settings.timeout_seconds
+            if deadline is not None:
+                embedding_timeout = min(embedding_timeout, deadline - time.monotonic())
+                if embedding_timeout <= 0:
+                    raise ProcessingError("PROCESSING_TIMEOUT", 504)
+            vector = await within_deadline(embed_question, embedding_timeout)
         finally:
             await embedding.aclose()
         vector_text = "[" + ",".join(format(value, ".9g") for value in vector) + "]"
@@ -210,10 +303,23 @@ class ReadOnlyRetriever:
              ORDER BY e.embedding <=> %s::public.vector, c.id
              LIMIT 5
         """
+        cancellation = _DatabaseCancellation()
+        database_task = asyncio.create_task(asyncio.to_thread(
+            self._fetch_rows, self._database_url, query, params, deadline, cancellation))
         try:
-            rows = await asyncio.to_thread(self._fetch_rows, self._database_url, query, params)
+            rows = await asyncio.shield(database_task)
+        except TimeoutError:
+            raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
         except asyncio.CancelledError:
+            await asyncio.to_thread(cancellation.cancel)
+            await asyncio.gather(database_task, return_exceptions=True)
             raise
+        except _DatabaseQueryCancelled:
+            raise asyncio.CancelledError from None
+        except psycopg.errors.QueryCanceled:
+            if deadline is not None and deadline - time.monotonic() <= 0.1:
+                raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
+            raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
         except psycopg.Error:
             raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
         evidence = []
@@ -243,8 +349,17 @@ class AnswerService:
 
     async def answer(self, request: dict) -> dict:
         self._contract.validate("TrustedAnswerRequest", request)
-        evidence = await self._retriever.retrieve(request["question"], request["scope"],
-                                                  request["request_id"])
+        deadline = time.monotonic() + ANSWER_DEADLINE_SECONDS
+        try:
+            async with asyncio.timeout(ANSWER_DEADLINE_SECONDS):
+                return await self._answer(request, deadline)
+        except TimeoutError:
+            raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
+
+    async def _answer(self, request: dict, deadline: float) -> dict:
+        evidence = await self._retriever.retrieve(
+            request["question"], request["scope"], request["request_id"],
+            deadline=deadline)
         allowed_indexes = [
             (item["document_id"], item["content_version_id"], item["index_version_id"])
             for item in request["scope"]["indexes"]

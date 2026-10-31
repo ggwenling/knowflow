@@ -30,3 +30,48 @@ python evaluation/data/tools/validate_seed.py
 使用当前 Parser/Chunker 对合成资料集执行 source-span 覆盖核验，报告见 `services/ai/docs/evidence/seed-chunk-coverage-local-draft6.json`。开发集 12 题（10 有答案、2 无答案），21/21 个标注证据区间都能在原始来源的 Chunk 中精确复核；留出集 3 题（2 有答案、1 无答案），3/3 个证据区间通过。未使用留出题调参，外部模型调用 0。
 
 该结果只证明标注证据没有在解析/分段中丢失；没有验证 pgvector top-k 排名、生成答案正确率或真实模型质量。没有可用的本机模型凭证时，这些项继续待验，不用 Chunk 覆盖结果替代。
+
+## 可重跑评分与 40/20 候选划分
+
+`evaluation/runner/runner.py` 读取已保存的预测 JSON，不连接 Java、数据库或模型 provider。运行前会复核种子资料的源哈希、答案标注、来源版本/位置和现有 leakage group；预测必须带当前 `manifest.json` 与 `questions.json` 的 SHA-256，并恰好包含所选 split 的全部题目，跨 split ID、缺题、越界来源和错误引用序号都会拒绝。每条检索证据只提交 document/content 版本、原文码点区间和该区间的 SHA-256；不需要把来源正文复制进预测报告。
+
+预测文件形状示例：
+
+```json
+{
+  "dataset_id": "qingzhu-seed-v1",
+  "dataset_sha256": "<sha256(manifest bytes + 0x00 + questions bytes)>",
+  "predictions": [{
+    "question_id": "q01",
+    "has_answer": true,
+    "retrieved_evidence": [{
+      "document_id": "api",
+      "content_version_id": "content-api-ca47c675c4bd",
+      "start": 73,
+      "end": 112,
+      "text_sha256": "<sha256(original source span UTF-8)>"
+    }],
+    "cited_evidence": [0],
+    "support_judgement": "supported",
+    "latency_ms": 123.4
+  }]
+}
+```
+
+复现开发集评分：
+
+```sh
+python evaluation/runner/runner.py --predictions path/to/predictions.json --split development --output path/to/report.json
+```
+
+报告含按题 ID 的分类结果和分母计数、answerability accuracy、原文证据跨度召回/完整覆盖、不可回答题拒答率、引用与标注跨度重合、外部人工支持判断的覆盖率/通过率，以及输入延迟的 nearest-rank p50/p95。引用存在不等于语义支持；答案支持判断由预测文件中的人工标注提供，runner 不会根据引用字符串自动判定。当前没有登记质量门槛，因此脚本不输出质量 pass/fail。
+
+`evaluation/data/tools/split_candidates.py` 用固定 seed 将候选题按 `leakage_group` 整组分到 40/20，只有能精确满足两个数量时才生成划分；它同时校验“candidate”记录未混入半成品答案标签，以及“reviewed”标注的原文、版本、行号和码点偏移。示例命令：
+
+```sh
+python evaluation/data/tools/split_candidates.py --input path/to/candidates.json --dataset evaluation/data/seed-v1 --output path/to/split.json
+```
+
+候选输入记录用 `annotation_status: "candidate"` 表示尚未核验；核对过的结构记录可使用 `annotation_status: "reviewed"`，但工具只能验证格式和原文位置，不能证明核验者身份或独立性。划分文件明确标为非盲留出，须先由独立评测者管理 holdout 题与答案，公开仓库中的留出题不构成盲测。
+
+当前仍只有 10 份原创合成文档、12 道开发题和 3 道留出题；没有建立 60 道题集、人工独立验证或检索/回答质量分数。上述 40/20 工具只提供候选集流程，不会把现有 12+3 题重新命名为 60 道人工题。

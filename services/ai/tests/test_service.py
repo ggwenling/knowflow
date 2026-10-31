@@ -7,7 +7,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ConfigDict
 import knowflow_ai.app as ai_app
-from knowflow_ai.app import create_app
+from knowflow_ai.app import await_answer_or_disconnect, create_app
 from knowflow_ai.config import Settings, ConfigurationError
 from knowflow_ai.protocol import ContractConsumer, InvalidMessage
 from knowflow_ai.adapters import ProcessingError, validate_provider_result, within_deadline
@@ -48,7 +48,7 @@ def test_health_does_not_probe_models_or_database(client):
     assert client.get('/health/live').json() == {'status': 'UP'}
     r = client.get('/internal/v1/health', headers={**AUTH, 'X-Request-ID': 'java-trace-01'})
     assert r.status_code == 200
-    assert r.json() == {'status': 'UP', 'contract_version': '0.2.0-draft.6', 'request_id': 'java-trace-01'}
+    assert r.json() == {'status': 'UP', 'contract_version': '0.2.0-draft.7', 'request_id': 'java-trace-01'}
     assert r.headers['x-request-id'] == 'java-trace-01'
     for path in ('/docs', '/openapi.json'):
         assert client.post(path, headers=AUTH, json={'owner_id': 'forged'}).status_code == 404
@@ -170,8 +170,32 @@ async def test_deadline_cancel_and_failure_redaction():
         await task
 
 
-def test_health_consumes_draft6_examples_without_version_fallback(app, client):
-    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft6.json').read_text(encoding='utf-8'))
+@pytest.mark.asyncio
+async def test_client_disconnect_cancels_answer_operation():
+    cancelled = asyncio.Event()
+
+    class DisconnectingRequest:
+        def __init__(self):
+            self.checks = 0
+
+        async def is_disconnected(self):
+            self.checks += 1
+            return self.checks > 1
+
+    async def slow_answer():
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await await_answer_or_disconnect(DisconnectingRequest(), slow_answer)
+
+    assert cancelled.is_set()
+
+
+def test_health_consumes_draft7_examples_without_version_fallback(app, client):
+    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft7.json').read_text(encoding='utf-8'))
     for case in cases:
         if case['valid']:
             app.state.contract.validate('InternalHealth', case['payload'])
@@ -180,18 +204,19 @@ def test_health_consumes_draft6_examples_without_version_fallback(app, client):
                 app.state.contract.validate('InternalHealth', case['payload'])
     response = client.get('/internal/v1/health', headers=AUTH)
     app.state.contract.validate('InternalHealth', response.json())
-    assert response.json()['contract_version'] == '0.2.0-draft.6'
+    assert response.json()['contract_version'] == '0.2.0-draft.7'
 
 
-@pytest.mark.parametrize('mutation', ['draft2', 'draft3', 'draft4', 'draft5', 'same-json-different-bytes'])
+@pytest.mark.parametrize('mutation', ['draft2', 'draft3', 'draft4', 'draft5', 'draft6', 'same-json-different-bytes'])
 def test_startup_rejects_old_and_modified_schema_without_bypass(tmp_path, mutation):
     raw = (ROOT / 'contracts/schemas/protocol.schema.json').read_bytes()
     if mutation == 'same-json-different-bytes':
         raw += b'\n'
     else:
         old = {'draft2': b'0.2.0-draft.2', 'draft3': b'0.2.0-draft.3',
-               'draft4': b'0.2.0-draft.4', 'draft5': b'0.2.0-draft.5'}[mutation]
-        raw = raw.replace(b'0.2.0-draft.6', old)
+               'draft4': b'0.2.0-draft.4', 'draft5': b'0.2.0-draft.5',
+               'draft6': b'0.2.0-draft.6'}[mutation]
+        raw = raw.replace(b'0.2.0-draft.7', old)
     path = tmp_path / 'schema.json'
     path.write_bytes(raw)
     with pytest.raises(ConfigurationError, match='CONTRACT_HASH_MISMATCH'):
@@ -210,7 +235,8 @@ def test_full_index_queue_returns_retryable_503_not_accepted(client, app, monkey
     async def reject_when_full(_dispatch):
         raise WorkerUnavailable('INDEX_QUEUE_FULL')
 
-    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: None))
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment',
+                        staticmethod(lambda: EmbeddingSettings(api_key='e' * 40)))
     monkeypatch.setattr(app.state.index_worker, 'accept', reject_when_full)
     response = client.post('/internal/v1/index-executions',
                            headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
@@ -221,6 +247,68 @@ def test_full_index_queue_returns_retryable_503_not_accepted(client, app, monkey
     assert response.json()['request_id'] == dispatch['request_id']
     assert response.json()['retryable'] is True
     assert 'result' not in response.json()
+
+
+def test_index_dispatch_accepts_effective_smaller_runtime_profile(client, app, monkeypatch):
+    cases = json.loads((ROOT / 'contracts/examples/protocol-cases.json').read_text(encoding='utf-8'))
+    dispatch = copy.deepcopy(next(case['payload'] for case in cases
+                                  if case['definition'] == 'IndexDispatch'
+                                  and case['structurally_valid']))
+    dispatch['request_id'] = 'smaller-profile-request'
+    dispatch['runtime_profile_id'] = 'runtime-default'
+    dispatch['runtime_profile'].update(
+        chunk_max_codepoints=400, overlap_codepoints=50, embedding_max_batch_items=8,
+        index_max_batch_chunks=4, index_max_batch_bytes=64_000)
+    settings = EmbeddingSettings(api_key='e' * 40, max_text_codepoints=400,
+                                 max_batch_items=8)
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: settings))
+    accepted = []
+
+    async def record_acceptance(payload):
+        accepted.append(payload)
+
+    monkeypatch.setattr(app.state.index_worker, 'accept', record_acceptance)
+    response = client.post('/internal/v1/index-executions',
+                           headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
+                           json=dispatch)
+
+    assert response.status_code == 202
+    assert accepted == [dispatch]
+
+
+@pytest.mark.parametrize('mismatch', ['pipeline', 'overlap', 'text-limit', 'batch-limit'])
+def test_index_dispatch_rejects_runtime_profile_that_cannot_be_executed(
+        client, app, monkeypatch, mismatch):
+    cases = json.loads((ROOT / 'contracts/examples/protocol-cases.json').read_text(encoding='utf-8'))
+    dispatch = copy.deepcopy(next(case['payload'] for case in cases
+                                  if case['definition'] == 'IndexDispatch'
+                                  and case['structurally_valid']))
+    dispatch['request_id'] = 'invalid-profile-request'
+    dispatch['runtime_profile_id'] = 'runtime-default'
+    settings = EmbeddingSettings(api_key='e' * 40)
+    if mismatch == 'pipeline':
+        dispatch['runtime_profile']['pipeline_profile_id'] = 'different-pipeline'
+    elif mismatch == 'overlap':
+        dispatch['runtime_profile'].update(chunk_max_codepoints=100,
+                                           overlap_codepoints=100)
+    elif mismatch == 'text-limit':
+        settings = EmbeddingSettings(api_key='e' * 40, max_text_codepoints=400)
+    else:
+        settings = EmbeddingSettings(api_key='e' * 40, max_batch_items=8)
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment', staticmethod(lambda: settings))
+    accepted = []
+
+    async def record_acceptance(payload):
+        accepted.append(payload)
+
+    monkeypatch.setattr(app.state.index_worker, 'accept', record_acceptance)
+    response = client.post('/internal/v1/index-executions',
+                           headers={**AUTH, 'X-Request-ID': dispatch['request_id']},
+                           json=dispatch)
+
+    assert response.status_code == 400
+    assert response.json()['code'] == 'INVALID_REQUEST'
+    assert accepted == []
 
 
 def test_index_dispatch_without_embedding_credential_is_not_accepted(client, app, monkeypatch):
@@ -261,7 +349,7 @@ def test_answer_without_model_credential_does_not_construct_service(monkeypatch,
         monkeypatch.setenv('EMBEDING_KEY', 'e' * 40)
 
     payload = {
-        'contract_version': '0.2.0-draft.6',
+        'contract_version': '0.2.0-draft.7',
         'request_id': f'missing-{missing_credential}-key',
         'question': 'How is this document indexed?',
         'scope': {
