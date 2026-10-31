@@ -154,9 +154,11 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 当前所选 Embedding/LLM 凭证均不存在，开发集真实模型评测记录为 `SKIPPED_NO_CREDENTIALS`（`services/ai/docs/evidence/development-evaluation-local-draft6-skipped.json`），本次外部模型调用 0；向量排序与生成质量仍未测，不能用合成 adapter 冒充。Q/M 正式验收仍待独立执行。
 - 提交前复验发现 Windows `taskkill` 偶尔在目标进程已退出后返回错误码；重放工具现仅在进程仍存活时传播该错误，并在清理后检查服务端口。两种错误码分支、进程树测试及真实服务合成重放均通过，Python 全量 **134 passed**；这次重放仍使用合成 adapter，外部模型调用 0。
 
-## 2026-10-31：Python 消费 draft.8 与边界回归
+## 2026-10-31：Python 消费 draft.8 与本机合成 E2E
 
-- Python 分支 target：`1d0c26ab4f7c273a9913e47b9011a76b325dee0f`；消费 Java draft.8 精确提交 `a68239b82e5885ad8aec559fb574dce6b70f95d8`，Schema SHA-256 固定为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。strict consumer 拒绝 draft.7/其他字节不同 Schema；HTTP health fixture、消费说明和 Java/Python health smoke 一并升版。
-- Python 全量 **173 passed**；契约结构校验 **70 cases**；离线 provider/模型回归 **16 passed**。解析器 smoke **15 项**、真实 Python HTTP process smoke **8 项**通过；真实 Java WebClient ↔ Python HTTP health smoke **9/9** 通过，证据见 `services/ai/docs/evidence/java-python-smoke-draft8-verified.json`。
+- Python consumer target：`1d0c26ab4f7c273a9913e47b9011a76b325dee0f`；draft.8 E2E runner：`e57e6335e9448dc4ef89186f9b48df8ae7dd89c5`；B 记录更新：`15b09b9701ab9ff33c61da439f008058ba95ad24`。消费 Java draft.8 精确提交 `a68239b82e5885ad8aec559fb574dce6b70f95d8`，Schema SHA-256 固定为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。strict consumer 拒绝 draft.7/其他字节不同 Schema；HTTP health fixture、消费说明和 Java/Python health smoke 一并升版。
+- Python 全量 **181 passed**；契约结构校验 **70 cases**；离线 provider/模型回归 **16 passed**。解析器 smoke **15 项**、真实 Python HTTP process smoke **8 项**通过；真实 Java WebClient ↔ Python HTTP health smoke **9/9** 通过，证据见 `services/ai/docs/evidence/java-python-smoke-draft8-verified.json`。
 - B1 长问题 801/16000 码点穿过 answer adapters；B2 按 dispatch runtime profile 限制分段、Embedding 数量和 JSON body 字节；B3 deadline/disconnect 中断及只读 DB 同步线程取消收尾；B5 候选解析放入可终止、有限内存进程；B7 离线评测按题记录结果并提供候选分组工具，修正人工支持率遗漏无答案题幻觉的问题。以上实现有本地测试，不等于真实 provider 质量通过。
-- 当前未配置 Embedding/LLM 凭证，真实模型调用 **0**。KF2-038 资源/延迟/费用测量继续等待 KF2-031 流式链路及 KF2-037 质量基线；没有实际 60 题盲测集合、真实向量排名或生成质量分数。Q 审阅和 M 消费确认待独立执行。
+- 在集成分支 `codex/integration-20261031`、基线 `6297956be29584d90e5ffea037afd550b60746de`、HEAD `860798a6a01aede62f73a79db3dbac86e8009821` 上完成 draft.8 本机 Java/Python/PostgreSQL/pgvector/MinIO 重放，Schema SHA-256 为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。结果 `DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS`：上传、索引 READY、只读检索、带来源合成问答、活动取消送达、adapter 收尾、无迟到 Chunk/Embedding 写入、知识库删除及清理队列排空均为 true。报告见 [draft.8 E2E evidence](../services/ai/docs/evidence/local-backend-e2e-draft8-replay.json)。
+- 本次 Embedding/LLM 使用本地确定性合成 adapter，外部 provider 调用 **0**；该验证证明本机集成流程，不证明真实模型质量、检索排序或生产性能。会话已注销、知识库已删除、清理队列已排空；合成账户记录留在本地数据库，Compose 容器已停止且数据卷保留。
+- 当前未配置 Embedding/LLM 凭证。KF2-038 资源/延迟/费用测量继续等待 KF2-031 流式链路及 KF2-037 质量基线；没有实际 60 题盲测集合、真实向量排名或生成质量分数。Q 审阅和 M 消费确认待独立执行。

@@ -41,6 +41,8 @@ uv run --project services/ai --frozen python services/ai/tools/process_smoke.py
 
 可从仓库根在 `local` 或 `codex/integration-*` 分支（且 `main` 为祖先）运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --output services/ai/docs/evidence/local-backend-e2e-draft8-replay.json` 重放该合成闭环；其他分支（包括 `main` 和作者分支）会被拒绝，分支与祖先检查通过后才读取本机 `services/api/.env`。需要先按 API README 启动健康的本地 Compose PostgreSQL/MinIO；8000/8080 必须空闲，数据库不能有未完成的索引任务或待处理清理队列。脚本会创建合成账户及知识库，删除知识库、等待相应存储/索引/取消清理完成并退出会话；合成账户记录保留在本地开发数据库中。测试使用合成 adapter，不发起外部模型调用；新报告使用 draft.8 路径 `docs/evidence/local-backend-e2e-draft8-replay.json`。现存 `*-draft6-*` 报告是历史记录，不代表当前契约。
 
+2026-10-31 已在 `codex/integration-20261031` / draft.8 候选上重放：真实 Java、Python、PostgreSQL/pgvector、MinIO 服务链路完成上传、索引 READY、只读检索和带来源的问答；活动取消、adapter 收尾、无迟到写入及清理队列排空也通过。报告为 [draft.8 合成 E2E](docs/evidence/local-backend-e2e-draft8-replay.json)，Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Embedding/LLM 均为本地确定性合成 adapter，外部模型调用 0；该结果只验证集成流程，不代表真实模型质量、检索排序或生产性能。知识库已删除、会话已注销、清理队列已排空；合成账户记录保留，Compose 容器已停止且数据卷保留。Q 审阅和 M 消费确认仍待完成。
+
 报告中的源码 SHA-256 按运行时工作区的原始字节计算；Git 行尾转换可能使其他检出或 Git blob 的字节哈希不同。需要复核时，应对运行时工作区文件计算哈希，或在目标检出中重跑验证。契约 Schema 的 LF 字节由 `.gitattributes` 固定。
 
 依赖使用 `uv.lock` 精确锁定；`requirements.lock` 是无开发依赖、带哈希的 pip 导出。PDF 解析使用 pypdf，TXT/MD 严格按 UTF-8 读取；解析、分段、定位说明分别见 `docs/parsing.md` 和 `docs/chunking.md`。模型和数据政策见仓库 `evaluation/smoke/provider-profile.md`。
