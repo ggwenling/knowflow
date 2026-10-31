@@ -5,6 +5,7 @@ from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
+import time
 
 import pytest
 
@@ -143,6 +144,78 @@ async def test_worker_applies_dispatch_chunk_embedding_and_write_limits(
     assert all(len(json.dumps(batch, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
                <= max_batch_bytes for batch in gateway.batches)
     assert gateway.completions[0]["outcome"] == "SUCCEEDED"
+
+
+@pytest.mark.asyncio
+async def test_one_codepoint_chunking_keeps_heartbeat_responsive_and_cancellable(monkeypatch):
+    import knowflow_ai.worker as worker_module
+    from knowflow_ai.parsing import parse_document
+
+    source = b"x" * 16_000
+    parsed = parse_document(source, format="txt", document_id="doc-example-1",
+                            content_version_id="content-example-1", file_id="file-example-1")
+
+    async def parsed_source(*_args, **_kwargs):
+        return parsed
+
+    monkeypatch.setattr(worker_module, "parse_document_isolated", parsed_source)
+    monkeypatch.setattr(worker_module, "_batch_wire_size", lambda *_args: 1)
+
+    class NoopContract:
+        def validate(self, *_args):
+            return None
+
+    class ResponsiveGateway(FakeGateway):
+        def __init__(self):
+            super().__init__(NoopContract(), source)
+            self.heartbeat_started = asyncio.Event()
+
+        async def heartbeat(self, _lease):
+            self.heartbeat_started.set()
+            return (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+
+        async def write_batch(self, _batch):
+            return None
+
+    class ResponsiveEmbedding:
+        calls = 0
+        vector = [0.125] * 1024
+
+        async def embed(self, texts, *, request_id):
+            self.calls += 1
+            return {"data": [{"embedding": self.vector} for _ in texts]}
+
+        async def aclose(self):
+            return None
+
+    gateway = ResponsiveGateway()
+    embedding = ResponsiveEmbedding()
+    worker = IndexWorker(gateway, heartbeat_seconds=0.001)
+    dispatch = _dispatch(source)
+    dispatch["runtime_profile"].update(
+        chunk_max_codepoints=1,
+        overlap_codepoints=0,
+        embedding_max_batch_items=64,
+        index_max_batch_chunks=64,
+        index_max_batch_bytes=1_000_000,
+    )
+    dispatch["lease_expires_at"] = (
+        datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    heartbeat = asyncio.create_task(worker._heartbeat(dispatch))
+    processing = asyncio.create_task(worker._index(dispatch, embedding))
+    started = time.monotonic()
+    try:
+        await asyncio.wait_for(gateway.heartbeat_started.wait(), timeout=1)
+        processing.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(processing, timeout=1)
+    finally:
+        heartbeat.cancel()
+        await asyncio.gather(heartbeat, return_exceptions=True)
+
+    assert time.monotonic() - started < 1
+    assert embedding.calls < 16_000 // 64
+    assert gateway.completions == []
 
 
 def test_runtime_profile_must_match_lease_and_embedding_limits():

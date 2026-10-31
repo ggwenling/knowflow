@@ -162,3 +162,10 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 在集成分支 `codex/integration-20261031`、基线 `6297956be29584d90e5ffea037afd550b60746de`、HEAD `860798a6a01aede62f73a79db3dbac86e8009821` 上完成 draft.8 本机 Java/Python/PostgreSQL/pgvector/MinIO 重放，Schema SHA-256 为 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。结果 `DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS`：上传、索引 READY、只读检索、带来源合成问答、活动取消送达、adapter 收尾、无迟到 Chunk/Embedding 写入、知识库删除及清理队列排空均为 true。报告见 [draft.8 E2E evidence](../services/ai/docs/evidence/local-backend-e2e-draft8-replay.json)。
 - 本次 Embedding/LLM 使用本地确定性合成 adapter，外部 provider 调用 **0**；该验证证明本机集成流程，不证明真实模型质量、检索排序或生产性能。会话已注销、知识库已删除、清理队列已排空；合成账户记录留在本地数据库，Compose 容器已停止且数据卷保留。
 - 当前未配置 Embedding/LLM 凭证。KF2-038 资源/延迟/费用测量继续等待 KF2-031 流式链路及 KF2-037 质量基线；没有实际 60 题盲测集合、真实向量排名或生成质量分数。Q 审阅和 M 消费确认待独立执行。
+
+## 2026-10-31：最新审查两项 P2 修复
+
+- 数据库取消/截止时间现在通过同步 psycopg `Connection.wait()` 的短间隔轮询协作；请求取消后由查询线程关闭连接，不再调用可能无限等待的 `cancel_safe()`，也不让 async 请求脱离等待清理的 DB 线程。连接阶段保留最多 5 秒 connect timeout，并在连接返回后检查取消状态。
+- 分段边界按优先级预索引并使用二分查找，分段结果以生成器流式提供给 worker；每处理 64 个 Chunk 主动让出事件循环，租约 heartbeat 和取消可以继续运行。`chunk_document()` 的 tuple API、边界选择、原文定位及 Chunk/profile ID 均保持不变。
+- 回归覆盖 PostgreSQL 协议黑洞下的 deadline、单次/重复取消、连接阶段取消；16,000 字符、`chunk_max_codepoints=1` 配置下的事件循环心跳与取消；固定 txt/Markdown/PDF golden 输出及边界查找次数。随机输入与修复前实现另做 100 组逐 Chunk 比对，结果一致。
+- Python 作者分支提交 `c2ceede`；Python 全量 **187 passed**；Schema **70** 个结构样例；离线回归 **16 passed**；parser smoke **15** 项、Python HTTP process smoke **8/8**。集成分支的 Java↔Python health 与本机业务 E2E 将在合并后记录。未调用真实 Embedding/LLM provider，Q/M 验收状态不变。

@@ -1,6 +1,8 @@
 import asyncio
 import json
 from pathlib import Path
+import socket
+import struct
 import threading
 import time
 
@@ -65,6 +67,160 @@ def _contract():
     return ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
 
 
+def _pg_message(tag, payload=b""):
+    return tag + struct.pack("!I", len(payload) + 4) + payload
+
+
+def _pg_row_description(name, type_oid):
+    column = (name.encode() + b"\0" + struct.pack("!IhIhih", 0, 0, type_oid,
+                                                   4 if type_oid == 23 else -1, -1, 0))
+    return _pg_message(b"T", struct.pack("!H", 1) + column)
+
+
+class _PostgresBlackhole:
+    """Tiny PostgreSQL protocol peer that hangs on the retrieval query."""
+
+    def __init__(self):
+        self.listener = socket.socket()
+        self.listener.bind(("127.0.0.1", 0))
+        self.listener.listen()
+        self.listener.settimeout(0.1)
+        self.url = (f"postgresql://readonly:secret@127.0.0.1:{self.listener.getsockname()[1]}"
+                    "/test?sslmode=disable")
+        self.query_started = threading.Event()
+        self.disconnected = threading.Event()
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self._serve, daemon=True)
+        self.thread.start()
+
+    @staticmethod
+    def _read_exact(connection, size):
+        value = bytearray()
+        while len(value) < size:
+            part = connection.recv(size - len(value))
+            if not part:
+                return None
+            value.extend(part)
+        return bytes(value)
+
+    @classmethod
+    def _read_message(cls, connection):
+        header = cls._read_exact(connection, 5)
+        if header is None:
+            return None, None
+        tag = header[:1]
+        length = struct.unpack("!I", header[1:])[0]
+        body = cls._read_exact(connection, length - 4)
+        return (tag, body) if body is not None else (None, None)
+
+    @staticmethod
+    def _ready(connection, status=b"I"):
+        connection.sendall(_pg_message(b"Z", status))
+
+    def _startup(self, connection):
+        header = self._read_exact(connection, 4)
+        if header is None:
+            return False
+        length = struct.unpack("!I", header)[0]
+        body = self._read_exact(connection, length - 4)
+        if body is None:
+            return False
+        if body[:4] == struct.pack("!I", 80877103):
+            connection.sendall(b"N")
+            header = self._read_exact(connection, 4)
+            if header is None:
+                return False
+            length = struct.unpack("!I", header)[0]
+            if self._read_exact(connection, length - 4) is None:
+                return False
+        startup = [_pg_message(b"R", struct.pack("!I", 0))]
+        for key, value in ((b"server_version", b"16.0"),
+                           (b"client_encoding", b"UTF8"),
+                           (b"standard_conforming_strings", b"on")):
+            startup.append(_pg_message(b"S", key + b"\0" + value + b"\0"))
+        startup.extend((_pg_message(b"K", struct.pack("!II", 1, 1)),
+                        _pg_message(b"Z", b"I")))
+        connection.sendall(b"".join(startup))
+        return True
+
+    def _serve(self):
+        connection = None
+        try:
+            connection, _ = self.listener.accept()
+            connection.settimeout(0.1)
+            if not self._startup(connection):
+                return
+            query = b""
+            in_transaction = False
+            while not self.stopped.is_set():
+                try:
+                    tag, body = self._read_message(connection)
+                except TimeoutError:
+                    continue
+                if tag is None:
+                    self.disconnected.set()
+                    return
+                if tag == b"P":
+                    _, query, _ = body.split(b"\0", 2)
+                    connection.sendall(_pg_message(b"1"))
+                elif tag == b"B":
+                    connection.sendall(_pg_message(b"2"))
+                elif tag == b"D" and b"set_config" in query:
+                    connection.sendall(_pg_row_description("set_config", 25))
+                elif tag == b"E":
+                    if b"set_config" not in query:
+                        self.query_started.set()
+                        while not self.stopped.is_set():
+                            try:
+                                if not connection.recv(1):
+                                    self.disconnected.set()
+                                    return
+                            except TimeoutError:
+                                continue
+                    else:
+                        value = b"5000ms"
+                        row = struct.pack("!Hi", 1, len(value)) + value
+                        connection.sendall(_pg_message(b"D", row)
+                                           + _pg_message(b"C", b"SELECT 1\0"))
+                elif tag == b"S":
+                    self._ready(connection, b"T" if in_transaction else b"I")
+                elif tag == b"Q":
+                    query = body.rstrip(b"\0")
+                    if query.strip().upper() == b"BEGIN":
+                        in_transaction = True
+                        connection.sendall(_pg_message(b"C", b"BEGIN\0"))
+                        self._ready(connection, b"T")
+                    elif b"set_config" not in query:
+                        self.query_started.set()
+                        while not self.stopped.is_set():
+                            try:
+                                if not connection.recv(1):
+                                    self.disconnected.set()
+                                    return
+                            except TimeoutError:
+                                continue
+                    else:
+                        value = b"5000ms"
+                        row = struct.pack("!Hi", 1, len(value)) + value
+                        connection.sendall(_pg_row_description("set_config", 25)
+                                           + _pg_message(b"D", row)
+                                           + _pg_message(b"C", b"SELECT 1\0"))
+                        self._ready(connection, b"T" if in_transaction else b"I")
+        except OSError:
+            if not self.stopped.is_set():
+                raise
+        finally:
+            if connection is not None:
+                connection.close()
+            self.disconnected.set()
+            self.listener.close()
+
+    def close(self):
+        self.stopped.set()
+        self.listener.close()
+        self.thread.join(timeout=1)
+
+
 @pytest.mark.asyncio
 async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
     query_rows = [{
@@ -98,10 +254,10 @@ async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
             return query_rows
 
     class FakeConnection:
-        def __enter__(self):
-            return self
+        def set_request_control(self, _cancellation, _deadline):
+            return None
 
-        def __exit__(self, *args):
+        def close(self):
             return None
 
         def cursor(self, *, row_factory):
@@ -115,7 +271,7 @@ async def test_read_only_database_query_runs_in_a_worker_thread(monkeypatch):
         return FakeConnection()
 
     import knowflow_ai.answering as answering
-    monkeypatch.setattr(answering.psycopg, "connect", connect)
+    monkeypatch.setattr(answering._CancellableConnection, "connect", staticmethod(connect))
 
     class FakeEmbedding:
         async def embed(self, texts, *, request_id):
@@ -232,11 +388,10 @@ async def test_database_statement_timeout_uses_remaining_answer_deadline(monkeyp
             return []
 
     class FakeConnection:
-        def __enter__(self):
+        def set_request_control(self, _cancellation, _deadline):
             time.sleep(0.02)
-            return self
 
-        def __exit__(self, *args):
+        def close(self):
             captured["closed"] = True
 
         def cursor(self, *, row_factory):
@@ -247,7 +402,7 @@ async def test_database_statement_timeout_uses_remaining_answer_deadline(monkeyp
         captured["connect_timeout"] = connect_timeout
         return FakeConnection()
 
-    monkeypatch.setattr(answering.psycopg, "connect", connect)
+    monkeypatch.setattr(answering._CancellableConnection, "connect", staticmethod(connect))
 
     rows = ReadOnlyRetriever._fetch_rows("postgresql://readonly.invalid/db",
                                          "SELECT 1", [], deadline)
@@ -270,15 +425,75 @@ async def test_database_statement_timeout_uses_remaining_answer_deadline(monkeyp
     assert captured["closed"] is True
 
 
+@pytest.mark.parametrize("cancel_twice", [False, True])
 @pytest.mark.asyncio
-async def test_cancelling_retrieval_cancels_blocked_database_call_and_closes_connection(monkeypatch):
+async def test_cancelling_retrieval_closes_unresponsive_database_socket(
+        monkeypatch, cancel_twice):
     from knowflow_ai import answering
 
-    query_started = threading.Event()
-    query_cancelled = threading.Event()
-    query_finished = threading.Event()
+    server = _PostgresBlackhole()
+    cancellation_seen = threading.Event()
+    database_thread_finished = threading.Event()
+    original_cancel = answering._DatabaseCancellation.cancel
+    original_fetch = ReadOnlyRetriever._fetch_rows
+
+    def tracked_cancel(cancellation):
+        original_cancel(cancellation)
+        cancellation_seen.set()
+
+    def tracked_fetch(*args, **kwargs):
+        try:
+            return original_fetch(*args, **kwargs)
+        finally:
+            database_thread_finished.set()
+
+    monkeypatch.setattr(answering._DatabaseCancellation, "cancel", tracked_cancel)
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(tracked_fetch))
+    class FakeEmbedding:
+        async def embed(self, texts, *, request_id):
+            return {"data": [{"embedding": [0.125] * 1024} for _ in texts]}
+
+        async def aclose(self):
+            return None
+
+    retriever = ReadOnlyRetriever(
+        server.url, embedding_factory=FakeEmbedding,
+        embedding_settings=EmbeddingSettings(api_key=EMBEDDING_KEY))
+    task = asyncio.create_task(retriever.retrieve("question", {
+        "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
+        "indexes": [{"document_id": "doc-example-1",
+                     "content_version_id": "content-example-1",
+                     "index_version_id": "index-example-1"}],
+    }, "answer-test-01", deadline=time.monotonic() + 10))
+    try:
+        assert await asyncio.to_thread(server.query_started.wait, 2)
+        task.cancel()
+        assert await asyncio.to_thread(cancellation_seen.wait, 1)
+        if cancel_twice:
+            task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=2)
+
+        assert await asyncio.to_thread(database_thread_finished.wait, 1)
+        assert await asyncio.to_thread(server.disconnected.wait, 1)
+    finally:
+        server.close()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_database_connect_closes_before_query(monkeypatch):
+    from knowflow_ai import answering
+
+    connect_started = threading.Event()
+    allow_connect = threading.Event()
+    cancellation_seen = threading.Event()
     connection_closed = threading.Event()
-    cancel_calls = []
+    executed = []
+    original_cancel = answering._DatabaseCancellation.cancel
+
+    def tracked_cancel(cancellation):
+        original_cancel(cancellation)
+        cancellation_seen.set()
 
     class FakeCursor:
         def __enter__(self):
@@ -288,37 +503,30 @@ async def test_cancelling_retrieval_cancels_blocked_database_call_and_closes_con
             return None
 
         def execute(self, query, params):
-            if "set_config" in query:
-                return
-            query_started.set()
-            if not query_cancelled.wait(timeout=2):
-                raise AssertionError("database cancellation was not delivered")
-            query_finished.set()
-            raise psycopg.errors.QueryCanceled("cancelled by client")
-
-        def fetchall(self):
-            return []
+            executed.append(query)
 
     class FakeConnection:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            connection_closed.set()
+        def set_request_control(self, _cancellation, _deadline):
+            return None
 
         def cursor(self, *, row_factory):
             return FakeCursor()
 
-        def cancel_safe(self, *, timeout):
-            cancel_calls.append(timeout)
-            query_cancelled.set()
+        def close(self):
+            connection_closed.set()
 
-    monkeypatch.setattr(answering.psycopg, "connect",
-                        lambda *_args, **_kwargs: FakeConnection())
+    def connect(*_args, **_kwargs):
+        connect_started.set()
+        if not allow_connect.wait(timeout=2):
+            raise AssertionError("test did not release connection setup")
+        return FakeConnection()
+
+    monkeypatch.setattr(answering._DatabaseCancellation, "cancel", tracked_cancel)
+    monkeypatch.setattr(answering._CancellableConnection, "connect", staticmethod(connect))
 
     class FakeEmbedding:
         async def embed(self, texts, *, request_id):
-            return {"data": [{"embedding": [0.125] * 1024}]}
+            return {"data": [{"embedding": [0.125] * 1024} for _ in texts]}
 
         async def aclose(self):
             return None
@@ -332,15 +540,59 @@ async def test_cancelling_retrieval_cancels_blocked_database_call_and_closes_con
                      "content_version_id": "content-example-1",
                      "index_version_id": "index-example-1"}],
     }, "answer-test-01", deadline=time.monotonic() + 10))
-    assert await asyncio.to_thread(query_started.wait, 1)
 
+    assert await asyncio.to_thread(connect_started.wait, 1)
     task.cancel()
+    assert await asyncio.to_thread(cancellation_seen.wait, 1)
+    allow_connect.set()
     with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(task, timeout=2)
+        await asyncio.wait_for(task, timeout=1)
 
-    assert cancel_calls == [1.0]
-    assert query_finished.is_set()
+    assert executed == []
     assert connection_closed.is_set()
+
+
+@pytest.mark.asyncio
+async def test_database_deadline_closes_an_unresponsive_connected_socket(monkeypatch):
+    server = _PostgresBlackhole()
+
+    class FakeEmbedding:
+        async def embed(self, texts, *, request_id):
+            return {"data": [{"embedding": [0.125] * 1024} for _ in texts]}
+
+        async def aclose(self):
+            return None
+
+    retriever = ReadOnlyRetriever(
+        server.url, embedding_factory=FakeEmbedding,
+        embedding_settings=EmbeddingSettings(api_key=EMBEDDING_KEY))
+    database_thread_finished = threading.Event()
+    original_fetch = ReadOnlyRetriever._fetch_rows
+
+    def tracked_fetch(*args, **kwargs):
+        try:
+            return original_fetch(*args, **kwargs)
+        finally:
+            database_thread_finished.set()
+
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(tracked_fetch))
+    started = time.monotonic()
+    try:
+        with pytest.raises(ProcessingError, match="PROCESSING_TIMEOUT"):
+            await asyncio.wait_for(retriever.retrieve("question", {
+                "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
+                "indexes": [{"document_id": "doc-example-1",
+                             "content_version_id": "content-example-1",
+                             "index_version_id": "index-example-1"}],
+            }, "answer-test-01", deadline=started + 1.2), timeout=2)
+
+        elapsed = time.monotonic() - started
+        assert elapsed <= 1.8
+        assert server.query_started.is_set()
+        assert await asyncio.to_thread(database_thread_finished.wait, 1)
+        assert await asyncio.to_thread(server.disconnected.wait, 1)
+    finally:
+        server.close()
 
 
 @pytest.mark.asyncio
