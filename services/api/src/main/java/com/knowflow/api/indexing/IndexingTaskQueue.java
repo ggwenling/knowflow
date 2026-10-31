@@ -61,6 +61,10 @@ public class IndexingTaskQueue {
                     cancelObsoleteTask(task);
                     continue;
                 }
+                if (!properties.getPipelineProfileId().equals(task.pipelineProfileId())) {
+                    failExhaustedTask(task, "INDEX_WRITE_FAILED");
+                    continue;
+                }
                 if (task.attemptCount() >= properties.getMaxAttempts()) {
                     failExhaustedTask(task, "RUNNING".equals(task.status())
                             ? "WORKER_LOST" : "MODEL_FAILURE");
@@ -112,7 +116,11 @@ public class IndexingTaskQueue {
                         lease, expiresAt,
                         new IndexDispatch.SourceFile(task.contentVersionId(),
                                 task.sourceSha256(), task.sourceFormat()),
-                        properties.getRuntimeProfileId());
+                        properties.getRuntimeProfileId(),
+                        new IndexDispatch.RuntimeProfile(task.pipelineProfileId(),
+                                properties.getChunkMaxCodepoints(), properties.getOverlapCodepoints(),
+                                properties.getEmbeddingMaxBatchItems(), properties.getMaxBatchChunks(),
+                                properties.getMaxBatchBytes()));
                 return new ClaimedIndexTask(lease, dispatch);
             }
             return null;

@@ -1,6 +1,7 @@
 package com.knowflow.api.security;
 
 import com.knowflow.api.config.AiServiceProperties;
+import com.knowflow.api.config.IndexingProperties;
 import com.knowflow.api.error.ApiErrorWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,13 +23,15 @@ public class DatabaseApiSecurityConfiguration {
     SecurityFilterChain databaseApiSecurityFilterChain(
             HttpSecurity http,
             AiServiceProperties aiProperties,
+            IndexingProperties indexingProperties,
             ApiErrorWriter errors,
             JdbcTemplate jdbc) throws Exception {
         RequestIdFilter requestIdFilter = new RequestIdFilter();
         InternalSecretAuthenticationFilter internalAuthFilter =
                 new InternalSecretAuthenticationFilter(aiProperties.getInternalSharedSecret());
         OncePerRequestFilter bearerSessionFilter = new BearerSessionAuthenticationFilter(jdbc, errors);
-        RequestBodySizeLimitFilter indexBatchLimitFilter = new RequestBodySizeLimitFilter(errors);
+        RequestBodySizeLimitFilter indexBatchLimitFilter =
+                new RequestBodySizeLimitFilter(errors, indexingProperties);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)

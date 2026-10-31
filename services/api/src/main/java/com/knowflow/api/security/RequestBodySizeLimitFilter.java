@@ -8,6 +8,7 @@ import java.nio.charset.Charset;
 import java.util.UUID;
 
 import com.knowflow.api.error.ApiErrorWriter;
+import com.knowflow.api.config.IndexingProperties;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletInputStream;
@@ -17,14 +18,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** Enforces the draft.5 JSON batch cap even for chunked requests without Content-Length. */
+/** Enforces the configured JSON batch cap even for chunked requests without Content-Length. */
 public final class RequestBodySizeLimitFilter extends OncePerRequestFilter {
-    public static final int MAX_INDEX_BATCH_BYTES = 1_048_576;
 
     private final ApiErrorWriter errors;
+    private final IndexingProperties properties;
 
-    public RequestBodySizeLimitFilter(ApiErrorWriter errors) {
+    public RequestBodySizeLimitFilter(ApiErrorWriter errors, IndexingProperties properties) {
         this.errors = errors;
+        this.properties = properties;
     }
 
     @Override
@@ -35,12 +37,13 @@ public final class RequestBodySizeLimitFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
-        if (request.getContentLengthLong() > MAX_INDEX_BATCH_BYTES) {
+        int maxBatchBytes = properties.getMaxBatchBytes();
+        if (request.getContentLengthLong() > maxBatchBytes) {
             writeLimitError(request, response);
             return;
         }
-        byte[] body = request.getInputStream().readNBytes(MAX_INDEX_BATCH_BYTES + 1);
-        if (body.length > MAX_INDEX_BATCH_BYTES) {
+        byte[] body = request.getInputStream().readNBytes(maxBatchBytes + 1);
+        if (body.length > maxBatchBytes) {
             writeLimitError(request, response);
             return;
         }

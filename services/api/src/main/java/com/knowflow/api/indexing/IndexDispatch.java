@@ -9,6 +9,10 @@ public record IndexDispatch(
         LeaseContext lease,
         OffsetDateTime leaseExpiresAt,
         SourceFile source,
-        String runtimeProfileId) {
+        String runtimeProfileId,
+        RuntimeProfile runtimeProfile) {
     public record SourceFile(UUID fileId, String sha256, String format) {}
+    public record RuntimeProfile(String pipelineProfileId, int chunkMaxCodepoints,
+                                 int overlapCodepoints, int embeddingMaxBatchItems,
+                                 int indexMaxBatchChunks, int indexMaxBatchBytes) {}
 }
