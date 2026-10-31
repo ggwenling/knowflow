@@ -169,3 +169,10 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - 分段边界按优先级预索引并使用二分查找，分段结果以生成器流式提供给 worker；每处理 64 个 Chunk 主动让出事件循环，租约 heartbeat 和取消可以继续运行。`chunk_document()` 的 tuple API、边界选择、原文定位及 Chunk/profile ID 均保持不变。
 - 回归覆盖 PostgreSQL 协议黑洞下的 deadline、单次/重复取消、连接阶段取消；16,000 字符、`chunk_max_codepoints=1` 配置下的事件循环心跳与取消；固定 txt/Markdown/PDF golden 输出及边界查找次数。随机输入与修复前实现另做 100 组逐 Chunk 比对，结果一致。
 - Python 作者分支提交 `c2ceede`；Python 全量 **187 passed**；Schema **70** 个结构样例；离线回归 **16 passed**；parser smoke **15** 项、Python HTTP process smoke **8/8**。合入集成提交 `b4f5380` 后，真实 Java WebClient ↔ Python health **9/9**，本机 Java/Python/PostgreSQL/pgvector/MinIO 合成业务 E2E 通过；报告分别为 `services/ai/docs/evidence/java-python-smoke-draft8-p2.json` 和 `services/ai/docs/evidence/local-backend-e2e-draft8-p2.json`。外部 Embedding/LLM 调用为 0，Compose 已停止、数据卷保留；Q/M 验收状态不变。
+
+## 2026-10-31：索引批次历史内存修复
+
+- Python 作者分支提交 `c6bfb1a` 修复 `IndexWorker` 保留全部已写入批次正文和向量的问题。每次 Java gateway 确认写入后，manifest 历史只保留 `batch_sequence`、`batch_id`、`batch_sha256`、`chunk_count`；末批写完后也立即释放 pending 行。
+- manifest digest 的序列化字段和值顺序保持不变；批次数量由轻量摘要中的 `chunk_count` 提供，公共契约和 Java 接口未改。
+- 新增 512 个单字符 Chunk 的 `tracemalloc` 回归，每个 Chunk 使用独立 1024 维向量；修复前复现峰值 **17,525,103 bytes**，修复后断言低于 **16 MiB**，并核验 8 个摘要只包含 manifest 所需四项。
+- Python 全量 **188 passed**；Schema **70** cases；离线回归 **16 passed**；worker 定向 **12 passed**。摘要结构变化后的真实 Java manifest 验收 E2E 正在本次集成验证中确认。外部模型调用 0，Q/M 状态不变。

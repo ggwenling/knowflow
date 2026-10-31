@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import time
+import tracemalloc
 
 import pytest
 
@@ -216,6 +217,81 @@ async def test_one_codepoint_chunking_keeps_heartbeat_responsive_and_cancellable
     assert time.monotonic() - started < 1
     assert embedding.calls < 16_000 // 64
     assert gateway.completions == []
+
+
+@pytest.mark.asyncio
+async def test_many_small_chunks_do_not_retain_written_embedding_vectors(monkeypatch):
+    import knowflow_ai.worker as worker_module
+    from knowflow_ai.parsing import parse_document
+
+    source = b"x" * 512
+    dispatch = _dispatch(source)
+    parsed = parse_document(source, format="txt",
+                            document_id=dispatch["lease"]["document_id"],
+                            content_version_id=dispatch["lease"]["content_version_id"],
+                            file_id=dispatch["source"]["file_id"])
+
+    async def parsed_source(*_args, **_kwargs):
+        return parsed
+
+    monkeypatch.setattr(worker_module, "parse_document_isolated", parsed_source)
+    monkeypatch.setattr(worker_module, "_batch_wire_size", lambda *_args: 1)
+    monkeypatch.setattr(worker_module, "batch_sha256", lambda _batch: "a" * 64)
+
+    summaries = []
+
+    def capture_manifest(_lease, _model, batches, _chunk_count):
+        summaries.extend(dict(batch) for batch in batches)
+        return "b" * 64
+
+    monkeypatch.setattr(worker_module, "manifest_sha256", capture_manifest)
+
+    class NoopContract:
+        def validate(self, *_args):
+            return None
+
+    class NonRetainingGateway(FakeGateway):
+        def __init__(self):
+            super().__init__(NoopContract(), source)
+            self.write_count = 0
+            self.completion = None
+
+        async def write_batch(self, _batch):
+            self.write_count += 1
+
+        async def complete(self, completion):
+            self.completion = completion
+
+    class LargeEmbedding(FakeEmbedding):
+        async def embed(self, texts, *, request_id):
+            return {"data": [{"embedding": [float(value) for value in range(1024)]}
+                             for _ in texts]}
+
+    gateway = NonRetainingGateway()
+    embedding = LargeEmbedding()
+    worker = IndexWorker(gateway, embedding_factory=LargeEmbedding)
+    dispatch["runtime_profile"].update(
+        chunk_max_codepoints=1,
+        overlap_codepoints=0,
+        embedding_max_batch_items=64,
+        index_max_batch_chunks=64,
+        index_max_batch_bytes=1_000_000,
+    )
+
+    tracemalloc.start()
+    try:
+        await worker._index(dispatch, embedding)
+        _, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert peak_bytes < 16 * 1024 * 1024
+    assert gateway.write_count == 8
+    assert len(summaries) == 8
+    assert all(set(batch) == {"batch_sequence", "batch_id", "batch_sha256", "chunk_count"}
+               for batch in summaries)
+    assert sum(batch["chunk_count"] for batch in summaries) == len(source)
+    assert gateway.completion["manifest"]["chunk_count"] == len(source)
 
 
 def test_runtime_profile_must_match_lease_and_embedding_limits():

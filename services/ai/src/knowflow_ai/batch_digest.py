@@ -55,12 +55,13 @@ def batch_sha256(batch: dict) -> str:
     return sha256(_canonical(values, b"knowflow-index-batch-v1\n")).hexdigest()
 
 
-def manifest_sha256(lease: dict, model_profile: str, batches: list[dict], chunk_count: int) -> str:
+def manifest_sha256(lease: dict, model_profile: str,
+                    batches: list[dict[str, int | str]], chunk_count: int) -> str:
     values = [lease[name] for name in (
         "task_id", "owner_id", "knowledge_base_id", "document_id",
         "content_version_id", "index_version_id", "pipeline_profile_id")]
     values.extend((model_profile, "1024", str(chunk_count), str(chunk_count), str(len(batches))))
     for batch in batches:
         values.extend((str(batch["batch_sequence"]), batch["batch_id"],
-                       batch["batch_sha256"], str(len(batch["chunks"]))))
+                       batch["batch_sha256"], str(batch["chunk_count"])))
     return sha256(_canonical(values, b"knowflow-index-manifest-v1\n")).hexdigest()
