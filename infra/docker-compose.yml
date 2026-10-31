@@ -1,0 +1,79 @@
+# KnowFlow 本地编排（KF2-009 草案，未验收）
+#
+# 状态：草案。以下原因使它现在不能算 KF2-009 完成：
+# - services/api、services/ai 尚不在 next 分支（只在 java/python 分支有骨架），
+#   本文件引用的 build 上下文在 next 上不存在；真实三端启动需等 006/007/008 落地与集成。
+# - 本机无 Docker，`docker compose config` 与真实启动/停止/重启验证尚未执行。
+# - 完整 KF2-009 验收（干净配置可启动、三端健康检查、首次 CI 实际通过）待上述条件齐备后补齐。
+#
+# 安全与边界（与 KF2-009 验收一致）：
+# - AI、数据库、对象存储不作为公开浏览器入口：本文件只发布 web:3000 与 api:8080；
+#   postgres、minio、ai 均不映射主机端口，调试用 `docker compose exec`。
+# - 不额外部署 Redis。
+# - 模型凭证通过运行配置注入，不得写入本文件；以下默认值仅为本地开发占位，生产必须替换。
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: knowflow
+      POSTGRES_PASSWORD: knowflow-dev-only
+      POSTGRES_DB: knowflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowflow -d knowflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: knowflow
+      MINIO_ROOT_PASSWORD: knowflow-dev-only
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+
+  api:
+    build: ../services/api
+    image: knowflow-api:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/knowflow
+      S3_ENDPOINT: http://minio:9000
+      JAVA_API_PORT: "8080"
+    ports:
+      - "8080:8080"
+
+  ai:
+    build: ../services/ai
+    image: knowflow-ai:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      JAVA_INTERNAL_BASE_URL: http://api:8080
+    # 不发布主机端口：浏览器不直接访问 AI 服务，只经 Java API。
+
+  web:
+    build: ../apps/web
+    image: knowflow-web:local
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      # Compose 运行的是真实服务，Mock 必须关闭；Mock 仅用于开发预研。
+      NEXT_PUBLIC_USE_MOCK: "false"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  miniodata:
