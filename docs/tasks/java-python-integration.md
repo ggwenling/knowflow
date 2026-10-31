@@ -75,3 +75,11 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - 合并后复验：Python 全量 **187 passed**；Schema **70** cases；离线回归 **16 passed**；parser smoke **15/15**；Python HTTP process smoke **8/8**。Java Spring/WebClient ↔ Python Uvicorn health **9/9**，报告 `services/ai/docs/evidence/java-python-smoke-draft8-p2.json`，SHA-256 `e73e70d4fdfdded01de281a9d8b35313ac6593e1f94ce7d1a4219fbc174495ae`；报告绑定集成 HEAD `b4f538065451275452daa9b9cede64c245418c46`，clean before/after，数据库和模型调用 0。
 - 本机 Java/Python/PostgreSQL/pgvector/MinIO 合成 E2E 通过，覆盖上传、索引 READY、只读检索/引用问答、活动取消、无迟到 Chunk/Embedding 写入、物理清理及 outbox 排空。报告 `services/ai/docs/evidence/local-backend-e2e-draft8-p2.json`，SHA-256 `891b58d4da5d33ebd61af421f4ba30135be08c01f561984c85f7f1a4a07ad025`；外部模型调用 0。合成账户仍留在本机开发库，KnowFlow Compose 容器已停止且数据卷保留，8000/8080 无残留 listener。
 - 本次不重跑 Java 全量 Maven/Testcontainers（Java 文件未改）；此前 draft.8 Java 全量 61 tests、0 failures/errors、1 个 opt-in skip 的结果仍对应原 Java target。独立 Q 审阅、M 消费确认、真实 provider 质量/费用评测状态不变；未推送或合并 `main`。
+
+## 2026-10-31：P2 已写入批次仍保留完整向量
+
+- Python 作者分支 `python` 提交 `c6bfb1a282181e5ac43aca4ea73d9d601d78866c`；合入本地集成分支 `codex/integration-20261031` 的 merge 提交为 `03a8051f7319d4420e66709f8846321d6b1c7644`。Java 源码未改。
+- `IndexWorker` 在 Java gateway 确认写入后，`batches` 仅保留 `batch_sequence`、`batch_id`、`batch_sha256`、`chunk_count`；末批写入完成后清空 `pending`。manifest digest 仍按相同字段和值生成，契约和 Java 接口未变。
+- 新增 512 个单字符 Chunk 的 `tracemalloc` 回归，每条 Chunk 携带独立 1024 维向量。修复前回归复现 **17,525,103 bytes** 峰值并失败；修复后峰值断言低于 **16 MiB**，同时验证 8 个批次摘要仅含 manifest 所需四项。
+- 合并后 Python 全量 **188 passed**，Schema 校验 **70 structural cases**，离线 provider 回归 **16 passed**；worker 定向 **12 passed**。真实 Java/Python/PostgreSQL/pgvector/MinIO 合成业务 E2E 通过，确认 Java 接受轻量摘要生成的 manifest；证据 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`，SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`。取消后 Chunk/Embedding 均为 0，清理 outbox 排空。
+- E2E 仅使用本地确定性合成 adapter，外部模型调用 **0**；测试知识库已删除、会话已注销，合成账户保留在本地开发数据库。KnowFlow Compose 已停止且数据卷保留。未改 Java 源码，因此没有重跑 Java Maven；此前 61 tests 的结论仍只对应原 Java target。Q/M 与真实 provider 质量/费用测量状态不变；未推送或合并 `main`。

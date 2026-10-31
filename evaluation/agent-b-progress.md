@@ -175,4 +175,4 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - Python 作者分支提交 `c6bfb1a` 修复 `IndexWorker` 保留全部已写入批次正文和向量的问题。每次 Java gateway 确认写入后，manifest 历史只保留 `batch_sequence`、`batch_id`、`batch_sha256`、`chunk_count`；末批写完后也立即释放 pending 行。
 - manifest digest 的序列化字段和值顺序保持不变；批次数量由轻量摘要中的 `chunk_count` 提供，公共契约和 Java 接口未改。
 - 新增 512 个单字符 Chunk 的 `tracemalloc` 回归，每个 Chunk 使用独立 1024 维向量；修复前复现峰值 **17,525,103 bytes**，修复后断言低于 **16 MiB**，并核验 8 个摘要只包含 manifest 所需四项。
-- Python 全量 **188 passed**；Schema **70** cases；离线回归 **16 passed**；worker 定向 **12 passed**。摘要结构变化后的真实 Java manifest 验收 E2E 正在本次集成验证中确认。外部模型调用 0，Q/M 状态不变。
+- Python 全量 **188 passed**；Schema **70** cases；离线回归 **16 passed**；worker 定向 **12 passed**。新摘要经真实 Java manifest 验收 E2E，集成分支报告 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`，结果 `DEVELOPMENT_PASS_SYNTHETIC_ADAPTERS`，SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`。取消后 Chunk/Embedding 行数和清理 outbox 均为 0；外部模型调用 0，Q/M 状态不变。

@@ -210,3 +210,7 @@ Q 可并行复核已有提交；本计划不要求作者停工等排期，也不
 验收：Python 全量 **187 passed**、Schema **70 cases**、离线回归 **16 passed**、parser smoke **15/15**、Python HTTP process smoke **8/8**；真实 Java WebClient ↔ Python health **9/9**。真实本机 Java/Python/PostgreSQL/pgvector/MinIO 的合成上传、索引 READY、只读问答、活动取消和清理 E2E 通过；取消后无 Chunk/Embedding 迟到写入，outbox 排空。详见 `services/ai/docs/evidence/java-python-smoke-draft8-p2.json` 与 `services/ai/docs/evidence/local-backend-e2e-draft8-p2.json`。外部模型调用 0，Compose 已停止且数据卷保留。
 
 本次没有修改 Java 源码或重跑 Java Maven 全量；此前 Java draft.8 target 的 Maven/Testcontainers **61 tests，0 failures/errors，1 个 opt-in skip**仍是原 target 的验证结果。Q 审阅、M 消费确认、真实 provider 排名/回答质量与费用测量仍待完成。
+
+## 2026-10-31 补充：批次历史保留完整向量 P2
+
+Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 提交 `03a8051f7319d4420e66709f8846321d6b1c7644`。成功写入的批次历史仅保存序号、批次 ID、哈希与 Chunk 数，末批完成后释放 `pending`；manifest 字段和值的摘要语义保持不变。512 个独立 1024 维向量小 Chunk 的内存回归修复前复现 17,525,103 bytes，修复后峰值低于 16 MiB。Python 188 项、Schema 70 项、离线回归 16 项通过；真实 Java/Python/本机数据库与对象存储合成 E2E 接受新 manifest，证据 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`（SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`）。Java 源码未改，Maven 未重跑；外部模型调用 0，Compose 已停止且保留数据卷，未推送或合并 `main`。Q/M 与真实模型质量/费用验证仍待完成。
