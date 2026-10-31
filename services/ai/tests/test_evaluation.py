@@ -66,6 +66,29 @@ def test_runner_scores_saved_predictions_and_keeps_human_judgement_explicit(tmp_
     assert report["interpretation"]["acceptance_threshold"].startswith("not registered")
 
 
+def test_runner_counts_unanswerable_hallucinations_in_support_review_metrics(tmp_path):
+    payload = _predictions("development")
+    questions = runner._load_dataset(DATASET)[1]
+    unanswerable_ids = {question["id"] for question in questions
+                        if question["split"] == "development" and not question["answerable"]}
+    unanswerable = [row for row in payload["predictions"]
+                    if row["question_id"] in unanswerable_ids]
+    unanswerable[0]["has_answer"] = True
+    unanswerable[0]["support_judgement"] = "unsupported"
+    unanswerable[1]["has_answer"] = True
+    unanswerable[1]["support_judgement"] = "unreviewed"
+    predictions = tmp_path / "hallucinations.json"
+    predictions.write_text(json.dumps(payload), encoding="utf-8")
+
+    report = runner.evaluate(predictions)
+
+    assert report["metrics"]["answerable_answer_rate"] == 1.0
+    assert report["metrics"]["questions_answered_count"] == 12
+    assert report["metrics"]["human_support_reviewed_answer_count"] == 11
+    assert report["metrics"]["human_support_review_coverage"] == round(11 / 12, 4)
+    assert report["metrics"]["human_supported_answer_rate"] == round(10 / 11, 4)
+
+
 def test_runner_refuses_dataset_drift_missing_rows_and_cross_split_predictions(tmp_path):
     payload = _predictions("development")
     path = tmp_path / "predictions.json"

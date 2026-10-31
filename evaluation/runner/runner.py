@@ -99,6 +99,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
     latencies = []
     evidence_total = evidence_hits = full_evidence_questions = 0
     answerability_correct = answerable_count = answerable_answered = 0
+    answered_count = 0
     supported_answers = reviewed_answers = 0
     unanswerable_count = unanswerable_refused = 0
     cited_total = cited_gold_overlap = 0
@@ -134,6 +135,11 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         question = expected[prediction["question_id"]]
         if not question["answerable"] and prediction["has_answer"] and judgement == "supported":
             raise ValueError("UNANSWERABLE_MARKED_SUPPORTED")
+        if prediction["has_answer"]:
+            answered_count += 1
+            if judgement in ("supported", "unsupported"):
+                reviewed_answers += 1
+                supported_answers += judgement == "supported"
         gold = question["evidence"]
         hits = sum(_covered(item, retrieved) for item in gold)
         evidence_total += len(gold)
@@ -142,9 +148,6 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         if question["answerable"]:
             answerable_count += 1
             answerable_answered += prediction["has_answer"]
-            if prediction["has_answer"] and judgement in ("supported", "unsupported"):
-                reviewed_answers += 1
-                supported_answers += judgement == "supported"
         else:
             unanswerable_count += 1
             unanswerable_refused += not prediction["has_answer"]
@@ -196,14 +199,15 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
                 full_evidence_questions / sum(bool(item["evidence"]) for item in selected), 4)
             if any(item["evidence"] for item in selected) else None,
             "answerable_questions_answered_count": answerable_answered,
+            "questions_answered_count": answered_count,
             "answerable_answer_rate": round(answerable_answered / answerable_count, 4)
             if answerable_count else None,
             "unanswerable_questions_refused_count": unanswerable_refused,
             "unanswerable_refusal_rate": round(unanswerable_refused / unanswerable_count, 4)
             if unanswerable_count else None,
             "human_support_reviewed_answer_count": reviewed_answers,
-            "human_support_review_coverage": round(reviewed_answers / answerable_answered, 4)
-            if answerable_answered else None,
+            "human_support_review_coverage": round(reviewed_answers / answered_count, 4)
+            if answered_count else None,
             "human_supported_answer_rate": round(supported_answers / reviewed_answers, 4)
             if reviewed_answers else None,
             "cited_gold_span_overlap_rate": round(cited_gold_overlap / cited_total, 4)
