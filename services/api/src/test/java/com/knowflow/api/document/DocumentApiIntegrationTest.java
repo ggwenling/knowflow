@@ -253,7 +253,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/tasks/")))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.7"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.8"))
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andReturn();
         JsonNode response = objectMapper.readTree(uploaded.getResponse().getContentAsByteArray());
@@ -1201,7 +1201,7 @@ class DocumentApiIntegrationTest {
         assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         String requestId = "source-read-regression";
         byte[] request = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.7", requestId, claim.lease()));
+                "0.2.0-draft.8", requestId, claim.lease()));
 
         var response = mockMvc.perform(post("/internal/v1/tasks/{taskId}/source",
                         claim.lease().taskId())
@@ -1211,7 +1211,7 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.APPLICATION_OCTET_STREAM)
                         .content(request))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.7"))
+                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.8"))
                 .andExpect(header().string("X-Request-ID", requestId))
                 .andExpect(header().string("X-Source-Format", "md"))
                 .andExpect(header().string("X-Source-SHA256",
@@ -1227,7 +1227,7 @@ class DocumentApiIntegrationTest {
                 claim.lease().pipelineProfileId(), claim.lease().leaseId(),
                 claim.lease().fencing(), "x".repeat(43));
         byte[] forgedRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.7", requestId, forged));
+                "0.2.0-draft.8", requestId, forged));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
                         .header("Authorization", "Bearer document-test-internal-secret-long-enough")
                         .header("X-Request-ID", requestId)
@@ -1392,7 +1392,7 @@ class DocumentApiIntegrationTest {
                         "BAAI/bge-m3", 1024),
                 1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
                         1, batch.batchId(), batch.batchSha256(), 1)));
-        CompletionRequest completion = new CompletionRequest("0.2.0-draft.7", requestId,
+        CompletionRequest completion = new CompletionRequest("0.2.0-draft.8", requestId,
                 claim.lease(), "SUCCEEDED",
                 new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
         byte[] body = objectMapper.writeValueAsBytes(completion);
@@ -1440,7 +1440,7 @@ class DocumentApiIntegrationTest {
         JsonNode uploaded = upload(token, knowledgeBaseId, "retry.txt", "retry this task");
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
-        CompletionRequest failure = new CompletionRequest("0.2.0-draft.7", "retryable-failure",
+        CompletionRequest failure = new CompletionRequest("0.2.0-draft.8", "retryable-failure",
                 first.lease(), "FAILED", null,
                 new CompletionRequest.Failure("MODEL_TIMEOUT", "model request timed out", true));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion", first.lease().taskId())
@@ -1843,7 +1843,7 @@ class DocumentApiIntegrationTest {
                     java.util.Collections.nCopies(1024, BigDecimal.ZERO)));
             start = end;
         }
-        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.7", requestId, lease,
+        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.8", requestId, lease,
                 batchId, 1, "0".repeat(64), chunks);
         String digest = IndexBatchDigest.calculate(candidate).sha256();
         return new IndexBatchRequest(candidate.contractVersion(), candidate.requestId(),
@@ -1890,7 +1890,7 @@ class DocumentApiIntegrationTest {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.7","email":"%s",
+                                {"contract_version":"0.2.0-draft.8","email":"%s",
                                  "password":"synthetic-document-password"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
@@ -1902,7 +1902,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.7","name":"%s"}
+                                {"contract_version":"0.2.0-draft.8","name":"%s"}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());
