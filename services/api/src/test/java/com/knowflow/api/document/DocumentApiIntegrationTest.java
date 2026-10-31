@@ -454,6 +454,36 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    void forwardsQuestionsThroughTheSharedContractLengthLimit() throws Exception {
+        JsonNode owner = register("question-length-owner@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Question length");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Trusted evidence.",
+                "question-length-index");
+        AtomicReference<Integer> forwardedCodePoints = new AtomicReference<>();
+        AI_RESPONSE.set(request -> {
+            forwardedCodePoints.set(request.question().codePointCount(0, request.question().length()));
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                    "No supporting evidence was found.", false, java.util.List.of());
+        });
+
+        for (int length : java.util.List.of(801, 16000)) {
+            var result = mockMvc.perform(post(
+                            "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsBytes(
+                                    new com.knowflow.api.answer.PublicQuestion("问".repeat(length)))))
+                    .andReturn();
+
+            assertThat(result.getResponse().getStatus())
+                    .withFailMessage("AI HTTP fixture failed: %s", AI_HANDLER_FAILURE.get())
+                    .isEqualTo(200);
+            assertThat(forwardedCodePoints.get()).isEqualTo(length);
+        }
+    }
+
+    @Test
     void unsupportedAiEvidenceIsRejectedAndExplicitNoEvidenceRemainsARefusal() throws Exception {
         JsonNode owner = register("question-refusal@example.test");
         String token = owner.path("access_token").asText();
