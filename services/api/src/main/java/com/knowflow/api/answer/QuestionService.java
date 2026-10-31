@@ -25,6 +25,9 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 @Profile("database")
@@ -48,6 +51,36 @@ public class QuestionService {
 
     public AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input) {
         return ask(user, knowledgeBaseId, input, System.nanoTime(), new QuestionCancellation());
+    }
+
+    Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
+                                         PublicQuestion input, QuestionCancellation cancellation) {
+        return Flux.defer(() -> {
+            long requestStartedAt = System.nanoTime();
+            String question = validateQuestion(input);
+            String requestId = UUID.randomUUID().toString();
+            QuestionSnapshot snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
+                    requestStartedAt, cancellation);
+            TrustedAnswerRequest request = new TrustedAnswerRequest(ApiError.CONTRACT_VERSION,
+                    requestId, question, new TrustedAnswerRequest.TrustedScope(user.id(),
+                    knowledgeBaseId, snapshot.snapshotId(), snapshot.indexes().stream()
+                    .map(index -> new TrustedAnswerRequest.IndexScope(index.documentId(),
+                            index.contentVersionId(), index.indexVersionId())).toList()));
+            StreamState state = new StreamState(requestId, snapshot, requestStartedAt, cancellation);
+            Flux<PublicAnswerStreamEvent> upstream = client.stream(request,
+                            remainingBudget(requestStartedAt))
+                    .publishOn(Schedulers.boundedElastic())
+                    .concatMap(event -> state.handle(event, user, request));
+            return Flux.concat(Mono.fromCallable(() -> {
+                        state.assertVisible();
+                        return state.event("started");
+                    }).subscribeOn(Schedulers.boundedElastic()), upstream)
+                    .doOnCancel(() -> {
+                        cancellation.clientDisconnected();
+                        state.cancel();
+                    })
+                    .onErrorResume(failure -> state.error(failure));
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 
     AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
@@ -488,4 +521,153 @@ public class QuestionService {
     private record QuestionSnapshot(UUID questionId, UUID snapshotId, UUID ownerId,
                                     UUID knowledgeBaseId, List<IndexRef> indexes) {}
     private record StoredChunk(String text, AiAnswerResponse.Locator locator) {}
+
+    private final class StreamState {
+        private final String requestId;
+        private final QuestionSnapshot snapshot;
+        private final long requestStartedAt;
+        private final QuestionCancellation cancellation;
+        private final StringBuilder answer = new StringBuilder();
+        private final StreamCitationMapper citations;
+        private long sequence;
+        private boolean sourcesSaved;
+
+        private StreamState(String requestId, QuestionSnapshot snapshot, long requestStartedAt,
+                            QuestionCancellation cancellation) {
+            this.requestId = requestId;
+            this.snapshot = snapshot;
+            this.requestStartedAt = requestStartedAt;
+            this.cancellation = cancellation;
+            this.citations = new StreamCitationMapper(snapshot.questionId());
+        }
+
+        private Flux<PublicAnswerStreamEvent> handle(AiAnswerStreamEvent event,
+                                                       AuthenticatedUser user,
+                                                       TrustedAnswerRequest request) {
+            assertVisible();
+            return switch (event.event()) {
+                case "started" -> Flux.empty();
+                case "delta" -> {
+                    answer.append(event.delta());
+                    String visible = citations.feed(event.delta());
+                    yield visible.isEmpty() ? Flux.empty() : Flux.just(deltaEvent(visible));
+                }
+                case "sources" -> persistAndEmitSources(event, user, request);
+                case "completed" -> {
+                    if (!sourcesSaved) {
+                        yield Flux.error(new IllegalStateException("AI stream completed before sources"));
+                    }
+                    yield Flux.just(event("completed"));
+                }
+                case "cancelled" -> {
+                    cancellation.clientDisconnected();
+                    markCancelled(snapshot.questionId());
+                    yield Flux.just(event("cancelled"));
+                }
+                case "error" -> {
+                    markFailed(snapshot.questionId(), event.code());
+                    yield Flux.just(errorEvent(event.code(), event.message(), event.retryable()));
+                }
+                default -> Flux.error(new IllegalStateException("AI stream event type is unknown"));
+            };
+        }
+
+        private Flux<PublicAnswerStreamEvent> persistAndEmitSources(AiAnswerStreamEvent event,
+                                                                      AuthenticatedUser user,
+                                                                      TrustedAnswerRequest request) {
+            List<AiAnswerResponse.AiSource> sources = event.sources().stream()
+                    .map(source -> new AiAnswerResponse.AiSource(source.sourceId(), source.documentId(),
+                            source.contentVersionId(), source.indexVersionId(), source.chunkId(),
+                            source.locator(), source.quote())).toList();
+            AiAnswerResponse response = new AiAnswerResponse(ApiError.CONTRACT_VERSION, requestId,
+                    answer.toString(), event.hasAnswer(), sources);
+            validateAnswer(response);
+            citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId).collect(java.util.stream.Collectors.toSet()));
+            return Mono.fromCallable(() -> transactions.execute(status -> {
+                        registerDeadlineCheck(requestStartedAt, cancellation);
+                        setStatementTimeout(requestStartedAt, cancellation);
+                        return saveAnswer(user, snapshot, requestId, response, cancellation,
+                                requestStartedAt);
+                    }))
+                    .switchIfEmpty(Mono.error(new IllegalStateException(
+                            "Question stream persistence did not return a response")))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .map(saved -> {
+                        assertVisible();
+                        sourcesSaved = true;
+                        List<AnswerStreamSource> publicSources = saved.sources().stream()
+                                .map(source -> new AnswerStreamSource(source.sourceId(), source.documentId(),
+                                        source.contentVersionId(), source.indexVersionId(), source.chunkId(),
+                                        source.locator(), source.quote())).toList();
+                        return sourcesEvent(saved.hasAnswer(), publicSources);
+                    }).flux();
+        }
+
+        private Flux<PublicAnswerStreamEvent> error(Throwable failure) {
+            if (cancellation.reason() == QuestionCancellation.Reason.CLIENT_DISCONNECTED) {
+                markCancelled(snapshot.questionId());
+                return Flux.empty();
+            }
+            boolean timeout = isTimeout(failure);
+            String code = timeout ? "PROCESSING_TIMEOUT"
+                    : failure instanceof ApiFailure apiFailure
+                    && "DOCUMENT_UNAVAILABLE".equals(apiFailure.code())
+                    ? "DOCUMENT_UNAVAILABLE" : "AI_PROCESSING_FAILED";
+            markFailed(snapshot.questionId(), code);
+            return Flux.just(errorEvent(code, code,
+                    timeout || "AI_PROCESSING_FAILED".equals(code)));
+        }
+
+        private void cancel() {
+            markCancelled(snapshot.questionId());
+        }
+
+        private void assertVisible() {
+            String predicates = snapshot.indexes().stream()
+                    .map(ignored -> "(d.id = ? AND iv.content_version_id = ? AND iv.id = ?)")
+                    .collect(java.util.stream.Collectors.joining(" OR "));
+            List<Object> parameters = new ArrayList<>();
+            parameters.add(snapshot.knowledgeBaseId());
+            parameters.add(snapshot.ownerId());
+            for (IndexRef index : snapshot.indexes()) {
+                parameters.add(index.documentId());
+                parameters.add(index.contentVersionId());
+                parameters.add(index.indexVersionId());
+            }
+            Integer visible = jdbc.queryForObject("""
+                    SELECT count(DISTINCT d.id)
+                      FROM knowflow.documents d
+                      JOIN knowflow.knowledge_bases kb
+                        ON kb.id = d.knowledge_base_id AND kb.owner_user_id = d.owner_user_id
+                      JOIN knowflow.index_versions iv ON iv.document_id = d.id
+                     WHERE d.knowledge_base_id = ? AND d.owner_user_id = ?
+                       AND d.status = 'ACTIVE' AND kb.status = 'ACTIVE'
+                       AND iv.status IN ('READY', 'RETIRED') AND iv.cleaned_at IS NULL
+                       AND (""" + predicates + ")", Integer.class, parameters.toArray());
+            if (visible == null || visible != snapshot.indexes().size()) {
+                throw ApiFailure.documentUnavailable();
+            }
+        }
+
+        private PublicAnswerStreamEvent event(String type) {
+            return new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION, requestId, ++sequence,
+                    type, null, null, null, null, null, null);
+        }
+
+        private PublicAnswerStreamEvent deltaEvent(String delta) {
+            return new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION, requestId, ++sequence,
+                    "delta", delta, null, null, null, null, null);
+        }
+
+        private PublicAnswerStreamEvent sourcesEvent(boolean hasAnswer,
+                                                       List<AnswerStreamSource> sources) {
+            return new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION, requestId, ++sequence,
+                    "sources", null, hasAnswer, sources, null, null, null);
+        }
+
+        private PublicAnswerStreamEvent errorEvent(String code, String message, boolean retryable) {
+            return new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION, requestId, ++sequence,
+                    "error", null, null, null, code, message, retryable);
+        }
+    }
 }

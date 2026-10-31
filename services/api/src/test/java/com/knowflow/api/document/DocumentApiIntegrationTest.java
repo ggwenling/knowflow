@@ -533,6 +533,41 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    void publicAnswerStreamForwardsValidatedEventsAndPersistsTheAnswer() throws Exception {
+        JsonNode owner = register("question-stream@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Stream answer");
+        String evidence = "Streaming evidence is persisted.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "stream.txt", evidence, "question-stream-index");
+        AI_RESPONSE.set(request -> {
+            TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                    "Streaming answer [stream-source]", true,
+                    List.of(new AiAnswerResponse.AiSource("stream-source", scope.documentId(),
+                            scope.contentVersionId(), scope.indexVersionId(), published.chunkId(),
+                            new AiAnswerResponse.Locator("text_range", null, 0,
+                                    evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
+        });
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                "What is streamed?"))))
+                .andReturn();
+        assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+        var streamed = mockMvc.perform(asyncDispatch(initial)).andReturn();
+        assertThat(streamed.getResponse().getStatus()).isEqualTo(200);
+        String body = streamed.getResponse().getContentAsString();
+        assertThat(body).contains("event: started", "event: delta", "event: sources", "event: completed")
+                .doesNotContain("stream-source");
+        assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions ORDER BY created_at DESC LIMIT 1",
+                String.class)).isEqualTo("SUCCEEDED");
+    }
+
+    @Test
     void forwardsQuestionsThroughTheSharedContractLengthLimit() throws Exception {
         JsonNode owner = register("question-length-owner@example.test");
         String token = owner.path("access_token").asText();
@@ -1855,12 +1890,54 @@ class DocumentApiIntegrationTest {
                 return;
             }
             AiAnswerResponse answer = AI_RESPONSE.get().apply(request);
-            respond(exchange, 200, AI_MAPPER.writeValueAsString(answer));
+            if (exchange.getRequestURI().getPath().endsWith("/stream")) {
+                respondStream(exchange, answer);
+            } else {
+                respond(exchange, 200, AI_MAPPER.writeValueAsString(answer));
+            }
         } catch (Exception failure) {
             AI_HANDLER_FAILURE.set(failure.getClass().getSimpleName() + ": "
                     + failure.getMessage());
             respond(exchange, 500, "{}");
         }
+    }
+
+    private static void respondStream(HttpExchange exchange, AiAnswerResponse answer)
+            throws java.io.IOException {
+        var started = AI_MAPPER.createObjectNode();
+        started.put("contract_version", answer.contractVersion());
+        started.put("request_id", answer.requestId());
+        started.put("sequence", 1);
+        started.put("event", "started");
+        var delta = AI_MAPPER.createObjectNode();
+        delta.put("contract_version", answer.contractVersion());
+        delta.put("request_id", answer.requestId());
+        delta.put("sequence", 2);
+        delta.put("event", "delta");
+        delta.put("delta", answer.answer());
+        var sources = AI_MAPPER.createObjectNode();
+        sources.put("contract_version", answer.contractVersion());
+        sources.put("request_id", answer.requestId());
+        sources.put("sequence", 3);
+        sources.put("event", "sources");
+        sources.put("has_answer", answer.hasAnswer());
+        sources.set("sources", AI_MAPPER.valueToTree(answer.sources()));
+        var completed = AI_MAPPER.createObjectNode();
+        completed.put("contract_version", answer.contractVersion());
+        completed.put("request_id", answer.requestId());
+        completed.put("sequence", 4);
+        completed.put("event", "completed");
+        String body = "event: started\ndata: " + started + "\n\n"
+                + "event: delta\ndata: " + delta + "\n\n"
+                + "event: sources\ndata: " + sources + "\n\n"
+                + "event: completed\ndata: " + completed + "\n\n";
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_EVENT_STREAM_VALUE);
+        exchange.sendResponseHeaders(200, bytes.length);
+        try (var output = exchange.getResponseBody()) {
+            output.write(bytes);
+        }
+        exchange.close();
     }
 
     private static String receiveInternalHeaders(HttpExchange exchange) throws java.io.IOException {
