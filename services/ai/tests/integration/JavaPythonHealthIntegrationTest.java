@@ -32,7 +32,7 @@ class JavaPythonHealthIntegrationTest {
             .retrieve().toEntity(Map.class).block(Duration.ofSeconds(5));
         assertEquals(200, response.getStatusCode().value());
         assertEquals("UP", response.getBody().get("status"));
-        assertEquals("0.2.0-draft.6", response.getBody().get("contract_version"));
+        assertEquals("0.2.0-draft.8", response.getBody().get("contract_version"));
         assertEquals("java-python-jp01-trace", response.getBody().get("request_id"));
         assertEquals("java-python-jp01-trace", response.getHeaders().getFirst("X-Request-ID"));
     }
@@ -62,11 +62,11 @@ class JavaPythonHealthIntegrationTest {
         assertTrue(method.getHeaders().getFirst("Allow").contains("GET"));
     }
 
-    @Test void actualJavaHealthClientAcceptsRealDraftSixPython() {
-        var health = healthClient.check("java-strict-draft6").block(Duration.ofSeconds(6));
-        assertEquals("0.2.0-draft.6", health.contract_version());
+    @Test void actualJavaHealthClientAcceptsRealDraftEightPython() {
+        var health = healthClient.check("java-strict-draft8").block(Duration.ofSeconds(6));
+        assertEquals("0.2.0-draft.8", health.contract_version());
         assertEquals("UP", health.status());
-        assertEquals("java-strict-draft6", health.request_id());
+        assertEquals("java-strict-draft8", health.request_id());
     }
 
     @Test void actualJavaHealthClientRejectsOldVersionFixture() {
@@ -78,11 +78,11 @@ class JavaPythonHealthIntegrationTest {
         }
     }
 
-    @Test void actualJavaHealthClientRejectsDraftFiveFixture() {
+    @Test void actualJavaHealthClientRejectsDraftSevenFixture() {
         try (var ctx = clientContext(System.getenv("KNOWFLOW_JP01_SLOW_URL"))) {
             var client = new AiInternalHealthClient(ctx.getBean(WebClient.class));
             var error = assertThrows(IllegalStateException.class,
-                () -> client.check("java-draft5-fixture").block(Duration.ofSeconds(6)));
+                () -> client.check("java-draft7-fixture").block(Duration.ofSeconds(6)));
             assertEquals("AI internal health response does not match the contract", error.getMessage());
         }
     }

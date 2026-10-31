@@ -2,7 +2,7 @@
 
 开发实现已交付，状态 IN_REVIEW。依赖 KF2-007/010 为本轮已通过开发验证的候选输入；用户授权继续，不宣称已获 Q 批准。采用 pypdf 6.21.4（BSD-3-Clause，实际 wheel/依赖哈希与许可元数据见锁及 dependency-licenses.json）作为首轮 PDF 基线；未安装 PyMuPDF，不沿用其 AGPL/商业许可选择。KF2-003 时 pypdf 只是候选，本任务才明确安装并实测选用。
 
-入口 `knowflow_ai.parsing.parse_document(data, format, document_id, content_version_id, file_id, limits)` 是纯函数，本身不是 HTTP 路由、不接任意 URL/磁盘路径、不读数据库、不发布索引。draft.7 Python worker 由认证的 `POST /internal/v1/index-executions` 接收 Java 派发，按有效 lease 读取来源并核验 SHA-256 后再调用此解析函数；租约授权和 READY 发布仍由 Java 负责。
+入口 `knowflow_ai.parsing.parse_document(data, format, document_id, content_version_id, file_id, limits)` 是纯函数，本身不是 HTTP 路由、不接任意 URL/磁盘路径、不读数据库、不发布索引。draft.8 Python worker 由认证的 `POST /internal/v1/index-executions` 接收 Java 派发，按有效 lease 读取来源并核验 SHA-256 后再调用此解析函数；租约授权和 READY 发布仍由 Java 负责。
 
 输出 ParsedDocument 保存三个来源身份、原始文件 SHA-256、格式、parser_profile、字符总量、总页数/空页及按序 TextBlock。TXT/MD 严格 UTF-8；仅由 Python str.isspace() 认定的 Unicode 空白（包括 U+00A0、U+3000、VT/FF 等）和 BOM 构成的内容返回 EMPTY_DOCUMENT。该检测只分类，不修改正文；有效文本保留 BOM、CRLF、原始 Markdown 和 Unicode 码点；块区间从 0 起、右端不含，未经归一化。PDF 提取非空页文本，页码从 1 起，空白中间页不使后续物理页号前移；没有页面坐标时不编造。PDF 字符顺序来自 pypdf，不宣称恢复了多栏阅读顺序。
 
