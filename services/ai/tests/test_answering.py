@@ -45,7 +45,7 @@ class FakeLlm:
 
 
 def _request():
-    return {"contract_version": "0.2.0-draft.6", "request_id": "answer-test-01",
+    return {"contract_version": "0.2.0-draft.7", "request_id": "answer-test-01",
             "question": "索引何时可检索？", "scope": {
                 "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
                 "snapshot_id": "snapshot-example-1", "indexes": [{
@@ -271,6 +271,79 @@ async def test_database_statement_timeout_uses_remaining_answer_deadline(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_cancelling_retrieval_cancels_blocked_database_call_and_closes_connection(monkeypatch):
+    from knowflow_ai import answering
+
+    query_started = threading.Event()
+    query_cancelled = threading.Event()
+    query_finished = threading.Event()
+    connection_closed = threading.Event()
+    cancel_calls = []
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def execute(self, query, params):
+            if "set_config" in query:
+                return
+            query_started.set()
+            if not query_cancelled.wait(timeout=2):
+                raise AssertionError("database cancellation was not delivered")
+            query_finished.set()
+            raise psycopg.errors.QueryCanceled("cancelled by client")
+
+        def fetchall(self):
+            return []
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            connection_closed.set()
+
+        def cursor(self, *, row_factory):
+            return FakeCursor()
+
+        def cancel_safe(self, *, timeout):
+            cancel_calls.append(timeout)
+            query_cancelled.set()
+
+    monkeypatch.setattr(answering.psycopg, "connect",
+                        lambda *_args, **_kwargs: FakeConnection())
+
+    class FakeEmbedding:
+        async def embed(self, texts, *, request_id):
+            return {"data": [{"embedding": [0.125] * 1024}]}
+
+        async def aclose(self):
+            return None
+
+    retriever = ReadOnlyRetriever(
+        "postgresql://readonly.invalid/db", embedding_factory=FakeEmbedding,
+        embedding_settings=EmbeddingSettings(api_key=EMBEDDING_KEY))
+    task = asyncio.create_task(retriever.retrieve("question", {
+        "owner_id": "user-example-a", "knowledge_base_id": "kb-example-a",
+        "indexes": [{"document_id": "doc-example-1",
+                     "content_version_id": "content-example-1",
+                     "index_version_id": "index-example-1"}],
+    }, "answer-test-01", deadline=time.monotonic() + 10))
+    assert await asyncio.to_thread(query_started.wait, 1)
+
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=2)
+
+    assert cancel_calls == [1.0]
+    assert query_finished.is_set()
+    assert connection_closed.is_set()
+
+
+@pytest.mark.asyncio
 async def test_retriever_batches_full_question_and_combines_vectors_by_segment_length(monkeypatch):
     embedded_batches = []
     vectors = iter([1.0, 3.0, 5.0, 7.0])
@@ -285,7 +358,8 @@ async def test_retriever_batches_full_question_and_combines_vectors_by_segment_l
 
     captured = {}
     monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows",
-                        staticmethod(lambda _url, _query, params, _deadline=None:
+                        staticmethod(lambda _url, _query, params, _deadline=None,
+                                            _cancellation=None:
                                      captured.setdefault("params", params) and []))
     settings = EmbeddingSettings(api_key=EMBEDDING_KEY, max_text_codepoints=3,
                                  max_batch_items=2)
@@ -337,7 +411,7 @@ async def test_long_question_runs_through_embedding_http_and_llm_without_truncat
         })
 
     monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(
-        lambda _url, _query, _params, _deadline=None: [{
+        lambda _url, _query, _params, _deadline=None, _cancellation=None: [{
             "chunk_id": evidence[0]["chunk_id"],
             "document_id": evidence[0]["document_id"],
             "content_version_id": evidence[0]["content_version_id"],

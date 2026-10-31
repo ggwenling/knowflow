@@ -5,6 +5,7 @@ import json
 import math
 import os
 import re
+import threading
 import time
 from urllib.parse import urlsplit
 import uuid
@@ -18,6 +19,49 @@ from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .protocol import CONTRACT_VERSION
 
 ANSWER_DEADLINE_SECONDS = 28.0
+
+
+class _DatabaseQueryCancelled(Exception):
+    pass
+
+
+class _DatabaseCancellation:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._connection = None
+        self._cancelled = False
+
+    def register(self, connection):
+        with self._lock:
+            cancelled = self._cancelled
+            if not cancelled:
+                self._connection = connection
+        if cancelled:
+            self._cancel_connection(connection)
+
+    def unregister(self, connection):
+        with self._lock:
+            if self._connection is connection:
+                self._connection = None
+
+    def is_cancelled(self):
+        with self._lock:
+            return self._cancelled
+
+    def cancel(self):
+        with self._lock:
+            self._cancelled = True
+            connection = self._connection
+        if connection is not None:
+            self._cancel_connection(connection)
+
+    @staticmethod
+    def _cancel_connection(connection):
+        try:
+            connection.cancel_safe(timeout=1.0)
+        except psycopg.Error:
+            # The query retains its server-side statement timeout as a fallback.
+            return
 
 
 @dataclass(frozen=True)
@@ -145,7 +189,10 @@ class ReadOnlyRetriever:
 
     @staticmethod
     def _fetch_rows(database_url: str, query: str, params: list,
-                    deadline: float | None = None) -> list[dict]:
+                    deadline: float | None = None,
+                    cancellation: _DatabaseCancellation | None = None) -> list[dict]:
+        if cancellation is not None and cancellation.is_cancelled():
+            raise _DatabaseQueryCancelled
         connect_timeout = 5
         options = "-c default_transaction_read_only=on -c statement_timeout=5000"
         if deadline is not None:
@@ -162,15 +209,34 @@ class ReadOnlyRetriever:
                 database_url,
                 options=options, connect_timeout=connect_timeout) as conn, \
                 conn.cursor(row_factory=psycopg.rows.dict_row) as cursor:
-            if deadline is not None:
-                remaining_ms = int((deadline - time.monotonic()) * 1000) - 50
-                statement_timeout_ms = min(5000, remaining_ms)
-                if statement_timeout_ms < 1:
-                    raise TimeoutError
-                cursor.execute("SELECT set_config('statement_timeout', %s, true)",
-                               (f"{statement_timeout_ms}ms",))
-            cursor.execute(query, params)
-            return cursor.fetchall()
+            if cancellation is not None:
+                cancellation.register(conn)
+            try:
+                if cancellation is not None and cancellation.is_cancelled():
+                    raise _DatabaseQueryCancelled
+                if deadline is not None:
+                    statement_timeout_ms = ReadOnlyRetriever._statement_timeout_ms(deadline)
+                    cursor.execute("SELECT set_config('statement_timeout', %s, true)",
+                                   (f"{statement_timeout_ms}ms",))
+                    # Recheck after connection setup and immediately before the retrieval query.
+                    statement_timeout_ms = min(statement_timeout_ms,
+                                               ReadOnlyRetriever._statement_timeout_ms(deadline))
+                    cursor.execute("SELECT set_config('statement_timeout', %s, true)",
+                                   (f"{statement_timeout_ms}ms",))
+                if cancellation is not None and cancellation.is_cancelled():
+                    raise _DatabaseQueryCancelled
+                cursor.execute(query, params)
+                return cursor.fetchall()
+            finally:
+                if cancellation is not None:
+                    cancellation.unregister(conn)
+
+    @staticmethod
+    def _statement_timeout_ms(deadline: float) -> int:
+        statement_timeout_ms = min(5000, int((deadline - time.monotonic()) * 1000) - 50)
+        if statement_timeout_ms < 1:
+            raise TimeoutError
+        return statement_timeout_ms
 
     async def retrieve(self, question: str, scope: dict, request_id: str,
                        *, deadline: float | None = None) -> list[dict]:
@@ -237,13 +303,19 @@ class ReadOnlyRetriever:
              ORDER BY e.embedding <=> %s::public.vector, c.id
              LIMIT 5
         """
+        cancellation = _DatabaseCancellation()
+        database_task = asyncio.create_task(asyncio.to_thread(
+            self._fetch_rows, self._database_url, query, params, deadline, cancellation))
         try:
-            rows = await asyncio.to_thread(self._fetch_rows, self._database_url,
-                                           query, params, deadline)
+            rows = await asyncio.shield(database_task)
         except TimeoutError:
             raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
         except asyncio.CancelledError:
+            await asyncio.to_thread(cancellation.cancel)
+            await asyncio.gather(database_task, return_exceptions=True)
             raise
+        except _DatabaseQueryCancelled:
+            raise asyncio.CancelledError from None
         except psycopg.errors.QueryCanceled:
             if deadline is not None and deadline - time.monotonic() <= 0.1:
                 raise ProcessingError("PROCESSING_TIMEOUT", 504) from None
