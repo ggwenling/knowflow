@@ -1,8 +1,15 @@
+import asyncio
 from hashlib import sha256
 import json
 from pathlib import Path
+import sys
 import pytest
-from knowflow_ai.parsing import parse_document,ParseFailure,ParseLimits,PARSER_PROFILE
+from knowflow_ai.parser_process import (
+    PARSER_MEMORY_LIMIT_BYTES,
+    PARSER_TIMEOUT_SECONDS,
+    parse_document_isolated,
+)
+from knowflow_ai.parsing import parse_document, ParseFailure, ParseLimits, PARSER_PROFILE
 
 FIXTURES=Path(__file__).parent/'fixtures/pdf'
 ROOT=Path(__file__).resolve().parents[3]
@@ -113,3 +120,131 @@ def test_unicode_whitespace_around_body_preserves_every_codepoint(format, paddin
     assert block.text[start:start + len(body)] == body
     emoji = start + body.index('🙂')
     assert block.text[emoji:emoji + 1] == '🙂'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('format,raw', [
+    ('txt', '\ufeff中文🙂A\r\n'.encode('utf-8')),
+    ('pdf', (FIXTURES / 'chinese-pages.pdf').read_bytes()),
+])
+async def test_isolated_parser_matches_in_process_source_positions(format, raw):
+    isolated = await parse_document_isolated(raw, format=format, **IDS)
+    direct = parse_document(raw, format=format, **IDS)
+
+    assert isolated == direct
+
+
+@pytest.mark.asyncio
+async def test_isolated_parser_preserves_input_type_and_size_errors():
+    with pytest.raises(ParseFailure, match='INVALID_INPUT_TYPE'):
+        await parse_document_isolated('text', format='txt', **IDS)
+    with pytest.raises(ParseFailure, match='FILE_TOO_LARGE'):
+        await parse_document_isolated(
+            b'x' * (8 * 1024 * 1024 + 1), format='txt', **IDS)
+
+
+@pytest.mark.asyncio
+async def test_isolated_parser_maps_process_spawn_error(monkeypatch):
+    from knowflow_ai import parser_process
+
+    async def unavailable(*_args, **_kwargs):
+        raise OSError('process creation failed')
+
+    monkeypatch.setattr(parser_process.asyncio, 'create_subprocess_exec', unavailable)
+    with pytest.raises(ParseFailure, match='PARSER_UNAVAILABLE'):
+        await parse_document_isolated(b'text', format='txt', **IDS)
+
+
+@pytest.mark.asyncio
+async def test_isolated_parser_wall_timeout_kills_child_process(monkeypatch):
+    from knowflow_ai import parser_process
+
+    assert PARSER_TIMEOUT_SECONDS == 15.0
+    children = []
+    create_process = asyncio.create_subprocess_exec
+
+    async def delayed_child(*_args, **kwargs):
+        process = await create_process(
+            sys.executable, '-c', 'import time; time.sleep(30)', **kwargs)
+        children.append(process)
+        return process
+
+    monkeypatch.setattr(parser_process.asyncio, 'create_subprocess_exec', delayed_child)
+    with pytest.raises(ParseFailure, match='PARSER_TIMEOUT'):
+        await parse_document_isolated(b'text', format='txt', **IDS,
+                                      timeout_seconds=0.1)
+
+    assert children[0].returncode is not None
+
+
+@pytest.mark.asyncio
+async def test_isolated_parser_cancellation_kills_child_before_return(monkeypatch):
+    from knowflow_ai import parser_process
+
+    started = asyncio.Event()
+    children = []
+    create_process = asyncio.create_subprocess_exec
+
+    async def delayed_child(*_args, **kwargs):
+        process = await create_process(
+            sys.executable, '-c', 'import time; time.sleep(30)', **kwargs)
+        children.append(process)
+        started.set()
+        return process
+
+    monkeypatch.setattr(parser_process.asyncio, 'create_subprocess_exec', delayed_child)
+    task = asyncio.create_task(parse_document_isolated(b'text', format='txt', **IDS))
+    await asyncio.wait_for(started.wait(), timeout=2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=2)
+
+    assert children[0].returncode is not None
+
+
+@pytest.mark.asyncio
+async def test_isolated_parser_kills_child_when_stdout_exceeds_limit(monkeypatch):
+    from knowflow_ai import parser_process
+
+    children = []
+    create_process = asyncio.create_subprocess_exec
+
+    async def noisy_child(*_args, **kwargs):
+        process = await create_process(
+            sys.executable, '-c',
+            'import sys\nwhile True:\n sys.stdout.buffer.write(b"x" * 65536)\n sys.stdout.flush()',
+            **kwargs)
+        children.append(process)
+        return process
+
+    monkeypatch.setattr(parser_process.asyncio, 'create_subprocess_exec', noisy_child)
+    with pytest.raises(ParseFailure, match='PARSER_RESOURCE_LIMIT'):
+        await asyncio.wait_for(
+            parse_document_isolated(b'text', format='txt', **IDS), timeout=2)
+
+    assert children[0].returncode is not None
+
+
+@pytest.mark.asyncio
+async def test_parser_worker_enforces_512_mib_process_memory_limit():
+    assert PARSER_MEMORY_LIMIT_BYTES == 512 * 1024 * 1024
+    code = (
+        'import sys\nfrom knowflow_ai.parser_worker import _apply_memory_limit\n'
+        f'try:\n _apply_memory_limit({PARSER_MEMORY_LIMIT_BYTES})\n'
+        'except Exception as error:\n print(type(error).__name__, str(error)); sys.exit(2)\n'
+        f'try:\n bytearray({PARSER_MEMORY_LIMIT_BYTES + 88 * 1024 * 1024})\n'
+        'except MemoryError:\n print("limit-enforced"); sys.exit(0)\n'
+        'print("limit-missed"); sys.exit(1)'
+    )
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, '-I', '-c', code,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+    try:
+        stdout, _ = await asyncio.wait_for(process.communicate(), timeout=10)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        raise
+
+    assert process.returncode == 0
+    assert stdout.decode().splitlines() == ['limit-enforced']
