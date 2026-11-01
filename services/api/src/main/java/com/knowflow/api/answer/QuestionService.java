@@ -250,6 +250,43 @@ public class QuestionService {
                                       String requestId, AiAnswerResponse response,
                                       QuestionCancellation cancellation,
                                       long requestStartedAt) {
+        AnswerResponse prepared = prepareAnswer(user, snapshot, requestId, response,
+                cancellation, requestStartedAt);
+        for (SourceResponse source : prepared.sources()) {
+            requireNotCancelled(cancellation);
+            setStatementTimeout(requestStartedAt, cancellation);
+            SourceResponse.Locator locator = source.locator();
+            jdbc.update("""
+                    INSERT INTO knowflow.question_sources
+                        (source_id, question_id, owner_user_id, knowledge_base_id, document_id,
+                         content_version_id, index_version_id, chunk_id, locator_kind,
+                         source_page, source_start, source_end, quote)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, source.sourceId(), snapshot.questionId(), snapshot.ownerId(),
+                    snapshot.knowledgeBaseId(), source.documentId(), source.contentVersionId(),
+                    source.indexVersionId(), source.chunkId(), locator.kind(), locator.page(),
+                    locator.start(), locator.end(), source.quote());
+        }
+        requireNotCancelled(cancellation);
+        setStatementTimeout(requestStartedAt, cancellation);
+        int updated = jdbc.update("""
+                UPDATE knowflow.questions
+                   SET status = 'SUCCEEDED', answer_text = ?, has_answer = ?,
+                       finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ? AND status = 'PROCESSING'
+                """, prepared.answer(), prepared.hasAnswer(), snapshot.questionId());
+        if (updated != 1) {
+            throw new IllegalStateException("Question was not processing at completion");
+        }
+        requireNotCancelled(cancellation);
+        remainingBudget(requestStartedAt);
+        return prepared;
+    }
+
+    private AnswerResponse prepareAnswer(AuthenticatedUser user, QuestionSnapshot snapshot,
+                                         String requestId, AiAnswerResponse response,
+                                         QuestionCancellation cancellation,
+                                         long requestStartedAt) {
         requireNotCancelled(cancellation);
         setStatementTimeout(requestStartedAt, cancellation);
         lockKnowledgeBase(user.id(), snapshot.knowledgeBaseId());
@@ -303,32 +340,12 @@ public class QuestionService {
             }
             UUID publicSourceId = UUID.nameUUIDFromBytes((snapshot.questionId() + ":"
                     + source.sourceId()).getBytes(StandardCharsets.UTF_8));
-            setStatementTimeout(requestStartedAt, cancellation);
-            jdbc.update("""
-                    INSERT INTO knowflow.question_sources
-                        (source_id, question_id, owner_user_id, knowledge_base_id, document_id,
-                         content_version_id, index_version_id, chunk_id, locator_kind,
-                         source_page, source_start, source_end, quote)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, publicSourceId, snapshot.questionId(), snapshot.ownerId(),
-                    snapshot.knowledgeBaseId(), source.documentId(), source.contentVersionId(),
-                    source.indexVersionId(), source.chunkId(), chunk.locator().kind(),
-                    chunk.locator().page(), chunk.locator().start(), chunk.locator().end(),
-                    source.quote());
             storedSources.add(new SourceResponse(ApiError.CONTRACT_VERSION, publicSourceId,
                     source.documentId(), source.contentVersionId(), source.indexVersionId(),
                     source.chunkId(), toPublicLocator(chunk.locator()), source.quote()));
             publicAnswer = publicAnswer.replace("[" + source.sourceId() + "]",
                     "[" + publicSourceId + "]");
         }
-        requireNotCancelled(cancellation);
-        setStatementTimeout(requestStartedAt, cancellation);
-        jdbc.update("""
-                UPDATE knowflow.questions
-                   SET status = 'SUCCEEDED', answer_text = ?, has_answer = ?,
-                       finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ? AND status = 'PROCESSING'
-                """, publicAnswer, response.hasAnswer(), snapshot.questionId());
         requireNotCancelled(cancellation);
         remainingBudget(requestStartedAt);
         return new AnswerResponse(ApiError.CONTRACT_VERSION, requestId, publicAnswer,
@@ -530,7 +547,8 @@ public class QuestionService {
         private final StringBuilder answer = new StringBuilder();
         private final StreamCitationMapper citations;
         private long sequence;
-        private boolean sourcesSaved;
+        private boolean sourcesPrepared;
+        private AiAnswerResponse pendingAnswer;
 
         private StreamState(String requestId, QuestionSnapshot snapshot, long requestStartedAt,
                             QuestionCancellation cancellation) {
@@ -552,27 +570,46 @@ public class QuestionService {
                     String visible = citations.feed(event.delta());
                     yield visible.isEmpty() ? Flux.empty() : Flux.just(deltaEvent(visible));
                 }
-                case "sources" -> persistAndEmitSources(event, user, request);
+                case "sources" -> prepareAndEmitSources(event, user, request);
                 case "completed" -> {
-                    if (!sourcesSaved) {
+                    if (!sourcesPrepared || pendingAnswer == null) {
                         yield Flux.error(new IllegalStateException("AI stream completed before sources"));
                     }
-                    yield Flux.just(event("completed"));
+                    yield Mono.fromCallable(() -> transactions.execute(status -> {
+                                registerDeadlineCheck(requestStartedAt, cancellation);
+                                saveAnswer(user, snapshot, requestId, pendingAnswer, cancellation,
+                                        requestStartedAt);
+                                return event("completed");
+                            }))
+                            .switchIfEmpty(Mono.error(new IllegalStateException(
+                                    "Question stream completion did not return an event")))
+                            .subscribeOn(Schedulers.boundedElastic()).flux();
                 }
                 case "cancelled" -> {
                     cancellation.clientDisconnected();
+                    if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT) {
+                        markFailed(snapshot.questionId(), "PROCESSING_TIMEOUT");
+                        yield Flux.just(errorEvent("PROCESSING_TIMEOUT", "PROCESSING_TIMEOUT", true));
+                    }
                     markCancelled(snapshot.questionId());
                     yield Flux.just(event("cancelled"));
                 }
                 case "error" -> {
-                    markFailed(snapshot.questionId(), event.code());
-                    yield Flux.just(errorEvent(event.code(), event.message(), event.retryable()));
+                    if (cancellation.reason() == QuestionCancellation.Reason.CLIENT_DISCONNECTED) {
+                        markCancelled(snapshot.questionId());
+                        yield Flux.empty();
+                    }
+                    boolean timeout = cancellation.reason() == QuestionCancellation.Reason.TIMEOUT;
+                    String code = timeout ? "PROCESSING_TIMEOUT" : event.code();
+                    String message = timeout ? code : event.message();
+                    markFailed(snapshot.questionId(), code);
+                    yield Flux.just(errorEvent(code, message, timeout || event.retryable()));
                 }
                 default -> Flux.error(new IllegalStateException("AI stream event type is unknown"));
             };
         }
 
-        private Flux<PublicAnswerStreamEvent> persistAndEmitSources(AiAnswerStreamEvent event,
+        private Flux<PublicAnswerStreamEvent> prepareAndEmitSources(AiAnswerStreamEvent event,
                                                                       AuthenticatedUser user,
                                                                       TrustedAnswerRequest request) {
             List<AiAnswerResponse.AiSource> sources = event.sources().stream()
@@ -586,7 +623,7 @@ public class QuestionService {
             return Mono.fromCallable(() -> transactions.execute(status -> {
                         registerDeadlineCheck(requestStartedAt, cancellation);
                         setStatementTimeout(requestStartedAt, cancellation);
-                        return saveAnswer(user, snapshot, requestId, response, cancellation,
+                        return prepareAnswer(user, snapshot, requestId, response, cancellation,
                                 requestStartedAt);
                     }))
                     .switchIfEmpty(Mono.error(new IllegalStateException(
@@ -594,7 +631,8 @@ public class QuestionService {
                     .subscribeOn(Schedulers.boundedElastic())
                     .map(saved -> {
                         assertVisible();
-                        sourcesSaved = true;
+                        pendingAnswer = response;
+                        sourcesPrepared = true;
                         List<AnswerStreamSource> publicSources = saved.sources().stream()
                                 .map(source -> new AnswerStreamSource(source.sourceId(), source.documentId(),
                                         source.contentVersionId(), source.indexVersionId(), source.chunkId(),
@@ -608,7 +646,8 @@ public class QuestionService {
                 markCancelled(snapshot.questionId());
                 return Flux.empty();
             }
-            boolean timeout = isTimeout(failure);
+            boolean timeout = cancellation.reason() == QuestionCancellation.Reason.TIMEOUT
+                    || isTimeout(failure);
             String code = timeout ? "PROCESSING_TIMEOUT"
                     : failure instanceof ApiFailure apiFailure
                     && "DOCUMENT_UNAVAILABLE".equals(apiFailure.code())
@@ -619,7 +658,11 @@ public class QuestionService {
         }
 
         private void cancel() {
-            markCancelled(snapshot.questionId());
+            if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT) {
+                markFailed(snapshot.questionId(), "PROCESSING_TIMEOUT");
+            } else {
+                markCancelled(snapshot.questionId());
+            }
         }
 
         private void assertVisible() {

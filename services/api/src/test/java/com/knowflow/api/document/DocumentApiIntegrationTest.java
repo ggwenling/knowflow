@@ -113,6 +113,12 @@ class DocumentApiIntegrationTest {
     private static final AtomicReference<Integer> AI_HTTP_STATUS = new AtomicReference<>(200);
     private static final AtomicReference<CountDownLatch> AI_RESPONSE_GATE =
             new AtomicReference<>(new CountDownLatch(0));
+    private static final AtomicReference<String> AI_STREAM_TERMINAL_EVENT =
+            new AtomicReference<>("completed");
+    private static final AtomicReference<CountDownLatch> AI_STREAM_TERMINAL_GATE =
+            new AtomicReference<>(new CountDownLatch(0));
+    private static final AtomicReference<CountDownLatch> AI_STREAM_SOURCES_SENT =
+            new AtomicReference<>(new CountDownLatch(0));
     private static final AtomicReference<Function<TrustedAnswerRequest, AiAnswerResponse>> AI_RESPONSE =
             new AtomicReference<>();
     private static final HttpServer AI_SERVER = startAiServer();
@@ -227,6 +233,9 @@ class DocumentApiIntegrationTest {
         AI_HANDLER_FAILURE.set(null);
         AI_HTTP_STATUS.set(200);
         AI_RESPONSE_GATE.set(new CountDownLatch(0));
+        AI_STREAM_TERMINAL_EVENT.set("completed");
+        AI_STREAM_TERMINAL_GATE.set(new CountDownLatch(0));
+        AI_STREAM_SOURCES_SENT.set(new CountDownLatch(0));
         questionProperties.setTotalBudgetSeconds(30);
         try (Connection connection = DriverManager.getConnection(
                 DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword());
@@ -549,6 +558,9 @@ class DocumentApiIntegrationTest {
                             new AiAnswerResponse.Locator("text_range", null, 0,
                                     evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
         });
+        CountDownLatch terminalGate = new CountDownLatch(1);
+        AI_STREAM_TERMINAL_GATE.set(terminalGate);
+        AI_STREAM_SOURCES_SENT.set(new CountDownLatch(1));
         var initial = mockMvc.perform(post(
                         "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
                         .header("Authorization", "Bearer " + token)
@@ -558,13 +570,180 @@ class DocumentApiIntegrationTest {
                                 "What is streamed?"))))
                 .andReturn();
         assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+        try {
+            assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+            awaitSseEvent(initial, "event:sources");
+            UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                    UUID.class, AI_RECEIVED_REQUEST_ID.get());
+            assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isEqualTo("PROCESSING");
+            assertThat(jdbc.queryForObject("SELECT answer_text FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isNull();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                    Integer.class, questionId)).isZero();
+        } finally {
+            terminalGate.countDown();
+        }
         var streamed = mockMvc.perform(asyncDispatch(initial)).andReturn();
         assertThat(streamed.getResponse().getStatus()).isEqualTo(200);
         String body = streamed.getResponse().getContentAsString();
-        assertThat(body).contains("event: started", "event: delta", "event: sources", "event: completed")
+        assertThat(body).contains("event:started", "event:delta", "event:sources", "event:completed")
                 .doesNotContain("stream-source");
-        assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions ORDER BY created_at DESC LIMIT 1",
-                String.class)).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE request_id = ?",
+                String.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM knowflow.question_sources qs
+                  JOIN knowflow.questions q ON q.id = qs.question_id
+                 WHERE q.request_id = ?
+                """, Integer.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo(1);
+    }
+
+    @Test
+    void publicAnswerStreamErrorsAndTruncationAfterSourcesMarkQuestionFailed() throws Exception {
+        JsonNode owner = register("question-stream-failure@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Stream failures");
+        String evidence = "Streaming evidence is persisted.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "stream-failure.txt", evidence, "question-stream-failure-index");
+        AI_RESPONSE.set(request -> {
+            TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                    "Streaming answer [stream-source]", true,
+                    List.of(new AiAnswerResponse.AiSource("stream-source", scope.documentId(),
+                            scope.contentVersionId(), scope.indexVersionId(), published.chunkId(),
+                            new AiAnswerResponse.Locator("text_range", null, 0,
+                                    evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
+        });
+
+        for (String terminal : List.of("error", "truncated")) {
+            AI_STREAM_TERMINAL_EVENT.set(terminal);
+            CountDownLatch terminalGate = new CountDownLatch("truncated".equals(terminal) ? 1 : 0);
+            AI_STREAM_TERMINAL_GATE.set(terminalGate);
+            AI_STREAM_SOURCES_SENT.set(new CountDownLatch(1));
+            var initial = mockMvc.perform(post(
+                            "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .accept(MediaType.TEXT_EVENT_STREAM)
+                            .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                    "What failed after sources?"))))
+                    .andReturn();
+            org.springframework.test.web.servlet.MvcResult streamed;
+            try {
+                if ("truncated".equals(terminal)) {
+                    assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+                    awaitSseEvent(initial, "event:sources");
+                }
+                terminalGate.countDown();
+                streamed = mockMvc.perform(asyncDispatch(initial)).andReturn();
+            } finally {
+                terminalGate.countDown();
+            }
+            String requestId = AI_RECEIVED_REQUEST_ID.get();
+            String body = streamed.getResponse().getContentAsString();
+            assertThat(body).contains("event:sources", "event:error")
+                    .doesNotContain("event:completed");
+            var failed = jdbc.queryForMap("""
+                    SELECT status, failure_code, answer_text FROM knowflow.questions WHERE request_id = ?
+                    """, requestId);
+            assertThat(failed.get("status")).isEqualTo("FAILED");
+            assertThat(failed.get("failure_code")).isEqualTo("AI_PROCESSING_FAILED");
+            assertThat(failed.get("answer_text")).isNull();
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM knowflow.question_sources qs
+                      JOIN knowflow.questions q ON q.id = qs.question_id
+                     WHERE q.request_id = ?
+                    """, Integer.class, requestId)).isZero();
+        }
+    }
+
+    @Test
+    void publicAnswerStreamDisconnectAfterSourcesMarksQuestionCancelled() throws Exception {
+        JsonNode owner = register("question-stream-disconnect@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Stream disconnect");
+        String evidence = "Streaming disconnect evidence.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "stream-disconnect.txt", evidence, "question-stream-disconnect-index");
+        AI_RESPONSE.set(request -> streamedAnswer(request, published, evidence));
+        CountDownLatch terminalGate = new CountDownLatch(1);
+        AI_STREAM_TERMINAL_GATE.set(terminalGate);
+        AI_STREAM_SOURCES_SENT.set(new CountDownLatch(1));
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                "Disconnect after sources?"))))
+                .andReturn();
+        try {
+            assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+            awaitSseEvent(initial, "event:sources");
+            String requestId = AI_RECEIVED_REQUEST_ID.get();
+            UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                    UUID.class, requestId);
+            assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isEqualTo("PROCESSING");
+            initial.getRequest().getAsyncContext().complete();
+            awaitQuestionStatus(questionId, "CANCELLED");
+            var cancelled = jdbc.queryForMap("""
+                    SELECT failure_code, answer_text FROM knowflow.questions WHERE id = ?
+                    """, questionId);
+            assertThat(cancelled.get("failure_code")).isNull();
+            assertThat(cancelled.get("answer_text")).isNull();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                    Integer.class, questionId)).isZero();
+        } finally {
+            terminalGate.countDown();
+        }
+    }
+
+    @Test
+    void publicAnswerStreamTimeoutAfterSourcesMarksQuestionFailedWithTimeout() throws Exception {
+        JsonNode owner = register("question-stream-timeout@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Stream timeout");
+        String evidence = "Streaming timeout evidence.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "stream-timeout.txt", evidence, "question-stream-timeout-index");
+        AI_RESPONSE.set(request -> streamedAnswer(request, published, evidence));
+        CountDownLatch terminalGate = new CountDownLatch(1);
+        AI_STREAM_TERMINAL_GATE.set(terminalGate);
+        AI_STREAM_SOURCES_SENT.set(new CountDownLatch(1));
+        int originalBudget = questionProperties.getTotalBudgetSeconds();
+        questionProperties.setTotalBudgetSeconds(3);
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                "Timeout after sources?"))))
+                .andReturn();
+        try {
+            assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+            awaitSseEvent(initial, "event:sources");
+            String requestId = AI_RECEIVED_REQUEST_ID.get();
+            UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                    UUID.class, requestId);
+            assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isEqualTo("PROCESSING");
+            awaitQuestionStatus(questionId, "FAILED");
+            var failed = jdbc.queryForMap("""
+                    SELECT failure_code, answer_text FROM knowflow.questions WHERE id = ?
+                    """, questionId);
+            assertThat(failed.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+            assertThat(failed.get("answer_text")).isNull();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                    Integer.class, questionId)).isZero();
+        } finally {
+            terminalGate.countDown();
+            questionProperties.setTotalBudgetSeconds(originalBudget);
+        }
     }
 
     @Test
@@ -1922,22 +2101,46 @@ class DocumentApiIntegrationTest {
         sources.put("event", "sources");
         sources.put("has_answer", answer.hasAnswer());
         sources.set("sources", AI_MAPPER.valueToTree(answer.sources()));
-        var completed = AI_MAPPER.createObjectNode();
-        completed.put("contract_version", answer.contractVersion());
-        completed.put("request_id", answer.requestId());
-        completed.put("sequence", 4);
-        completed.put("event", "completed");
         String body = "event: started\ndata: " + started + "\n\n"
                 + "event: delta\ndata: " + delta + "\n\n"
-                + "event: sources\ndata: " + sources + "\n\n"
-                + "event: completed\ndata: " + completed + "\n\n";
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                + "event: sources\ndata: " + sources + "\n\n";
         exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_EVENT_STREAM_VALUE);
-        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.sendResponseHeaders(200, 0);
         try (var output = exchange.getResponseBody()) {
-            output.write(bytes);
+            output.write(body.getBytes(StandardCharsets.UTF_8));
+            output.flush();
+            AI_STREAM_SOURCES_SENT.get().countDown();
+            try {
+                if (!AI_STREAM_TERMINAL_GATE.get().await(15, TimeUnit.SECONDS)) {
+                    throw new java.io.IOException("Test stream terminal gate timed out");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            String terminalEvent = AI_STREAM_TERMINAL_EVENT.get();
+            if (!"truncated".equals(terminalEvent)) {
+                var terminal = AI_MAPPER.createObjectNode();
+                terminal.put("contract_version", answer.contractVersion());
+                terminal.put("request_id", answer.requestId());
+                terminal.put("sequence", 4);
+                terminal.put("event", terminalEvent);
+                if ("error".equals(terminalEvent)) {
+                    terminal.put("code", "AI_PROCESSING_FAILED");
+                    terminal.put("message", "Stream failed after sources");
+                    terminal.put("retryable", true);
+                } else if (!"completed".equals(terminalEvent)) {
+                    throw new java.io.IOException("Unknown test stream terminal event");
+                }
+                output.write(("event: " + terminalEvent + "\ndata: " + terminal + "\n\n")
+                        .getBytes(StandardCharsets.UTF_8));
+                output.flush();
+            }
+        } catch (java.io.IOException disconnected) {
+            // The SSE disconnect regression deliberately closes this response before its terminal event.
+        } finally {
+            exchange.close();
         }
-        exchange.close();
     }
 
     private static String receiveInternalHeaders(HttpExchange exchange) throws java.io.IOException {
@@ -1976,6 +2179,29 @@ class DocumentApiIntegrationTest {
             org.springframework.test.web.servlet.MvcResult result) throws Exception {
         assertThat(result.getRequest().isAsyncStarted()).isTrue();
         return mockMvc.perform(asyncDispatch(result)).andReturn();
+    }
+
+    private static AiAnswerResponse streamedAnswer(TrustedAnswerRequest request,
+                                                   PublishedIndex published, String evidence) {
+        TrustedAnswerRequest.IndexScope scope = request.scope().indexes().getFirst();
+        return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+                "Streaming answer [stream-source]", true,
+                List.of(new AiAnswerResponse.AiSource("stream-source", scope.documentId(),
+                        scope.contentVersionId(), scope.indexVersionId(), published.chunkId(),
+                        new AiAnswerResponse.Locator("text_range", null, 0,
+                                evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
+    }
+
+    private void awaitSseEvent(org.springframework.test.web.servlet.MvcResult result,
+                               String expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (result.getResponse().getContentAsString().contains(expected)) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(result.getResponse().getContentAsString()).contains(expected);
     }
 
     private void awaitQuestionStatus(String expected) throws InterruptedException {
