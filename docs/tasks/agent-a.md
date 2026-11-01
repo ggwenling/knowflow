@@ -209,3 +209,15 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - 回归覆盖成功首 delta/终态一次、无 delta 的 timeout 和断连/错误终态一次。Maven/Testcontainers 全量 **80 项，0 failure、0 error、1 opt-in skip**，含 3 项生命周期测试。
 - 新增真实本地恢复演练报告 `services/ai/docs/evidence/recovery-e2e-draft10.json`：隔离数据库上的 4 个恢复/删除场景全通过。外部模型调用 0；临时库已清理，服务端口已释放。
 - 代码和记录仍是 `local` 工作树未提交修改；Q/M 审阅状态不变。
+
+## 2026-11-01 Review follow-up：timeout lifecycle 分类
+
+- SSE `error` 事件携带 `PROCESSING_TIMEOUT` 时，生命周期记录现在写 `terminal_status=timeout`，其他 error 仍记为 `failed`。
+- 新增 upstream timeout event 回归；`AnswerStreamLifecycleTest` **4/4 passed**。此前 Java 全量 80 项的结果不包含这项新增回归，本次未重跑全量。
+
+## 2026-11-01：修复后全量复验
+
+- Maven/Testcontainers 全量 **81 项，0 failure/error，1 opt-in skip**，包含新增的 timeout 分类回归；`DocumentApiIntegrationTest` 39/39。
+- 测试运行日志实测该分类生效：`answer_stream_lifecycle request_id=... first_delta_ms=98 total_ms=3035 terminal_status=timeout error_code=PROCESSING_TIMEOUT`，其他错误码仍记为 `failed`。
+- 用修复后的恢复 harness 重跑 4 场景真实本地恢复演练，全部通过；报告 `services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json`，其中 Java 重启场景断言问题恢复为 `FAILED/PROCESSING_TIMEOUT` 且答案与来源均未落库。隔离库已删除，仅停止本轮启动的 PostgreSQL/MinIO，端口释放，外部模型调用 0。
+- 本轮未改共享契约与 Flyway（仍为 V1–V8、draft.10，SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。Q 审阅与 M 消费确认仍未执行，不据此把任何任务标为 DONE。

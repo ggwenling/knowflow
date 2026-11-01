@@ -12,6 +12,7 @@ import httpx
 
 from .adapters import ProcessingError, validate_provider_result
 from .config import ConfigurationError
+from .http_client import build_async_client
 
 
 EXPECTED_MODEL = "BAAI/bge-m3"
@@ -101,8 +102,8 @@ class SiliconFlowEmbeddingAdapter:
     def __init__(self, settings: EmbeddingSettings, client: httpx.AsyncClient | None = None):
         self.settings = settings
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(timeout=settings.timeout_seconds,
-                                                    follow_redirects=False, trust_env=True)
+        self._client = client or build_async_client(settings.timeout_seconds,
+                                                    environment_proxy_fallback=True)
 
     async def aclose(self) -> None:
         if self._owns_client:

@@ -17,6 +17,7 @@ import psycopg
 from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
+from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION
 
 ANSWER_DEADLINE_SECONDS = 28.0
@@ -120,8 +121,8 @@ class DeepSeekAdapter:
     def __init__(self, settings: LlmSettings, client: httpx.AsyncClient | None = None):
         self.settings = settings
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(timeout=settings.timeout_seconds,
-                                                   follow_redirects=False, trust_env=True)
+        self._client = client or build_async_client(settings.timeout_seconds,
+                                                    environment_proxy_fallback=True)
 
     async def aclose(self):
         if self._owns_client:

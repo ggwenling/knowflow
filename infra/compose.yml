@@ -1,0 +1,135 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    environment:
+      POSTGRES_DB: knowflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KNOWFLOW_DEV_POSTGRES_PASSWORD:?set KNOWFLOW_DEV_POSTGRES_PASSWORD}
+      KNOWFLOW_DEV_MIGRATOR_PASSWORD: ${KNOWFLOW_DEV_MIGRATOR_PASSWORD:?set KNOWFLOW_DEV_MIGRATOR_PASSWORD}
+      KNOWFLOW_DEV_APP_PASSWORD: ${KNOWFLOW_DEV_APP_PASSWORD:?set KNOWFLOW_DEV_APP_PASSWORD}
+      KNOWFLOW_DEV_AI_PASSWORD: ${KNOWFLOW_DEV_AI_PASSWORD:?set KNOWFLOW_DEV_AI_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../services/api/src/main/resources/db/bootstrap-roles.sql:/docker-entrypoint-initdb.d/10-bootstrap-roles.sql:ro
+      - ../services/api/docker/dev/20-set-role-passwords.sh:/docker-entrypoint-initdb.d/20-set-role-passwords.sh:ro
+      - ../services/api/docker/dev/20-set-role-passwords.sql:/tmp/20-set-role-passwords.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [knowflow]
+
+  minio:
+    image: bitnamilegacy/minio:2025.4.22@sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01
+    environment:
+      MINIO_ROOT_USER: ${KNOWFLOW_DEV_MINIO_ROOT_USER:?set KNOWFLOW_DEV_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${KNOWFLOW_DEV_MINIO_ROOT_PASSWORD:?set KNOWFLOW_DEV_MINIO_ROOT_PASSWORD}
+    volumes:
+      - object-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [knowflow]
+
+  migrate:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    command: ["--migrate-only"]
+    environment:
+      KNOWFLOW_MIGRATION_DATABASE_URL: jdbc:postgresql://postgres:5432/knowflow
+      KNOWFLOW_MIGRATION_DATABASE_USERNAME: knowflow_migrator
+      KNOWFLOW_MIGRATION_DATABASE_PASSWORD: ${KNOWFLOW_DEV_MIGRATOR_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [knowflow]
+
+  ai:
+    build:
+      context: ..
+      dockerfile: services/ai/Dockerfile
+    command: ["python", "services/ai/tools/browser_e2e_server.py", "--host", "0.0.0.0"]
+    environment:
+      KNOWFLOW_INTERNAL_SHARED_SECRET: ${KNOWFLOW_INTERNAL_SHARED_SECRET:?set KNOWFLOW_INTERNAL_SHARED_SECRET}
+      KNOWFLOW_CONTRACT_PATH: /workspace/contracts/schemas/protocol.schema.json
+      KNOWFLOW_JAVA_BASE_URL: http://api:8080
+      KNOWFLOW_AI_DATABASE_URL: postgresql://knowflow_ai:${KNOWFLOW_DEV_AI_PASSWORD}@postgres:5432/knowflow
+      KNOWFLOW_RUNTIME_PROFILE_ID: muse-e2e-synthetic
+      KNOWFLOW_EMBEDDING_KEY_ENV: KNOWFLOW_E2E_DUMMY_EMBEDDING_KEY
+      KNOWFLOW_E2E_DUMMY_EMBEDDING_KEY: ${KNOWFLOW_E2E_DUMMY_EMBEDDING_KEY:?set KNOWFLOW_E2E_DUMMY_EMBEDDING_KEY}
+      KNOWFLOW_LLM_KEY_ENV: KNOWFLOW_E2E_DUMMY_LLM_KEY
+      KNOWFLOW_E2E_DUMMY_LLM_KEY: ${KNOWFLOW_E2E_DUMMY_LLM_KEY:?set KNOWFLOW_E2E_DUMMY_LLM_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [knowflow]
+
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: database,storage
+      KNOWFLOW_DATABASE_URL: jdbc:postgresql://postgres:5432/knowflow
+      KNOWFLOW_DATABASE_USERNAME: knowflow_app
+      KNOWFLOW_DATABASE_PASSWORD: ${KNOWFLOW_DEV_APP_PASSWORD}
+      KNOWFLOW_STORAGE_ENDPOINT: http://minio:9000
+      KNOWFLOW_STORAGE_BUCKET: knowflow-documents
+      KNOWFLOW_STORAGE_ACCESS_KEY: ${KNOWFLOW_DEV_MINIO_ROOT_USER}
+      KNOWFLOW_STORAGE_SECRET_KEY: ${KNOWFLOW_DEV_MINIO_ROOT_PASSWORD}
+      KNOWFLOW_AI_BASE_URL: http://ai:8000
+      KNOWFLOW_INTERNAL_SHARED_SECRET: ${KNOWFLOW_INTERNAL_SHARED_SECRET}
+      KNOWFLOW_INDEXING_SCHEDULER_ENABLED: "true"
+      KNOWFLOW_INDEXING_POLL_DELAY_MILLIS: "250"
+      KNOWFLOW_INDEXING_RUNTIME_PROFILE_ID: muse-e2e-synthetic
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [knowflow]
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    environment:
+      KNOWFLOW_API_BASE_URL: http://api:8080
+      KNOWFLOW_WEB_MODEL_MODE: synthetic
+    ports:
+      - "${KNOWFLOW_WEB_HOST_BIND:-127.0.0.1}:${KNOWFLOW_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/mode').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [knowflow, web-edge]
+
+volumes:
+  postgres-data:
+  object-data:
+
+networks:
+  knowflow:
+    internal: true
+  web-edge:

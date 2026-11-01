@@ -1,28 +1,29 @@
 ---
 schema_version: 1
 handoff_id: 20261101-050501
-updated_at: 2026-11-01T07:35:11Z
+updated_at: 2026-11-01T08:41:00Z
 from: codex
 to: codex
 status: in_progress
 source_machine: WENLING
 target_machine: same
 branch: local
-commit: f5bf00f
+commit: 013fcf5
 ---
 
 # AI project handoff
 
 ## Outcome
-完成 draft.10 计划后续的 Java SSE 生命周期观测、Python 候选标注审核门禁和本地恢复演练；当前在 `local` 分支 HEAD `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828` 上开发。新增改动仍未提交、未推送或合并 `main`。Java/Python 全量、契约结构、离线模型回归和 4 个本地合成恢复场景均通过。候选人工审核、真实 provider 质量/费用及独立 Q/M 验收仍未完成。
+已完成 draft.10 计划后续、两项 review follow-up 及其全量复验；当前在 `local` 分支 HEAD `013fcf5a2de72b09599037fb997765443f5d61ee` 上开发。最新修复仍未提交、未推送或合并 `main`。本轮 Java **81 项**、Python **252 passed**、契约结构 **85 cases**、离线模型回归 **16 passed** 全部通过，并用修复后的 harness 重跑 4 场景真实恢复 E2E 全通过。候选人工审核、真实 provider 质量/费用及独立 Q/M 验收仍未完成。
 
 ## Current state
-- **基线与契约**：分支 `local`，HEAD `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。
-- **Java**：V7/V8 历史、幂等、deadline、profile 与来源 tombstone 约束已验证。新增 SSE 结构化生命周期记录 request ID、首个成功发送的非空 delta 耗时、总耗时和安全终态；原子保护使终态日志最多一次，不记录答案正文或异常消息。Maven 全量 **80 项，0 failure、0 error、1 opt-in skip**。
-- **Python/评测**：profile/tombstone 消费、`top_k=1..10`、Recall@5/MRR@10 与分类汇总已实现。全量 **243 passed**（1 条既有 Starlette/httpx 弃用警告）；Schema **85 structural cases**，offline smoke **16 passed**。候选/待审标注在 runner 被拒绝计分。
+- **基线与契约**：分支 `local`，HEAD `013fcf5a2de72b09599037fb997765443f5d61ee`。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。
+- **Java**：V7/V8 历史、幂等、deadline、profile 与来源 tombstone 约束已验证。SSE `PROCESSING_TIMEOUT` error event 与异常 timeout 统一记录为 `timeout`。Maven 全量 **81 项，0 failure、0 error、1 opt-in skip**，其中含该分类回归；运行时日志实测 `terminal_status=timeout error_code=PROCESSING_TIMEOUT`。
+- **Python/评测**：profile/tombstone 消费、`top_k=1..10`、Recall@5/MRR@10 与分类汇总已实现。全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告），含新增 `test_http_client.py` 6 项与 `test_recovery_e2e.py` 3 项。Schema **85 structural cases**，offline smoke **16 passed**。候选/待审标注在 runner 被拒绝计分。
+- **HTTP 客户端与代理环境**：新增 `knowflow_ai/http_client.py`。宿主机 `NO_PROXY` 含不可解析条目（本机为 `[::1]`）或 `socks://` 缺少 socksio 时，原先在适配器构造阶段抛 `httpx.InvalidURL`/`ImportError`，绕过 fail-closed 响应；现在降级构造并只记录固定告警 token（不写环境值）。外部 provider 适配器保留可用环境代理，内部 Java 网关不采用代理。测试期用 `services/ai/tests/conftest.py` 规范化代理环境，避免宿主机配置影响套件结果。
 - **候选数据**：10 份合成资料、60 道候选题、36 个 evidence groups；机器草稿含来源定位，显式 `reviewed=0`。审核导入要求审核人、带时区时间，并校验题目/分组/来源证据后写入独立数据目录。40/20 只是组级公开分配，不是 blind holdout；真实质量尚未验收。
-- **恢复 E2E**：`services/ai/docs/evidence/recovery-e2e-draft10.json` 的 4 个隔离数据库场景全部通过：worker fencing 恢复、三次 worker loss 与旧活动索引保留、Java 重启后的问答 deadline 失败收敛、worker 离线删除后不复活。只用合成 adapters，外部模型调用 0；临时数据库已删除、服务端口已释放、进程日志无 secret。既有业务 E2E `local-backend-e2e-draft10-replay.json` 也仍在。
-- **工作树**：Java/Python 源码、测试、候选工具/机器草稿、恢复脚本/报告及 A/B/联调/计划/handoff 记录均包含本轮未提交修改；保留其他已有行尾差异。未读取 `data/raw/`。
+- **恢复 E2E**：用修复后的 harness 重跑 4 个隔离数据库场景，全部通过，新报告 `services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json`（隔离库 `knowflow_recovery_772a89955a5e`，已删除；本轮只启动并停止 PostgreSQL/MinIO；端口 8000/8080 已释放；外部模型调用 0）。修复前报告 `recovery-e2e-draft10.json` 保留为历史证据，不再代表当前 harness。
+- **工作树**：Java/Python 源码、测试、候选工具/机器草稿、恢复脚本/报告及 A/B/联调/计划/handoff 记录均包含未提交修改；保留其他已有行尾差异。未读取 `data/raw/`。
 
 ### Historical 2026-10-30 handoff snapshot
 - 按用户明确要求，本地开发改动已提交至 `local`：`8b1c5ba7df0a77b1658edae32d5dc9e411af6eaf`，提交标题 `feat: integrate draft.6 indexing and cited answers`；未推送、未合并 `main`。提交前发现 Windows `taskkill` 在进程已退出后偶发非零退出码，已加回归并修复误报，随后 Python 全量 **134 passed**、真实本机合成闭环重放通过。
@@ -49,16 +50,23 @@ commit: f5bf00f
 - 真实 Embedding/LLM 凭证未使用。`.gitattributes` 约束 schema/JSON 行尾和原始数据/PDF 字节。Windows Git 对部分 seed/PDF 报出旧工作区状态，但逐文件 HEAD/index/work SHA-1 一致且 `git diff` 无内容差异；不要为了消除显示状态改写这些原始字节。
 
 ## Acceptance criteria
-- [x] 在 `local` 开发并验证 Java SSE 生命周期观测；全量 Maven **80 项，0 failure/error，1 opt-in skip**。
+- [x] 在 `local` 开发并验证 Java SSE 生命周期观测；全量 Maven **81 项，0 failure/error，1 opt-in skip**。
 - [x] 新增 Python 候选机器标注草稿、人工审核导入门禁与 runner pending 拒评；全量 **243 passed**，候选仍 `reviewed=0`。
 - [x] 本地真实 Java/Python/PostgreSQL/pgvector/MinIO 完成 4 个恢复/删除场景；隔离数据库清理，端口释放，外部模型调用 0。
 - [x] 契约结构校验 **85 cases**，离线模型回归 **16 passed**；记录明确授权/租约/数据库转换的结构校验边界。
 - [x] 更新 A/B 进度、Java/Python 联调、计划执行结果和 handoff；本轮改动未提交/推送。
+- [x] 修复 Compose 只停止本轮启动服务；Python 恢复/E2E 定向 **28 passed**。
+- [x] 修复 SSE `PROCESSING_TIMEOUT` error-event 状态，并以全量复验取代定向证据：Java **81 项**、Python **252 passed**。
+- [x] 用修复后的 harness 重跑 4 场景真实恢复 E2E，全通过；隔离库、端口与 Compose 启动集合核对干净。
+- [ ] 60 道候选题人工复核与明确的 blind holdout。
+- [ ] 真实 provider 的排名/答案质量与费用测量（当前无凭证，调用 0）。
+- [ ] 独立 Q 审阅与 M 消费确认。
 
 ## Start here
-1. 继续在 `D:\konwflow` 的 `local` 分支；HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`，先检查本轮未提交 Java/Python 代码和恢复报告。
+1. 继续在 `D:\konwflow` 的 `local` 分支；HEAD 为 `013fcf5a2de72b09599037fb997765443f5d61ee`，工作树的 review 修复已完成全量复验，尚未提交。
 2. 查看本节 SHA 与当前变更，勿把计划记录中的历史提交或旧 draft.8/.9 快照当作当前 HEAD。
 3. 下一阶段优先安排人工独立复核 60 道题并绑定明确 holdout；只有真实 provider 凭证可用且资料获准时再开展有调用上限的质量/费用评测。Q 审阅与 M 消费确认独立跟踪。
+4. 重新跑套件前先确认宿主机代理环境：`NO_PROXY` 中的不可解析条目已由适配器与测试期 conftest 处理，不需要手动改 shell 变量。
 
 ## Files and commands
 - `contracts/schemas/protocol.schema.json` — draft.10 SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。
@@ -72,14 +80,14 @@ commit: f5bf00f
 - E2E: 先启动并迁移目标本地数据库，再运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --database-name <safe-local-db> --output services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。
 
 ## Decisions and guardrails
-- 保持在 `local`；当前 HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`。本轮实现仍未提交、未推送或合并 `main`。
+- 保持在 `local`；当前 HEAD 为 `013fcf5a2de72b09599037fb997765443f5d61ee`。两项 review 修复仍未提交、未推送或合并 `main`。
 - Java remains sole owner of task, lease/fencing, Chunk/vector writes and publication. Python writes only through authenticated bounded Java endpoints; retrieval uses read-only DB access.
 - 当前 draft.10 是开发候选，不标为冻结或 Q approved；真实模型质量/费用和 Q/M 状态独立报告。
 - 只用合成/获准资料；候选数据不是人工审核结果；报告不得包含 secret、请求正文、模型答案或向量。
 - 不检查 `data/raw/`。
 
 ## Working tree
-- Branch `local` at `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`; current uncommitted changes include Java/Python lifecycle/evaluation implementation, tests, candidate tooling/data, recovery harness/evidence, and progress records.
+- Branch `local` at `013fcf5a2de72b09599037fb997765443f5d61ee`; current uncommitted changes include Java/Python lifecycle/evaluation implementation, tests, candidate tooling/data, recovery harness/evidence, and progress records.
 - `.context/ai-handoff.md` is tracked and modified in the worktree.
 - Local Compose services are stopped; named volumes remain. Temporary E2E database was dropped after successful replay. Ports 8000/8080 were confirmed free by the runner.
 
@@ -89,8 +97,10 @@ commit: f5bf00f
 - Independent Q review and M consumption confirmation remain pending. Do not change ticket status to DONE without those approvals.
 
 ## Handoff log
+- `2026-11-01T08:41:00Z` — 两项 review P2 修复完成全量复验：Java **81 项**（0 failure/error，1 opt-in skip，日志实测 `terminal_status=timeout`）；Python **252 passed**；Schema **85 cases**、离线 **16 passed**。用修复后 harness 重跑 4 场景真实恢复 E2E 全通过，新报告 `recovery-e2e-draft10-compose-scope.json`（隔离库已删、只停本轮启动的 PostgreSQL/MinIO、端口释放、外部模型调用 0）。另修复宿主机畸形 `NO_PROXY` / 缺 socksio 令适配器构造抛异常绕过 fail-closed 的问题：新增 `knowflow_ai/http_client.py`（外部 provider 保留代理、内部网关不代理）、`test_http_client.py` 6 项与测试期 conftest 规范化。改动仍在 `local` 未提交工作树。
 - `2026-11-01T07:03:08Z` — 为候选 corpus 添加 Git `-text` 与 manifest `eol=lf`，模板摘要规范化 CRLF；10 份 SHA 匹配。Python 评测 10 项、全量 235 项通过；工作树未提交。
 - `2026-11-01T07:35:11Z` — 完成 JP-02 扩展计划：Java SSE lifecycle logging、Python 60 条候选机器标注及人工审核导入门禁、runner pending 拒评和 4 场景本地恢复演练。Java 80 项（0 failure/error，1 opt-in skip）、Python 243 passed、Schema 85 structural cases、offline 16 passed；恢复 E2E 4/4，外部模型调用 0，隔离库已删除。代码及记录留在 `local` 未提交工作树；Q/M、人工审核和真实 provider 评测未完成。
+- `2026-11-01T08:18:23Z` — 修复两项 review P2：恢复脚本按服务跟踪 Compose 启动集合，健康 PostgreSQL/停止 MinIO 时只启动并停止 MinIO（Python 定向 28 passed）；SSE `PROCESSING_TIMEOUT` error event 归类为 `timeout`（Java 生命周期定向 4 passed）。未重跑完整双端套件/四场景 E2E；当前 HEAD `013fcf5`，工作区未提交。
 - `2026-11-01T07:02:04Z` — candidate corpus 增加 Git `-text`，manifest 固定 LF，模板摘要规范化 CRLF。十份文档 SHA-256 匹配，模板摘要等于 manifest LF SHA；Python 评测 10 项、全量 235 项通过。
 - `2026-11-01T06:52:43Z` — HEAD 更新为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`（`14:52继续修复bug`），当前仍在 `local`，未推送。
 - `2026-11-01T06:50:04Z` — 修复同步问答 deadline rejection 的历史失败码，并将 candidate-01 改成真实问题、重生成候选产物。定向 Java 新回归 1/1、Document API 39/39、全 Java 77（1 opt-in skip）；Python 全量 235、评测 10。未提交或推送。

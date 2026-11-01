@@ -18,8 +18,9 @@ From the repository root, with the KnowFlow development environment file availab
 
 The runner uses an isolated knowflow_recovery_<run-id> database, applies migrations V1–V8
 through the Java migration profile, and uses the local Compose PostgreSQL and MinIO services.
-It starts those services only when they are not already healthy, and stops only services it
-started. It never migrates or drops the existing knowflow database. On successful cleanup,
+It starts only services that were not running when the run began and stops only that subset.
+An already-running but unhealthy service is observed while readiness is checked; the runner
+does not restart or stop it. It never migrates or drops the existing knowflow database. On successful cleanup,
 it drops only the isolated database created by that run; if cleanup fails, it preserves that
 database for inspection. Temporary synthetic fixtures are removed.
 
@@ -51,3 +52,28 @@ first_delta_ms, total_ms, terminal status, and safe error code. first_delta_ms m
 first nonempty delta successfully sent to the client; it is not provider-side token time.
 An absent delta is recorded as null. The log excludes question text, answer text, citations,
 and credentials.
+
+## Review follow-up (2026-11-01)
+
+Compose ownership is tracked per service. The targeted regression reproduces healthy PostgreSQL
+with stopped MinIO and confirms the runner issues `up -d minio` and cleanup issues `stop minio`;
+PostgreSQL is not restarted or stopped. The four-scenario report above predates this cleanup
+change and remains evidence for the recorded run, not a rerun of the updated harness.
+
+## Rerun on the updated harness (2026-11-01)
+
+All four scenarios were rerun against the per-service Compose harness and passed. Neither
+dependency was running when the run began, so the runner started both and stopped both; ports
+8000/8080 were released, the isolated database `knowflow_recovery_772a89955a5e` was dropped
+after cleanup, process logs contained no configured secret, and external model calls were 0.
+
+| Scenario | Recorded result |
+|---|---|
+| `single_worker_restart` | passed; fencing 1 → 2, stale batch and stale completion both rejected, document READY |
+| `three_worker_losses` | passed; attempt count 3, `WORKER_LOST`, previous active index preserved and still queryable, three distinct failed candidates |
+| `java_restart_question_recovery` | passed; recovered status `FAILED`/`PROCESSING_TIMEOUT`, no answer and no source rows |
+| `delete_while_worker_offline` | passed; document stayed deleted, document detail/source file/retrieval/internal source read all denied, cleanup queues drained |
+
+Machine-readable evidence, including the harness source hashes recorded in that run:
+[recovery-e2e-draft10-compose-scope.json](../../services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json).
+The earlier report remains as the pre-fix record.

@@ -21,6 +21,9 @@ node_modules/
 coverage/
 dist/
 build/
+*.tsbuildinfo
+playwright-report/
+test-results/
 target/
 
 # Local application data and private fixtures

@@ -49,34 +49,44 @@ def _run_compose(env_path: Path, args: list[str]) -> subprocess.CompletedProcess
         errors="replace", timeout=30)
 
 
-def _ensure_compose(env_path: Path) -> bool:
+def _stop_compose_services(env_path: Path, services: set[str]) -> None:
+    if services:
+        _run_compose(env_path, ["stop", *sorted(services)])
+
+
+def _ensure_compose(env_path: Path) -> set[str]:
     try:
-        result = _run_compose(env_path, ["ps", "--format", "json"])
+        result = _run_compose(env_path, ["ps", "--all", "--format", "json"])
     except (OSError, subprocess.SubprocessError):
         raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY") from None
-    containers = []
-    if result.returncode == 0:
-        containers = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
-    health = {item.get("Service"): item.get("Health") for item in containers}
-    if all(health.get(name) == "healthy" for name in ("postgres", "minio")):
-        return False
-    try:
-        started = _run_compose(env_path, ["up", "-d", "postgres", "minio"])
-    except (OSError, subprocess.SubprocessError):
-        raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY") from None
-    if started.returncode:
+    if result.returncode:
         raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY")
-    deadline = time.monotonic() + 90
-    while time.monotonic() < deadline:
-        result = _run_compose(env_path, ["ps", "--format", "json"])
-        if result.returncode == 0:
-            containers = [json.loads(line) for line in result.stdout.splitlines()
-                          if line.strip()]
-            health = {item.get("Service"): item.get("Health") for item in containers}
-            if all(health.get(name) == "healthy" for name in ("postgres", "minio")):
-                return True
-        time.sleep(1)
-    raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY")
+    containers = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    by_service = {item.get("Service"): item for item in containers}
+    started_services = {
+        name for name in ("postgres", "minio")
+        if by_service.get(name, {}).get("State") != "running"
+    }
+    try:
+        if started_services:
+            started = _run_compose(
+                env_path, ["up", "-d", *sorted(started_services)])
+            if started.returncode:
+                raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY")
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            result = _run_compose(env_path, ["ps", "--format", "json"])
+            if result.returncode == 0:
+                containers = [json.loads(line) for line in result.stdout.splitlines()
+                              if line.strip()]
+                health = {item.get("Service"): item.get("Health") for item in containers}
+                if all(health.get(name) == "healthy" for name in ("postgres", "minio")):
+                    return started_services
+            time.sleep(1)
+        raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY")
+    except (OSError, subprocess.SubprocessError, RuntimeError):
+        _stop_compose_services(env_path, started_services)
+        raise
 
 
 def _create_database(dotenv: dict[str, str], database_name: str) -> None:
@@ -765,8 +775,7 @@ def run(args):
                 _drop_database(dotenv, database_name)
             except Exception:
                 database_clean = False
-        if compose_started:
-            _run_compose(env_path, ["stop", "postgres", "minio"])
+        _stop_compose_services(env_path, compose_started)
 
     if not all(local.can_bind(port) for port in (8000, 8080)):
         failure = failure or "LOCAL_SERVICE_PORT_STILL_IN_USE"

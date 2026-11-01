@@ -138,3 +138,18 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - `services/ai/tools/recovery_e2e.py` 使用独立临时数据库、真实本地 Java/Python/PostgreSQL/pgvector/MinIO 与合成模型 adapters 验证四个场景：worker 重启后 fencing 与旧写拒绝、三次 worker 丢失终态且保留旧活动索引、Java 重启后问答 deadline 恢复、worker 离线时删除后不复活。报告 `services/ai/docs/evidence/recovery-e2e-draft10.json`，4/4 通过；临时库已删除，端口已释放，日志无 secret，外部模型调用 0。
 - 当轮复验：Java **80 项，0 failure/error，1 opt-in skip**；Python **243 passed**（1 条既有弃用警告）；Schema **85 structural cases**；离线模型回归 **16 passed**。Schema 工具明确不执行授权、租约或数据库状态转换验证，这部分由真实恢复 E2E 与集成测试覆盖。
 - `local` HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`；本轮实现仍未提交、未推送、未合并。Q/M 审阅及真实 provider 质量/费用仍待完成。
+
+## 2026-11-01：review follow-up
+
+- Compose 恢复清理现在以服务为单位跟踪本次启动集合；对“PostgreSQL 已运行、MinIO 停止”情形只启动并停止 MinIO。Python 定向回归 **28 passed**。
+- Java 将 Python 发出的 `PROCESSING_TIMEOUT` error event 记为 `timeout` 终态；生命周期定向测试 **4 passed**。本轮未重跑完整 Java/Python 套件或四场景 E2E。
+- 当前 HEAD `013fcf5a2de72b09599037fb997765443f5d61ee`，两项修复留在 `local` 未提交工作树。
+
+## 2026-11-01：修复后全量复验与恢复演练重跑
+
+- Java 全量 Maven/Testcontainers **81 项，0 failure/error，1 opt-in skip**，含 timeout 分类回归；运行日志实测 `answer_stream_lifecycle ... terminal_status=timeout error_code=PROCESSING_TIMEOUT`。
+- Python 全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告），含新增 `test_http_client.py` 6 项与 `test_recovery_e2e.py` 3 项；Schema **85 structural cases**；离线模型回归 **16 passed**。
+- 用修复后的 Compose 归属 harness 重跑 4 场景真实恢复 E2E，全通过：单 worker 重启后 fencing 1→2 且旧 batch/completion 均 `LEASE_REJECTED`；三次 worker 丢失终态 `WORKER_LOST` 且旧活动索引仍可查询；Java 重启后问题恢复为 `FAILED/PROCESSING_TIMEOUT` 且无答案/来源；worker 离线时删除后文档、来源文件、检索与内部来源读取全部拒绝，清理队列排空。报告 `services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json`。
+- 收尾核对：隔离库 `knowflow_recovery_772a89955a5e` 已删除；运行前 PostgreSQL/MinIO 均未运行，运行后两者均停止（只停本轮启动集合）；端口 8000/8080 释放；进程日志无 secret；外部模型调用 0。修复前的 `recovery-e2e-draft10.json` 保留为历史证据。
+- 新增 `knowflow_ai/http_client.py` 解决宿主机畸形代理环境令适配器构造抛异常、绕过 fail-closed 的问题；provider 适配器保留环境代理，内部 Java 网关不使用代理。两端源码未改共享契约，契约版本仍为 `0.2.0-draft.10`、SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。
+- 仍未完成：60 道候选题人工复核与 blind holdout、真实 provider 质量/费用测量、独立 Q 审阅与 M 消费确认。全部改动仍在 `local` 未提交工作树。

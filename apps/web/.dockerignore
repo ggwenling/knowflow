@@ -1,0 +1,12 @@
+node_modules
+.next
+playwright-report
+test-results
+e2e
+playwright.config.ts
+vitest.config.mts
+vitest.setup.ts
+eslint.config.mjs
+.env
+.env.*
+!.env.example

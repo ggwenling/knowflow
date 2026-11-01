@@ -6,6 +6,7 @@ from urllib.parse import quote
 import httpx
 
 from .adapters import ProcessingError
+from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION
 
 
@@ -21,8 +22,7 @@ class JavaGateway:
         self._secret = secret
         self._contract = contract
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(timeout=httpx.Timeout(12.0),
-                                                   follow_redirects=False, trust_env=True)
+        self._client = client or build_async_client(httpx.Timeout(12.0))
 
     async def aclose(self):
         if self._owns_client:

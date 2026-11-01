@@ -54,7 +54,8 @@ final class AnswerStreamLifecycle {
     void terminal(PublicAnswerStreamEvent event) {
         switch (event.event()) {
             case "completed" -> finish("completed", null);
-            case "error" -> finish("failed", event.code());
+            case "error" -> finish("PROCESSING_TIMEOUT".equals(event.code())
+                    ? "timeout" : "failed", event.code());
             case "cancelled" -> finish("cancelled", null);
             default -> { }
         }

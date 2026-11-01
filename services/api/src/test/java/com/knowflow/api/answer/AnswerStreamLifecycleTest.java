@@ -73,6 +73,22 @@ class AnswerStreamLifecycleTest {
                         "disconnected", null));
     }
 
+    @Test
+    void classifiesProcessingTimeoutErrorEventAsTimeout() {
+        List<AnswerStreamLifecycle.Terminal> records = new ArrayList<>();
+        AnswerStreamLifecycle lifecycle = new AnswerStreamLifecycle(
+                "fallback", () -> 0L, records::add);
+        PublicAnswerStreamEvent error = new PublicAnswerStreamEvent(
+                "0.2.0-draft.10", "timeout-request-id", 1, "error",
+                null, null, null, "PROCESSING_TIMEOUT", "PROCESSING_TIMEOUT", true);
+
+        lifecycle.sent(error);
+        lifecycle.terminal(error);
+
+        assertThat(records).containsExactly(new AnswerStreamLifecycle.Terminal(
+                "timeout-request-id", null, 0L, "timeout", "PROCESSING_TIMEOUT"));
+    }
+
     private static PublicAnswerStreamEvent event(String requestId, String name, String delta) {
         return new PublicAnswerStreamEvent("0.2.0-draft.10", requestId, 1, name,
                 delta, null, null, null, null, null);

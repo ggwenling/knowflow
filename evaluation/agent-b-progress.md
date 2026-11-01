@@ -221,3 +221,16 @@ candidate-01 原先把 `documentId`、`profileId` 与类型作为陈述直接放
 - 新增独立审核导入器：要求 reviewer ID 与带时区时间，校验两份摘要、60 个 ID、不可变题目元数据、40/20 组分配、来源版本/引文/区间；仅写入独立输出目录并验证最终 seed。没有把机器草稿伪装成审核结果。
 - 评测 runner 对 candidate/pending/incomplete 标注 fail closed，返回 `DATASET_ANNOTATIONS_PENDING`。测试覆盖草稿拒绝计分、完整测试用审核 fixture 导入和分组/摘要/证据篡改拒绝。
 - Python 全量 **243 passed**（1 条既有 Starlette/httpx 弃用警告）；离线 provider 回归 **16 passed**。候选题仍 `reviewed=0`，尚未生成可用于质量结论的人工确认集。
+
+## 2026-11-01 Review follow-up：恢复脚本 Compose 服务归属
+
+- 恢复 runner 现在用 `docker compose ps --all` 判断每个依赖服务是否已在运行，只对未运行的 PostgreSQL/MinIO 服务执行 `up`，并仅停止由本次执行启动的服务。
+- 回归模拟 PostgreSQL 已 healthy、MinIO 已停止，断言启动及清理命令都只包含 `minio`；两个恢复脚本相关测试文件合计 **28 passed**。四场景真实 E2E 报告来自此前 harness 版本，本次针对性验证了 Compose 生命周期，不重跑完整场景。
+
+## 2026-11-01：代理环境加固与全量复验
+
+- 宿主机 `NO_PROXY` 若含不可解析条目（本机为 `[::1]`，httpx 读成 host `[` + port `:1]`），`httpx.AsyncClient(trust_env=True)` 会在构造期抛 `httpx.InvalidURL`；`socks://` 代理缺少 socksio 时抛 `ImportError`。两者都发生在适配器构造阶段，会绕过既有 fail-closed 503 变成未处理错误。
+- 新增 `knowflow_ai/http_client.py`：`build_async_client()` 先按环境代理构造，失败则降级并只记录固定告警 token（不写环境值）。外部 provider 适配器（Embedding、LLM）降级时保留可解析的环境代理，内部 Java 网关不使用任何环境代理。改动接入 `embedding.py`、`answering.py`、`java_client.py`；请求超时、`follow_redirects=False`、调用方注入客户端等既有边界不变。
+- 新增 `services/ai/tests/test_http_client.py` 6 项：畸形 `NO_PROXY` 下构造成功、provider 保留代理、网关拒绝代理、合法环境仍 trust_env、Embedding adapter 可构造、socks 无 extra 时降级。
+- 新增 `services/ai/tests/conftest.py`：测试期为会话规范化 `NO_PROXY`，去掉 httpx 无法解析的条目，使套件不受宿主机代理配置影响；其余代理变量保持原样。
+- 复验：Python 全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告）；Schema **85 structural cases**；离线 provider 回归 **16 passed**；外部模型调用 0。候选题仍 `reviewed=0`，真实质量与费用未测。

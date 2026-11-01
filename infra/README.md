@@ -1,7 +1,20 @@
-# 基础设施（M 所有）
+# 全栈本地环境
 
-此目录用于后续本地 Compose、CI 外的本地开发配置、服务启动文档和部署基础设施。由 M 管理共享 Compose、CI 和根级工程接入；A/B 提交服务要求，不同时修改这些共享文件。
+`compose.yml` 启动 PostgreSQL/pgvector、MinIO、迁移任务、Java API、Python AI 服务与 Next.js Web。数据卷使用 Compose 项目名前缀隔离；只有 Web 在宿主机开放端口。Web 同时加入入口网络和内部服务网络，其余服务只加入内部网络。
 
-当前尚无 Compose、Dockerfile 或 CI 配置。KF2-009 依赖 Java、Python、Web 三端骨架任务 KF2-006/007/008，完成前不提供虚构的启动命令。
+从仓库根目录首次启动：
 
-本地数据、真实原文、凭证、模型权重和下载缓存必须留在忽略路径之外的本地私有目录；不得放进 Docker build context 或提交到仓库。
+```powershell
+Copy-Item infra/.env.example infra/.env
+docker compose --project-name knowflow-local -f infra/compose.yml --env-file infra/.env up --build --wait
+```
+
+先为 `.env` 中的密码和内部共享凭证生成不同的随机值。默认页面为 `http://localhost:3000`。停止服务并保留本地数据：
+
+```powershell
+docker compose --project-name knowflow-local -f infra/compose.yml --env-file infra/.env down
+```
+
+只有明确要删除 `knowflow-local` 环境里的 PostgreSQL 与 MinIO 数据时，才给 `down` 添加 `--volumes`。不得把示例值用于实际凭证，也不要提交 `infra/.env`。
+
+本 Compose 使用网络隔离的合成 AI 适配器，模型模式会在页面显示。真实 provider 质量、隐私条款与费用评测仍需独立执行。

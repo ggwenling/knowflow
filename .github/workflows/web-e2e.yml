@@ -1,0 +1,39 @@
+name: Web engineering E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main, local]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Check Web
+        working-directory: apps/web
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+      - name: Install browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Run isolated full stack
+        run: node scripts/e2e-web.mjs
+      - name: Report service state after failure
+        if: failure()
+        run: docker ps -a --format "table {{.Names}}\t{{.Status}}"

@@ -1,0 +1,14 @@
+.git
+.context
+.review-*
+**/node_modules
+**/.next
+**/.venv
+**/target
+data/raw
+data/private
+*.env
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
