@@ -1,28 +1,28 @@
 ---
 schema_version: 1
 handoff_id: 20261101-050501
-updated_at: 2026-11-01T06:50:04Z
+updated_at: 2026-11-01T07:35:11Z
 from: codex
 to: codex
 status: in_progress
 source_machine: WENLING
 target_machine: same
 branch: local
-commit: b72485c
+commit: f5bf00f
 ---
 
 # AI project handoff
 
 ## Outcome
-完成 2026-11-01 `local` 分支上的 draft.10 Java/Python 开发与本机验证，基线提交为 `b72485c`，未推送或合并 `main`。后续审查的五项 P2 问题已修复，代码、测试、迁移和候选数据留在未提交工作树。历史 API、幂等键、deadline 恢复、模型 profile、来源 tombstone 和候选评测工具已实现；Java/Python 全量测试、Schema/离线评测和真实本地合成 E2E 均通过。真实 provider 质量、费用以及独立 Q/M 验收仍未完成。
+完成 draft.10 计划后续的 Java SSE 生命周期观测、Python 候选标注审核门禁和本地恢复演练；当前在 `local` 分支 HEAD `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828` 上开发。新增改动仍未提交、未推送或合并 `main`。Java/Python 全量、契约结构、离线模型回归和 4 个本地合成恢复场景均通过。候选人工审核、真实 provider 质量/费用及独立 Q/M 验收仍未完成。
 
 ## Current state
-- **基线与契约**：分支 `local`，HEAD `b72485c`（draft.10 实现与审查修复提交）。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。
-- **Java**：V7 保存幂等键、deadline、profile 和来源 tombstone；V8 收紧来源保留形状。问答历史列表/详情/终态删除为 owner-only，处理中问题不能删除，过期处理中记录自动失败。SSE 与同步 completion 的 deadline rejection 均保存 `PROCESSING_TIMEOUT`。Maven 全量 **77 项，0 failure、0 error、1 opt-in skip**；`DocumentApiIntegrationTest` 39 项通过。
-- **Python/评测**：profile 与历史来源 tombstone 消费、可配置 `top_k=1..10`、Recall@5/MRR@10 和分类汇总已实现。全量 **235 passed**（有 1 条既有 Starlette/httpx 弃用警告）；Schema **85** 项，offline smoke **16 passed**。E2E runner 支持安全的 `--database-name`。
-- **候选数据**：`evaluation/data/seed-v2-candidate/` 有 10 份合成资料、60 道 pending 题、36 个 evidence groups；candidate-01 是提问而非内嵌答案；40/20 是 group allocation，不是 blind holdout；`reviewed=0`，不声称人工审核或质量验收。
-- **本机 E2E**：报告 `services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`，真实 Java/Python/PostgreSQL/pgvector/MinIO 使用合成 adapters；上传、READY、检索、带来源回答、活动取消、无迟到写入与清理队列排空均通过，外部模型调用 0。原本机 `knowflow` 库未迁移 schema；首次失败尝试可能留下合成账户记录，但知识库已删除、会话已注销。本次隔离库迁移/重放后已删除，Compose 容器已停止且数据卷保留。
-- **工作树**：draft.10 已在 `b72485c`；后续审查修复未提交。保留预先存在的 `services/api/mvnw.cmd` 行尾差异和 `.context/` 未跟踪状态。候选数据与 draft.10 E2E 报告已在基线提交；本轮候选 JSON 有更新。未读取 `data/raw/`。
+- **基线与契约**：分支 `local`，HEAD `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。
+- **Java**：V7/V8 历史、幂等、deadline、profile 与来源 tombstone 约束已验证。新增 SSE 结构化生命周期记录 request ID、首个成功发送的非空 delta 耗时、总耗时和安全终态；原子保护使终态日志最多一次，不记录答案正文或异常消息。Maven 全量 **80 项，0 failure、0 error、1 opt-in skip**。
+- **Python/评测**：profile/tombstone 消费、`top_k=1..10`、Recall@5/MRR@10 与分类汇总已实现。全量 **243 passed**（1 条既有 Starlette/httpx 弃用警告）；Schema **85 structural cases**，offline smoke **16 passed**。候选/待审标注在 runner 被拒绝计分。
+- **候选数据**：10 份合成资料、60 道候选题、36 个 evidence groups；机器草稿含来源定位，显式 `reviewed=0`。审核导入要求审核人、带时区时间，并校验题目/分组/来源证据后写入独立数据目录。40/20 只是组级公开分配，不是 blind holdout；真实质量尚未验收。
+- **恢复 E2E**：`services/ai/docs/evidence/recovery-e2e-draft10.json` 的 4 个隔离数据库场景全部通过：worker fencing 恢复、三次 worker loss 与旧活动索引保留、Java 重启后的问答 deadline 失败收敛、worker 离线删除后不复活。只用合成 adapters，外部模型调用 0；临时数据库已删除、服务端口已释放、进程日志无 secret。既有业务 E2E `local-backend-e2e-draft10-replay.json` 也仍在。
+- **工作树**：Java/Python 源码、测试、候选工具/机器草稿、恢复脚本/报告及 A/B/联调/计划/handoff 记录均包含本轮未提交修改；保留其他已有行尾差异。未读取 `data/raw/`。
 
 ### Historical 2026-10-30 handoff snapshot
 - 按用户明确要求，本地开发改动已提交至 `local`：`8b1c5ba7df0a77b1658edae32d5dc9e411af6eaf`，提交标题 `feat: integrate draft.6 indexing and cited answers`；未推送、未合并 `main`。提交前发现 Windows `taskkill` 在进程已退出后偶发非零退出码，已加回归并修复误报，随后 Python 全量 **134 passed**、真实本机合成闭环重放通过。
@@ -49,18 +49,14 @@ commit: b72485c
 - 真实 Embedding/LLM 凭证未使用。`.gitattributes` 约束 schema/JSON 行尾和原始数据/PDF 字节。Windows Git 对部分 seed/PDF 报出旧工作区状态，但逐文件 HEAD/index/work SHA-1 一致且 `git diff` 无内容差异；不要为了消除显示状态改写这些原始字节。
 
 ## Acceptance criteria
-- [x] 在 `local` 分支实现 Java/Python draft.10 代码与候选 Schema；已按用户授权提交 `b72485c`，未推送或合并 `main`。
-- [x] Java Maven/Testcontainers：76 项，0 failures/errors，1 opt-in skip；问答 API/历史/超时恢复与 V7 migration 集成通过。
-- [x] Python 全量 235 passed；Schema 85 structural cases；离线 provider 回归 16 passed。
-- [x] 真实本地 Java/Python/PostgreSQL/pgvector/MinIO synthetic E2E 全部通过；报告记录 0 外部模型调用、取消与清理队列为 0。
-- [x] 生成 60 道 pending 合成候选题及 40/20 evidence-group 分配；明确 reviewed=0，未声称 blind holdout 或质量已验收。
-- [x] 修复 late SSE timeout 分类；新增 V8 CHECK `IS TRUE` 并验证 V7 脏数据升级回滚；合并等价候选题组并重生成 36 组分配。
-- [x] 本轮复验：定向 Java 39 项、全量 Java 76 项（1 opt-in skip）、Python 全量 235 项、Schema 85 项、offline 16 项通过。
-- [x] 同步 deadline rejection 保存 `PROCESSING_TIMEOUT`；candidate-01 改为有效问题并重生成全部候选 JSON。Java 全量 77 项、Python 全量 235 项，相关定向回归通过。
-- [x] Updated A/B, integration, plan, README and handoff; `git diff --check` passes and Schema/report hashes match.
+- [x] 在 `local` 开发并验证 Java SSE 生命周期观测；全量 Maven **80 项，0 failure/error，1 opt-in skip**。
+- [x] 新增 Python 候选机器标注草稿、人工审核导入门禁与 runner pending 拒评；全量 **243 passed**，候选仍 `reviewed=0`。
+- [x] 本地真实 Java/Python/PostgreSQL/pgvector/MinIO 完成 4 个恢复/删除场景；隔离数据库清理，端口释放，外部模型调用 0。
+- [x] 契约结构校验 **85 cases**，离线模型回归 **16 passed**；记录明确授权/租约/数据库转换的结构校验边界。
+- [x] 更新 A/B 进度、Java/Python 联调、计划执行结果和 handoff；本轮改动未提交/推送。
 
 ## Start here
-1. 继续在 `D:\konwflow` 的 `local` 分支；基线为 `b72485c`，先检查本轮尚未提交的 P2 修复。保留 `services/api/mvnw.cmd` 既有行尾差异及未跟踪 `.context/`。
+1. 继续在 `D:\konwflow` 的 `local` 分支；HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`，先检查本轮未提交 Java/Python 代码和恢复报告。
 2. 查看本节 SHA 与当前变更，勿把计划记录中的历史提交或旧 draft.8/.9 快照当作当前 HEAD。
 3. 下一阶段优先安排人工独立复核 60 道题并绑定明确 holdout；只有真实 provider 凭证可用且资料获准时再开展有调用上限的质量/费用评测。Q 审阅与 M 消费确认独立跟踪。
 
@@ -76,16 +72,15 @@ commit: b72485c
 - E2E: 先启动并迁移目标本地数据库，再运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --database-name <safe-local-db> --output services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。
 
 ## Decisions and guardrails
-- 保持在 `local`；基线为 `b72485c`。后续审查修复尚未提交、未推送或合并 `main`。
+- 保持在 `local`；当前 HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`。本轮实现仍未提交、未推送或合并 `main`。
 - Java remains sole owner of task, lease/fencing, Chunk/vector writes and publication. Python writes only through authenticated bounded Java endpoints; retrieval uses read-only DB access.
 - 当前 draft.10 是开发候选，不标为冻结或 Q approved；真实模型质量/费用和 Q/M 状态独立报告。
 - 只用合成/获准资料；候选数据不是人工审核结果；报告不得包含 secret、请求正文、模型答案或向量。
 - 不检查 `data/raw/`。
 
 ## Working tree
-- Branch `local` at `b72485c`; current P2 implementation, tests, V8 migration, project records and regenerated candidate files are uncommitted.
-- Preserve pre-existing `services/api/mvnw.cmd` line-ending modification.
-- `.context/ai-handoff.md` remains untracked local handoff state and is intentionally excluded from commits.
+- Branch `local` at `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`; current uncommitted changes include Java/Python lifecycle/evaluation implementation, tests, candidate tooling/data, recovery harness/evidence, and progress records.
+- `.context/ai-handoff.md` is tracked and modified in the worktree.
 - Local Compose services are stopped; named volumes remain. Temporary E2E database was dropped after successful replay. Ports 8000/8080 were confirmed free by the runner.
 
 ## Open questions
@@ -94,6 +89,10 @@ commit: b72485c
 - Independent Q review and M consumption confirmation remain pending. Do not change ticket status to DONE without those approvals.
 
 ## Handoff log
+- `2026-11-01T07:03:08Z` — 为候选 corpus 添加 Git `-text` 与 manifest `eol=lf`，模板摘要规范化 CRLF；10 份 SHA 匹配。Python 评测 10 项、全量 235 项通过；工作树未提交。
+- `2026-11-01T07:35:11Z` — 完成 JP-02 扩展计划：Java SSE lifecycle logging、Python 60 条候选机器标注及人工审核导入门禁、runner pending 拒评和 4 场景本地恢复演练。Java 80 项（0 failure/error，1 opt-in skip）、Python 243 passed、Schema 85 structural cases、offline 16 passed；恢复 E2E 4/4，外部模型调用 0，隔离库已删除。代码及记录留在 `local` 未提交工作树；Q/M、人工审核和真实 provider 评测未完成。
+- `2026-11-01T07:02:04Z` — candidate corpus 增加 Git `-text`，manifest 固定 LF，模板摘要规范化 CRLF。十份文档 SHA-256 匹配，模板摘要等于 manifest LF SHA；Python 评测 10 项、全量 235 项通过。
+- `2026-11-01T06:52:43Z` — HEAD 更新为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`（`14:52继续修复bug`），当前仍在 `local`，未推送。
 - `2026-11-01T06:50:04Z` — 修复同步问答 deadline rejection 的历史失败码，并将 candidate-01 改成真实问题、重生成候选产物。定向 Java 新回归 1/1、Document API 39/39、全 Java 77（1 opt-in skip）；Python 全量 235、评测 10。未提交或推送。
 - `2026-11-01T06:34:56Z` — 最终 `mvnw -DskipTests test-compile` 通过，覆盖本轮生产代码及全部 Java 测试源码编译。
 - `2026-11-01T06:34:18Z` — 保留真实 Spring migration 配置后复跑 `PostgreSqlMigrationIntegrationTest`：1/1 通过；V7 dirty row 回滚与清理后 V8 升级均再次通过。

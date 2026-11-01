@@ -1,5 +1,7 @@
 contracts/schemas/protocol.schema.json text eol=lf
 contracts/examples/protocol-cases.json text eol=lf
 evaluation/data/seed-v1/documents/** -text
+evaluation/data/seed-v2-candidate/documents/** -text
+evaluation/data/seed-v2-candidate/manifest.json text eol=lf
 services/ai/tests/fixtures/pdf/** -text
 *.pdf binary

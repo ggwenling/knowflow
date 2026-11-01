@@ -1,0 +1,70 @@
+{
+  "run_date": "2026-11-01",
+  "result": "DEVELOPMENT_PASS_SYNTHETIC_RECOVERY",
+  "failure": null,
+  "branch": "local",
+  "base_commit": "df6f981c7bc912063c3936511a0a81f26b102660",
+  "database_name": "knowflow_recovery_38164cf29084",
+  "database_dropped_after_cleanup": true,
+  "contract_version": "0.2.0-draft.10",
+  "schema_sha256": "d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c",
+  "scenarios": {
+    "single_worker_restart": {
+      "passed": true,
+      "first_fencing": 1,
+      "recovered_fencing": 2,
+      "stale_batch_rejected": true,
+      "stale_completion_rejected": true,
+      "recovered_document_ready": true
+    },
+    "three_worker_losses": {
+      "passed": true,
+      "attempt_count": 3,
+      "failure_code": "WORKER_LOST",
+      "previous_active_index_preserved": true,
+      "previous_active_index_queryable": true,
+      "distinct_failed_candidates": 3
+    },
+    "java_restart_question_recovery": {
+      "passed": true,
+      "recovered_status": "FAILED",
+      "failure_code": "PROCESSING_TIMEOUT",
+      "answer_absent": true,
+      "sources_absent": true
+    },
+    "delete_while_worker_offline": {
+      "passed": true,
+      "worker_was_offline_at_delete": true,
+      "services_restarted": true,
+      "document_remained_deleted": true,
+      "document_get_denied": true,
+      "source_file_denied": true,
+      "question_retrieval_denied": true,
+      "internal_source_read_denied": true,
+      "cleanup_queues_drained": true
+    }
+  },
+  "cleanup": {
+    "isolated_database_created": true,
+    "isolated_database_clean": true,
+    "services_ports_released": true,
+    "secret_in_process_logs": false
+  },
+  "model_calls": {
+    "embedding_adapter": "local deterministic synthetic adapter",
+    "llm_adapter": "local deterministic synthetic adapter",
+    "external_model_calls": 0
+  },
+  "code_sha256": {
+    "recovery_script": "4279171a4b4627e8ebf4df69bf81a7e0f1a9d187401426ec71704843f3c36dc8",
+    "worker": "7989f6b409d34b7cf3f47e35b0f448fdedeeb069d6aafebd4450cd0676325725",
+    "question_service": "f4683b78fbcbdcb9059c90074adefbcb47b656e493a680b46a5b69598d54dd52",
+    "question_recovery_service": "a3618e94445fa6f1982c843250b4a3a2c65d60c4797d9d072ffc1a50c0dafbb3",
+    "source_read_service": "8e81db8ef6fd16f34574f3337808458aeecb40dbe0e7d72c3cc10f793d1118ca"
+  },
+  "limitations": [
+    "All model adapters were deterministic synthetic test implementations; no provider quality claim is made.",
+    "The 40/20 candidate allocation remains public and is not a blind holdout.",
+    "Independent Q review and M consumption confirmation remain pending."
+  ]
+}

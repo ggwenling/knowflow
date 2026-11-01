@@ -202,3 +202,10 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 
 - Fixed streamed-answer profile loss: `StreamState` carries the `started` event profile into the pending answer, and `DocumentApiIntegrationTest` now verifies the IDs remain stored after `completed`.
 - Java full Maven/Testcontainers suite: **76 tests, 0 failures/errors, 1 opt-in skip**; `DocumentApiIntegrationTest` 38/38 passed.
+
+## 2026-11-01：SSE 生命周期观测与恢复验收
+
+- 新增 `AnswerStreamLifecycle`，记录 request ID、首个成功发送的非空 delta 耗时、总耗时、终态和安全错误码；不会记录答案正文或异常消息。`QuestionController` 在发送成功后计首 delta，并通过原子终态保护避免重复终态日志。
+- 回归覆盖成功首 delta/终态一次、无 delta 的 timeout 和断连/错误终态一次。Maven/Testcontainers 全量 **80 项，0 failure、0 error、1 opt-in skip**，含 3 项生命周期测试。
+- 新增真实本地恢复演练报告 `services/ai/docs/evidence/recovery-e2e-draft10.json`：隔离数据库上的 4 个恢复/删除场景全通过。外部模型调用 0；临时库已清理，服务端口已释放。
+- 代码和记录仍是 `local` 工作树未提交修改；Q/M 审阅状态不变。

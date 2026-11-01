@@ -238,3 +238,15 @@ Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 
 同步问答的最终 deadline guard 触发 `PROCESSING_TIMEOUT` 时，现在以相同错误码落库；新增回归在问题仍为 `PROCESSING` 且无取消原因时令 DB deadline 过期，确认 API 返回 504、历史记录为 `PROCESSING_TIMEOUT`，且答案/来源未写入。候选数据 candidate-01 改为真正的提问“创建索引任务请求需要提供哪些必填字段？”，生成器测试明确防止题干再次包含示例答案的字段名。
 
 重新生成问题、分配清单和标注模板；仍为 36 组、development/holdout 40/20、reviewed=0。Java 全量 **77 tests，0 failures/errors，1 opt-in skip**，新增同步迟到完成回归通过；Python 全量 **235 passed**（1 条既有弃用警告），评测定向 **10 passed**。更新留在 `local` 未提交工作树。
+
+## 2026-11-01：候选数据跨平台字节稳定
+
+将 candidate documents 加入 `.gitattributes` 的 `-text` 字节保护规则，并固定 candidate `manifest.json` 为 LF。生成器显式写 LF；annotation-template 摘要把 CRLF 规范化为 LF 后计算，并重生成模板。验证十份文档 SHA-256 全部匹配 manifest，规范化 manifest SHA-256 与模板值一致；Python 全量 **235 passed**（1 条既有弃用警告），评测定向 **10 passed**。
+
+## 2026-11-01：JP-02 扩展计划执行结果
+
+- **Java**：完成 SSE 首个成功 delta 和终态生命周期观测，结构化记录 request ID、耗时、终态和安全错误码；增加重复终态、timeout 与无 delta 回归。Maven 全量 **80 项，0 failure/error，1 opt-in skip**。
+- **Python**：完成 60 条机器标注草稿、独立人工审核导入器和评测 pending 门禁。草稿仍标注 `reviewed=0`；无审核人信息时不能生成最终 seed，也不能进入计分。全量 **243 passed**。
+- **恢复验收**：真实本地服务与隔离 PostgreSQL 数据库跑过 4 个故障/删除场景，全部通过；报告 `services/ai/docs/evidence/recovery-e2e-draft10.json`。仅使用确定性合成模型 adapters，外部调用 0；临时数据库清理、服务端口释放。
+- **复验**：Schema 85 structural cases、offline smoke 16 passed。`contracts/validate.py` 不覆盖授权/租约/DB 转换；这不作为其通过范围，本地 E2E 和 Java 集成回归提供相应运行证据。
+- 计划中可在当前授权下完成的代码、测试、恢复演练和记录均已完成。候选人工复核、真实 provider 排名/答案质量/成本及独立 Q/M 审批属于待依赖，继续保持未完成。所有改动仍在 `local` 未提交工作树。

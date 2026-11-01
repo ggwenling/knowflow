@@ -18,7 +18,14 @@ def _load(name, path):
 runner = _load("evaluation_runner", ROOT / "evaluation/runner/runner.py")
 candidate_tool = _load("candidate_split", ROOT / "evaluation/data/tools/split_candidates.py")
 candidate_seed = _load("candidate_seed", ROOT / "evaluation/data/tools/prepare_candidate_seed.py")
+draft_tool = _load(
+    "candidate_annotation_draft",
+    ROOT / "evaluation/data/tools/draft_candidate_annotations.py")
+finalize_tool = _load(
+    "candidate_annotation_finalize",
+    ROOT / "evaluation/data/tools/finalize_annotations.py")
 DATASET = ROOT / "evaluation/data/seed-v1"
+CANDIDATE_DATASET = ROOT / "evaluation/data/seed-v2-candidate"
 
 
 def _predictions(split):
@@ -178,6 +185,13 @@ def test_candidate_seed_builds_60_unreviewed_questions_and_exact_40_20_split(tmp
     assert count == 60
     assert (dataset_root / "questions.json").read_bytes() == (
         checked_in_root / "questions.json").read_bytes()
+    manifest_bytes = (dataset_root / "manifest.json").read_bytes()
+    assert b"\r" not in manifest_bytes
+    assert manifest_bytes == (checked_in_root / "manifest.json").read_bytes()
+    manifest = json.loads(manifest_bytes)
+    for item in manifest["documents"]:
+        assert (dataset_root / item["path"]).read_bytes() == (
+            checked_in_root / item["path"]).read_bytes()
     assert candidate_tool.validate_candidate_questions(questions, dataset_root)[
         "annotation_status_counts"] == {"candidate": 60, "reviewed": 0}
     assert {category: sum(item["category"] == category for item in questions)
@@ -236,6 +250,12 @@ def test_candidate_seed_builds_60_unreviewed_questions_and_exact_40_20_split(tmp
     annotation_template = candidate_tool.annotation_template(questions, dataset_root)
     assert annotation_template == json.loads(
         (checked_in_root / "annotation-template.json").read_text(encoding="utf-8"))
+    assert annotation_template["source_manifest_sha256"] == sha256(manifest_bytes).hexdigest()
+
+    manifest_path = dataset_root / "manifest.json"
+    manifest_path.write_bytes(manifest_bytes.replace(b"\n", b"\r\n"))
+    assert candidate_tool.annotation_template(questions, dataset_root)[
+        "source_manifest_sha256"] == annotation_template["source_manifest_sha256"]
 
 
 def test_candidate_annotation_must_match_original_source_and_version():
@@ -275,3 +295,154 @@ def test_candidate_split_rejects_groups_that_cannot_fill_exact_holdout():
                  for index in range(60)]
     with pytest.raises(ValueError, match="LEAKAGE_GROUPS_CANNOT_FILL_HOLDOUT"):
         candidate_tool.assign_splits(questions)
+
+
+def _review_fixture():
+    candidates = json.loads((CANDIDATE_DATASET / "questions.json").read_text(encoding="utf-8"))
+    split = json.loads(
+        (CANDIDATE_DATASET / "split-manifest.json").read_text(encoding="utf-8"))
+    draft = draft_tool.draft_annotations(CANDIDATE_DATASET)
+    annotations = []
+    for item in draft["annotations"]:
+        reviewed = dict(item)
+        reviewed["annotation_status"] = "reviewed"
+        annotations.append(reviewed)
+    review = {
+        "review_version": 1,
+        "status": "human_reviewed",
+        "dataset_id": draft["dataset_id"],
+        "source_manifest_sha256": draft["source_manifest_sha256"],
+        "candidate_questions_sha256": draft["candidate_questions_sha256"],
+        "reviewer": {"id": "test-only-fixture", "reviewed_at": "2026-01-01T00:00:00Z"},
+        "annotations": annotations,
+    }
+    return candidates, split, review
+
+
+def _write_json(path, value):
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def test_machine_draft_is_complete_source_grounded_and_still_pending():
+    draft = draft_tool.draft_annotations(CANDIDATE_DATASET)
+
+    assert draft["question_count"] == 60
+    assert draft["human_reviewed"] is False
+    assert draft["questions_marked_reviewed_count"] == 0
+    assert draft["status"] == "machine_authored_pending_human_review"
+    assert sum(item["answerable"] for item in draft["annotations"]) == 50
+    assert all(item["annotation_status"] == "machine_draft"
+               for item in draft["annotations"])
+    reviewed_shape = [dict(item, annotation_status="reviewed")
+                      for item in draft["annotations"]]
+    validation = candidate_tool.validate_candidate_questions(
+        reviewed_shape, CANDIDATE_DATASET)
+    assert validation["annotation_status_counts"] == {"candidate": 0, "reviewed": 60}
+
+    with pytest.raises(ValueError, match="DATASET_ANNOTATIONS_PENDING"):
+        runner._load_dataset(CANDIDATE_DATASET)
+
+
+def test_human_review_fixture_finalizes_and_runs_through_offline_evaluator(tmp_path):
+    _candidates, _split, review = _review_fixture()
+    review_path = tmp_path / "review.json"
+    output = tmp_path / "reviewed-dataset"
+    _write_json(review_path, review)
+
+    result = finalize_tool.finalize(
+        CANDIDATE_DATASET / "questions.json",
+        CANDIDATE_DATASET / "split-manifest.json",
+        review_path, CANDIDATE_DATASET, output)
+
+    assert result["question_count"] == 60
+    assert result["split_counts"] == {"development": 40, "holdout": 20}
+    manifest, questions, _documents, sources, dataset_sha = runner._load_dataset(output)
+    assert manifest["dataset_id"] == "qingzhu-seed-v2-reviewed"
+    assert manifest["annotation_provenance"]["reviewer_id"] == "test-only-fixture"
+    assert {split: sum(item["split"] == split for item in questions)
+            for split in ("development", "holdout")} == {"development": 40, "holdout": 20}
+
+    predictions = []
+    for index, question in enumerate(
+            (item for item in questions if item["split"] == "development"), 1):
+        evidence = []
+        for item in question["evidence"]:
+            source = sources[item["document_id"]]
+            evidence.append({
+                "document_id": item["document_id"],
+                "content_version_id": item["content_version_id"],
+                "start": item["start"],
+                "end": item["end"],
+                "text_sha256": sha256(
+                    source[item["start"]:item["end"]].encode("utf-8")).hexdigest(),
+            })
+        predictions.append({
+            "question_id": question["id"],
+            "has_answer": question["answerable"],
+            "retrieved_evidence": evidence,
+            "cited_evidence": list(range(len(evidence))) if evidence else [],
+            "support_judgement": "supported" if evidence else "not_applicable",
+            "latency_ms": float(index),
+        })
+    prediction_path = tmp_path / "predictions.json"
+    _write_json(prediction_path, {
+        "dataset_id": manifest["dataset_id"],
+        "dataset_sha256": dataset_sha,
+        "predictions": predictions,
+    })
+    report = runner.evaluate(prediction_path, dataset_root=output)
+    assert report["sample_count"] == 40
+    assert report["dataset_provenance"] == "synthetic authored seed; not human-user evaluation"
+    assert report["metrics"]["gold_evidence_span_recall"] == 1.0
+    assert report["metrics"]["answerability_accuracy"] == 1.0
+
+
+def test_finalizer_rejects_pending_draft_without_creating_output(tmp_path):
+    draft = draft_tool.draft_annotations(CANDIDATE_DATASET)
+    review_path = tmp_path / "machine-draft.json"
+    output = tmp_path / "should-not-exist"
+    _write_json(review_path, draft)
+
+    with pytest.raises(ValueError, match="ANNOTATIONS_NOT_HUMAN_REVIEWED"):
+        finalize_tool.finalize(
+            CANDIDATE_DATASET / "questions.json",
+            CANDIDATE_DATASET / "split-manifest.json",
+            review_path, CANDIDATE_DATASET, output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ("missing-question", "REVIEW_QUESTION_SET_MISMATCH"),
+        ("question-drift", "REVIEW_QUESTION_METADATA_DRIFT"),
+        ("bad-span", "INVALID_ANNOTATION_EVIDENCE"),
+        ("stale-digest", "REVIEW_SOURCE_DIGEST_MISMATCH"),
+        ("split-leak", "SPLIT_LEAKAGE_GROUP_MISMATCH"),
+    ],
+)
+def test_finalizer_rejects_incomplete_or_drifted_review(tmp_path, change, error):
+    candidates, split, review = _review_fixture()
+    if change == "missing-question":
+        review["annotations"].pop()
+    elif change == "question-drift":
+        review["annotations"][0]["question"] = "替换后的问题"
+    elif change == "bad-span":
+        review["annotations"][0]["evidence"][0]["start"] += 1
+    elif change == "stale-digest":
+        review["source_manifest_sha256"] = "0" * 64
+    elif change == "split-leak":
+        split["leakage_groups"]["development"].append(
+            split["leakage_groups"]["holdout"][0])
+
+    review_path = tmp_path / "review.json"
+    split_path = tmp_path / "split.json"
+    output = tmp_path / "invalid-dataset"
+    _write_json(review_path, review)
+    _write_json(split_path, split)
+
+    with pytest.raises(ValueError, match=error):
+        finalize_tool.finalize(
+            CANDIDATE_DATASET / "questions.json", split_path,
+            review_path, CANDIDATE_DATASET, output)
+    assert not output.exists()

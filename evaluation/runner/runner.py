@@ -21,15 +21,32 @@ def _fingerprint(manifest_path, questions_path):
 
 def _load_dataset(dataset_root):
     root = Path(dataset_root).resolve()
+    manifest_path = root / "manifest.json"
+    questions_path = root / "questions.json"
+    manifest = _read_json(manifest_path)
+    questions = _read_json(questions_path)
+    required_question_fields = {
+        "id", "question", "answerable", "reference_answer", "evidence",
+        "split", "leakage_group",
+    }
+    if (not isinstance(questions, list) or not questions
+            or any(not isinstance(item, dict) for item in questions)
+            or any(
+                not required_question_fields <= item.keys()
+                or type(item.get("answerable")) is not bool
+                or not isinstance(item.get("reference_answer"), str)
+                or not item["reference_answer"].strip()
+                or not isinstance(item.get("evidence"), list)
+                or item.get("split") not in ("development", "holdout")
+                or item.get("annotation_status") not in (None, "reviewed")
+                for item in questions
+            )):
+        raise ValueError("DATASET_ANNOTATIONS_PENDING")
     validator_path = ROOT / "evaluation" / "data" / "tools" / "validate_seed.py"
     spec = importlib.util.spec_from_file_location("seed_validation", validator_path)
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
     validator.validate(root)
-    manifest_path = root / "manifest.json"
-    questions_path = root / "questions.json"
-    manifest = _read_json(manifest_path)
-    questions = _read_json(questions_path)
     if manifest.get("synthetic") is not True or not isinstance(questions, list):
         raise ValueError("UNSUPPORTED_DATASET")
     documents = {}

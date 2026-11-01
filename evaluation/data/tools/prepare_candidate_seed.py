@@ -99,7 +99,8 @@ def build(output: Path = OUTPUT):
                 "description": "60 pending candidate questions over the original synthetic Qingzhu corpus; not human-verified labels.",
                 "documents": documents}
     (output / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False,
-                                                       indent=2) + "\n", encoding="utf-8")
+                                                       indent=2) + "\n", encoding="utf-8",
+                                           newline="\n")
     questions = _questions()
     category_counts = {category: sum(row["category"] == category for row in questions)
                        for category in {"factual", "rewrite", "multi_evidence",

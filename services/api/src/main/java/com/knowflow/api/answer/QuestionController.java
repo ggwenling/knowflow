@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.knowflow.api.config.QuestionProperties;
 import com.knowflow.api.error.ApiFailure;
 import com.knowflow.api.security.AuthenticatedUser;
+import com.knowflow.api.security.RequestIdFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.task.TaskExecutor;
@@ -118,12 +120,17 @@ public class QuestionController {
                       @PathVariable UUID knowledgeBaseId,
                       @RequestHeader(value = "Idempotency-Key", required = false)
                               String idempotencyKey,
-                      @RequestBody PublicQuestion question) {
+                      @RequestBody PublicQuestion question,
+                      HttpServletRequest servletRequest) {
         QuestionService.parseIdempotencyKey(idempotencyKey);
         QuestionCancellation cancellation = new QuestionCancellation();
+        Object requestIdAttribute = servletRequest.getAttribute(RequestIdFilter.ATTRIBUTE);
+        String fallbackRequestId = requestIdAttribute instanceof String id
+                ? id : UUID.randomUUID().toString();
+        AnswerStreamLifecycle lifecycle = new AnswerStreamLifecycle(fallbackRequestId);
         SseEmitter emitter = new SseEmitter(properties.getTotalBudgetSeconds() * 1_000L);
         AtomicReference<Disposable> subscription = new AtomicReference<>();
-        Runnable disconnect = () -> {
+        Runnable cancelUpstream = () -> {
             cancellation.clientDisconnected();
             Disposable current = subscription.getAndSet(null);
             if (current != null) {
@@ -132,38 +139,54 @@ public class QuestionController {
         };
         emitter.onTimeout(() -> {
             cancellation.timeout();
+            lifecycle.finish("timeout", "PROCESSING_TIMEOUT");
             Disposable current = subscription.getAndSet(null);
             if (current != null) current.dispose();
             emitter.completeWithError(ApiFailure.processingTimeout());
         });
-        emitter.onCompletion(disconnect);
-        emitter.onError(error -> disconnect.run());
+        emitter.onCompletion(() -> {
+            cancelUpstream.run();
+            lifecycle.finish("disconnected", null);
+        });
+        emitter.onError(error -> {
+            cancelUpstream.run();
+            lifecycle.failed(error);
+        });
         try {
             executor.execute(() -> {
                 try {
                     Disposable current = questions.stream(user, knowledgeBaseId, question,
                                     cancellation, idempotencyKey)
-                            .subscribe(event -> send(emitter, event, cancellation),
-                                    emitter::completeWithError, emitter::complete);
+                            .subscribe(event -> send(emitter, event, cancellation, lifecycle),
+                                    failure -> {
+                                        lifecycle.failed(failure);
+                                        emitter.completeWithError(failure);
+                                    }, emitter::complete);
                     if (!subscription.compareAndSet(null, current)) {
                         current.dispose();
                     }
                 } catch (RuntimeException failure) {
+                    lifecycle.failed(failure);
                     emitter.completeWithError(failure);
                 }
             });
         } catch (TaskRejectedException overloaded) {
+            lifecycle.finish("failed", "AI_PROCESSING_FAILED");
             emitter.completeWithError(ApiFailure.aiProcessingFailed());
         }
         return emitter;
     }
 
     private static void send(SseEmitter emitter, PublicAnswerStreamEvent event,
-                             QuestionCancellation cancellation) {
+                             QuestionCancellation cancellation,
+                             AnswerStreamLifecycle lifecycle) {
         try {
             emitter.send(SseEmitter.event().name(event.event()).data(event, MediaType.APPLICATION_JSON));
+            lifecycle.sent(event);
+            lifecycle.terminal(event);
         } catch (IOException failure) {
             cancellation.clientDisconnected();
+            lifecycle.finish("disconnected", null);
             emitter.completeWithError(failure);
         }
     }

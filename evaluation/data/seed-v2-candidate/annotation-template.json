@@ -2,7 +2,7 @@
   "template_version": 1,
   "status": "pending_annotations_not_a_blind_holdout",
   "dataset_id": "qingzhu-seed-v2-candidate",
-  "source_manifest_sha256": "1081202980de526095bfdee6310a6b69b5dd3c6467766425c615719f9e1d648e",
+  "source_manifest_sha256": "abac46bdea76a614be035d24585b9eb5b760cc69e6c1ebf6f6035ebbf899d617",
   "question_count": 60,
   "questions_marked_reviewed_count": 0,
   "source_catalog": [

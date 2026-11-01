@@ -135,13 +135,14 @@ def prepare(questions, dataset_root, *, development_count=40,
 def annotation_template(candidate_questions, dataset_root):
     """Prepare blank annotations; the unfinished records fail split validation."""
     root = Path(dataset_root).resolve()
-    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    manifest_bytes = (root / "manifest.json").read_bytes().replace(b"\r\n", b"\n")
+    manifest = json.loads(manifest_bytes)
     validate_candidate_questions(candidate_questions, dataset_root)
     return {
         "template_version": 1,
         "status": "pending_annotations_not_a_blind_holdout",
         "dataset_id": manifest["dataset_id"],
-        "source_manifest_sha256": sha256((root / "manifest.json").read_bytes()).hexdigest(),
+        "source_manifest_sha256": sha256(manifest_bytes).hexdigest(),
         "question_count": len(candidate_questions),
         "questions_marked_reviewed_count": 0,
         "source_catalog": [{key: item[key] for key in

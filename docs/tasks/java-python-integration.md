@@ -124,3 +124,17 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - 最终答案保存遇到 deadline guard 时，`ask()` 的 `ApiFailure` catch 现在保留 `PROCESSING_TIMEOUT`。PostgreSQL 集成回归将仍在处理的问题 deadline 置为过去时间后放行同步 AI 响应，验证公开 504 与历史失败码一致，且没有答案/来源写入。
 - `candidate-01` 题干改为“创建索引任务请求需要提供哪些必填字段？”，不再把 `documentId`、`profileId` 及其类型作为题干内容；重生成候选文件。
 - Java 全量 **77 tests，0 failures/errors，1 opt-in skip**；Python 全量 **235 passed**，评测定向 **10 passed**。改动尚未提交或推送。
+
+## 2026-11-01：候选数据换行与摘要校准
+
+- `.gitattributes` 对 `seed-v2-candidate/documents/**` 设置 `-text`，避免 Windows checkout 转换受哈希校验的文档字节；candidate `manifest.json` 固定为 `eol=lf`。
+- manifest 生成时使用固定 LF；`annotation_template()` 对 manifest 字节的 CRLF 统一成 LF 后计算 SHA-256。标注模板摘要已重生成。
+- 测试同时覆盖临时 CRLF manifest 摘要稳定性，并逐一对比十份候选文档字节和清单哈希。评测定向 **10 passed**，Python 全量 **235 passed**（1 条既有弃用警告）。
+
+## 2026-11-01：JP-02 执行结果
+
+- Java 在 `QuestionController` 接入 SSE 生命周期观测：request ID、首个成功发送的非空 delta 耗时、总耗时、终态与安全错误码；不记录正文/异常消息。原子终态防止重复 lifecycle 日志。
+- Python 增加候选机器标注草稿、需人工审核的安全导入器及 runner pending 拒绝门禁。60 条草稿保留 `reviewed=0`，不会进入质量评分。
+- `services/ai/tools/recovery_e2e.py` 使用独立临时数据库、真实本地 Java/Python/PostgreSQL/pgvector/MinIO 与合成模型 adapters 验证四个场景：worker 重启后 fencing 与旧写拒绝、三次 worker 丢失终态且保留旧活动索引、Java 重启后问答 deadline 恢复、worker 离线时删除后不复活。报告 `services/ai/docs/evidence/recovery-e2e-draft10.json`，4/4 通过；临时库已删除，端口已释放，日志无 secret，外部模型调用 0。
+- 当轮复验：Java **80 项，0 failure/error，1 opt-in skip**；Python **243 passed**（1 条既有弃用警告）；Schema **85 structural cases**；离线模型回归 **16 passed**。Schema 工具明确不执行授权、租约或数据库状态转换验证，这部分由真实恢复 E2E 与集成测试覆盖。
+- `local` HEAD 为 `f5bf00f40cbd962c0423a7144ad6dd3a2eb02828`；本轮实现仍未提交、未推送、未合并。Q/M 审阅及真实 provider 质量/费用仍待完成。

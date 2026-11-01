@@ -208,3 +208,16 @@ Guarded answerable/unanswerable category denominators before computing rates and
 ## 2026-11-01：修正 candidate-01 题干
 
 candidate-01 原先把 `documentId`、`profileId` 与类型作为陈述直接放入 question 字段。生成器现在改为提问“创建索引任务请求需要提供哪些必填字段？”，并在评测测试中断言题干精确内容及不包含答案字段名。重生成 questions、split manifest 和 annotation template；36 组 40/20 分配不变，`reviewed=0`。评测定向 **10 passed**，Python 全量 **235 passed**。
+
+## 2026-11-01：候选语料字节与 manifest digest 稳定
+
+- 为 `seed-v2-candidate/documents/**` 添加 `.gitattributes` `-text`，保证 `core.autocrlf=true` checkout 不转换文档原始字节；`manifest.json` 使用 LF 且固定 `eol=lf`。
+- `prepare_candidate_seed.build()` 显式以 LF 写 manifest；`annotation_template()` 在摘要计算前统一将 CRLF 规范化为 LF。重新生成 `annotation-template.json`，其 digest 为 `abac46bdea76a614be035d24585b9eb5b760cc69e6c1ebf6f6035ebbf899d617`。
+- 十份文档字节均与 manifest SHA-256 匹配。回归模拟 CRLF manifest 并确认摘要保持不变；Python 全量 **235 passed**（1 条既有弃用警告），评测定向 **10 passed**。
+
+## 2026-11-01：候选标注草稿与审核导入门禁
+
+- 新增机器草稿生成器，为 60 道候选题生成来源定位与答案性草稿；逐条核验引文及 Unicode 码点/行位置。清单记录来源 manifest 与候选题摘要，并显式标为 `machine_authored_pending_human_review`、`human_reviewed=false`、已审核数 0。
+- 新增独立审核导入器：要求 reviewer ID 与带时区时间，校验两份摘要、60 个 ID、不可变题目元数据、40/20 组分配、来源版本/引文/区间；仅写入独立输出目录并验证最终 seed。没有把机器草稿伪装成审核结果。
+- 评测 runner 对 candidate/pending/incomplete 标注 fail closed，返回 `DATASET_ANNOTATIONS_PENDING`。测试覆盖草稿拒绝计分、完整测试用审核 fixture 导入和分组/摘要/证据篡改拒绝。
+- Python 全量 **243 passed**（1 条既有 Starlette/httpx 弃用警告）；离线 provider 回归 **16 passed**。候选题仍 `reviewed=0`，尚未生成可用于质量结论的人工确认集。
