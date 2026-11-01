@@ -16,5 +16,7 @@ public record DocumentResponse(
         long byteSize,
         String sourceSha256,
         UUID activeIndexVersionId,
+        UUID latestTaskId,
+        String latestTaskStatus,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

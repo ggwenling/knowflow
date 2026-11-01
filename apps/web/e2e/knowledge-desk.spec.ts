@@ -5,18 +5,23 @@ import { resolve } from "node:path";
 
 let firstPage: Page | undefined;
 let firstKnowledgeBase = "";
+let secondKnowledgeBase = "";
 
 test.afterEach(async () => {
-  if (firstPage && firstKnowledgeBase) {
-    await firstPage.evaluate(async (id) => fetch(`/api/v1/knowledge-bases/${id}`, { method: "DELETE" }), firstKnowledgeBase).catch(() => undefined);
+  if (firstPage) {
+    for (const id of [firstKnowledgeBase, secondKnowledgeBase]) {
+      if (id) await firstPage.evaluate(async (baseId) => fetch(`/api/v1/knowledge-bases/${baseId}`, { method: "DELETE" }), id).catch(() => undefined);
+    }
   }
   await firstPage?.context().close();
   firstPage = undefined;
   firstKnowledgeBase = "";
+  secondKnowledgeBase = "";
 });
 
 test("register, index, stream, verify source, enforce ownership, delete and preview PDF", async ({ page, browser }) => {
   firstPage = page;
+  await page.setViewportSize({ width: 390, height: 844 });
   const email = `web-${randomUUID()}@example.test`;
   const password = "KnowFlow-e2e-only-2026!";
   await page.goto("/");
@@ -26,10 +31,25 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await page.getByRole("button", { name: "创建账户" }).click();
 
   await expect(page.getByRole("heading", { name: "开始整理你的资料" })).toBeVisible();
+  await expect(page.getByLabel("新知识库名称")).toBeVisible();
+  await expect(page.getByText("我的知识库")).toBeVisible();
+  await expect(page.getByText("最近问答")).toBeVisible();
   const baseResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/knowledge-bases") && response.request().method() === "POST");
-  await page.getByLabel("新知识库名称").fill(`浏览器验收 ${randomUUID().slice(0, 8)}`);
+  const firstBaseName = `浏览器验收 ${randomUUID().slice(0, 8)}`;
+  await page.getByLabel("新知识库名称").fill(firstBaseName);
   await page.getByRole("button", { name: "创建知识库" }).click();
   firstKnowledgeBase = (await (await baseResponse).json()).id;
+  await expect(page.getByRole("button", { name: new RegExp(firstBaseName) })).toBeVisible();
+
+  const secondBaseResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/knowledge-bases") && response.request().method() === "POST");
+  const secondBaseName = `移动端切换 ${randomUUID().slice(0, 8)}`;
+  await page.getByLabel("新知识库名称").fill(secondBaseName);
+  await page.getByRole("button", { name: "创建知识库" }).click();
+  secondKnowledgeBase = (await (await secondBaseResponse).json()).id;
+  await page.getByRole("button", { name: new RegExp(secondBaseName) }).click();
+  await expect(page.getByRole("heading", { name: secondBaseName })).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(firstBaseName) }).click();
+  await expect(page.getByRole("heading", { name: firstBaseName })).toBeVisible();
 
   const markdown = "KnowFlow 合成验收资料。\n索引状态只有 READY 时才会参与问答。\n上传文件大小上限为 8 MiB。\n";
   const markdownName = "流程规则.md";
@@ -50,6 +70,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const source = JSON.parse(sourceFrame!.split(/\r?\n/).find((line) => line.startsWith("data:"))!.slice(5))
     .sources[0] as { source_id: string; document_id: string; content_version_id: string };
   await expect(page.getByText("本地合成验证", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: /什么时候允许使用这份资料进行问答/ })).toBeVisible();
   await page.getByRole("button").filter({ hasText: "索引状态只有 READY" }).first().click();
   await expect(page.getByRole("dialog", { name: "原文依据" }).locator("pre")).toContainText("索引状态只有 READY");
   await expect(page.getByRole("dialog", { name: "原文依据" }).locator("pre")).toContainText(markdown.trim());

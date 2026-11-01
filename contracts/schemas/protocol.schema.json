@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "KnowFlow proposed messages 0.2.0-draft.10",
-  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. Draft.10 adds model profile reporting and idempotent question submission errors.",
+  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. Draft.10 adds model profile reporting, idempotent question submission errors, and latest indexing task details on documents for client recovery.",
   "$defs": {
     "ContractVersion": {
       "const": "0.2.0-draft.10"
@@ -1665,6 +1665,18 @@
         },
         "active_index_version_id": {
           "$ref": "#/$defs/Identifier"
+        },
+        "latest_task_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "latest_task_status": {
+          "enum": [
+            "QUEUED",
+            "RUNNING",
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED"
+          ]
         },
         "created_at": {
           "type": "string",

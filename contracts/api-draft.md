@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.10`；Schema SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。draft.10 延续 draft.9 的 SSE 与内容版本语义，新增非秘密模型配置身份、请求级问答幂等键、问答历史响应和清理后的来源标识。模型档案标识允许 provider/model 名称中的 `/`。所有共享报文的 `contract_version` 升至 draft.10；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。
+状态：`DRAFT 0.2.0-draft.10`；Schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。draft.10 延续 draft.9 的 SSE 与内容版本语义，新增非秘密模型配置身份、请求级问答幂等键、问答历史响应和清理后的来源标识。模型档案标识允许 provider/model 名称中的 `/`。所有共享报文的 `contract_version` 升至 draft.10；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。
 
 ## 公开入口：浏览器 → Java
 

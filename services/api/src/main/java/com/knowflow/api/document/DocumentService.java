@@ -235,6 +235,7 @@ public class DocumentService {
         List<DocumentResponse> rows = jdbc.query("""
                 SELECT d.id, d.knowledge_base_id, d.original_name, cv.source_format,
                        cv.byte_size, cv.source_sha256, d.active_index_version_id,
+                       latest.id AS latest_task_id, latest.status AS latest_task_status,
                        d.created_at, d.updated_at,
                        CASE
                          WHEN active.status = 'READY' THEN 'READY'
@@ -249,7 +250,7 @@ public class DocumentService {
                   LEFT JOIN knowflow.index_versions active
                     ON active.id = d.active_index_version_id
                   LEFT JOIN LATERAL (
-                      SELECT t.status
+                      SELECT t.id, t.status
                         FROM knowflow.indexing_tasks t
                        WHERE t.document_id = d.id
                        ORDER BY t.created_at DESC, t.id DESC
@@ -272,6 +273,7 @@ public class DocumentService {
         List<DocumentResponse> rows = jdbc.query("""
                 SELECT d.id, d.knowledge_base_id, d.original_name, cv.source_format,
                        cv.byte_size, cv.source_sha256, d.active_index_version_id,
+                       latest.id AS latest_task_id, latest.status AS latest_task_status,
                        d.created_at, d.updated_at,
                        CASE
                          WHEN active.status = 'READY' THEN 'READY'
@@ -286,7 +288,7 @@ public class DocumentService {
                   LEFT JOIN knowflow.index_versions active
                     ON active.id = d.active_index_version_id
                   LEFT JOIN LATERAL (
-                      SELECT t.status
+                      SELECT t.id, t.status
                         FROM knowflow.indexing_tasks t
                        WHERE t.document_id = d.id
                        ORDER BY t.created_at DESC, t.id DESC
@@ -466,6 +468,8 @@ public class DocumentService {
                 result.getLong("byte_size"),
                 result.getString("source_sha256"),
                 result.getObject("active_index_version_id", UUID.class),
+                result.getObject("latest_task_id", UUID.class),
+                result.getString("latest_task_status"),
                 result.getObject("created_at", java.time.OffsetDateTime.class),
                 result.getObject("updated_at", java.time.OffsetDateTime.class));
     }

@@ -7,6 +7,8 @@ export type Document = {
   format: string;
   byte_size: number;
   active_index_version_id?: string;
+  latest_task_id?: string;
+  latest_task_status?: string;
   current_content_version_id?: string;
 };
 export type Source = {

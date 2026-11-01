@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, Document, KnowledgeBase, QuestionDetail, QuestionHistory, Source, streamQuestion, User } from "@/lib/api";
 import styles from "./workspace.module.css";
+import SourceViewer from "./source-viewer";
 
 type Task = { task_id: string; status: string; failure_code: string | null };
 const contractVersion = "0.2.0-draft.10";
@@ -40,10 +41,25 @@ export default function Workspace() {
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState("");
-  const [viewing, setViewing] = useState<{ source: Source; document: Document; url: string | null; text: string | null } | null>(null);
+  const [viewing, setViewing] = useState<{ source: Source; documentName: string } | null>(null);
   const [openMenu, setOpenMenu] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   const questionViewRef = useRef(0);
+  const selectedBaseRef = useRef("");
+  const baseGenerationRef = useRef(0);
+  const refreshGenerationRef = useRef(0);
+  const pollingTasksRef = useRef(new Set<string>());
+
+  const selectBase = useCallback((baseId: string) => {
+    if (selectedBaseRef.current !== baseId) {
+      baseGenerationRef.current += 1;
+      setDocuments([]);
+      setHistory([]);
+      setAnswer(null);
+    }
+    selectedBaseRef.current = baseId;
+    setSelectedBase(baseId);
+  }, []);
 
   function leaveQuestion() {
     questionViewRef.current += 1;
@@ -52,20 +68,66 @@ export default function Workspace() {
     setBusy(false);
   }
 
-  const refresh = useCallback(async (baseId: string) => {
+  const applyRefresh = useCallback(async (baseId: string) => {
+    const baseGeneration = baseGenerationRef.current;
+    const requestGeneration = ++refreshGenerationRef.current;
     const [documentList, historyList] = await Promise.all([
       api<{ items: Document[] }>(`knowledge-bases/${baseId}/documents?limit=50&offset=0`),
       api<{ items: QuestionHistory[] }>("questions?limit=50&offset=0"),
     ]);
+    if (selectedBaseRef.current !== baseId || baseGenerationRef.current !== baseGeneration || refreshGenerationRef.current !== requestGeneration) return null;
     setDocuments(documentList.items);
     setHistory(historyList.items);
+    return documentList.items;
   }, []);
+
+  const pollDocument = useCallback(async (documentId: string, taskId: string, baseId: string) => {
+    const generation = baseGenerationRef.current;
+    const pollKey = `${generation}:${taskId}`;
+    const isCurrent = () => selectedBaseRef.current === baseId && baseGenerationRef.current === generation;
+    if (pollingTasksRef.current.has(pollKey)) return;
+    pollingTasksRef.current.add(pollKey);
+    try {
+      for (;;) {
+        if (!isCurrent()) return;
+        const [document, task] = await Promise.all([
+          api<Document>(`documents/${documentId}`),
+          api<Task>(`tasks/${taskId}`),
+        ]);
+        if (!isCurrent()) return;
+        setDocuments((previous) => previous.map((item) => item.id === documentId ? document : item));
+        if (terminal.has(task.status)) {
+          await applyRefresh(baseId);
+          if (isCurrent() && task.status !== "SUCCEEDED") {
+            setNotice(task.failure_code ?? "索引未能完成；可以检查状态后重建。");
+          }
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    } finally { pollingTasksRef.current.delete(pollKey); }
+  }, [applyRefresh]);
+
+  const refresh = useCallback(async (baseId: string) => {
+    const documentList = await applyRefresh(baseId);
+    if (!documentList) return;
+    for (const document of documentList) {
+      if (document.latest_task_id && document.latest_task_status && !terminal.has(document.latest_task_status)) {
+        void pollDocument(document.id, document.latest_task_id, baseId).catch((error) => {
+          if (selectedBaseRef.current === baseId) setNotice(messageOf(error));
+        });
+      }
+    }
+  }, [applyRefresh, pollDocument]);
 
   const loadBases = useCallback(async () => {
     const response = await api<{ items: KnowledgeBase[] }>("knowledge-bases?limit=50&offset=0");
     setBases(response.items);
-    setSelectedBase((current) => response.items.find((item) => item.id === current)?.id ?? response.items[0]?.id ?? "");
-  }, []);
+    const chosen = response.items.find((item) => item.id === selectedBaseRef.current)?.id ?? response.items[0]?.id ?? "";
+    selectBase(chosen);
+    if (chosen) await refresh(chosen);
+    else { setDocuments([]); setHistory([]); }
+  }, [refresh, selectBase]);
 
   useEffect(() => {
     let active = true;
@@ -74,18 +136,13 @@ export default function Workspace() {
         const current = await api<User>("me");
         if (!active) return;
         setUser(current);
-        const response = await api<{ items: KnowledgeBase[] }>("knowledge-bases?limit=50&offset=0");
-        if (!active) return;
-        setBases(response.items);
-        const chosen = response.items.find((item) => item.id === selectedBase)?.id ?? response.items[0]?.id ?? "";
-        setSelectedBase(chosen);
-        if (chosen) await refresh(chosen);
+        await loadBases();
       } catch (error) {
         if (active) { setUser(null); setNotice(messageOf(error)); }
       } finally { if (active) setAuthLoading(false); }
     })();
     return () => { active = false; };
-  }, [refresh, selectedBase]);
+  }, [loadBases]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -104,7 +161,7 @@ export default function Workspace() {
 
   async function signOut() {
     try { await api("auth/logout", { method: "POST", body: "{}" }); } catch { /* The proxy clears expired sessions too. */ }
-    leaveQuestion(); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
+    leaveQuestion(); selectBase(""); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
   }
 
   async function createBase(event: FormEvent<HTMLFormElement>) {
@@ -116,22 +173,6 @@ export default function Workspace() {
       await loadBases();
     } catch (error) { setNotice(messageOf(error)); }
     finally { setWorking(false); }
-  }
-
-  async function pollDocument(documentId: string, taskId: string, baseId: string) {
-    for (;;) {
-      const [document, task] = await Promise.all([
-        api<Document>(`documents/${documentId}`),
-        api<Task>(`tasks/${taskId}`),
-      ]);
-      setDocuments((previous) => previous.map((item) => item.id === documentId ? document : item));
-      if (terminal.has(task.status)) {
-        await refresh(baseId);
-        if (task.status !== "SUCCEEDED") setNotice(task.failure_code ?? "索引未能完成；可以检查状态后重建。");
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
   }
 
   async function upload(file?: File, updateDocument?: Document) {
@@ -208,12 +249,14 @@ export default function Workspace() {
 
   async function openHistory(item: QuestionHistory) {
     leaveQuestion();
+    selectBase(item.knowledge_base_id);
     try {
       await refresh(item.knowledge_base_id);
-      setSelectedBase(item.knowledge_base_id);
-      setAnswer(await api<QuestionDetail>(`questions/${item.question_id}`));
+      if (selectedBaseRef.current !== item.knowledge_base_id) return;
+      const detail = await api<QuestionDetail>(`questions/${item.question_id}`);
+      if (selectedBaseRef.current === item.knowledge_base_id) setAnswer(detail);
     }
-    catch (error) { setNotice(messageOf(error)); }
+    catch (error) { if (selectedBaseRef.current === item.knowledge_base_id) setNotice(messageOf(error)); }
   }
 
   async function deleteHistory(item: QuestionDetail) {
@@ -225,34 +268,13 @@ export default function Workspace() {
     } catch (error) { setNotice(messageOf(error)); }
   }
 
-  async function viewSource(source: Source) {
-    if (viewing?.url) URL.revokeObjectURL(viewing.url);
+  function viewSource(source: Source) {
     const document = documents.find((item) => item.id === source.document_id);
     if (!document) { setNotice("找不到来源对应的文档。"); return; }
-    setViewing({ source, document, url: null, text: null });
-    try {
-      const currentSource = await api<Source>(`sources/${source.source_id}`);
-      if (currentSource.document_id !== source.document_id || currentSource.content_version_id !== source.content_version_id) {
-        throw new Error("来源已删除或版本已失效。");
-      }
-      const response = await fetch(`/api/v1/documents/${document.id}/contents/${source.content_version_id}/file`, { credentials: "same-origin" });
-      if (!response.ok) throw new Error("来源已删除或版本已失效。");
-      if (response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() === "application/pdf") {
-        const url = URL.createObjectURL(await response.blob());
-        setViewing((old) => old ? { ...old, url } : old);
-      } else {
-        const chars = Array.from(await response.text());
-        const { start, end } = source.locator ?? { start: 0, end: 0 };
-        const excerpt = start != null && end != null ? chars.slice(start, end).join("") : source.quote ?? "";
-        setViewing((old) => old ? { ...old, text: excerpt || source.quote || "未提供定位内容。" } : old);
-      }
-    } catch (error) { setNotice(messageOf(error)); setViewing(null); }
+    setViewing({ source, documentName: document.original_name });
   }
 
-  function closeViewer() {
-    if (viewing?.url) URL.revokeObjectURL(viewing.url);
-    setViewing(null);
-  }
+  function closeViewer() { setViewing(null); }
 
   if (authLoading) return <main className={styles.loading}>正在检查登录状态…</main>;
   if (!user) return (
@@ -281,7 +303,7 @@ export default function Workspace() {
       <aside className={styles.sidebar}>
         <a className={styles.brand} href="#"><span className={styles.brandMark}>K</span><span>KnowFlow<small>文档核验工作台</small></span></a>
         <div className={styles.sideLabel}>我的知识库</div>
-        <div className={styles.baseList}>{bases.map((base) => <button key={base.id} className={`${styles.baseItem} ${selectedBase === base.id ? styles.activeBase : ""}`} onClick={() => { leaveQuestion(); setSelectedBase(base.id); setAnswer(null); void refresh(base.id).catch((error) => setNotice(messageOf(error))); }}><span className={styles.baseGlyph}>▤</span>{base.name}</button>)}</div>
+        <div className={styles.baseList}>{bases.map((base) => <button key={base.id} className={`${styles.baseItem} ${selectedBase === base.id ? styles.activeBase : ""}`} onClick={() => { leaveQuestion(); selectBase(base.id); setAnswer(null); void refresh(base.id).catch((error) => { if (selectedBaseRef.current === base.id) setNotice(messageOf(error)); }); }}><span className={styles.baseGlyph}>▤</span>{base.name}</button>)}</div>
         {bases.length === 0 && <p className={styles.sideEmpty}>这里还没有知识库。</p>}
         <form className={styles.newBase} onSubmit={createBase}><input aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
         <div className={styles.sideLabel}>最近问答</div>
@@ -312,7 +334,7 @@ export default function Workspace() {
         </div>
       </section>
 
-      {viewing && <div className={styles.modalBackdrop} role="presentation" onClick={closeViewer}><section className={styles.viewer} role="dialog" aria-modal="true" aria-label="原文依据" onClick={(event) => event.stopPropagation()}><header><div><span className={styles.eyebrow}>SOURCE EXCERPT</span><h2>{viewing.document.original_name}</h2></div><button aria-label="关闭原文" onClick={closeViewer}>×</button></header><blockquote>{viewing.source.quote}</blockquote>{viewing.text != null && <pre>{viewing.text}</pre>}{viewing.url && <iframe title={`${viewing.document.original_name} PDF 原文`} src={`${viewing.url}#page=${viewing.source.locator?.page ?? 1}`} />}</section></div>}
+      {viewing && <SourceViewer source={viewing.source} documentName={viewing.documentName} onClose={closeViewer} />}
     </main>
   );
 }

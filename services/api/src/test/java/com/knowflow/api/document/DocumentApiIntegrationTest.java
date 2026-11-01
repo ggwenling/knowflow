@@ -278,6 +278,8 @@ class DocumentApiIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
                 .andExpect(jsonPath("$.format").value("txt"))
                 .andExpect(jsonPath("$.byte_size").value(text.length))
+                .andExpect(jsonPath("$.latest_task_id").value(taskId))
+                .andExpect(jsonPath("$.latest_task_status").value("QUEUED"))
                 .andExpect(jsonPath("$.source_sha256").value(
                         "73621482ff083eca9ea88880393298f7d3f53402200780b0c16354a9beb0535a"));
         mockMvc.perform(get("/api/v1/tasks/{taskId}", taskId)
@@ -290,7 +292,9 @@ class DocumentApiIntegrationTest {
                         knowledgeBaseId).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(1))
-                .andExpect(jsonPath("$.items[0].id").value(documentId));
+                .andExpect(jsonPath("$.items[0].id").value(documentId))
+                .andExpect(jsonPath("$.items[0].latest_task_id").value(taskId))
+                .andExpect(jsonPath("$.items[0].latest_task_status").value("QUEUED"));
 
         JsonNode other = register("document-other@example.test");
         String otherToken = other.path("access_token").asText();

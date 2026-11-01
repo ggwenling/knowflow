@@ -54,7 +54,6 @@ export default function SourceViewer({ source, documentName, onClose }: Props) {
     const controller = new AbortController();
     let active = true;
     let objectUrl: string | undefined;
-    setPreview({ key: sourceKey, kind: "loading" });
     (async () => {
       try {
         const current = await api<PreviewSource>(`sources/${sourceId}`, { signal: controller.signal });
@@ -115,7 +114,7 @@ export default function SourceViewer({ source, documentName, onClose }: Props) {
         {unavailable ? <div className={styles.feedback}><p role="status">{unavailable}</p><button type="button" disabled>预览不可用</button></div> : <>
           {quote && <blockquote>{quote}</blockquote>}
           {current.kind === "loading" && <p className={styles.feedback} role="status">正在载入原文…</p>}
-          {current.kind === "error" && <div className={styles.feedback}><p role="alert">{current.message}</p><button type="button" onClick={() => setAttempt((value) => value + 1)}>重新载入原文</button></div>}
+          {current.kind === "error" && <div className={styles.feedback}><p role="alert">{current.message}</p><button type="button" onClick={() => { setPreview({ key: sourceKey, kind: "loading" }); setAttempt((value) => value + 1); }}>重新载入原文</button></div>}
           {current.kind === "text" && <pre>{current.text}</pre>}
           {current.kind === "pdf" && <><a className={styles.pdfLink} href={`${current.url}#page=${page}`} target="_blank" rel="noopener noreferrer">在新窗口打开 PDF 原文（第 {page} 页）</a><iframe tabIndex={-1} title={`${documentName} PDF 原文`} src={`${current.url}#page=${page}`} /></>}
         </>}

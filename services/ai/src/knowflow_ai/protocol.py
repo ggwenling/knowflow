@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 from .config import ConfigurationError
 
 CONTRACT_VERSION = '0.2.0-draft.10'
-SCHEMA_SHA256 = 'd34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c'
+SCHEMA_SHA256 = '20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f'
 
 
 class InvalidMessage(ValueError):

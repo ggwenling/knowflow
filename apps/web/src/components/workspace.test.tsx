@@ -18,6 +18,12 @@ let document: Document;
 let fileResponse: Response;
 let taskStatus: string;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   document = { id: "doc", original_name: "当前资料.md", format: "md", status: "READY", byte_size: 20, active_index_version_id: "old-index" };
   taskStatus = "RUNNING";
@@ -26,12 +32,13 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "me") return { user_id: "user", email: "user@example.test" };
     if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
-    if (path.startsWith("knowledge-bases/kb/documents?")) return { items: [document] };
+    if (path.startsWith("knowledge-bases/kb/documents?")) return { items: [taskStatus === "SUCCEEDED" ? { ...document, status: "READY", active_index_version_id: "ready-index" } : document] };
     if (path.startsWith("questions?")) return { items: [historical] };
     if (path === "questions/old-question") return historical;
-    if (path === "documents/doc") return document;
+    if (path === "documents/doc") return taskStatus === "SUCCEEDED" ? { ...document, status: "READY", active_index_version_id: "ready-index" } : document;
     if (path === "documents/doc/rebuilds" || path === "documents/doc/contents") return { document_id: "doc", task_id: "new-task" };
     if (path === "tasks/new-task") return { task_id: "new-task", status: taskStatus, failure_code: "NEW_INDEX_FAILED" };
+    if (path === "tasks/recovered-task") return { task_id: "recovered-task", status: taskStatus, failure_code: null };
     if (path === "sources/old-source") return source;
     throw new Error(`Unexpected API path: ${path}`);
   });
@@ -71,6 +78,76 @@ describe("index task polling", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
     expect(screen.getByText("NEW_INDEX_FAILED")).toBeVisible();
     expect(upload).not.toBeDisabled();
+  });
+
+  it("resumes polling an in-flight task after workspace load even with a READY index", async () => {
+    document = { ...document, status: "READY", active_index_version_id: "old-index", latest_task_id: "recovered-task", latest_task_status: "RUNNING" };
+    await openWorkspace();
+    await waitFor(() => expect(api).toHaveBeenCalledWith("tasks/recovered-task"));
+    await act(async () => {});
+    vi.useFakeTimers();
+    taskStatus = "SUCCEEDED";
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(screen.getByText(document.original_name).closest("article")).toHaveTextContent("已就绪");
+  });
+});
+
+describe("knowledge-base refresh isolation", () => {
+  it("ignores a stale response after switching A to B and back to A", async () => {
+    const stale = deferred<{ items: Document[] }>();
+    let calls = 0;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "me") return { user_id: "user", email: "user@example.test" };
+      if (path.startsWith("knowledge-bases?")) return { items: [
+        { id: "kb", name: "资料库", status: "ACTIVE" }, { id: "kb-b", name: "第二资料库", status: "ACTIVE" },
+      ] };
+      if (path.startsWith("knowledge-bases/kb/documents?")) {
+        calls += 1;
+        return calls === 2 ? stale.promise : { items: [document] };
+      }
+      if (path.startsWith("knowledge-bases/kb-b/documents?")) return { items: [] };
+      if (path.startsWith("questions?")) return { items: [] };
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /^▤\s*资料库$/ }));
+    await waitFor(() => expect(calls).toBe(2));
+    fireEvent.click(screen.getByRole("button", { name: /第二资料库/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^▤\s*资料库$/ }));
+    await waitFor(() => expect(calls).toBe(3));
+    await screen.findByText(document.original_name);
+    await act(async () => { stale.resolve({ items: [{ ...document, original_name: "旧结果.md", status: "PROCESSING" }] }); });
+    expect(screen.getByText(document.original_name)).toBeVisible();
+    expect(screen.queryByText("旧结果.md")).not.toBeInTheDocument();
+  });
+  it("ignores an old knowledge-base response after the user switches bases", async () => {
+    const secondDocument: Document = { ...document, id: "doc-b", original_name: "第二资料.md" };
+    const staleRefresh = deferred<{ items: Document[] }>();
+    let firstBaseDocumentCalls = 0;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "me") return { user_id: "user", email: "user@example.test" };
+      if (path.startsWith("knowledge-bases?")) return { items: [
+        { id: "kb", name: "资料库", status: "ACTIVE" },
+        { id: "kb-b", name: "第二资料库", status: "ACTIVE" },
+      ] };
+      if (path.startsWith("knowledge-bases/kb/documents?")) {
+        firstBaseDocumentCalls += 1;
+        return firstBaseDocumentCalls === 1 ? { items: [document] } : staleRefresh.promise;
+      }
+      if (path.startsWith("knowledge-bases/kb-b/documents?")) return { items: [secondDocument] };
+      if (path.startsWith("questions?")) return { items: [historical] };
+      if (path === "questions/old-question") return historical;
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /历史问题/ }));
+    await waitFor(() => expect(firstBaseDocumentCalls).toBe(2));
+    fireEvent.click(screen.getByRole("button", { name: /第二资料库/ }));
+    await screen.findByText("第二资料.md");
+    await act(async () => { staleRefresh.resolve({ items: [document] }); });
+    expect(screen.getByText("第二资料.md")).toBeVisible();
+    expect(screen.queryByText("当前资料.md")).not.toBeInTheDocument();
   });
 });
 
@@ -123,5 +200,76 @@ describe("historical source format", () => {
       expect(dialog.querySelector("iframe")).toBeNull();
     }
     expect(fetch).toHaveBeenCalledWith("/api/v1/documents/doc/contents/old-version/file", expect.anything());
+  });
+
+  it("ignores a late source lookup after the viewer is replaced", async () => {
+    const sourceA: Source = { ...source, source_id: "source-a", quote: "引用 A" };
+    const sourceB: Source = { ...source, source_id: "source-b", content_version_id: "version-b", quote: "引用 B", locator: { kind: "text_range", start: 0, end: 10, page: null, unit: "unicode_code_point" } };
+    const pendingSource = deferred<Source>();
+    historical.sources = [sourceA, sourceB];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "me") return { user_id: "user", email: "user@example.test" };
+      if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
+      if (path.startsWith("knowledge-bases/kb/documents?")) return { items: [document] };
+      if (path.startsWith("questions?")) return { items: [historical] };
+      if (path === "questions/old-question") return historical;
+      if (path === "sources/source-a") return pendingSource.promise;
+      if (path === "sources/source-b") return sourceB;
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/mode") return Response.json({ mode: "synthetic" });
+      if (url.endsWith("/version-b/file")) return new Response("B original", { headers: { "content-type": "text/markdown" } });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /历史问题/ }));
+    await screen.findByText("历史回答");
+    fireEvent.click(screen.getByRole("button", { name: /引用 A/ }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("sources/source-a", expect.anything()));
+    fireEvent.click(screen.getByRole("button", { name: "关闭原文" }));
+    fireEvent.click(screen.getByRole("button", { name: /引用 B/ }));
+    const dialog = await screen.findByRole("dialog", { name: "原文依据" });
+    await waitFor(() => expect(dialog.querySelector("pre")).toHaveTextContent("B original"));
+    await act(async () => { pendingSource.resolve(sourceA); });
+    expect(dialog.querySelector("pre")).toHaveTextContent("B original");
+    expect(fetch).not.toHaveBeenCalledWith("/api/v1/documents/doc/contents/old-version/file", expect.anything());
+  });
+
+  it("ignores a late source file response after the viewer is replaced", async () => {
+    const sourceA: Source = { ...source, source_id: "source-a", content_version_id: "version-a", quote: "引用 A", locator: { kind: "text_range", start: 0, end: 10, page: null, unit: "unicode_code_point" } };
+    const sourceB: Source = { ...source, source_id: "source-b", content_version_id: "version-b", quote: "引用 B", locator: { kind: "text_range", start: 0, end: 10, page: null, unit: "unicode_code_point" } };
+    const pendingFile = deferred<Response>();
+    historical.sources = [sourceA, sourceB];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "me") return { user_id: "user", email: "user@example.test" };
+      if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
+      if (path.startsWith("knowledge-bases/kb/documents?")) return { items: [document] };
+      if (path.startsWith("questions?")) return { items: [historical] };
+      if (path === "questions/old-question") return historical;
+      if (path === "sources/source-a") return sourceA;
+      if (path === "sources/source-b") return sourceB;
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/mode") return Response.json({ mode: "synthetic" });
+      if (url.endsWith("/version-a/file")) return pendingFile.promise;
+      if (url.endsWith("/version-b/file")) return new Response("B original", { headers: { "content-type": "text/markdown" } });
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /历史问题/ }));
+    await screen.findByText("历史回答");
+    fireEvent.click(screen.getByRole("button", { name: /引用 A/ }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/v1/documents/doc/contents/version-a/file", expect.anything()));
+    fireEvent.click(screen.getByRole("button", { name: "关闭原文" }));
+    fireEvent.click(screen.getByRole("button", { name: /引用 B/ }));
+    const dialog = await screen.findByRole("dialog", { name: "原文依据" });
+    await waitFor(() => expect(dialog.querySelector("pre")).toHaveTextContent("B original"));
+    await act(async () => { pendingFile.resolve(new Response("A stale original", { headers: { "content-type": "text/markdown" } })); });
+    expect(dialog.querySelector("pre")).toHaveTextContent("B original");
+    expect(dialog.querySelector("pre")).not.toHaveTextContent("A stale original");
   });
 });

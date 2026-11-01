@@ -202,7 +202,7 @@ async def test_client_disconnect_cancels_answer_operation():
 
 def test_health_consumes_draft10_examples_without_version_fallback(app, client):
     assert CONTRACT_VERSION == '0.2.0-draft.10'
-    assert SCHEMA_SHA256 == 'd34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c'
+    assert SCHEMA_SHA256 == '20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f'
     cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft10.json').read_text(encoding='utf-8'))
     for case in cases:
         if case['valid']:
