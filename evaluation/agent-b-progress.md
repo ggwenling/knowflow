@@ -198,3 +198,13 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 ## 2026-11-01 Review follow-up
 
 Guarded answerable/unanswerable category denominators before computing rates and added single-label regression coverage. Python full suite: **235 passed**; evaluation tests: **10 passed**. No scoring semantics changed when both denominators are present.
+
+## 2026-11-01：候选题泄漏组修复
+
+- `candidate-41`..`candidate-49` 中 9 道关键词题已并入对应 fact/多证据组：API 字段、重叠、Unicode offset、owner scope、PDF 页码、发布权限、OCR/解析边界、超时状态、retry 草案。
+- 重新生成 `questions.json`、`split-manifest.json` 和 `annotation-template.json`。组数由 45 降至 **36**，组间无跨 split；development **40**、holdout **20**。Unicode 相关题同处 development；PDF 页码相关题同处 holdout。
+- 候选题总数及分类数不变，`reviewed=0`。测试核对等价题组、固定 seed 的实际分配，并确保已跟踪数据文件与生成器输出一致。评测定向 **10 passed**，Python 全量 **235 passed**。
+
+## 2026-11-01：修正 candidate-01 题干
+
+candidate-01 原先把 `documentId`、`profileId` 与类型作为陈述直接放入 question 字段。生成器现在改为提问“创建索引任务请求需要提供哪些必填字段？”，并在评测测试中断言题干精确内容及不包含答案字段名。重生成 questions、split manifest 和 annotation template；36 组 40/20 分配不变，`reviewed=0`。评测定向 **10 passed**，Python 全量 **235 passed**。

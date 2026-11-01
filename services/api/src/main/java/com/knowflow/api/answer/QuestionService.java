@@ -183,8 +183,10 @@ public class QuestionService {
             if (cancellation.reason() != null) {
                 return cancelQuestion(snapshot.questionId(), cancellation);
             }
-            markFailed(snapshot.questionId(), "DOCUMENT_UNAVAILABLE".equals(failure.code())
-                    ? "DOCUMENT_UNAVAILABLE" : "AI_PROCESSING_FAILED");
+            String failureCode = "DOCUMENT_UNAVAILABLE".equals(failure.code())
+                    || "PROCESSING_TIMEOUT".equals(failure.code())
+                    ? failure.code() : "AI_PROCESSING_FAILED";
+            markFailed(snapshot.questionId(), failureCode);
             throw failure;
         } catch (DataAccessException storageFailure) {
             if (cancellation.reason() != null) {
@@ -596,7 +598,9 @@ public class QuestionService {
 
     private static boolean isTimeout(Throwable failure) {
         for (Throwable current = failure; current != null; current = current.getCause()) {
-            if (current instanceof TimeoutException
+            if ((current instanceof ApiFailure apiFailure
+                    && "PROCESSING_TIMEOUT".equals(apiFailure.code()))
+                    || current instanceof TimeoutException
                     || current.getClass().getSimpleName().toLowerCase(java.util.Locale.ROOT)
                     .contains("timeout")
                     || current instanceof SQLException sqlException

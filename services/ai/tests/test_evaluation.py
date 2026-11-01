@@ -173,8 +173,11 @@ def test_candidate_seed_builds_60_unreviewed_questions_and_exact_40_20_split(tmp
     dataset_root = tmp_path / "seed-v2-candidate"
     _documents, count = candidate_seed.build(dataset_root)
     questions = json.loads((dataset_root / "questions.json").read_text(encoding="utf-8"))
+    checked_in_root = ROOT / "evaluation" / "data" / "seed-v2-candidate"
 
     assert count == 60
+    assert (dataset_root / "questions.json").read_bytes() == (
+        checked_in_root / "questions.json").read_bytes()
     assert candidate_tool.validate_candidate_questions(questions, dataset_root)[
         "annotation_status_counts"] == {"candidate": 60, "reviewed": 0}
     assert {category: sum(item["category"] == category for item in questions)
@@ -187,6 +190,52 @@ def test_candidate_seed_builds_60_unreviewed_questions_and_exact_40_20_split(tmp
     assert len(split["development"]) == 40
     assert len(split["holdout"]) == 20
     assert set(split["development_groups"]).isdisjoint(split["holdout_groups"])
+    assert len(split["development_groups"]) + len(split["holdout_groups"]) == 36
+
+    by_id = {item["id"]: item for item in questions}
+    assert by_id["candidate-01"]["question"] == "创建索引任务请求需要提供哪些必填字段？"
+    assert "documentId" not in by_id["candidate-01"]["question"]
+    assert "profileId" not in by_id["candidate-01"]["question"]
+    equivalent_groups = {
+        "candidate-41": "fact-01",
+        "candidate-42": "fact-05",
+        "candidate-43": "fact-07",
+        "candidate-44": "identity-notfound",
+        "candidate-45": "fact-08",
+        "candidate-46": "fact-10",
+        "candidate-47": "parse-boundary",
+        "candidate-48": "fact-14",
+        "candidate-49": "rollback-timeout",
+    }
+    assert {question_id: by_id[question_id]["leakage_group"]
+            for question_id in equivalent_groups} == equivalent_groups
+
+    assignment = {question_id: split_name
+                  for split_name in ("development", "holdout")
+                  for question_id in split[split_name]}
+    for family in (
+            ("candidate-01", "candidate-16", "candidate-41"),
+            ("candidate-05", "candidate-20", "candidate-42"),
+            ("candidate-07", "candidate-22", "candidate-43"),
+            ("candidate-08", "candidate-23", "candidate-45"),
+            ("candidate-10", "candidate-25", "candidate-46"),
+            ("candidate-14", "candidate-29", "candidate-48"),
+            ("candidate-35", "candidate-44"),
+            ("candidate-36", "candidate-49"),
+            ("candidate-38", "candidate-47")):
+        assert len({assignment[question_id] for question_id in family}) == 1
+    assert {assignment[question_id] for question_id in
+            ("candidate-07", "candidate-22", "candidate-43")} == {"development"}
+    assert {assignment[question_id] for question_id in
+            ("candidate-08", "candidate-23", "candidate-45")} == {"holdout"}
+
+    split_manifest = candidate_tool.prepare(questions, dataset_root)
+    assert split_manifest["validation"]["leakage_group_count"] == 36
+    assert split_manifest == json.loads(
+        (checked_in_root / "split-manifest.json").read_text(encoding="utf-8"))
+    annotation_template = candidate_tool.annotation_template(questions, dataset_root)
+    assert annotation_template == json.loads(
+        (checked_in_root / "annotation-template.json").read_text(encoding="utf-8"))
 
 
 def test_candidate_annotation_must_match_original_source_and_version():

@@ -1,7 +1,7 @@
 [
   {
     "id": "candidate-01",
-    "question": "必填字段是 documentId（UUID）和 profileId（字符串）。",
+    "question": "创建索引任务请求需要提供哪些必填字段？",
     "leakage_group": "fact-01",
     "annotation_status": "candidate",
     "category": "factual"
@@ -282,63 +282,63 @@
   {
     "id": "candidate-41",
     "question": "查询“索引任务”的必填 camelCase 字段叫什么？",
-    "leakage_group": "api-field",
+    "leakage_group": "fact-01",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-42",
     "question": "分段配置中的 overlap 默认是多少？",
-    "leakage_group": "chunk-overlap",
+    "leakage_group": "fact-05",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-43",
     "question": "text_range 的 Unicode code point 偏移从几开始、右端是否包含？",
-    "leakage_group": "unicode-offset",
+    "leakage_group": "fact-07",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-44",
     "question": "客户端传入 owner_id 应如何处理？",
-    "leakage_group": "owner-id",
+    "leakage_group": "identity-notfound",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-45",
     "question": "PDF locator 的页码起点是多少？",
-    "leakage_group": "pdf-page",
+    "leakage_group": "fact-08",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-46",
     "question": "候选 embedding 由谁提交，active_index 由谁切换？",
-    "leakage_group": "vector-publish",
+    "leakage_group": "fact-10",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-47",
     "question": "扫描版 PDF 是否自动 OCR？",
-    "leakage_group": "ocr-limit",
+    "leakage_group": "parse-boundary",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-48",
     "question": "PROCESSING_TIMEOUT 对应哪个 HTTP 状态？",
-    "leakage_group": "http-timeout",
+    "leakage_group": "fact-14",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },
   {
     "id": "candidate-49",
     "question": "未批准的 retry draft 能否代表当前生效配置？",
-    "leakage_group": "draft-state",
+    "leakage_group": "rollback-timeout",
     "annotation_status": "candidate",
     "category": "chinese_keyword"
   },

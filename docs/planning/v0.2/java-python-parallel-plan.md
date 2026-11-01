@@ -224,3 +224,17 @@ Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 
 60 道候选题尚未人工审核（reviewed=0）；Q 审阅、M 消费确认、真实 provider 质量/成本仍待完成。本轮实现与审查修复已提交到 `local`，未推送或合并 `main`。
 
 2026-11-01 审查意见复验：修复 category 单标签时 0 分母导致的异常，并修复 SSE `started` 已保存模型 profile、但 `completed` 保存答案时被 null 覆盖的问题。Python 全量 **235 passed**；Java 全量 **76 项，0 failure/error，1 opt-in skip**。对应回归覆盖单标签类别及 SSE 完成后的 profile 持久化。
+
+## 2026-11-01：后续三项 P2 修复
+
+`local` 的 SSE 迟到完成错误现已将 `ApiFailure` 代码 `PROCESSING_TIMEOUT` 分类为超时；回归验证恢复任务胜出后只发出一条 `PROCESSING_TIMEOUT` error，`retryable=true`，且不保存成功答案或来源。新增 V8 迁移将来源保留形状 CHECK 限定为真值；真实 PostgreSQL 测试从 V7 升级，确认已有畸形行会令迁移失败并回滚，修正数据后可成功升级；PDF、文本区间、完整 tombstone 可写入，缺少 locator kind/page/range endpoint 的来源均被拒绝。V7 未改写，历史校验和保持稳定。
+
+候选题生成器将 9 道关键词题并入其等价事实组，重生成问题、组分配与标注模板。分配为 36 组、development/holdout 40/20；Unicode 规则相关题同在 development，PDF 页码题同在 holdout；60 道题仍均为候选，`reviewed=0`。
+
+验证：Java 定向集成 **39 tests 全通过**，全量 **76 tests，0 failures/errors，1 opt-in skip**；Python 评测定向 **10 passed**、全量 **235 passed**（1 条既有弃用警告）；Schema **85 cases**、离线回归 **16 passed**。改动尚在 `local` 工作树，未提交或推送；原有 `mvnw.cmd` 行尾差异与 `.context/` 保留。
+
+## 2026-11-01：后续两项 P2 修复
+
+同步问答的最终 deadline guard 触发 `PROCESSING_TIMEOUT` 时，现在以相同错误码落库；新增回归在问题仍为 `PROCESSING` 且无取消原因时令 DB deadline 过期，确认 API 返回 504、历史记录为 `PROCESSING_TIMEOUT`，且答案/来源未写入。候选数据 candidate-01 改为真正的提问“创建索引任务请求需要提供哪些必填字段？”，生成器测试明确防止题干再次包含示例答案的字段名。
+
+重新生成问题、分配清单和标注模板；仍为 36 组、development/holdout 40/20、reviewed=0。Java 全量 **77 tests，0 failures/errors，1 opt-in skip**，新增同步迟到完成回归通过；Python 全量 **235 passed**（1 条既有弃用警告），评测定向 **10 passed**。更新留在 `local` 未提交工作树。

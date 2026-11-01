@@ -778,10 +778,12 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.TEXT_EVENT_STREAM)
                         .content("{\"question\":\"What is the recovery evidence?\"}"))
                 .andReturn();
+        UUID questionId;
         try {
             assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+            awaitSseEvent(initial, "event:sources");
             String requestId = AI_RECEIVED_REQUEST_ID.get();
-            UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+            questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
                     UUID.class, requestId);
             jdbc.update("UPDATE knowflow.questions SET deadline_at = clock_timestamp() - INTERVAL '3 seconds' WHERE id = ?",
                     questionId);
@@ -795,12 +797,25 @@ class DocumentApiIntegrationTest {
         }
         var finished = mockMvc.perform(asyncDispatch(initial)).andReturn();
         assertThat(finished.getResponse().getStatus()).isEqualTo(200);
-        assertThat(finished.getResponse().getContentAsString()).contains("event:error")
-                .doesNotContain("event:completed");
-        UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions ORDER BY created_at DESC LIMIT 1",
-                UUID.class);
+        String body = finished.getResponse().getContentAsString();
+        assertThat(body.split("event:error", -1)).hasSize(2);
+        assertThat(body).doesNotContain("event:completed");
+        String errorData = body.substring(body.indexOf("event:error")).lines()
+                .filter(line -> line.startsWith("data:"))
+                .map(line -> line.substring("data:".length()).trim())
+                .findFirst().orElseThrow();
+        JsonNode errorEvent = objectMapper.readTree(errorData);
+        assertThat(errorEvent.path("code").asText()).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(errorEvent.path("message").asText()).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(errorEvent.path("retryable").asBoolean()).isTrue();
         assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
                 String.class, questionId)).isEqualTo("FAILED");
+        assertThat(jdbc.queryForObject("SELECT failure_code FROM knowflow.questions WHERE id = ?",
+                String.class, questionId)).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(jdbc.queryForObject("SELECT answer_text FROM knowflow.questions WHERE id = ?",
+                String.class, questionId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                Integer.class, questionId)).isZero();
     }
 
     @Test
@@ -960,6 +975,53 @@ class DocumentApiIntegrationTest {
                 """);
         assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
         assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+    }
+
+    @Test
+    void rejectedQuestionCompletionPreservesTimeoutFailureCode() throws Exception {
+        JsonNode owner = register("question-expired-completion@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Expired completion");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Expiration evidence.",
+                "expired-completion-index");
+        CountDownLatch responseGate = new CountDownLatch(1);
+        AI_RESPONSE_GATE.set(responseGate);
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(
+                                new com.knowflow.api.answer.PublicQuestion("What is required?"))))
+                .andReturn();
+        org.springframework.test.web.servlet.MvcResult result;
+        UUID questionId;
+        try {
+            assertThat(initial.getRequest().isAsyncStarted()).isTrue();
+            assertThat(AI_REQUEST_RECEIVED.get().await(5, TimeUnit.SECONDS)).isTrue();
+            questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                    UUID.class, AI_RECEIVED_REQUEST_ID.get());
+            jdbc.update("UPDATE knowflow.questions SET deadline_at = clock_timestamp() - INTERVAL '1 second' WHERE id = ?",
+                    questionId);
+            responseGate.countDown();
+            assertThat(initial.getAsyncResult(5_000)).isNotNull();
+            result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+        } finally {
+            responseGate.countDown();
+        }
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(504);
+        JsonNode error = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        assertThat(error.path("code").asText()).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(error.path("retryable").asBoolean()).isTrue();
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code, answer_text FROM knowflow.questions WHERE id = ?
+                """, questionId);
+        assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("PROCESSING_TIMEOUT");
+        assertThat(failedQuestion.get("answer_text")).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                Integer.class, questionId)).isZero();
     }
 
     @Test

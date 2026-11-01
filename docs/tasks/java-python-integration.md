@@ -111,3 +111,16 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - Category evaluation now checks `answerable_count` and `unanswerable_count` before division and reports `null` for the unavailable rate. Regression coverage uses `factual` with answerable-only rows and `no_answer` with unanswerable-only rows.
 - Streamed `started` model profile is carried into `pendingAnswer`; the end-to-end test confirms profile IDs persist after the terminal `completed` event rather than being overwritten with null.
 - Targeted checks: Python evaluation **10 passed**, Java `DocumentApiIntegrationTest` **38 passed**. Full checks: Python **235 passed** (1 existing deprecation warning), Java **76 tests, 0 failures/errors, 1 opt-in skip**.
+
+## 2026-11-01：后续 P2 修复
+
+- Java 的 SSE `StreamState.isTimeout()` 现在识别 `ApiFailure` 的 `PROCESSING_TIMEOUT` 代码。迟到 completion 回归断言只发送一条准确的终态错误，并确认失败记录没有答案或来源写入。
+- 新增 V8 替代来源保留形状约束并要求表达式 `IS TRUE`。PostgreSQL 集成测试验证 V7→V8：畸形历史行使升级失败且事务回滚；删除该行后升级成功。PDF、text range 与全空 tombstone 接受；quote 存在但 kind/page/range endpoint 缺失时拒绝。
+- Java 定向集成 **39 tests**、全量 **76 tests（0 failures/errors，1 opt-in skip）**通过。未在原本机 `knowflow` 库执行迁移。
+- 相关代码、测试、V8 migration 与候选分配更新当前未提交在 `local`；未推送或合并 `main`。
+
+## 2026-11-01：同步问答超时状态与候选题内容
+
+- 最终答案保存遇到 deadline guard 时，`ask()` 的 `ApiFailure` catch 现在保留 `PROCESSING_TIMEOUT`。PostgreSQL 集成回归将仍在处理的问题 deadline 置为过去时间后放行同步 AI 响应，验证公开 504 与历史失败码一致，且没有答案/来源写入。
+- `candidate-01` 题干改为“创建索引任务请求需要提供哪些必填字段？”，不再把 `documentId`、`profileId` 及其类型作为题干内容；重生成候选文件。
+- Java 全量 **77 tests，0 failures/errors，1 opt-in skip**；Python 全量 **235 passed**，评测定向 **10 passed**。改动尚未提交或推送。

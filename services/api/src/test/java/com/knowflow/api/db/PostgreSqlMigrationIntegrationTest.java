@@ -5,13 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 
 import com.knowflow.api.config.ApplicationDatabaseConfiguration;
 import com.knowflow.api.config.ApplicationDatabaseProperties;
 import com.knowflow.api.config.DatabaseMigrationConfiguration;
 import com.knowflow.api.config.DatabaseMigrationProperties;
+import org.flywaydb.core.api.FlywayException;
+import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.Flyway;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.junit.jupiter.api.BeforeAll;
@@ -64,10 +68,14 @@ class PostgreSqlMigrationIntegrationTest {
 
     @Test
     void migratesRealPgvectorSchemaIdempotentlyAndEnforcesRoleAndDataBoundaries() {
+        Flyway v7Flyway = migrationFlyway("7");
+        assertThat(v7Flyway.migrate().migrationsExecuted).isEqualTo(7);
+        assertThat(v7Flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+        verifyQuestionSourceRetentionUpgrade();
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
             assertThat(queryLong("""
                     SELECT count(*) FROM information_schema.columns
                      WHERE table_schema = 'knowflow' AND table_name = 'questions'
@@ -86,7 +94,6 @@ class PostgreSqlMigrationIntegrationTest {
             assertThat(extensionVersion).isEqualTo("0.8.1");
 
             try (Connection app = connect("knowflow_app", APP_PASSWORD)) {
-                insertValidKnowledgeGraph(app);
                 assertConstraintViolation(app, """
                         INSERT INTO knowflow.content_versions
                             (id, document_id, version_no, source_sha256, source_format, object_key, byte_size, original_name)
@@ -213,6 +220,48 @@ class PostgreSqlMigrationIntegrationTest {
         });
     }
 
+    private static void verifyQuestionSourceRetentionUpgrade() {
+        try (Connection app = connect("knowflow_app", APP_PASSWORD)) {
+            insertValidKnowledgeGraph(app);
+            insertQuestionForSourceTests(app);
+            insertQuestionSource(app, "00000000-0000-0000-0000-000000000501",
+                    null, null, null, null, "retained quote with missing locator");
+
+            Flyway flyway = migrationFlyway(null);
+            assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class);
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+            assertThat(queryLong(app, """
+                    SELECT count(*) FROM knowflow.question_sources
+                     WHERE source_id = '00000000-0000-0000-0000-000000000501'
+                    """)).isEqualTo(1L);
+
+            execute(app, """
+                    DELETE FROM knowflow.question_sources
+                     WHERE source_id = '00000000-0000-0000-0000-000000000501'
+                    """);
+            assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+
+            insertQuestionSource(app, "00000000-0000-0000-0000-000000000502",
+                    "pdf_page", 1, null, null, "PDF quote");
+            insertQuestionSource(app, "00000000-0000-0000-0000-000000000503",
+                    "text_range", null, 0, 3, "abc");
+            insertQuestionSource(app, "00000000-0000-0000-0000-000000000504",
+                    null, null, null, null, null);
+
+            assertQuestionSourceShapeRejected(app, "00000000-0000-0000-0000-000000000505",
+                    null, null, null, null, "quote without locator kind");
+            assertQuestionSourceShapeRejected(app, "00000000-0000-0000-0000-000000000506",
+                    "pdf_page", null, null, null, "PDF quote without page");
+            assertQuestionSourceShapeRejected(app, "00000000-0000-0000-0000-000000000507",
+                    "text_range", null, null, 3, "range without start");
+            assertQuestionSourceShapeRejected(app, "00000000-0000-0000-0000-000000000508",
+                    "text_range", null, 0, null, "range without end");
+        } catch (SQLException exception) {
+            throw new AssertionError("Question source retention migration verification failed", exception);
+        }
+    }
+
     private static void verifyProfileBoundApplicationDataSource() {
         new ApplicationContextRunner()
                 .withUserConfiguration(ApplicationDataSourceTestConfiguration.class)
@@ -297,6 +346,71 @@ class PostgreSqlMigrationIntegrationTest {
                         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                         'text_range', 0, 3)
                 """);
+    }
+
+    private static void insertQuestionForSourceTests(Connection app) throws SQLException {
+        execute(app, """
+                INSERT INTO knowflow.questions
+                    (id, owner_user_id, knowledge_base_id, request_id, snapshot_id,
+                     question_text, deadline_at)
+                VALUES ('00000000-0000-0000-0000-000000000401',
+                        '00000000-0000-0000-0000-000000000001',
+                        '00000000-0000-0000-0000-000000000101',
+                        'migration-source-shape',
+                        '00000000-0000-0000-0000-000000000402',
+                        'Question source shape', CURRENT_TIMESTAMP + INTERVAL '30 seconds')
+                """);
+    }
+
+    private static void insertQuestionSource(Connection app, String sourceId, String locatorKind,
+                                             Integer sourcePage, Integer sourceStart,
+                                             Integer sourceEnd, String quote) throws SQLException {
+        try (PreparedStatement statement = app.prepareStatement("""
+                INSERT INTO knowflow.question_sources
+                    (source_id, question_id, owner_user_id, knowledge_base_id, document_id,
+                     content_version_id, index_version_id, chunk_id, locator_kind, source_page,
+                     source_start, source_end, quote)
+                VALUES (?, '00000000-0000-0000-0000-000000000401',
+                        '00000000-0000-0000-0000-000000000001',
+                        '00000000-0000-0000-0000-000000000101',
+                        '00000000-0000-0000-0000-000000000102',
+                        '00000000-0000-0000-0000-000000000201',
+                        '00000000-0000-0000-0000-000000000301',
+                        '00000000-0000-0000-0000-000000000302', ?, ?, ?, ?, ?)
+                """)) {
+            statement.setObject(1, java.util.UUID.fromString(sourceId));
+            statement.setObject(2, locatorKind, Types.VARCHAR);
+            statement.setObject(3, sourcePage, Types.INTEGER);
+            statement.setObject(4, sourceStart, Types.INTEGER);
+            statement.setObject(5, sourceEnd, Types.INTEGER);
+            statement.setString(6, quote);
+            statement.execute();
+        }
+    }
+
+    private static void assertQuestionSourceShapeRejected(Connection app, String sourceId,
+                                                          String locatorKind, Integer sourcePage,
+                                                          Integer sourceStart, Integer sourceEnd,
+                                                          String quote) {
+        assertThatThrownBy(() -> insertQuestionSource(app, sourceId, locatorKind, sourcePage,
+                sourceStart, sourceEnd, quote))
+                .isInstanceOf(SQLException.class)
+                .extracting(exception -> ((SQLException) exception).getSQLState())
+                .isEqualTo("23514");
+    }
+
+    private static Flyway migrationFlyway(String targetVersion) {
+        var configuration = Flyway.configure()
+                .dataSource(DATABASE.getJdbcUrl(), "knowflow_migrator", MIGRATOR_PASSWORD)
+                .defaultSchema("knowflow_flyway")
+                .schemas("knowflow_flyway", "knowflow")
+                .createSchemas(false)
+                .cleanDisabled(true)
+                .locations("classpath:db/migration");
+        if (targetVersion != null) {
+            configuration.target(MigrationVersion.fromVersion(targetVersion));
+        }
+        return configuration.load();
     }
 
     private static String zeroVector(int dimensions) {
