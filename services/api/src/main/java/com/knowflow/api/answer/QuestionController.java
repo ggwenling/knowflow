@@ -122,6 +122,7 @@ public class QuestionController {
                               String idempotencyKey,
                       @RequestBody PublicQuestion question,
                       HttpServletRequest servletRequest) {
+        long requestStartedAt = System.nanoTime();
         QuestionService.parseIdempotencyKey(idempotencyKey);
         QuestionCancellation cancellation = new QuestionCancellation();
         Object requestIdAttribute = servletRequest.getAttribute(RequestIdFilter.ATTRIBUTE);
@@ -156,7 +157,7 @@ public class QuestionController {
             executor.execute(() -> {
                 try {
                     Disposable current = questions.stream(user, knowledgeBaseId, question,
-                                    cancellation, idempotencyKey)
+                                    cancellation, idempotencyKey, requestStartedAt)
                             .subscribe(event -> send(emitter, event, cancellation, lifecycle),
                                     failure -> {
                                         lifecycle.failed(failure);

@@ -11,6 +11,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Semaphore;
 import java.util.regex.Pattern;
 
 import com.knowflow.api.error.ApiError;
@@ -25,6 +26,8 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -32,6 +35,7 @@ import reactor.core.scheduler.Schedulers;
 @Service
 @Profile("database")
 public class QuestionService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(QuestionService.class);
     private static final int MAX_SCOPE_DOCUMENTS = 100;
     private static final int CLEANUP_TIMEOUT_MILLIS = 2_000;
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}");
@@ -40,6 +44,7 @@ public class QuestionService {
     private final TransactionTemplate transactions;
     private final AiAnswerClient client;
     private final QuestionProperties properties;
+    private final Semaphore questionPermits;
 
     public QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions,
                            AiAnswerClient client, QuestionProperties properties) {
@@ -47,6 +52,7 @@ public class QuestionService {
         this.transactions = transactions;
         this.client = client;
         this.properties = properties;
+        this.questionPermits = new Semaphore(properties.getMaxConcurrentRequests());
     }
 
     public AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input) {
@@ -68,41 +74,60 @@ public class QuestionService {
     Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
                                          PublicQuestion input, QuestionCancellation cancellation,
                                          String idempotencyKey) {
+        return stream(user, knowledgeBaseId, input, cancellation, idempotencyKey,
+                System.nanoTime());
+    }
+
+    Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
+                                         PublicQuestion input, QuestionCancellation cancellation,
+                                         String idempotencyKey, long requestStartedAt) {
         return Flux.defer(() -> {
-            long requestStartedAt = System.nanoTime();
-            String question = validateQuestion(input);
-            String requestId = UUID.randomUUID().toString();
-            QuestionSnapshot snapshot;
+            if (!questionPermits.tryAcquire()) {
+                String requestId = UUID.randomUUID().toString();
+                return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
+                        requestId, 1, "error", null, null, null, "AI_PROCESSING_FAILED",
+                        "The AI service could not complete the request.", true));
+            }
             try {
-                snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                        requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey));
-            } catch (ApiFailure failure) {
-                if ("QUESTION_REQUEST_CONFLICT".equals(failure.code())) {
-                    return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
-                            requestId, 1, "error", null, null, null, failure.code(),
-                            failure.getMessage(), false));
+                String question = validateQuestion(input);
+                String requestId = UUID.randomUUID().toString();
+                QuestionSnapshot snapshot;
+                try {
+                    snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
+                            requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey));
+                } catch (ApiFailure failure) {
+                    if ("QUESTION_REQUEST_CONFLICT".equals(failure.code())) {
+                        return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
+                                requestId, 1, "error", null, null, null, failure.code(),
+                                failure.getMessage(), false))
+                                .doFinally(signal -> questionPermits.release());
+                    }
+                    throw failure;
                 }
+                TrustedAnswerRequest request = new TrustedAnswerRequest(ApiError.CONTRACT_VERSION,
+                        requestId, question, new TrustedAnswerRequest.TrustedScope(user.id(),
+                        knowledgeBaseId, snapshot.snapshotId(), snapshot.indexes().stream()
+                        .map(index -> new TrustedAnswerRequest.IndexScope(index.documentId(),
+                                index.contentVersionId(), index.indexVersionId())).toList()));
+                StreamState state = new StreamState(requestId, snapshot, requestStartedAt, cancellation);
+                Flux<PublicAnswerStreamEvent> upstream = client.stream(request,
+                                remainingBudget(requestStartedAt))
+                        .publishOn(Schedulers.boundedElastic())
+                        .concatMap(event -> state.handle(event, user, request));
+                return Flux.concat(Mono.fromCallable(() -> {
+                            state.assertVisible();
+                            return state.event("started");
+                        }).subscribeOn(Schedulers.boundedElastic()), upstream)
+                        .doOnCancel(() -> {
+                            cancellation.clientDisconnected();
+                            state.cancel();
+                        })
+                        .onErrorResume(failure -> state.error(failure))
+                        .doFinally(signal -> questionPermits.release());
+            } catch (RuntimeException | Error failure) {
+                questionPermits.release();
                 throw failure;
             }
-            TrustedAnswerRequest request = new TrustedAnswerRequest(ApiError.CONTRACT_VERSION,
-                    requestId, question, new TrustedAnswerRequest.TrustedScope(user.id(),
-                    knowledgeBaseId, snapshot.snapshotId(), snapshot.indexes().stream()
-                    .map(index -> new TrustedAnswerRequest.IndexScope(index.documentId(),
-                            index.contentVersionId(), index.indexVersionId())).toList()));
-            StreamState state = new StreamState(requestId, snapshot, requestStartedAt, cancellation);
-            Flux<PublicAnswerStreamEvent> upstream = client.stream(request,
-                            remainingBudget(requestStartedAt))
-                    .publishOn(Schedulers.boundedElastic())
-                    .concatMap(event -> state.handle(event, user, request));
-            return Flux.concat(Mono.fromCallable(() -> {
-                        state.assertVisible();
-                        return state.event("started");
-                    }).subscribeOn(Schedulers.boundedElastic()), upstream)
-                    .doOnCancel(() -> {
-                        cancellation.clientDisconnected();
-                        state.cancel();
-                    })
-                    .onErrorResume(failure -> state.error(failure));
         }).subscribeOn(Schedulers.boundedElastic());
     }
 
@@ -114,6 +139,21 @@ public class QuestionService {
     AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
                        long requestStartedAt, QuestionCancellation cancellation,
                        UUID idempotencyKey) {
+        if (!questionPermits.tryAcquire()) {
+            throw ApiFailure.aiProcessingFailed();
+        }
+        try {
+            return askAdmitted(user, knowledgeBaseId, input, requestStartedAt,
+                    cancellation, idempotencyKey);
+        } finally {
+            questionPermits.release();
+        }
+    }
+
+    private AnswerResponse askAdmitted(AuthenticatedUser user, UUID knowledgeBaseId,
+                                       PublicQuestion input, long requestStartedAt,
+                                       QuestionCancellation cancellation,
+                                       UUID idempotencyKey) {
         String question = validateQuestion(input);
         String requestId = UUID.randomUUID().toString();
         QuestionSnapshot snapshot;
@@ -146,11 +186,14 @@ public class QuestionService {
                         index.contentVersionId(), index.indexVersionId())).toList()));
 
         AiAnswerResponse response;
+        long aiStartedAt = System.nanoTime();
         try {
             if (cancellation.reason() != null) {
                 throw new CancellationException("Question request was cancelled");
             }
             response = client.answer(request, remainingBudget(requestStartedAt));
+            LOGGER.info("question_stage request_id={} stage=ai_answer duration_ms={} outcome=success",
+                    requestId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - aiStartedAt));
             validateAnswer(response);
             if (cancellation.reason() != null) {
                 throw new CancellationException("Question request was cancelled");
@@ -159,6 +202,11 @@ public class QuestionService {
         } catch (CancellationException cancelled) {
             return cancelQuestion(snapshot.questionId(), cancellation);
         } catch (RuntimeException failure) {
+            String failureCode = failure instanceof ApiFailure apiFailure
+                    ? apiFailure.code() : "AI_PROCESSING_FAILED";
+            LOGGER.info("question_stage request_id={} stage=ai_answer duration_ms={} outcome=failed code={}",
+                    requestId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - aiStartedAt),
+                    failureCode);
             if (cancellation.reason() != null) {
                 return cancelQuestion(snapshot.questionId(), cancellation);
             }
@@ -168,6 +216,7 @@ public class QuestionService {
         }
 
         try {
+            long persistenceStartedAt = System.nanoTime();
             AnswerResponse saved = transactions.execute(status -> {
                 registerDeadlineCheck(requestStartedAt, cancellation);
                 return saveAnswer(user, snapshot, requestId, response, cancellation,
@@ -176,6 +225,9 @@ public class QuestionService {
             if (saved == null) {
                 throw new IllegalStateException("Question persistence did not return a response");
             }
+            LOGGER.info("question_stage request_id={} stage=persistence duration_ms={} outcome=success",
+                    requestId, TimeUnit.NANOSECONDS.toMillis(
+                            System.nanoTime() - persistenceStartedAt));
             return saved;
         } catch (CancellationException cancelled) {
             return cancelQuestion(snapshot.questionId(), cancellation);

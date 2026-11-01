@@ -16,6 +16,7 @@ def _load(name, path):
 
 
 runner = _load("evaluation_runner", ROOT / "evaluation/runner/runner.py")
+review_tool = _load("evaluation_review", ROOT / "evaluation/runner/review_predictions.py")
 candidate_tool = _load("candidate_split", ROOT / "evaluation/data/tools/split_candidates.py")
 candidate_seed = _load("candidate_seed", ROOT / "evaluation/data/tools/prepare_candidate_seed.py")
 draft_tool = _load(
@@ -76,6 +77,53 @@ def test_runner_scores_saved_predictions_and_keeps_human_judgement_explicit(tmp_
     assert report["metrics"]["latency_ms"] == {
         "sample_count": 12, "p50_nearest_rank": 6.0, "p95_nearest_rank": 12.0}
     assert report["interpretation"]["acceptance_threshold"].startswith("not registered")
+    assert report["quality_gate"] == {
+        "status": "incomplete", "reason": "QUALITY_CONFIG_MISSING"}
+
+
+def test_quality_gate_requires_dataset_bound_explicit_thresholds(tmp_path):
+    predictions = tmp_path / "predictions.json"
+    predictions.write_text(json.dumps(_predictions("development")), encoding="utf-8")
+    manifest, _questions, _documents, _sources, dataset_sha = runner._load_dataset(DATASET)
+    config = tmp_path / "quality.json"
+    config.write_text(json.dumps({
+        "gate_version": 1, "dataset_id": manifest["dataset_id"],
+        "dataset_sha256": dataset_sha,
+        "minimums": {"answerability_accuracy": 0.95, "recall_at_5": 0.9},
+    }), encoding="utf-8")
+
+    report = runner.evaluate(predictions, quality_config_path=config)
+
+    assert report["quality_gate"]["status"] == "passed"
+    gate = json.loads(config.read_text(encoding="utf-8"))
+    gate["dataset_sha256"] = "0" * 64
+    config.write_text(json.dumps(gate), encoding="utf-8")
+    with pytest.raises(ValueError, match="INVALID_QUALITY_CONFIG"):
+        runner.evaluate(predictions, quality_config_path=config)
+
+
+def test_support_review_bundle_is_bound_to_predictions_and_requires_reviewer_timestamp(tmp_path):
+    predictions = tmp_path / "predictions.json"
+    predictions.write_text(json.dumps(_predictions("development")), encoding="utf-8")
+    bundle_path = tmp_path / "review.json"
+    bundle_path.write_text(json.dumps(review_tool.prepare_bundle(
+        predictions, created_at="2026-11-01T00:00:00Z")), encoding="utf-8")
+    bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+    answers = [item for item in bundle["entries"] if item["has_answer"]]
+    for answer in answers:
+        answer.update(support_judgement="supported", reviewed_by="reviewer-1",
+                      reviewed_at="2026-11-01T00:01:00Z")
+    bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+    output = tmp_path / "reviewed-predictions.json"
+
+    review_tool.merge_reviews(predictions, bundle_path, output)
+
+    reviewed = json.loads(output.read_text(encoding="utf-8"))
+    assert next(item for item in reviewed["predictions"]
+                if item["question_id"] == answers[0]["question_id"])["support_judgement"] == "supported"
+    predictions.write_text(json.dumps(_predictions("development")) + " ", encoding="utf-8")
+    with pytest.raises(ValueError, match="REVIEW_INPUT_MISMATCH"):
+        review_tool.merge_reviews(predictions, bundle_path, output)
 
 
 def test_runner_groups_answerability_metrics_by_question_category(tmp_path, monkeypatch):

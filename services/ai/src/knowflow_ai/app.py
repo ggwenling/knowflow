@@ -22,6 +22,10 @@ ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
 
 
 class ClosingStreamingResponse(StreamingResponse):
+    def __init__(self, *args, on_close=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.on_close = on_close
+
     async def __call__(self, scope, receive, send):
         streaming = asyncio.create_task(self.stream_response(send))
         disconnect = asyncio.create_task(self.listen_for_disconnect(receive))
@@ -34,7 +38,26 @@ class ClosingStreamingResponse(StreamingResponse):
                 if not task.done():
                     task.cancel()
             await asyncio.gather(streaming, disconnect, return_exceptions=True)
-            await self.body_iterator.aclose()
+            try:
+                await self.body_iterator.aclose()
+            finally:
+                if self.on_close is not None:
+                    self.on_close()
+
+
+class QuestionAdmission:
+    def __init__(self, limit: int):
+        self.limit = limit
+        self.active = 0
+
+    def try_acquire(self) -> bool:
+        if self.active >= self.limit:
+            return False
+        self.active += 1
+        return True
+
+    def release(self) -> None:
+        self.active -= 1
 
 
 async def await_answer_or_disconnect(request: Request, operation):
@@ -127,6 +150,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title='KnowFlow internal AI', docs_url=None, redoc_url=None,
                   openapi_url=None, lifespan=lifespan)
     app.state.contract = contract
+    app.state.question_admission = QuestionAdmission(settings.max_concurrent_questions)
     app.add_middleware(BoundaryMiddleware, secret=settings.internal_secret)
 
     @app.exception_handler(HTTPException)
@@ -204,7 +228,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 embedding_settings=embedding_settings,
                                 model_profile={"embedding_model_profile_id": embedding_settings.model,
                                                "llm_model_profile_id": llm_settings.model})
-        return await await_answer_or_disconnect(request, lambda: service.answer(payload))
+        admission = request.app.state.question_admission
+        if not admission.try_acquire():
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        try:
+            return await await_answer_or_disconnect(request, lambda: service.answer(payload))
+        finally:
+            admission.release()
 
     @app.post('/internal/v1/answers/stream')
     async def stream_answer(request: Request, payload: dict[str, Any]):
@@ -220,6 +250,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 model_profile={"embedding_model_profile_id": embedding_settings.model,
                                                "llm_model_profile_id": llm_settings.model})
 
+        admission = request.app.state.question_admission
+        if not admission.try_acquire():
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+
         async def frames():
             async with aclosing(service.stream(payload)) as events:
                 async for event in events:
@@ -227,6 +261,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     yield f"event: {event['event']}\ndata: {data}\n\n"
 
         return ClosingStreamingResponse(frames(), media_type='text/event-stream',
+                                        on_close=admission.release,
                                         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
     return app

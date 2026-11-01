@@ -2,6 +2,7 @@
 import asyncio
 from contextlib import aclosing
 import json
+import logging
 import time
 
 import httpx
@@ -9,6 +10,21 @@ import httpx
 from .adapters import ProcessingError
 from .config import ConfigurationError
 from .protocol import CONTRACT_VERSION
+
+_logger = logging.getLogger(__name__)
+
+
+def _provider_usage(usage):
+    if not isinstance(usage, dict):
+        return None
+    prompt, completion, total = (usage.get("prompt_tokens"),
+                                 usage.get("completion_tokens"),
+                                 usage.get("total_tokens"))
+    if (type(prompt) is int and prompt >= 0 and type(completion) is int and completion >= 0
+            and type(total) is int and total == prompt + completion):
+        return {"prompt_tokens": prompt, "completion_tokens": completion,
+                "total_tokens": total}
+    return None
 
 MAX_ANSWER_CODEPOINTS = 16000
 MAX_JSON_CODEPOINTS = 65536
@@ -226,6 +242,12 @@ async def provider_content(adapter, question, evidence, *, request_id):
                     if not isinstance(chunk, dict) or chunk.get("model") != adapter.settings.model:
                         raise _model_failure()
                     choices = chunk.get("choices")
+                    if choices == []:
+                        usage = _provider_usage(chunk.get("usage"))
+                        if not finished or usage is None:
+                            raise _model_failure()
+                        adapter.last_usage = usage
+                        continue
                     if not isinstance(choices, list) or len(choices) != 1 or finished:
                         raise _model_failure()
                     choice = choices[0]
@@ -282,41 +304,55 @@ async def answer_events(service, request):
     try:
         deadline = time.monotonic() + ANSWER_DEADLINE_SECONDS
         async with asyncio.timeout(ANSWER_DEADLINE_SECONDS):
+            retrieval_started = time.monotonic()
             evidence = await service._retrieve_evidence(request, deadline)
-        if evidence:
-            model = service._llm_factory()
-            parser = IncrementalAnswerParser()
-            try:
-                async with aclosing(model.stream_content(
-                        request["question"], evidence, request_id=request["request_id"])) as content:
-                    while True:
-                        try:
-                            async with asyncio.timeout(max(0, deadline - time.monotonic())):
-                                fragment = await anext(content)
-                        except StopAsyncIteration:
-                            break
-                        delta = parser.feed(fragment)
-                        if delta:
-                            yield event("delta", delta=delta)
-            finally:
-                await model.aclose()
-            generated = parser.finish()
-        else:
-            generated = {"answer": REFUSAL, "has_answer": False, "source_ids": []}
-        if time.monotonic() >= deadline:
-            raise TimeoutError
-        response = service._response_from_generated(request, evidence, generated)
-        if not response["has_answer"]:
-            yield event("delta", delta=response["answer"])
-        yield event("sources", has_answer=response["has_answer"], sources=response["sources"])
-        terminal = event("completed")
+            _logger.info("ai_stage request_id=%s stage=evidence_validation duration_ms=%d result_count=%d outcome=success",
+                         request["request_id"], round((time.monotonic() - retrieval_started) * 1000),
+                         len(evidence))
+            if evidence:
+                model = service._llm_factory()
+                generation_started = time.monotonic()
+                parser = IncrementalAnswerParser()
+                try:
+                    async with aclosing(model.stream_content(
+                            request["question"], evidence, request_id=request["request_id"])) as content:
+                        while True:
+                            try:
+                                async with asyncio.timeout(max(0, deadline - time.monotonic())):
+                                    fragment = await anext(content)
+                            except StopAsyncIteration:
+                                break
+                            delta = parser.feed(fragment)
+                            if delta:
+                                yield event("delta", delta=delta)
+                finally:
+                    await model.aclose()
+                _logger.info("ai_stage request_id=%s stage=generation duration_ms=%d usage=%s outcome=success",
+                             request["request_id"], round((time.monotonic() - generation_started) * 1000),
+                             getattr(model, "last_usage", None) or "unknown")
+                generated = parser.finish()
+            else:
+                generated = {"answer": REFUSAL, "has_answer": False, "source_ids": []}
+            if time.monotonic() >= deadline:
+                raise TimeoutError
+            response = service._response_from_generated(request, evidence, generated)
+            if not response["has_answer"]:
+                yield event("delta", delta=response["answer"])
+            yield event("sources", has_answer=response["has_answer"], sources=response["sources"])
+            terminal = event("completed")
     except asyncio.CancelledError:
+        _logger.info("ai_stage request_id=%s stage=request outcome=cancelled",
+                     request["request_id"])
         terminal = event("cancelled")
     except (TimeoutError, ProcessingError, ConfigurationError) as exc:
         timeout = isinstance(exc, TimeoutError) or getattr(exc, "status", None) == 504
         code = "PROCESSING_TIMEOUT" if timeout else "AI_PROCESSING_FAILED"
+        _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=%s",
+                        request["request_id"], code)
         terminal = event("error", code=code, message=code,
                          retryable=timeout or getattr(exc, "retryable", False))
     except Exception:
+        _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=AI_PROCESSING_FAILED",
+                        request["request_id"])
         terminal = event("error", code="AI_PROCESSING_FAILED", message="AI_PROCESSING_FAILED", retryable=False)
     yield terminal

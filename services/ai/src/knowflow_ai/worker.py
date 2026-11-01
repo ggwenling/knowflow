@@ -4,6 +4,8 @@ from collections import OrderedDict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import logging
+import time
 import uuid
 
 from .adapters import ProcessingError
@@ -15,6 +17,8 @@ from .java_client import JavaGateway, JavaGatewayError
 from .parser_process import parse_document_isolated
 from .parsing import ParseFailure
 from .protocol import CONTRACT_VERSION
+
+_logger = logging.getLogger(__name__)
 
 
 class WorkerUnavailable(RuntimeError):
@@ -211,12 +215,24 @@ class IndexWorker:
         lease = dispatch["lease"]
         profile = dispatch["runtime_profile"]
         chunking = validate_runtime_profile(dispatch)
+        stage_started = time.monotonic()
         source = await self._gateway.read_source(dispatch)
-        parsed = await parse_document_isolated(
-            source, format=dispatch["source"]["format"],
-            document_id=lease["document_id"],
-            content_version_id=lease["content_version_id"],
-            file_id=dispatch["source"]["file_id"])
+        _logger.info("ai_stage request_id=%s stage=source_read duration_ms=%d outcome=success",
+                     dispatch["request_id"], round((time.monotonic() - stage_started) * 1000))
+        stage_started = time.monotonic()
+        try:
+            parsed = await parse_document_isolated(
+                source, format=dispatch["source"]["format"],
+                document_id=lease["document_id"],
+                content_version_id=lease["content_version_id"],
+                file_id=dispatch["source"]["file_id"])
+        except ParseFailure as error:
+            _logger.warning("ai_stage request_id=%s stage=parse duration_ms=%d outcome=failed code=%s",
+                            dispatch["request_id"],
+                            round((time.monotonic() - stage_started) * 1000), str(error))
+            raise
+        _logger.info("ai_stage request_id=%s stage=parse duration_ms=%d outcome=success",
+                     dispatch["request_id"], round((time.monotonic() - stage_started) * 1000))
         if parsed.file_sha256 != dispatch["source"]["sha256"]:
             raise ProcessingError("SOURCE_UNAVAILABLE", 502, retryable=False)
         chunks = _iter_document_chunks(parsed, chunking)
@@ -239,7 +255,11 @@ class IndexWorker:
             }
             batch["batch_sha256"] = batch_sha256(batch)
             self._gateway._contract.validate("IndexBatch", batch)
+            write_started = time.monotonic()
             await self._gateway.write_batch(batch)
+            _logger.info("ai_stage request_id=%s stage=index_write duration_ms=%d chunk_count=%d outcome=success",
+                         dispatch["request_id"], round((time.monotonic() - write_started) * 1000),
+                         len(batch_rows))
             batches.append({
                 "batch_sequence": sequence,
                 "batch_id": batch["batch_id"],
@@ -269,8 +289,12 @@ class IndexWorker:
         chunk_count = 0
 
         async def embed_batch(source_chunks):
+            embed_started = time.monotonic()
             result = await embedding.embed([chunk.text for chunk in source_chunks],
                                            request_id=str(uuid.uuid4()))
+            _logger.info("ai_stage request_id=%s stage=index_embedding duration_ms=%d item_count=%d usage=%s outcome=success",
+                         dispatch["request_id"], round((time.monotonic() - embed_started) * 1000),
+                         len(source_chunks), result.get("usage", "unknown"))
             for chunk, vector in zip(source_chunks, result["data"], strict=True):
                 await add_row({
                     "chunk_id": str(uuid.uuid5(chunk_namespace, chunk.chunk_id)),
@@ -339,7 +363,7 @@ class IndexWorker:
         if error.code in {"PROCESSING_TIMEOUT", "MODEL_TIMEOUT", "JAVA_GATEWAY_TIMEOUT"}:
             return "MODEL_TIMEOUT"
         if error.code == "SOURCE_UNAVAILABLE":
-            return "UNSUPPORTED_CONTENT"
+            return "INDEX_WRITE_FAILED" if error.retryable else "UNSUPPORTED_CONTENT"
         if error.code in {"JAVA_GATEWAY_UNAVAILABLE", "JAVA_GATEWAY_REJECTED"}:
             return "INDEX_WRITE_FAILED"
         if error.code in {"MODEL_FAILURE", "PROVIDER_MODEL_MISMATCH", "EMBEDDING_COUNT_MISMATCH"}:

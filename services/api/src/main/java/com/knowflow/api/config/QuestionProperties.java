@@ -12,11 +12,23 @@ public class QuestionProperties {
     @Max(30)
     private int totalBudgetSeconds = 30;
 
+    @Min(1)
+    @Max(32)
+    private int maxConcurrentRequests = 4;
+
     public int getTotalBudgetSeconds() {
         return totalBudgetSeconds;
     }
 
     public void setTotalBudgetSeconds(int value) {
         totalBudgetSeconds = value;
+    }
+
+    public int getMaxConcurrentRequests() {
+        return maxConcurrentRequests;
+    }
+
+    public void setMaxConcurrentRequests(int value) {
+        maxConcurrentRequests = value;
     }
 }

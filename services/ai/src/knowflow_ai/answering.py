@@ -3,6 +3,7 @@ import asyncio
 from contextlib import aclosing
 from dataclasses import dataclass, field
 import json
+import logging
 import math
 import os
 import re
@@ -21,6 +22,7 @@ from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION
 
 ANSWER_DEADLINE_SECONDS = 28.0
+_logger = logging.getLogger(__name__)
 
 
 class _DatabaseQueryCancelled(Exception):
@@ -123,6 +125,7 @@ class DeepSeekAdapter:
         self._owns_client = client is None
         self._client = client or build_async_client(settings.timeout_seconds,
                                                     environment_proxy_fallback=True)
+        self.last_usage = None
 
     async def aclose(self):
         if self._owns_client:
@@ -153,11 +156,13 @@ class DeepSeekAdapter:
 
     async def stream_content(self, question, evidence, *, request_id):
         from .streaming import provider_content
+        self.last_usage = None
         async with aclosing(provider_content(self, question, evidence, request_id=request_id)) as content:
             async for fragment in content:
                 yield fragment
 
     async def generate(self, question: str, evidence: list[dict], *, request_id: str) -> dict:
+        self.last_usage = None
         payload = self._payload(question, evidence)
         try:
             async with self._client.stream(
@@ -198,9 +203,23 @@ class DeepSeekAdapter:
             if not isinstance(message, dict) or not isinstance(message.get("content"), str):
                 raise ValueError
             result = json.loads(message["content"])
+            self.last_usage = _provider_usage(provider.get("usage"))
         except (ValueError, TypeError, KeyError, IndexError, UnicodeDecodeError):
             raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
         return result
+
+
+def _provider_usage(usage):
+    if not isinstance(usage, dict):
+        return None
+    prompt, completion, total = (usage.get("prompt_tokens"),
+                                 usage.get("completion_tokens"),
+                                 usage.get("total_tokens"))
+    if (type(prompt) is int and prompt >= 0 and type(completion) is int and completion >= 0
+            and type(total) is int and total == prompt + completion):
+        return {"prompt_tokens": prompt, "completion_tokens": completion,
+                "total_tokens": total}
+    return None
 
 
 class ReadOnlyRetriever:
@@ -267,6 +286,9 @@ class ReadOnlyRetriever:
         if type(top_k) is not int or not 1 <= top_k <= 10:
             raise ValueError("INVALID_RETRIEVAL_LIMIT")
         embedding = self._embedding_factory()
+        embedding_started = time.monotonic()
+        embedding_usage = []
+        embedding_outcome = "failed"
         try:
             maximum = self._embedding_settings.max_text_codepoints
             segments = [question[start:start + maximum]
@@ -278,6 +300,8 @@ class ReadOnlyRetriever:
                 for start in range(0, len(segments), batch_size):
                     result = await embedding.embed(segments[start:start + batch_size],
                                                    request_id=request_id)
+                    if result.get("usage") is not None:
+                        embedding_usage.append(result["usage"])
                     vectors.extend(row["embedding"] for row in result["data"])
                 if len(vectors) == 1:
                     return vectors[0]
@@ -296,8 +320,12 @@ class ReadOnlyRetriever:
                 if embedding_timeout <= 0:
                     raise ProcessingError("PROCESSING_TIMEOUT", 504)
             vector = await within_deadline(embed_question, embedding_timeout)
+            embedding_outcome = "success"
         finally:
             await embedding.aclose()
+            _logger.info("ai_stage request_id=%s stage=embedding duration_ms=%d usage=%s outcome=%s",
+                         request_id, round((time.monotonic() - embedding_started) * 1000),
+                         embedding_usage if embedding_usage else "unknown", embedding_outcome)
         vector_text = "[" + ",".join(format(value, ".9g") for value in vector) + "]"
         indexes = scope["indexes"]
         scope_predicates = " OR ".join(
@@ -333,6 +361,7 @@ class ReadOnlyRetriever:
         cancellation = _DatabaseCancellation()
         database_task = asyncio.create_task(asyncio.to_thread(
             self._fetch_rows, self._database_url, query, params, deadline, cancellation))
+        retrieval_started = time.monotonic()
         try:
             rows = await asyncio.shield(database_task)
         except TimeoutError:
@@ -358,6 +387,8 @@ class ReadOnlyRetriever:
             raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
         except psycopg.Error:
             raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=True) from None
+        _logger.info("ai_stage request_id=%s stage=retrieval duration_ms=%d result_count=%d outcome=success",
+                     request_id, round((time.monotonic() - retrieval_started) * 1000), len(rows))
         evidence = []
         for row in rows:
             locator = {"kind": row["locator_kind"]}
@@ -418,7 +449,11 @@ class AnswerService:
         return evidence
 
     async def _answer(self, request: dict, deadline: float) -> dict:
+        retrieval_started = time.monotonic()
         evidence = await self._retrieve_evidence(request, deadline)
+        _logger.info("ai_stage request_id=%s stage=evidence_validation duration_ms=%d result_count=%d outcome=success",
+                     request["request_id"], round((time.monotonic() - retrieval_started) * 1000),
+                     len(evidence))
         if not evidence:
             response = {"contract_version": CONTRACT_VERSION,
                         "request_id": request["request_id"],
@@ -429,11 +464,15 @@ class AnswerService:
             self._contract.validate("AnswerResponse", response)
             return response
         model = self._llm_factory()
+        generation_started = time.monotonic()
         try:
             generated = await model.generate(request["question"], evidence,
                                              request_id=request["request_id"])
         finally:
             await model.aclose()
+        _logger.info("ai_stage request_id=%s stage=generation duration_ms=%d usage=%s outcome=success",
+                     request["request_id"], round((time.monotonic() - generation_started) * 1000),
+                     getattr(model, "last_usage", None) or "unknown")
         return self._response_from_generated(request, evidence, generated)
 
     def _response_from_generated(self, request, evidence, generated):

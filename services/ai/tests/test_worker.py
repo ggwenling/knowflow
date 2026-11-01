@@ -26,6 +26,13 @@ _digest_spec.loader.exec_module(_digest_module)
 shared_batch_sha256 = _digest_module.batch_sha256
 
 
+def test_retryable_source_unavailable_is_not_reported_as_unsupported_content():
+    assert IndexWorker._failure_code(ProcessingError(
+        'SOURCE_UNAVAILABLE', 502, retryable=True)) == 'INDEX_WRITE_FAILED'
+    assert IndexWorker._failure_code(ProcessingError(
+        'SOURCE_UNAVAILABLE', 404, retryable=False)) == 'UNSUPPORTED_CONTENT'
+
+
 class FakeEmbedding:
     async def embed(self, texts, *, request_id):
         return {"request_id": request_id, "model": "BAAI/bge-m3", "dimensions": 1024,

@@ -29,3 +29,15 @@ stream. An HTTP disconnect closes the event iterator and cancels its retrieval
 or provider work. If the disconnect wins, the terminal event is not deliverable.
 The route checks required model credentials before constructing the service;
 missing credentials cause no provider network call.
+
+Java and Python answer routes share a per-process in-flight limit. Set
+`KNOWFLOW_QUESTION_MAX_CONCURRENT` from 1 to 32 on both services; the default is
+4. Over-capacity requests fail immediately with the existing retryable
+`AI_PROCESSING_FAILED` error and do not create question history. An admitted
+stream holds its slot until its body and provider iterator are closed.
+
+Stage logs use the trusted `request_id` and record durations, counts, outcomes,
+and provider token usage only when the provider returns a valid usage object.
+Missing usage is logged as `unknown`; prompts, answers, source text, and vectors
+are not logged. A provider's terminal usage-only SSE chunk is accepted only
+after a valid `stop` finish marker.

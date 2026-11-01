@@ -112,6 +112,21 @@ async def test_provider_stream_accepts_fragmented_utf8_and_validates_final_sourc
 
 
 @pytest.mark.asyncio
+async def test_provider_stream_accepts_final_usage_only_chunk():
+    generated = '{"has_answer":true,"answer":"ok[src-evidence-1]","source_ids":["src-evidence-1"]}'
+    usage = {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20}
+    body = (_sse([generated], done=False)
+            + b'data: ' + json.dumps({"model": "deepseek-flash", "choices": [],
+                                     "usage": usage}).encode() + b'\n\n'
+            + b'data: [DONE]\n\n')
+    service, client, _calls = _service(ProviderStream([body]))
+    async with client:
+        events = [event async for event in service.stream(_request())]
+    assert events[-1]['event'] == 'completed'
+    assert service._llm_factory().last_usage == usage
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('fragments,finish,done,model', [
     (['{"has_answer":true,"answer":"x[src-forged]","source_ids":["src-forged"]}'], 'stop', True, 'deepseek-flash'),
     (['{"has_answer":true,"answer":"x'], 'stop', True, 'deepseek-flash'),
@@ -292,6 +307,7 @@ async def test_http_disconnect_closes_real_provider_stream(monkeypatch, spec, di
     async with client:
         await asyncio.wait_for(app(scope, receive, send), 2)
     assert stream.closed
+    assert app.state.question_admission.active == 0
     assert not any(b'event: completed' in row.get('body', b'') for row in sent)
 
 
@@ -316,3 +332,44 @@ async def test_http_sse_route_serializes_valid_events(monkeypatch):
     assert [event['event'] for event in events] == ['started', 'delta', 'sources', 'completed']
     for event in events:
         _contract().validate('AnswerStreamEvent', event)
+    assert app.state.question_admission.active == 0
+
+
+@pytest.mark.asyncio
+async def test_http_answer_rejects_when_shared_capacity_is_full(monkeypatch):
+    import knowflow_ai.app as ai_app
+    from knowflow_ai.config import Settings
+    from test_service import SECRET
+
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    class WaitingAnswerService:
+        async def stream(self, payload):
+            entered.set()
+            await release.wait()
+            yield {'event': 'error', 'request_id': payload['request_id'], 'sequence': 1,
+                   'code': 'AI_PROCESSING_FAILED'}
+
+    monkeypatch.setenv('EMBEDING_KEY', 'e' * 40)
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'd' * 40)
+    monkeypatch.setattr(ai_app, 'AnswerService', lambda *args, **kwargs: WaitingAnswerService())
+    app = ai_app.create_app(Settings(SECRET,
+        ai_database_url='postgresql://unused.invalid/db', max_concurrent_questions=1))
+    payload = _request()
+    headers = {'Authorization': 'Bearer ' + SECRET, 'X-Request-ID': payload['request_id']}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:
+        first = asyncio.create_task(client.post('/internal/v1/answers/stream', json=payload,
+                                                 headers=headers))
+        await asyncio.wait_for(entered.wait(), 1)
+        second_payload = dict(payload)
+        second_payload['request_id'] = 'request-busy-check'
+        rejected = await client.post('/internal/v1/answers', json=second_payload, headers={
+            'Authorization': 'Bearer ' + SECRET, 'X-Request-ID': second_payload['request_id']})
+        assert rejected.status_code == 503
+        assert rejected.json()['code'] == 'AI_PROCESSING_FAILED'
+        assert rejected.json()['retryable'] is True
+        release.set()
+        response = await first
+        assert response.status_code == 200
+        assert 'event: error' in response.text
+    assert app.state.question_admission.active == 0

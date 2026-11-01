@@ -96,7 +96,8 @@ def _percentile(values, percentile):
     return round(ordered[index], 2)
 
 
-def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATASET):
+def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATASET,
+             quality_config_path=None):
     if split not in ("development", "holdout"):
         raise ValueError("INVALID_SPLIT")
     manifest, questions, documents, sources, dataset_sha = _load_dataset(dataset_root)
@@ -232,7 +233,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
                 values["unanswerable_refused_count"] / values["unanswerable_count"], 4)
         else:
             values["unanswerable_refusal_rate"] = None
-    return {
+    report = {
         "report_version": 1,
         "dataset_id": manifest["dataset_id"],
         "dataset_sha256": dataset_sha,
@@ -284,6 +285,44 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
             "acceptance_threshold": "not registered; no pass/fail quality claim is made",
         },
     }
+    if quality_config_path is None:
+        report["quality_gate"] = {"status": "incomplete", "reason": "QUALITY_CONFIG_MISSING"}
+    else:
+        config = _read_json(quality_config_path)
+        if (not isinstance(config, dict)
+                or set(config) != {"gate_version", "dataset_id", "dataset_sha256", "minimums"}
+                or type(config["gate_version"]) is not int or config["gate_version"] != 1
+                or config["dataset_id"] != manifest["dataset_id"]
+                or config["dataset_sha256"] != dataset_sha
+                or not isinstance(config["minimums"], dict)
+                or not config["minimums"]
+                or set(config["minimums"]) - {
+                    "answerability_accuracy", "gold_evidence_span_recall", "recall_at_5",
+                    "mrr_at_10", "answerable_answer_rate", "unanswerable_refusal_rate",
+                    "human_support_review_coverage", "human_supported_answer_rate",
+                    "cited_gold_span_overlap_rate"}):
+            raise ValueError("INVALID_QUALITY_CONFIG")
+        checks = {}
+        failed = False
+        incomplete = False
+        for metric, minimum in sorted(config["minimums"].items()):
+            if (type(minimum) not in (int, float) or not math.isfinite(minimum)
+                    or not 0 <= minimum <= 1):
+                raise ValueError("INVALID_QUALITY_CONFIG")
+            observed = report["metrics"].get(metric)
+            passed = observed is not None and observed >= minimum
+            checks[metric] = {"minimum": minimum, "observed": observed,
+                              "status": "passed" if passed else
+                              "incomplete" if observed is None else "failed"}
+            failed |= observed is not None and not passed
+            incomplete |= observed is None
+        report["quality_gate"] = {
+            "status": "failed" if failed else "incomplete" if incomplete else "passed",
+            "gate_version": config["gate_version"], "checks": checks,
+        }
+        report["interpretation"]["acceptance_threshold"] = (
+            "explicit dataset-bound thresholds applied; not independent user-quality approval")
+    return report
 
 
 def main():
@@ -292,8 +331,10 @@ def main():
     parser.add_argument("--split", choices=("development", "holdout"), default="development")
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--quality-config", type=Path)
     args = parser.parse_args()
-    report = evaluate(args.predictions, split=args.split, dataset_root=args.dataset)
+    report = evaluate(args.predictions, split=args.split, dataset_root=args.dataset,
+                      quality_config_path=args.quality_config)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf-8")

@@ -264,3 +264,17 @@ Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 
 - 收尾核对：隔离库已删除；运行前 PostgreSQL/MinIO 均未运行，运行后均停止且只停本轮启动集合；端口 8000/8080 释放；日志无 secret；外部模型调用 0。
 - 新增 `knowflow_ai/http_client.py`：宿主机 `NO_PROXY` 含不可解析条目或 `socks://` 缺 socksio 时，适配器构造不再抛异常绕过 fail-closed；外部 provider 保留可用环境代理，内部 Java 网关不使用代理。新增 `test_http_client.py` 6 项与测试期代理环境规范化 `conftest.py`。
 - 契约未变（`0.2.0-draft.10`，SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。仍未完成：60 题人工复核与 blind holdout、真实 provider 质量/费用、独立 Q 审阅与 M 消费确认。改动仍在 `local` 未提交工作树。
+
+## 2026-11-01：JP-03 V1 收尾增量实施
+
+本轮承接 JP-02 与 review follow-up 后的实际 `local@553d2892bd43f72502bd757b5eba589d8b1043d1`，未提交/推送。实现范围：
+
+- Java 问答同步与 SSE 共用每进程 semaphore，Python 同步与 SSE 共用应用级 admission gate；默认 4、配置范围 1–32，过载沿用 retryable `AI_PROCESSING_FAILED`，不创建问答历史。SSE deadline 改从 Controller 收到请求时开始计时；加入过载无 DB/AI 调用及 Python 跨同步/SSE 共享容量回归。
+- Java 问答 AI/持久化和索引 dispatch，Python source-read/parse/index-embedding/index-write、问答 embedding/retrieval/generation 阶段增加 request ID、耗时/条数/终态日志；日志不记录正文或向量。provider usage 缺失时记 `unknown`；解析并记录有效 LLM/Embedding usage，接受合法 final usage-only SSE chunk。
+- retryable `SOURCE_UNAVAILABLE` 改映射至既有 `INDEX_WRITE_FAILED`；非 retryable 仍为 `UNSUPPORTED_CONTENT`。
+- `evaluation/runner/runner.py` 新增绑定 dataset ID/SHA 的显式质量门；无配置时返回 `incomplete`，阈值不可用或配置不匹配会拒绝。新增 `review_predictions.py`，按预测原始字节哈希提供人工支持性复核模板和合并，要求 reviewer 与 UTC 时间。
+- Windows parser smoke **15 个样例**已重跑；原始 PDF/文本解析限制与无 OCR/复杂布局不保证的边界沿用现有说明。本轮未完成多栏/表格专项新样例与 Linux 资源限制实测。
+
+验证结果：Python 全量 **263 passed**（1 条既有 Starlette/httpx 弃用警告）；评测 **20 passed**；Schema **85 structural cases**（不覆盖授权/租约/数据库迁移）；offline provider regression **16 passed**；Windows parser smoke **15/15**；seed validation 10 文档/15 题通过。Java 编译通过，非容器测试 **37 项，0 failure/error，1 opt-in skip**。全量 Maven 已尝试，但 Docker daemon 不可用，4 个 Testcontainers 集成类无法运行；不得将其记为通过。
+
+尚未完成的计划项：真实 upload/index/retrieval 流程的预测收集器；10/100 文档、并发 1/4/8 的端到端性能基线；隔离 PostgreSQL/MinIO outage 与第二批 embedding 失败的恢复演练；Linux parser CPU/内存/kill-reap 验证；真实模型 smoke。当前 shell 未配置 provider 凭证，本轮外部模型调用 **0**，未触及 10 Embedding + 10 LLM 预算。候选 60 题仍 `reviewed=0`，Q/M 审阅与独立盲测待后续完成。

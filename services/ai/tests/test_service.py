@@ -44,6 +44,12 @@ def test_startup_fails_closed_without_echoing_secret(tmp_path):
         create_app(Settings(SECRET, changed))
 
 
+@pytest.mark.parametrize('limit', [0, 33, True, 1.5, '2'])
+def test_question_concurrency_limit_is_validated(limit):
+    with pytest.raises(ConfigurationError, match='QUESTION_CONCURRENCY_INVALID'):
+        Settings(SECRET, max_concurrent_questions=limit)
+
+
 def test_health_does_not_probe_models_or_database(client):
     assert client.get('/health/live').json() == {'status': 'UP'}
     r = client.get('/internal/v1/health', headers={**AUTH, 'X-Request-ID': 'java-trace-01'})

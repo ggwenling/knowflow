@@ -40,18 +40,22 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
   const path = (await params).path;
   const pathname = `/api/v1/${path.map(encodeURIComponent).join("/")}`;
   const authPath = path.join("/") === "auth/login" || path.join("/") === "auth/register";
-  const isLogout = path.join("/") === "auth/logout";
+  const isLogout = request.method === "POST" && path.join("/") === "auth/logout";
   if (request.method !== "GET" && !sameOriginRequest(request)) {
     return failure(403, "CROSS_ORIGIN_REQUEST");
   }
+  const finish = (response: Response) => {
+    if (isLogout || response.status === 401) expireSession(response);
+    return response;
+  };
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > 9 * 1024 * 1024) return failure(413, "REQUEST_TOO_LARGE");
+  if (declaredLength > 9 * 1024 * 1024) return finish(failure(413, "REQUEST_TOO_LARGE"));
 
   const token = request.cookies.get(cookieName)?.value;
-  if (!authPath && !token) return failure(401, "UNAUTHENTICATED");
+  if (!authPath && !token) return finish(failure(401, "UNAUTHENTICATED"));
 
   const apiBase = process.env.KNOWFLOW_API_BASE_URL;
-  if (!apiBase) return failure(503, "API_NOT_CONFIGURED");
+  if (!apiBase) return finish(failure(503, "API_NOT_CONFIGURED"));
 
   const headers = new Headers();
   for (const name of forwardedHeaders) {
@@ -62,7 +66,7 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
 
   try {
     const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
-    if (body && body.byteLength > 9 * 1024 * 1024) return failure(413, "REQUEST_TOO_LARGE");
+    if (body && body.byteLength > 9 * 1024 * 1024) return finish(failure(413, "REQUEST_TOO_LARGE"));
     const upstream = await fetch(`${apiBase.replace(/\/$/, "")}${pathname}${request.nextUrl.search}`, {
       method: request.method,
       headers,
@@ -70,13 +74,6 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(40_000)]),
       cache: "no-store",
     });
-
-    if (upstream.status === 401) {
-      const response = new Response(upstream.body, { status: upstream.status });
-      expireSession(response);
-      response.headers.set("Cache-Control", "no-store");
-      return response;
-    }
 
     const outgoing = new Headers({ "Cache-Control": "no-store" });
     for (const name of responseHeaders) {
@@ -89,23 +86,21 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
     }
 
     if (authPath && upstream.ok) {
-      const payload = await upstream.json() as { access_token?: string; expires_at?: string };
-      const expires = Date.parse(payload.expires_at ?? "");
-      if (!payload.access_token || !Number.isFinite(expires) || expires <= Date.now()) {
-        return failure(502, "INVALID_AUTH_RESPONSE");
+      const payload = await upstream.json().catch(() => null) as Record<string, unknown> | null;
+      const expires = typeof payload?.expires_at === "string" ? Date.parse(payload.expires_at) : NaN;
+      if (typeof payload?.access_token !== "string" || !/^[A-Za-z0-9._~+/-]+=*$/.test(payload.access_token)
+          || !Number.isFinite(expires) || expires <= Date.now()) {
+        return finish(failure(502, "INVALID_AUTH_RESPONSE"));
       }
       const maxAge = Math.floor((expires - Date.now()) / 1000);
       outgoing.append("Set-Cookie", `${cookieName}=${encodeURIComponent(payload.access_token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
       delete payload.access_token;
-      return Response.json(payload, { status: upstream.status, headers: outgoing });
+      return finish(Response.json(payload, { status: upstream.status, headers: outgoing }));
     }
 
-    if (isLogout && upstream.ok) {
-      outgoing.append("Set-Cookie", `${cookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
-    }
-    return new Response(upstream.body, { status: upstream.status, headers: outgoing });
+    return finish(new Response(upstream.body, { status: upstream.status, headers: outgoing }));
   } catch {
-    return failure(502, "API_UNAVAILABLE");
+    return finish(failure(502, "API_UNAVAILABLE"));
   }
 }
 

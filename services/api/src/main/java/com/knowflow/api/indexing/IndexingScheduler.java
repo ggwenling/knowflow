@@ -1,5 +1,7 @@
 package com.knowflow.api.indexing;
 
+import java.util.concurrent.TimeUnit;
+
 import com.knowflow.api.config.IndexingProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,16 +29,24 @@ public class IndexingScheduler {
     @Scheduled(fixedDelayString = "${knowflow.indexing.poll-delay-millis:1000}")
     public void dispatchOne() {
         queue.claimNext().ifPresent(claim -> {
+            long startedAt = System.nanoTime();
             try {
                 client.dispatch(claim.dispatch());
+                LOGGER.info("index_stage request_id={} task_id={} stage=dispatch duration_ms={} outcome=accepted",
+                        claim.dispatch().requestId(), claim.lease().taskId(),
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
             } catch (RuntimeException dispatchFailure) {
                 if (AiIndexExecutionClient.isDefinitiveClientRejection(dispatchFailure)) {
                     queue.rejectDispatch(claim);
-                    LOGGER.warn("AI service rejected an index dispatch; the task was rescheduled");
+                    LOGGER.warn("index_stage request_id={} task_id={} stage=dispatch duration_ms={} outcome=rejected",
+                            claim.dispatch().requestId(), claim.lease().taskId(),
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
                 } else {
                     // The service may have accepted the request before a timeout or disconnect.
                     // Keep the lease active and let expiry/fencing recover it safely.
-                    LOGGER.warn("AI dispatch outcome is unknown; the task lease will expire safely");
+                    LOGGER.warn("index_stage request_id={} task_id={} stage=dispatch duration_ms={} outcome=unknown",
+                            claim.dispatch().requestId(), claim.lease().taskId(),
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
                 }
             }
         });

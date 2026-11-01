@@ -64,7 +64,27 @@ python evaluation/data/tools/validate_seed.py
 python evaluation/runner/runner.py --predictions path/to/predictions.json --split development --output path/to/report.json
 ```
 
-报告含按题 ID 的分类结果和分母计数、answerability accuracy、原文证据跨度召回/完整覆盖、不可回答题拒答率、引用与标注跨度重合、外部人工支持判断的覆盖率/通过率，以及输入延迟的 nearest-rank p50/p95。人工支持率和审阅覆盖率以所有已生成答案为分母，包括不可回答题上的幻觉；可回答题回答率仍单独统计。引用存在不等于语义支持；答案支持判断由预测文件中的人工标注提供，runner 不会根据引用字符串自动判定。当前没有登记质量门槛，因此脚本不输出质量 pass/fail。
+报告含按题 ID 的分类结果和分母计数、answerability accuracy、原文证据跨度召回/完整覆盖、不可回答题拒答率、引用与标注跨度重合、外部人工支持判断的覆盖率/通过率，以及输入延迟的 nearest-rank p50/p95。人工支持率和审阅覆盖率以所有已生成答案为分母，包括不可回答题上的幻觉；可回答题回答率仍单独统计。引用存在不等于语义支持；答案支持判断由预测文件中的人工标注提供，runner 不会根据引用字符串自动判定。没有显式门槛配置时，质量门返回 `incomplete`，不输出隐式质量通过。
+
+显式质量配置以 gate 版本、dataset ID 和当前数据集 SHA 绑定；只对可用的 0–1 比率指定下限。任何版本/哈希不匹配或未知字段都会拒绝运行：
+
+```json
+{
+  "gate_version": 1,
+  "dataset_id": "qingzhu-seed-v1",
+  "dataset_sha256": "<current dataset fingerprint>",
+  "minimums": {"answerability_accuracy": 0.9, "recall_at_5": 0.8}
+}
+```
+
+可用 `--quality-config path/to/gate.json` 传入。配置中的阈值必须由项目评审显式选择；此处不提供产品默认值。
+
+人工支持判断工作包由 `evaluation/runner/review_predictions.py` 创建。包绑定原始预测字节 SHA 和数据集指纹；每个回答项必须由审核者填写 `supported` 或 `unsupported`、审核者标识及 UTC `reviewed_at`，未回答项为 `not_applicable`。合并后才生成 runner 可评分的预测文件：
+
+```sh
+python evaluation/runner/review_predictions.py --predictions predictions.json --output review-bundle.json
+python evaluation/runner/review_predictions.py --predictions predictions.json --review completed-review.json --output reviewed-predictions.json
+```
 
 `evaluation/data/tools/split_candidates.py` 用固定 seed 将候选题按 `leakage_group` 整组分到 40/20，只有能精确满足两个数量时才生成划分；它同时校验“candidate”记录未混入半成品答案标签，以及“reviewed”标注的原文、版本、行号和码点偏移。示例命令：
 

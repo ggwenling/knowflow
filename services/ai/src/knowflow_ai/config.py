@@ -17,6 +17,7 @@ class Settings:
     java_base_url: str = 'http://127.0.0.1:8080'
     runtime_profile_id: str = 'runtime-default'
     ai_database_url: str = field(default='', repr=False)
+    max_concurrent_questions: int = 4
 
     def __post_init__(self):
         if not (32 <= len(self.internal_secret) <= 256 and
@@ -32,6 +33,9 @@ class Settings:
                 or parsed.query or parsed.fragment or parsed.path not in ('', '/')
                 or (port is not None and not 1 <= port <= 65535)):
             raise ConfigurationError('JAVA_BASE_URL_INVALID')
+        if (type(self.max_concurrent_questions) is not int
+                or not 1 <= self.max_concurrent_questions <= 32):
+            raise ConfigurationError('QUESTION_CONCURRENCY_INVALID')
 
     @classmethod
     def from_environment(cls):
@@ -41,4 +45,9 @@ class Settings:
         kwargs['java_base_url'] = os.environ.get('KNOWFLOW_JAVA_BASE_URL', 'http://127.0.0.1:8080')
         kwargs['runtime_profile_id'] = os.environ.get('KNOWFLOW_RUNTIME_PROFILE_ID', 'runtime-default')
         kwargs['ai_database_url'] = os.environ.get('KNOWFLOW_AI_DATABASE_URL', '')
+        try:
+            kwargs['max_concurrent_questions'] = int(os.environ.get(
+                'KNOWFLOW_QUESTION_MAX_CONCURRENT', '4'))
+        except ValueError:
+            raise ConfigurationError('QUESTION_CONCURRENCY_INVALID') from None
         return cls(**kwargs)
