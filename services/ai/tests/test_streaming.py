@@ -42,7 +42,7 @@ def _sse(fragments, *, finish='stop', done=True, model='deepseek-flash'):
     return body + (b'data: [DONE]\n\n' if done else b'')
 
 
-def _service(stream, *, status=200):
+def _service(stream, *, status=200, model_profile=None):
     calls = []
 
     def handler(request):
@@ -52,7 +52,7 @@ def _service(stream, *, status=200):
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     adapter = DeepSeekAdapter(LlmSettings(api_key=KEY), client)
     service = AnswerService('unused', _contract(), retriever=FakeRetriever(_evidence()),
-                            llm_factory=lambda: adapter)
+                            llm_factory=lambda: adapter, model_profile=model_profile)
     return service, client, calls
 
 
@@ -96,10 +96,13 @@ async def test_provider_stream_accepts_fragmented_utf8_and_validates_final_sourc
     generated = '{"has_answer":true,"answer":"READY😀[src-evidence-1]","source_ids":["src-evidence-1"]}'
     body = _sse(list(generated))
     stream = ProviderStream([body[index:index+1] for index in range(len(body))])
-    service, client, _calls = _service(stream)
+    model_profile = {'embedding_model_profile_id': 'BAAI/bge-m3',
+                     'llm_model_profile_id': 'deepseek-flash'}
+    service, client, _calls = _service(stream, model_profile=model_profile)
     async with client:
         events = [event async for event in service.stream(_request())]
     assert events[0]['event'] == 'started'
+    assert events[0]['model_profile'] == model_profile
     assert ''.join(event['delta'] for event in events if event['event'] == 'delta') == 'READY😀[src-evidence-1]'
     assert events[-2]['event'] == 'sources'
     assert events[-2]['sources'][0]['chunk_id'] == 'chunk-example-1'

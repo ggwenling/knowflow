@@ -1,6 +1,6 @@
 # KF2-004 后端开发候选 API 目录
 
-状态：`DRAFT 0.2.0-draft.9`；Schema SHA-256 `fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`。draft.9 延续 draft.7 的 `IndexDispatch.runtime_profile` 配置上限，并定义内容更新及同内容索引重建的原子发布 API。所有共享报文的 `contract_version` 升至 draft.9；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。用户已批准 V0.2 重建基线，不再等待缺失的 V1.1 设计包。
+状态：`DRAFT 0.2.0-draft.10`；Schema SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。draft.10 延续 draft.9 的 SSE 与内容版本语义，新增非秘密模型配置身份、请求级问答幂等键、问答历史响应和清理后的来源标识。模型档案标识允许 provider/model 名称中的 `/`。所有共享报文的 `contract_version` 升至 draft.10；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。
 
 ## 公开入口：浏览器 → Java
 
@@ -34,6 +34,14 @@ Java 已实现的文件代理为 `GET /api/v1/documents/{document_id}/contents/{
 文档列表为 `GET /api/v1/knowledge-bases/{kb_id}/documents?limit=50&offset=0`；文档状态为 `GET /api/v1/documents/{document_id}`；任务状态为 `GET /api/v1/tasks/{task_id}`。列表只包含当前用户、活动知识库下未删除文档。上传提交后任务为 `QUEUED`；只有已发布索引才显示 `READY`，候选版本成功或 Worker 自报完成都不表示 `READY`。状态响应不返回执行令牌、对象键、原文、向量或内部凭证。
 
 所有输出前检查以当前可见性为准。历史答案文本可能包含删除前已经显示的内容；不可借其来源访问已失效原文件。源版本保留期限待确认，不能无限保留或直接承诺固定天数。
+
+### 问答历史与重复提交
+
+`GET /api/v1/questions?limit=50&offset=0` 只返回当前用户的分页问题摘要；`limit` 为 1–100，`offset` 为 0–1,000,000。`GET /api/v1/questions/{question_id}` 返回问题、最终答案/失败状态、模型 profile ID 与最多 5 个来源。来源仍在版本保留窗口内时为 `AVAILABLE` 并带 locator/quote；文档删除后为 `DOCUMENT_DELETED`，版本清理后为 `VERSION_EXPIRED`，后两者保留来源标识但 locator 和 quote 必须为 `null`。找不到记录或记录属于其他用户均返回 404。
+
+`DELETE /api/v1/questions/{question_id}` 仅允许删除已结束的问题；`PROCESSING` 返回 409 `QUESTION_IN_PROGRESS`。删除历史也删除其来源/快照元数据并释放关联幂等键。
+
+问答 POST 可选带 `Idempotency-Key: <UUID>`。键按认证用户唯一；已有记录保留期间重复使用会返回 409 `QUESTION_REQUEST_CONFLICT`，不会再次调用模型。SSE 响应已经开始后无法再改为 HTTP 409，因此重复流式提交以单个终止 `error` 事件报告同一错误码。键在对应历史记录删除后可以重新使用。
 
 ### KF2-012/013 局部凭证与知识库候选
 
@@ -110,7 +118,13 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 
 ## draft.9 SSE 与证据
 
-`POST /internal/v1/answers/stream` 使用现有 `TrustedAnswerRequest`，响应为 `text/event-stream`。每条 SSE data 是一个通过 `AnswerStreamEvent` 校验的 JSON 对象：`started → delta* → sources → completed`，或以唯一 `error` / `cancelled` 终止。所有事件带 draft.9 `contract_version`、原 `request_id` 和从 1 开始递增的 `sequence`。`delta` 仅含答案文本；`sources` 带经范围与引用核验的 `has_answer` 和来源；`completed` 不重复答案，消费者拼接 delta。拒答发标准拒答文本与空来源。
+`POST /internal/v1/answers/stream` 使用现有 `TrustedAnswerRequest`，响应为 `text/event-stream`。每条 SSE data 是一个通过 `AnswerStreamEvent` 校验的 JSON 对象：`started → delta* → sources → completed`，或以唯一 `error` / `cancelled` 终止。所有事件带契约版本、原 `request_id` 和从 1 递增的 `sequence`。`delta` 仅含答案文本；`sources` 带经范围与引用核验的 `has_answer` 和来源；`completed` 不重复答案，消费者拼接 delta。拒答发标准拒答文本与空来源。
+
+## draft.10 历史与幂等问答
+
+`GET /api/v1/questions?limit=50&offset=0`、`GET /api/v1/questions/{question_id}` 和 `DELETE /api/v1/questions/{question_id}` 均由 Java 按当前所有者过滤。处理中问题不能删除（409 `QUESTION_IN_PROGRESS`）；终态删除返回 204。详情保留问题、答案和模型配置身份；来源为 `AVAILABLE` 时返回 quote/locator，来源失效时只返回标识、版本和 `DOCUMENT_DELETED` / `VERSION_EXPIRED` 状态。
+
+非流式与 SSE 问答可带 UUID `Idempotency-Key`。相同用户的键在历史记录保留期间唯一；重复键返回 `QUESTION_REQUEST_CONFLICT`（HTTP 请求返回 409，流式响应返回唯一 `error` 事件），不会再次调用模型。SSE 不支持断点续传。`model_profile` 仅记录本次服务选用的 embedding/model 别名，不包含 key、URL 或 selector，也不声称供应商提供了不可变版本。
 
 Python 请求供应商 `stream=true`，只增量解析 JSON answer 字段；provider 完整 JSON、source IDs、引用集合及可信快照检查成功后才发 sources。截断、畸形或伪造引用必须以脱敏 error 终止。请求有端到端 deadline 与响应/答案大小上限；断连取消检索或模型请求并关闭流。真实 provider 流式行为需要可用凭证才能验证。
 

@@ -67,7 +67,19 @@ class PostgreSqlMigrationIntegrationTest {
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+            assertThat(queryLong("""
+                    SELECT count(*) FROM information_schema.columns
+                     WHERE table_schema = 'knowflow' AND table_name = 'questions'
+                       AND column_name IN ('idempotency_key', 'deadline_at',
+                                           'embedding_model_profile_id', 'llm_model_profile_id')
+                    """)).isEqualTo(4L);
+            assertThat(queryLong("""
+                    SELECT count(*) FROM pg_indexes
+                     WHERE schemaname = 'knowflow' AND indexname IN (
+                         'questions_owner_idempotency_key_uq',
+                         'questions_processing_deadline_idx')
+                    """)).isEqualTo(2L);
 
             var extensionVersion = queryString(
                     "SELECT extversion FROM pg_extension WHERE extname = 'vector'");

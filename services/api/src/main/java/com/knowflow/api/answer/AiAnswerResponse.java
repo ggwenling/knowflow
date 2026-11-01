@@ -4,7 +4,13 @@ import java.util.List;
 import java.util.UUID;
 
 public record AiAnswerResponse(String contractVersion, String requestId, String answer,
-                               Boolean hasAnswer, List<AiSource> sources) {
+                               Boolean hasAnswer, List<AiSource> sources,
+                               ModelProfile modelProfile) {
+    public AiAnswerResponse(String contractVersion, String requestId, String answer,
+                            Boolean hasAnswer, List<AiSource> sources) {
+        this(contractVersion, requestId, answer, hasAnswer, sources, null);
+    }
+
     public record AiSource(String sourceId, UUID documentId, UUID contentVersionId,
                            UUID indexVersionId, UUID chunkId, Locator locator, String quote) {}
 

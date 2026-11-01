@@ -1,6 +1,6 @@
 # Python AI 服务（Codex-B 所有）
 
-Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.9`（Schema SHA-256：`fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935`）。契约仍是候选版本；Q 独立审阅、M 页面消费确认和正式冻结未完成。
+Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.10`（Schema SHA-256：`d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。回答与 SSE `started` 会报告非秘密模型配置身份；契约仍是候选版本，Q 独立审阅、M 页面消费确认和正式冻结未完成。
 
 ## 当前能力
 
@@ -36,11 +36,17 @@ python -m unittest discover -s evaluation/smoke -p 'test_*.py' -v
 uv run --project services/ai --frozen python services/ai/tools/process_smoke.py
 ```
 
+`evaluation/data/seed-v2-candidate/` contains 60 candidate questions over the same 10 synthetic documents as seed-v1: 15 factual, 15 rewrite, 10 multi-evidence, 10 Chinese keyword and 10 no-answer candidates. All are unreviewed. The checked-in 40/20 allocation keeps rewrite groups together but is explicitly not a blind holdout; no quality score may be reported from this candidate set until answerability, references and evidence spans are independently annotated. The annotation template and source-version checks are in the same directory and `evaluation/data/tools/split_candidates.py`.
+
+The offline runner reports evidence Recall@5, MRR@10, answerability and latency, with per-category answerability/refusal breakdowns. `ReadOnlyRetriever.retrieve(..., top_k=10)` is available to a local evaluation harness; production answers continue to request the default top 5. These metrics score saved predictions against validated annotations and do not make model-quality claims by themselves.
+
 当前 Python 单测、Schema、离线模型回归及真实 Python HTTP process smoke 分别验证不同边界，不替代 Java↔Python 双进程联调、真实数据库权限测试或真实模型质量/费用验收。`java_python_smoke.py` 验证真实 Java WebClient 与 Python HTTP health；Java `DocumentApiIntegrationTest` 另以本地 HTTP fixture 验证上游 AI 返回 503 时公开问答接口映射为可重试 502，并将问题状态记为失败。索引/问答真实模型闭环仍使用本地合成 adapter 验收；真实模型质量需有凭证后单独验证。
 
 2026-10-30 的本机合成 E2E 使用真实 Java/Python 进程、PostgreSQL/pgvector 和 MinIO，验证上传、索引 READY、只读检索、问答来源校验与持久化；新增 Python 快照范围 guard 后再次通过。另在活动合成 embedding 阻塞期间删除文档，真实验证 Java cancellation outbox 到 Python HTTP cancel、worker 子任务中断、adapter 收尾、清理队列排空及无迟到 Chunk/向量写入。修复记录与报告见 `docs/evidence/cancellation-e2e-local-draft6-verified.json`。Embedding/LLM 使用本地替身，外部模型调用为 0。问答证据见 `docs/evidence/local-backend-e2e-draft6-verified.json`；当前 Compose 权限见 `docs/evidence/local-db-role-audit-draft6.json`；12 道开发题与 3 道留出题的来源证据 Chunk 覆盖见 `docs/evidence/seed-chunk-coverage-local-draft6.json`。这些不代表真实模型质量或向量排名通过。Windows 默认 Proactor 事件循环不支持 psycopg 异步连接，因此只读 SQL 通过 `asyncio.to_thread` 调用同步 psycopg；连接与语句均有 5 秒上限，事务保持只读。
 
-可从仓库根在 `local` 或 `codex/integration-*` 分支（且 `main` 为祖先）运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --output services/ai/docs/evidence/local-backend-e2e-draft8-replay.json` 重放该合成闭环；其他分支（包括 `main` 和作者分支）会被拒绝，分支与祖先检查通过后才读取本机 `services/api/.env`。需要先按 API README 启动健康的本地 Compose PostgreSQL/MinIO；8000/8080 必须空闲，数据库不能有未完成的索引任务或待处理清理队列。脚本会创建合成账户及知识库，删除知识库、等待相应存储/索引/取消清理完成并退出会话；合成账户记录保留在本地开发数据库中。测试使用合成 adapter，不发起外部模型调用；新报告使用 draft.8 路径 `docs/evidence/local-backend-e2e-draft8-replay.json`。现存 `*-draft6-*` 报告是历史记录，不代表当前契约。
+可从仓库根在 `local` 或 `codex/integration-*` 分支（且 `main` 为祖先）运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --output services/ai/docs/evidence/local-backend-e2e-draft10-replay.json` 重放该合成闭环；其他分支（包括 `main` 和作者分支）会被拒绝，分支与祖先检查通过后才读取本机 `services/api/.env`。先按 API README 启动健康的本地 Compose PostgreSQL/MinIO，并将目标数据库迁移到当前版本；隔离验证可用 `--database-name knowflow_e2e_local` 指定已创建并迁移的本地数据库。8000/8080 必须空闲，目标数据库不能有未完成的索引任务或待处理清理队列。脚本会创建合成账户及知识库，删除知识库、等待相应存储/索引/取消清理完成并退出会话；合成账户记录保留在目标开发数据库中。测试使用合成 adapter，不发起外部模型调用；新报告使用 draft.10 路径 `docs/evidence/local-backend-e2e-draft10-replay.json`。现存 `*-draft6-*`、`*-draft8-*` 报告是历史记录，不代表当前契约。
+
+2026-11-01 在临时隔离数据库上完成 draft.10 真实 Java/Python/PostgreSQL/MinIO 合成 E2E，随后删除该隔离数据库并停止 Compose 容器（保留数据卷）。报告见 [draft.10 E2E](docs/evidence/local-backend-e2e-draft10-replay.json)；原本地 `knowflow` 库为旧表结构，未对其执行迁移。
 
 2026-10-31 已在 `codex/integration-20261031` / draft.8 候选上重放：真实 Java、Python、PostgreSQL/pgvector、MinIO 服务链路完成上传、索引 READY、只读检索和带来源的问答；活动取消、adapter 收尾、无迟到写入及清理队列排空也通过。报告为 [draft.8 合成 E2E](docs/evidence/local-backend-e2e-draft8-replay.json)，Schema SHA-256 `f4db55243d97b1bbd4938a8479bed7ce3a8f1955874ec3885f86906219032c5a`。Embedding/LLM 均为本地确定性合成 adapter，外部模型调用 0；该结果只验证集成流程，不代表真实模型质量、检索排序或生产性能。知识库已删除、会话已注销、清理队列已排空；合成账户记录保留，Compose 容器已停止且数据卷保留。Q 审阅和 M 消费确认仍待完成。
 

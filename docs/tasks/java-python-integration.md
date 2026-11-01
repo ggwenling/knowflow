@@ -98,3 +98,16 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - 浏览器断连或超时会取消上游订阅并将 PROCESSING 问题标记为 `CANCELLED`；上游异常、非法事件、删除/版本清理和超时会发送唯一脱敏 error。跨 delta 引用标记由 bounded mapper 映射为公开 source UUID，内部 source ID 不出现在 SSE。
 - 新增 `DocumentApiIntegrationTest.publicAnswerStreamForwardsValidatedEventsAndPersistsTheAnswer`，覆盖事件顺序、内部引用 ID 脱敏和 `SUCCEEDED` 持久化。该 Testcontainers 测试已编译，但当前 Docker Engine 缺失，执行在容器启动阶段阻断。
 - 无容器 Java 编译与 SSE/citation 单测仍通过：test-compile SUCCESS，7/7 passed。公开 SSE 代码提交为 `e949c19`；整体 `local` 后续需在 Docker 可用时补跑集成测试。
+
+## 2026-11-01：draft.10 双端复验
+
+- Java 与 Python 在 `local` 分支同步消费 draft.10，Schema SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。Java V7/问答历史/幂等/deadline 恢复与 Python profile/tombstone 消费均已通过各自全量套件。
+- 首次尝试使用现存本机 `knowflow` 库时，上传因旧表缺少当前迁移列返回 500；确认该库没有当前 Flyway history 后未对其执行迁移。随后在临时隔离库从空库应用 V1–V7 并重放成功，完成后删除临时库。原库未迁移 schema；失败流程已删除合成知识库并注销会话，合成用户记录可能保留。本机 Compose 容器已停止、数据卷保留。
+- 真实 Java/Python/PostgreSQL/pgvector/MinIO 合成 E2E 全通过：上传、索引 READY、只读检索、带来源合成回答、活动取消、无迟到 Chunk/Embedding、知识库清理及 outbox 排空。外部模型调用 0；报告 `services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。
+- 测试期间新建的合成账户在原本地 `knowflow` 库中可能保留（知识库已由失败流程清理、会话已注销）；实现与审查修复已提交至 `local`，未推送。Q/M/真实 provider 质量与费用仍待完成。
+
+## 2026-11-01 Review follow-up
+
+- Category evaluation now checks `answerable_count` and `unanswerable_count` before division and reports `null` for the unavailable rate. Regression coverage uses `factual` with answerable-only rows and `no_answer` with unanswerable-only rows.
+- Streamed `started` model profile is carried into `pendingAnswer`; the end-to-end test confirms profile IDs persist after the terminal `completed` event rather than being overwritten with null.
+- Targeted checks: Python evaluation **10 passed**, Java `DocumentApiIntegrationTest` **38 passed**. Full checks: Python **235 passed** (1 existing deprecation warning), Java **76 tests, 0 failures/errors, 1 opt-in skip**.

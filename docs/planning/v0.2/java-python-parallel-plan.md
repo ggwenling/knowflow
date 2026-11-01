@@ -214,3 +214,13 @@ Q 可并行复核已有提交；本计划不要求作者停工等排期，也不
 ## 2026-10-31 补充：批次历史保留完整向量 P2
 
 Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 提交 `03a8051f7319d4420e66709f8846321d6b1c7644`。成功写入的批次历史仅保存序号、批次 ID、哈希与 Chunk 数，末批完成后释放 `pending`；manifest 字段和值的摘要语义保持不变。512 个独立 1024 维向量小 Chunk 的内存回归修复前复现 17,525,103 bytes，修复后峰值低于 16 MiB。Python 188 项、Schema 70 项、离线回归 16 项通过；真实 Java/Python/本机数据库与对象存储合成 E2E 接受新 manifest，证据 `services/ai/docs/evidence/local-backend-e2e-draft8-memory-p2.json`（SHA-256 `ba8183cd8093eb248e666ee4da5825240f0da6f7919e518ee5a35fd2f807ca42`）。Java 源码未改，Maven 未重跑；外部模型调用 0，Compose 已停止且保留数据卷，未推送或合并 `main`。Q/M 与真实模型质量/费用验证仍待完成。
+
+## 2026-11-01：当日计划执行结果（draft.10）
+
+计划中的 Java 历史追踪/幂等/超时恢复，Python profile 与评测候选准备，以及两端契约同步已在 `local` 分支完成。Java 全量 **76 项，0 failure/error，1 opt-in skip**；Python 全量 **235 passed**；契约结构校验 **85 项**；离线回归 **16 passed**。
+
+本机 PostgreSQL 原 `knowflow` 库缺少当前迁移列且无 Flyway 迁移历史；没有在该库直接补迁移。为完成验收，在同一本机 PostgreSQL 容器创建隔离临时库，应用 V1–V7，再以真实 Java/Python 服务、pgvector 和 MinIO 完成合成 E2E，报告 `services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。全流程及物理清理通过，外部模型调用 0；临时库已删除，容器停止、数据卷保留。
+
+60 道候选题尚未人工审核（reviewed=0）；Q 审阅、M 消费确认、真实 provider 质量/成本仍待完成。本轮实现与审查修复已提交到 `local`，未推送或合并 `main`。
+
+2026-11-01 审查意见复验：修复 category 单标签时 0 分母导致的异常，并修复 SSE `started` 已保存模型 profile、但 `completed` 保存答案时被 null 覆盖的问题。Python 全量 **235 passed**；Java 全量 **76 项，0 failure/error，1 opt-in skip**。对应回归覆盖单标签类别及 SSE 完成后的 profile 持久化。

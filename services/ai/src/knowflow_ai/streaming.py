@@ -276,7 +276,9 @@ async def answer_events(service, request):
         service._contract.validate("AnswerStreamEvent", value)
         return value
 
-    yield event("started")
+    started_fields = ({"model_profile": service._model_profile}
+                      if service._model_profile is not None else {})
+    yield event("started", **started_fields)
     try:
         deadline = time.monotonic() + ANSWER_DEADLINE_SECONDS
         async with asyncio.timeout(ANSWER_DEADLINE_SECONDS):

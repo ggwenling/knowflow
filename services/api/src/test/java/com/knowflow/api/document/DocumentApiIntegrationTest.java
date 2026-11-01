@@ -183,6 +183,9 @@ class DocumentApiIntegrationTest {
     @Autowired
     private QuestionProperties questionProperties;
 
+    @Autowired
+    private com.knowflow.api.answer.QuestionRecoveryService questionRecovery;
+
     @DynamicPropertySource
     static void serviceProperties(DynamicPropertyRegistry properties) {
         properties.add("knowflow.database.application.url", DATABASE::getJdbcUrl);
@@ -262,7 +265,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/v1/tasks/")))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.9"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.10"))
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andReturn();
         JsonNode response = objectMapper.readTree(uploaded.getResponse().getContentAsByteArray());
@@ -556,7 +559,8 @@ class DocumentApiIntegrationTest {
                     List.of(new AiAnswerResponse.AiSource("stream-source", scope.documentId(),
                             scope.contentVersionId(), scope.indexVersionId(), published.chunkId(),
                             new AiAnswerResponse.Locator("text_range", null, 0,
-                                    evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
+                                    evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)),
+                    new com.knowflow.api.answer.ModelProfile("BAAI/bge-m3", "deepseek-flash"));
         });
         CountDownLatch terminalGate = new CountDownLatch(1);
         AI_STREAM_TERMINAL_GATE.set(terminalGate);
@@ -577,6 +581,10 @@ class DocumentApiIntegrationTest {
                     UUID.class, AI_RECEIVED_REQUEST_ID.get());
             assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
                     String.class, questionId)).isEqualTo("PROCESSING");
+            assertThat(jdbc.queryForObject("""
+                    SELECT embedding_model_profile_id || ':' || llm_model_profile_id
+                      FROM knowflow.questions WHERE id = ?
+                    """, String.class, questionId)).isEqualTo("BAAI/bge-m3:deepseek-flash");
             assertThat(jdbc.queryForObject("SELECT answer_text FROM knowflow.questions WHERE id = ?",
                     String.class, questionId)).isNull();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
@@ -591,6 +599,11 @@ class DocumentApiIntegrationTest {
                 .doesNotContain("stream-source");
         assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE request_id = ?",
                 String.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.queryForObject("""
+                SELECT embedding_model_profile_id || ':' || llm_model_profile_id
+                  FROM knowflow.questions WHERE request_id = ?
+                """, String.class, AI_RECEIVED_REQUEST_ID.get()))
+                .isEqualTo("BAAI/bge-m3:deepseek-flash");
         assertThat(jdbc.queryForObject("""
                 SELECT count(*) FROM knowflow.question_sources qs
                   JOIN knowflow.questions q ON q.id = qs.question_id
@@ -744,6 +757,50 @@ class DocumentApiIntegrationTest {
             terminalGate.countDown();
             questionProperties.setTotalBudgetSeconds(originalBudget);
         }
+    }
+
+    @Test
+    void expiredQuestionRecoveryWinsAgainstALateStreamCompletion() throws Exception {
+        String token = register("question-recovery@example.test").path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Question recovery");
+        String evidence = "Recovery evidence.";
+        PublishedIndex published = publishDocument(token, knowledgeBaseId,
+                "recovery.txt", evidence, "question-recovery-index");
+        AI_RESPONSE.set(request -> streamedAnswer(request, published, evidence));
+        CountDownLatch terminalGate = new CountDownLatch(1);
+        AI_STREAM_TERMINAL_GATE.set(terminalGate);
+        AI_STREAM_SOURCES_SENT.set(new CountDownLatch(1));
+
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("{\"question\":\"What is the recovery evidence?\"}"))
+                .andReturn();
+        try {
+            assertThat(AI_STREAM_SOURCES_SENT.get().await(5, TimeUnit.SECONDS)).isTrue();
+            String requestId = AI_RECEIVED_REQUEST_ID.get();
+            UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                    UUID.class, requestId);
+            jdbc.update("UPDATE knowflow.questions SET deadline_at = clock_timestamp() - INTERVAL '3 seconds' WHERE id = ?",
+                    questionId);
+            questionRecovery.recoverExpiredQuestions();
+            assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isEqualTo("FAILED");
+            assertThat(jdbc.queryForObject("SELECT failure_code FROM knowflow.questions WHERE id = ?",
+                    String.class, questionId)).isEqualTo("PROCESSING_TIMEOUT");
+        } finally {
+            terminalGate.countDown();
+        }
+        var finished = mockMvc.perform(asyncDispatch(initial)).andReturn();
+        assertThat(finished.getResponse().getStatus()).isEqualTo(200);
+        assertThat(finished.getResponse().getContentAsString()).contains("event:error")
+                .doesNotContain("event:completed");
+        UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions ORDER BY created_at DESC LIMIT 1",
+                UUID.class);
+        assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE id = ?",
+                String.class, questionId)).isEqualTo("FAILED");
     }
 
     @Test
@@ -1415,7 +1472,7 @@ class DocumentApiIntegrationTest {
         assertThat(claim.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
         String requestId = "source-read-regression";
         byte[] request = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.9", requestId, claim.lease()));
+                "0.2.0-draft.10", requestId, claim.lease()));
 
         var response = mockMvc.perform(post("/internal/v1/tasks/{taskId}/source",
                         claim.lease().taskId())
@@ -1425,7 +1482,7 @@ class DocumentApiIntegrationTest {
                         .accept(MediaType.APPLICATION_OCTET_STREAM)
                         .content(request))
                 .andExpect(status().isOk())
-                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.9"))
+                .andExpect(header().string("X-Contract-Version", "0.2.0-draft.10"))
                 .andExpect(header().string("X-Request-ID", requestId))
                 .andExpect(header().string("X-Source-Format", "md"))
                 .andExpect(header().string("X-Source-SHA256",
@@ -1441,7 +1498,7 @@ class DocumentApiIntegrationTest {
                 claim.lease().pipelineProfileId(), claim.lease().leaseId(),
                 claim.lease().fencing(), "x".repeat(43));
         byte[] forgedRequest = objectMapper.writeValueAsBytes(new SourceReadRequest(
-                "0.2.0-draft.9", requestId, forged));
+                "0.2.0-draft.10", requestId, forged));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/source", claim.lease().taskId())
                         .header("Authorization", "Bearer document-test-internal-secret-long-enough")
                         .header("X-Request-ID", requestId)
@@ -1606,7 +1663,7 @@ class DocumentApiIntegrationTest {
                         "BAAI/bge-m3", 1024),
                 1, 1, java.util.List.of(new IndexManifestDigest.BatchIdentity(
                         1, batch.batchId(), batch.batchSha256(), 1)));
-        CompletionRequest completion = new CompletionRequest("0.2.0-draft.9", requestId,
+        CompletionRequest completion = new CompletionRequest("0.2.0-draft.10", requestId,
                 claim.lease(), "SUCCEEDED",
                 new CompletionRequest.Manifest(1, 1, 1024, "BAAI/bge-m3", manifestHash), null);
         byte[] body = objectMapper.writeValueAsBytes(completion);
@@ -1654,7 +1711,7 @@ class DocumentApiIntegrationTest {
         JsonNode uploaded = upload(token, knowledgeBaseId, "retry.txt", "retry this task");
         ClaimedIndexTask first = indexingTasks.claimNext().orElseThrow();
         assertThat(first.lease().taskId().toString()).isEqualTo(uploaded.path("task_id").asText());
-        CompletionRequest failure = new CompletionRequest("0.2.0-draft.9", "retryable-failure",
+        CompletionRequest failure = new CompletionRequest("0.2.0-draft.10", "retryable-failure",
                 first.lease(), "FAILED", null,
                 new CompletionRequest.Failure("MODEL_TIMEOUT", "model request timed out", true));
         mockMvc.perform(post("/internal/v1/tasks/{taskId}/completion", first.lease().taskId())
@@ -1821,17 +1878,44 @@ class DocumentApiIntegrationTest {
         String kb = createKnowledgeBase(token, "Updates");
         PublishedIndex first = publishDocument(token, kb, "first.txt", "First evidence.", "first-publish");
         UUID document = first.lease().documentId();
-        AI_RESPONSE.set(request -> new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
+        var providerCalls = new java.util.concurrent.atomic.AtomicInteger();
+        AI_RESPONSE.set(request -> {
+            providerCalls.incrementAndGet();
+            return new AiAnswerResponse(ApiError.CONTRACT_VERSION, request.requestId(),
                 "Answer [s1]", true, List.of(new AiAnswerResponse.AiSource("s1", document,
                 first.lease().contentVersionId(), first.lease().indexVersionId(), first.chunkId(),
                 new AiAnswerResponse.Locator("text_range", null, 0, 15, "unicode_code_point"),
-                "First evidence."))));
+                "First evidence.")), new com.knowflow.api.answer.ModelProfile(
+                "BAAI/bge-m3", "deepseek-flash"));
+        });
+        String idempotencyKey = UUID.randomUUID().toString();
         var asking = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
-                .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", idempotencyKey).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"question\":\"What is the evidence?\"}")).andReturn();
         JsonNode answer = objectMapper.readTree(mockMvc.perform(asyncDispatch(asking))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray());
         String sourceId = answer.path("sources").get(0).path("source_id").asText();
+        UUID questionId = jdbc.queryForObject("SELECT id FROM knowflow.questions WHERE request_id = ?",
+                UUID.class, answer.path("request_id").asText());
+        var duplicate = mockMvc.perform(post("/api/v1/knowledge-bases/{id}/questions", kb)
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", idempotencyKey).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"question\":\"What is the evidence?\"}")).andReturn();
+        mockMvc.perform(asyncDispatch(duplicate))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("QUESTION_REQUEST_CONFLICT"));
+        assertThat(providerCalls).hasValue(1);
+        mockMvc.perform(get("/api/v1/questions").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].question_id").value(questionId.toString()));
+        mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sources[0].state").value("AVAILABLE"))
+                .andExpect(jsonPath("$.embedding_model_profile_id").value("BAAI/bge-m3"))
+                .andExpect(jsonPath("$.llm_model_profile_id").value("deepseek-flash"))
+                .andExpect(jsonPath("$.sources[0].quote").value("First evidence."));
         JsonNode secondTask = updateContent(token, document, "second.md", "Second evidence.");
         assertThat(jdbc.queryForObject("SELECT current_content_version_id FROM knowflow.documents WHERE id = ?",
                 UUID.class, document)).isEqualTo(first.lease().contentVersionId());
@@ -1854,10 +1938,22 @@ class DocumentApiIntegrationTest {
         mockMvc.perform(get("/api/v1/documents/{id}/contents/{version}/file", document,
                 first.lease().contentVersionId()).header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sources[0].state").value("VERSION_EXPIRED"))
+                .andExpect(jsonPath("$.sources[0].quote").value(org.hamcrest.Matchers.nullValue()));
+        String otherToken = register("history-other@example.test").path("access_token").asText();
+        mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+                .header("Authorization", "Bearer " + otherToken)).andExpect(status().isNotFound());
+        mockMvc.perform(delete("/api/v1/questions/{id}", questionId)
+                .header("Authorization", "Bearer " + token)).andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+                .header("Authorization", "Bearer " + token)).andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
+                Integer.class, questionId)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.chunks WHERE index_version_id = ?",
                 Integer.class, first.lease().indexVersionId())).isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.questions WHERE status = 'SUCCEEDED'",
-                Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT cleaned_at IS NULL FROM knowflow.index_versions WHERE id = ?",
                 Boolean.class, second.lease().indexVersionId())).isTrue();
     }
@@ -2088,6 +2184,9 @@ class DocumentApiIntegrationTest {
         started.put("request_id", answer.requestId());
         started.put("sequence", 1);
         started.put("event", "started");
+        if (answer.modelProfile() != null) {
+            started.set("model_profile", AI_MAPPER.valueToTree(answer.modelProfile()));
+        }
         var delta = AI_MAPPER.createObjectNode();
         delta.put("contract_version", answer.contractVersion());
         delta.put("request_id", answer.requestId());
@@ -2189,7 +2288,9 @@ class DocumentApiIntegrationTest {
                 List.of(new AiAnswerResponse.AiSource("stream-source", scope.documentId(),
                         scope.contentVersionId(), scope.indexVersionId(), published.chunkId(),
                         new AiAnswerResponse.Locator("text_range", null, 0,
-                                evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
+                                evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)),
+                new com.knowflow.api.answer.ModelProfile("synthetic-embedding",
+                        "synthetic-llm"));
     }
 
     private void awaitSseEvent(org.springframework.test.web.servlet.MvcResult result,
@@ -2284,7 +2385,7 @@ class DocumentApiIntegrationTest {
                     java.util.Collections.nCopies(1024, BigDecimal.ZERO)));
             start = end;
         }
-        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.9", requestId, lease,
+        IndexBatchRequest candidate = new IndexBatchRequest("0.2.0-draft.10", requestId, lease,
                 batchId, 1, "0".repeat(64), chunks);
         String digest = IndexBatchDigest.calculate(candidate).sha256();
         return new IndexBatchRequest(candidate.contractVersion(), candidate.requestId(),
@@ -2331,7 +2432,7 @@ class DocumentApiIntegrationTest {
         return objectMapper.readTree(mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.9","email":"%s",
+                                {"contract_version":"0.2.0-draft.10","email":"%s",
                                  "password":"synthetic-document-password"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
@@ -2343,7 +2444,7 @@ class DocumentApiIntegrationTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"contract_version":"0.2.0-draft.9","name":"%s"}
+                                {"contract_version":"0.2.0-draft.10","name":"%s"}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsByteArray());

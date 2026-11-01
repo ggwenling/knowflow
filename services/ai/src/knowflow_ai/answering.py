@@ -262,7 +262,9 @@ class ReadOnlyRetriever:
         return statement_timeout_ms
 
     async def retrieve(self, question: str, scope: dict, request_id: str,
-                       *, deadline: float | None = None) -> list[dict]:
+                       *, deadline: float | None = None, top_k: int = 5) -> list[dict]:
+        if type(top_k) is not int or not 1 <= top_k <= 10:
+            raise ValueError("INVALID_RETRIEVAL_LIMIT")
         embedding = self._embedding_factory()
         try:
             maximum = self._embedding_settings.max_text_codepoints
@@ -305,6 +307,7 @@ class ReadOnlyRetriever:
             params.extend((index["document_id"], index["content_version_id"],
                            index["index_version_id"]))
         params.append(vector_text)
+        params.append(top_k)
         query = f"""
             SELECT c.id::text AS chunk_id, c.document_id::text, c.content_version_id::text,
                    c.index_version_id::text, c.text_content, c.text_sha256,
@@ -324,7 +327,7 @@ class ReadOnlyRetriever:
                AND iv.cleaned_at IS NULL
                AND ({scope_predicates})
              ORDER BY e.embedding <=> %s::public.vector, c.id
-             LIMIT 5
+             LIMIT %s
         """
         cancellation = _DatabaseCancellation()
         database_task = asyncio.create_task(asyncio.to_thread(
@@ -373,8 +376,10 @@ class AnswerService:
 
     def __init__(self, database_url: str, contract, embedding_factory=None,
                  llm_factory=None, retriever=None,
-                 embedding_settings: EmbeddingSettings | None = None):
+                 embedding_settings: EmbeddingSettings | None = None,
+                 model_profile: dict | None = None):
         self._contract = contract
+        self._model_profile = model_profile
         self._retriever = retriever or ReadOnlyRetriever(
             database_url, embedding_factory, embedding_settings)
         self._llm_factory = llm_factory or (lambda: DeepSeekAdapter(LlmSettings.from_environment()))
@@ -418,6 +423,8 @@ class AnswerService:
                         "request_id": request["request_id"],
                         "answer": "没有足够的资料证据回答这个问题。",
                         "has_answer": False, "sources": []}
+            if self._model_profile is not None:
+                response["model_profile"] = self._model_profile
             self._contract.validate("AnswerResponse", response)
             return response
         model = self._llm_factory()
@@ -462,5 +469,7 @@ class AnswerService:
         response = {"contract_version": CONTRACT_VERSION,
                     "request_id": request["request_id"], "answer": answer,
                     "has_answer": bool(generated["has_answer"]), "sources": sources}
+        if self._model_profile is not None:
+            response["model_profile"] = self._model_profile
         self._contract.validate("AnswerResponse", response)
         return response

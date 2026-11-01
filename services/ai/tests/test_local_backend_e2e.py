@@ -21,8 +21,8 @@ def test_e2e_version_and_report_name_match_shared_contract():
     schema = json.loads((e2e.REPO / "contracts/schemas/protocol.schema.json").read_text(
         encoding="utf-8"))
 
-    assert e2e.VERSION == schema["$defs"]["ContractVersion"]["const"] == "0.2.0-draft.9"
-    assert e2e.DEFAULT_OUTPUT == e2e.AI_ROOT / "docs/evidence/local-backend-e2e-draft9-replay.json"
+    assert e2e.VERSION == schema["$defs"]["ContractVersion"]["const"] == "0.2.0-draft.10"
+    assert e2e.DEFAULT_OUTPUT == e2e.AI_ROOT / "docs/evidence/local-backend-e2e-draft10-replay.json"
 
 
 @pytest.mark.parametrize(("branch", "allowed"), [
@@ -36,6 +36,34 @@ def test_e2e_version_and_report_name_match_shared_contract():
 ])
 def test_e2e_allows_only_local_or_named_integration_branches(branch, allowed):
     assert e2e.is_allowed_integration_branch(branch) is allowed
+
+
+@pytest.mark.parametrize("database_name", ["knowflow", "knowflow_e2e_20261101", "local_2"])
+def test_e2e_accepts_safe_local_database_names(database_name):
+    assert e2e.require_database_name(database_name) == database_name
+
+
+@pytest.mark.parametrize("database_name", ["", "KnowFlow", "../postgres", "postgres", "template0"])
+def test_e2e_rejects_unsafe_local_database_names(database_name):
+    with pytest.raises(RuntimeError, match="LOCAL_DATABASE_NAME_INVALID"):
+        e2e.require_database_name(database_name)
+
+
+def test_e2e_database_name_is_used_for_all_service_connections(tmp_path):
+    dotenv = {
+        "KNOWFLOW_DEV_APP_PASSWORD": "local-app-password",
+        "KNOWFLOW_DEV_AI_PASSWORD": "local-ai-password",
+        "KNOWFLOW_DEV_MINIO_ROOT_USER": "local-minio-user",
+        "KNOWFLOW_DEV_MINIO_ROOT_PASSWORD": "local-minio-password",
+        "KNOWFLOW_INTERNAL_SHARED_SECRET": "s" * 32,
+    }
+
+    java_env, python_env, app_url = e2e.make_environment(
+        dotenv, tmp_path / "marker", "knowflow_e2e_local")
+
+    assert java_env["KNOWFLOW_DATABASE_URL"].endswith("/knowflow_e2e_local")
+    assert python_env["KNOWFLOW_AI_DATABASE_URL"].endswith("/knowflow_e2e_local")
+    assert app_url.endswith("/knowflow_e2e_local")
 
 
 @pytest.mark.parametrize(("unfinished", "cleanup", "error"), [

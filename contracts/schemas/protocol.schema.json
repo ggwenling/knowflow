@@ -1,14 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.9",
-  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. Draft.9 adds the internal streaming answer event envelope and retained snapshot semantics.",
+  "title": "KnowFlow proposed messages 0.2.0-draft.10",
+  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. Draft.10 adds model profile reporting and idempotent question submission errors.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.9"
+      "const": "0.2.0-draft.10"
     },
     "Identifier": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "ModelProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["embedding_model_profile_id", "llm_model_profile_id"],
+      "properties": {
+        "embedding_model_profile_id": {"$ref": "#/$defs/ModelProfileId"},
+        "llm_model_profile_id": {"$ref": "#/$defs/ModelProfileId"}
+      }
+    },
+    "ModelProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
     },
     "Sha256": {
       "type": "string",
@@ -346,7 +361,9 @@
             "SOURCE_UNAVAILABLE",
             "UNSUPPORTED_CONTENT",
             "RESOURCE_LIMIT",
-            "STORAGE_UNAVAILABLE"
+            "STORAGE_UNAVAILABLE",
+            "QUESTION_REQUEST_CONFLICT",
+            "QUESTION_IN_PROGRESS"
           ]
         },
         "message": {
@@ -1285,6 +1302,9 @@
           "items": {
             "$ref": "#/$defs/Source"
           }
+        },
+        "model_profile": {
+          "$ref": "#/$defs/ModelProfile"
         }
       },
       "allOf": [
@@ -1328,6 +1348,104 @@
         }
       ]
     },
+    "QuestionHistoryListResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "items", "limit", "offset", "has_more"],
+      "properties": {
+        "contract_version": {"$ref": "#/$defs/ContractVersion"},
+        "items": {"type": "array", "maxItems": 100,
+          "items": {"$ref": "#/$defs/QuestionHistoryItem"}},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        "offset": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "has_more": {"type": "boolean"}
+      }
+    },
+    "QuestionHistoryItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question_id", "knowledge_base_id", "question", "status",
+                   "created_at", "finished_at"],
+      "properties": {
+        "question_id": {"$ref": "#/$defs/Identifier"},
+        "knowledge_base_id": {"$ref": "#/$defs/Identifier"},
+        "question": {"type": "string", "minLength": 1, "maxLength": 16000},
+        "status": {"enum": ["PROCESSING", "SUCCEEDED", "FAILED", "CANCELLED"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"anyOf": [{"type": "string", "format": "date-time"},
+                                     {"type": "null"}]}
+      }
+    },
+    "QuestionHistorySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "document_id", "content_version_id", "index_version_id",
+                   "chunk_id", "state", "locator", "quote"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/Identifier"},
+        "document_id": {"$ref": "#/$defs/Identifier"},
+        "content_version_id": {"$ref": "#/$defs/Identifier"},
+        "index_version_id": {"$ref": "#/$defs/Identifier"},
+        "chunk_id": {"$ref": "#/$defs/Identifier"},
+        "state": {"enum": ["AVAILABLE", "DOCUMENT_DELETED", "VERSION_EXPIRED"]},
+        "locator": {"anyOf": [{"$ref": "#/$defs/Locator"}, {"type": "null"}]},
+        "quote": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 16000},
+                               {"type": "null"}]}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"const": "AVAILABLE"}}, "required": ["state"]},
+         "then": {"properties": {"locator": {"$ref": "#/$defs/Locator"},
+                                   "quote": {"type": "string", "minLength": 1}}}},
+        {"if": {"properties": {"state": {"enum": ["DOCUMENT_DELETED", "VERSION_EXPIRED"]}},
+                 "required": ["state"]},
+         "then": {"properties": {"locator": {"type": "null"}, "quote": {"type": "null"}}}}
+      ]
+    },
+    "QuestionHistoryDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "question_id", "knowledge_base_id", "question",
+                   "status", "created_at", "finished_at", "answer", "has_answer",
+                   "failure_code", "embedding_model_profile_id", "llm_model_profile_id",
+                   "sources"],
+      "properties": {
+        "contract_version": {"$ref": "#/$defs/ContractVersion"},
+        "question_id": {"$ref": "#/$defs/Identifier"},
+        "knowledge_base_id": {"$ref": "#/$defs/Identifier"},
+        "question": {"type": "string", "minLength": 1, "maxLength": 16000},
+        "status": {"enum": ["PROCESSING", "SUCCEEDED", "FAILED", "CANCELLED"]},
+        "created_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"anyOf": [{"type": "string", "format": "date-time"},
+                                     {"type": "null"}]},
+        "answer": {"anyOf": [{"type": "string", "maxLength": 16000}, {"type": "null"}]},
+        "has_answer": {"anyOf": [{"type": "boolean"}, {"type": "null"}]},
+        "failure_code": {"anyOf": [{"enum": ["AI_PROCESSING_FAILED", "PROCESSING_TIMEOUT",
+                                                   "DOCUMENT_UNAVAILABLE"]}, {"type": "null"}]},
+        "embedding_model_profile_id": {"anyOf": [{"$ref": "#/$defs/ModelProfileId"},
+                                                    {"type": "null"}]},
+        "llm_model_profile_id": {"anyOf": [{"$ref": "#/$defs/ModelProfileId"},
+                                             {"type": "null"}]},
+        "sources": {"type": "array", "maxItems": 5,
+          "items": {"$ref": "#/$defs/QuestionHistorySource"}}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "SUCCEEDED"}}, "required": ["status"]},
+         "then": {"properties": {"answer": {"type": "string"},
+                                   "has_answer": {"type": "boolean"},
+                                   "failure_code": {"type": "null"}}}},
+        {"if": {"properties": {"status": {"const": "FAILED"}}, "required": ["status"]},
+         "then": {"properties": {"answer": {"type": "null"},
+                                   "has_answer": {"type": "null"},
+                                   "failure_code": {"enum": ["AI_PROCESSING_FAILED",
+                                                               "PROCESSING_TIMEOUT",
+                                                               "DOCUMENT_UNAVAILABLE"]}}}},
+        {"if": {"properties": {"status": {"enum": ["PROCESSING", "CANCELLED"]}},
+                 "required": ["status"]},
+         "then": {"properties": {"answer": {"type": "null"},
+                                   "has_answer": {"type": "null"},
+                                   "failure_code": {"type": "null"}}}}
+      ]
+    },
     "AnswerStreamEvent": {
       "oneOf": [
         {
@@ -1338,7 +1456,8 @@
             "contract_version": {"$ref": "#/$defs/ContractVersion"},
             "request_id": {"$ref": "#/$defs/Identifier"},
             "sequence": {"type": "integer", "minimum": 1},
-            "event": {"const": "started"}
+            "event": {"const": "started"},
+            "model_profile": {"$ref": "#/$defs/ModelProfile"}
           }
         },
         {
@@ -1392,7 +1511,7 @@
             "request_id": {"$ref": "#/$defs/Identifier"},
             "sequence": {"type": "integer", "minimum": 1},
             "event": {"const": "error"},
-            "code": {"enum": ["INVALID_REQUEST", "UNAUTHENTICATED", "SCOPE_DENIED", "RESOURCE_NOT_FOUND", "LEASE_REJECTED", "DOCUMENT_UNAVAILABLE", "COMPLETION_CONFLICT", "AI_PROCESSING_FAILED", "PROCESSING_TIMEOUT", "ENDPOINT_UNAVAILABLE", "ACCOUNT_CREATE_REJECTED", "INTERNAL_ERROR", "BATCH_CONFLICT", "INDEX_INTEGRITY_FAILED", "SOURCE_UNAVAILABLE", "UNSUPPORTED_CONTENT", "RESOURCE_LIMIT", "STORAGE_UNAVAILABLE"]},
+            "code": {"enum": ["INVALID_REQUEST", "UNAUTHENTICATED", "SCOPE_DENIED", "RESOURCE_NOT_FOUND", "LEASE_REJECTED", "DOCUMENT_UNAVAILABLE", "COMPLETION_CONFLICT", "AI_PROCESSING_FAILED", "PROCESSING_TIMEOUT", "ENDPOINT_UNAVAILABLE", "ACCOUNT_CREATE_REJECTED", "INTERNAL_ERROR", "BATCH_CONFLICT", "INDEX_INTEGRITY_FAILED", "SOURCE_UNAVAILABLE", "UNSUPPORTED_CONTENT", "RESOURCE_LIMIT", "STORAGE_UNAVAILABLE", "QUESTION_REQUEST_CONFLICT", "QUESTION_IN_PROGRESS"]},
             "message": {"type": "string", "minLength": 1, "maxLength": 512},
             "retryable": {"type": "boolean"}
           }

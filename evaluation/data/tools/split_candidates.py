@@ -5,9 +5,11 @@ import json
 from pathlib import Path
 import random
 
-REVIEWED_FIELDS = {"id", "question", "leakage_group", "annotation_status",
+QUESTION_CATEGORIES = {"factual", "rewrite", "multi_evidence",
+                       "chinese_keyword", "no_answer"}
+REVIEWED_FIELDS = {"id", "question", "leakage_group", "annotation_status", "category",
                    "answerable", "reference_answer", "evidence"}
-CANDIDATE_FIELDS = {"id", "question", "leakage_group", "annotation_status"}
+CANDIDATE_FIELDS = {"id", "question", "leakage_group", "annotation_status", "category"}
 EVIDENCE_FIELDS = {"document_id", "content_version_id", "start", "end", "unit",
                    "quote", "line_start", "line_end"}
 
@@ -43,7 +45,9 @@ def validate_candidate_questions(questions, dataset_root):
                 or question["id"] in ids
                 or not isinstance(question["question"], str) or not question["question"].strip()
                 or not isinstance(question["leakage_group"], str)
-                or not question["leakage_group"]):
+                or not question["leakage_group"]
+                or not isinstance(question["category"], str)
+                or question["category"] not in QUESTION_CATEGORIES):
             raise ValueError("INVALID_CANDIDATE")
         ids.add(question["id"])
         counts[status] += 1
@@ -144,7 +148,7 @@ def annotation_template(candidate_questions, dataset_root):
                             ("id", "path", "content_version_id", "sha256")}
                            for item in manifest["documents"]],
         "annotations": [{"id": item["id"], "question": item["question"],
-                         "leakage_group": item["leakage_group"],
+                         "leakage_group": item["leakage_group"], "category": item["category"],
                          "annotation_status": "pending", "answerable": None,
                          "reference_answer": "", "evidence": []}
                         for item in candidate_questions],

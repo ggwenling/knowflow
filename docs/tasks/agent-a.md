@@ -190,3 +190,15 @@ KF2-001、KF2-004、KF2-006 的逐项 SHA、验收范围及独立复核清单见
 - KF2-029 按最近两个成功 ready_at 保留来源、Chunk/向量与原文件；保护运行任务和 PROCESSING 问答快照，清理后 source/file 返回 404，保留问答文本和轻量版本审计行。
 - Java test-compile 通过；SSE 状态/来源映射单测 7/7 通过。更新、失败、重建幂等、保留窗口和公开 SSE 持久化 Testcontainers 场景已新增并编译，但本机 Docker Engine 未启动，无法执行数据库场景。KF2-031 公开 SSE endpoint、事件顺序校验、逐事件可见性、取消/超时、引用映射和问答/来源事务持久化均已实现。
 - 当前状态为开发候选，待 Docker 可用后运行真实迁移/发布/清理/SSE 集成测试；Q/M 验收未执行，不标 DONE。
+
+## 2026-11-01：Java draft.10 历史与恢复
+
+- 在 `local` 的 `df6f981c7bc912063c3936511a0a81f26b102660` 基线上新增 V7：问答幂等 UUID、处理 deadline、Embedding/LLM profile 持久化、超期恢复索引及来源 tombstone。
+- 新增 owner-only 历史列表/详情/终态删除；处理中删除返回冲突。问答完成写入受 deadline 约束；版本保留清理保留 source 行并清空过期引用字段。
+- Maven 全量 **76 项，0 failures、0 errors、1 opt-in skip**；`DocumentApiIntegrationTest` 38 项，PostgreSQL migration 集成 1 项通过。draft.10 本机 E2E 在隔离新库覆盖运行时链路，报告 `services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。
+- 当前 draft.10 实现及审查修复已提交至 `local`，未推送/合并 `main`。问答审计策略与接口需待 Q/M 独立复核。
+
+## 2026-11-01 Review follow-up
+
+- Fixed streamed-answer profile loss: `StreamState` carries the `started` event profile into the pending answer, and `DocumentApiIntegrationTest` now verifies the IDs remain stored after `completed`.
+- Java full Maven/Testcontainers suite: **76 tests, 0 failures/errors, 1 opt-in skip**; `DocumentApiIntegrationTest` 38/38 passed.

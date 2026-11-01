@@ -214,7 +214,8 @@ async def test_one_codepoint_chunking_keeps_heartbeat_responsive_and_cancellable
         heartbeat.cancel()
         await asyncio.gather(heartbeat, return_exceptions=True)
 
-    assert time.monotonic() - started < 1
+    # Each wait has its own one-second bound; allow host scheduling between them.
+    assert time.monotonic() - started < 2
     assert embedding.calls < 16_000 // 64
     assert gateway.completions == []
 

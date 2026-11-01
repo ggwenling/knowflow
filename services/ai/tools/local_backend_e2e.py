@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import socket
 import subprocess
@@ -174,7 +175,16 @@ def stop(process: subprocess.Popen | None) -> None:
         process.wait(timeout=5)
 
 
-def make_environment(dotenv: dict[str, str], marker_file: Path) -> tuple[dict, dict, str]:
+def require_database_name(value: str) -> str:
+    if (not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", value)
+            or value in {"postgres", "template0", "template1"}):
+        raise RuntimeError("LOCAL_DATABASE_NAME_INVALID")
+    return value
+
+
+def make_environment(dotenv: dict[str, str], marker_file: Path,
+                     database_name: str = "knowflow") -> tuple[dict, dict, str]:
+    database_name = require_database_name(database_name)
     required = (
         "KNOWFLOW_DEV_APP_PASSWORD", "KNOWFLOW_DEV_AI_PASSWORD",
         "KNOWFLOW_DEV_MINIO_ROOT_USER", "KNOWFLOW_DEV_MINIO_ROOT_PASSWORD",
@@ -186,7 +196,7 @@ def make_environment(dotenv: dict[str, str], marker_file: Path) -> tuple[dict, d
     if not 32 <= len(secret) <= 256:
         raise RuntimeError("LOCAL_DEV_INTERNAL_SECRET_INVALID")
 
-    database_url = "jdbc:postgresql://127.0.0.1:55432/knowflow"
+    database_url = f"jdbc:postgresql://127.0.0.1:55432/{database_name}"
     storage_url = "http://127.0.0.1:59000"
     java_env = os.environ.copy()
     java_env.update({
@@ -208,14 +218,14 @@ def make_environment(dotenv: dict[str, str], marker_file: Path) -> tuple[dict, d
     ai_password = quote(dotenv["KNOWFLOW_DEV_AI_PASSWORD"], safe="")
     app_password = quote(dotenv["KNOWFLOW_DEV_APP_PASSWORD"], safe="")
     application_database_url = (
-        f"postgresql://knowflow_app:{app_password}@127.0.0.1:55432/knowflow")
+        f"postgresql://knowflow_app:{app_password}@127.0.0.1:55432/{database_name}")
     python_env = os.environ.copy()
     python_env.update({
         "KNOWFLOW_INTERNAL_SHARED_SECRET": secret,
         "KNOWFLOW_JAVA_BASE_URL": "http://127.0.0.1:8080",
         "KNOWFLOW_CONTRACT_PATH": str(REPO / "contracts/schemas/protocol.schema.json"),
         "KNOWFLOW_AI_DATABASE_URL":
-            f"postgresql://knowflow_ai:{ai_password}@127.0.0.1:55432/knowflow",
+            f"postgresql://knowflow_ai:{ai_password}@127.0.0.1:55432/{database_name}",
         "KNOWFLOW_EMBEDDING_KEY_ENV": "EMBEDING_KEY",
         "KNOWFLOW_LLM_KEY_ENV": "DEEPSEEK_API_KEY",
         "KNOWFLOW_EMBEDDING_BASE_URL": "https://api.siliconflow.cn/v1",
@@ -352,7 +362,8 @@ def run(args) -> None:
         raise RuntimeError("LOCAL_POSTGRES_MINIO_NOT_HEALTHY")
 
     marker_file = Path(tempfile.gettempdir()) / f"knowflow-e2e-{uuid.uuid4().hex}.marker"
-    java_env, python_env, application_database_url = make_environment(dotenv, marker_file)
+    java_env, python_env, application_database_url = make_environment(
+        dotenv, marker_file, args.database_name)
     require_idle_database(application_database_url)
     java_log = None
     python_log = None
@@ -568,6 +579,8 @@ def main() -> None:
     parser.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--env-file", type=Path, default=REPO / "services/api/.env")
     parser.add_argument("--maven-settings", type=Path)
+    parser.add_argument("--database-name", default="knowflow",
+                        help="local PostgreSQL database to use (default: knowflow)")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
     if args.serve:

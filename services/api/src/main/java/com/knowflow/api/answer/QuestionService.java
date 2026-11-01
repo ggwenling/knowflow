@@ -53,14 +53,37 @@ public class QuestionService {
         return ask(user, knowledgeBaseId, input, System.nanoTime(), new QuestionCancellation());
     }
 
+    AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
+                       long requestStartedAt, QuestionCancellation cancellation,
+                       String idempotencyKey) {
+        return ask(user, knowledgeBaseId, input, requestStartedAt, cancellation,
+                parseIdempotencyKey(idempotencyKey));
+    }
+
     Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
                                          PublicQuestion input, QuestionCancellation cancellation) {
+        return stream(user, knowledgeBaseId, input, cancellation, null);
+    }
+
+    Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
+                                         PublicQuestion input, QuestionCancellation cancellation,
+                                         String idempotencyKey) {
         return Flux.defer(() -> {
             long requestStartedAt = System.nanoTime();
             String question = validateQuestion(input);
             String requestId = UUID.randomUUID().toString();
-            QuestionSnapshot snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                    requestStartedAt, cancellation);
+            QuestionSnapshot snapshot;
+            try {
+                snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
+                        requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey));
+            } catch (ApiFailure failure) {
+                if ("QUESTION_REQUEST_CONFLICT".equals(failure.code())) {
+                    return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
+                            requestId, 1, "error", null, null, null, failure.code(),
+                            failure.getMessage(), false));
+                }
+                throw failure;
+            }
             TrustedAnswerRequest request = new TrustedAnswerRequest(ApiError.CONTRACT_VERSION,
                     requestId, question, new TrustedAnswerRequest.TrustedScope(user.id(),
                     knowledgeBaseId, snapshot.snapshotId(), snapshot.indexes().stream()
@@ -85,12 +108,18 @@ public class QuestionService {
 
     AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
                        long requestStartedAt, QuestionCancellation cancellation) {
+        return ask(user, knowledgeBaseId, input, requestStartedAt, cancellation, (UUID) null);
+    }
+
+    AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
+                       long requestStartedAt, QuestionCancellation cancellation,
+                       UUID idempotencyKey) {
         String question = validateQuestion(input);
         String requestId = UUID.randomUUID().toString();
         QuestionSnapshot snapshot;
         try {
             snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                    requestStartedAt, cancellation);
+                    requestStartedAt, cancellation, idempotencyKey);
         } catch (RuntimeException failure) {
             if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT
                     || isTimeout(failure)) {
@@ -183,7 +212,8 @@ public class QuestionService {
     private QuestionSnapshot createSnapshot(AuthenticatedUser user, UUID knowledgeBaseId,
                                             String question, String requestId,
                                             long requestStartedAt,
-                                            QuestionCancellation cancellation) {
+                                            QuestionCancellation cancellation,
+                                            UUID idempotencyKey) {
         QuestionSnapshot snapshot = transactions.execute(status -> {
             registerDeadlineCheck(requestStartedAt, cancellation);
             setStatementTimeout(requestStartedAt, cancellation);
@@ -222,11 +252,34 @@ public class QuestionService {
             UUID questionId = UUID.randomUUID();
             UUID snapshotId = UUID.randomUUID();
             setStatementTimeout(requestStartedAt, cancellation);
-            jdbc.update("""
-                    INSERT INTO knowflow.questions
-                        (id, owner_user_id, knowledge_base_id, request_id, snapshot_id, question_text)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """, questionId, user.id(), knowledgeBaseId, requestId, snapshotId, question);
+            long remainingMillis = Math.max(1, remainingBudget(requestStartedAt).toMillis());
+            List<UUID> inserted;
+            if (idempotencyKey == null) {
+                inserted = jdbc.query("""
+                        INSERT INTO knowflow.questions
+                            (id, owner_user_id, knowledge_base_id, request_id, snapshot_id,
+                             question_text, deadline_at)
+                        VALUES (?, ?, ?, ?, ?, ?, clock_timestamp() + (? * INTERVAL '1 millisecond'))
+                        RETURNING id
+                        """, (result, row) -> result.getObject(1, UUID.class), questionId,
+                        user.id(), knowledgeBaseId, requestId, snapshotId, question, remainingMillis);
+            } else {
+                inserted = jdbc.query("""
+                        INSERT INTO knowflow.questions
+                            (id, owner_user_id, knowledge_base_id, request_id, snapshot_id,
+                             question_text, idempotency_key, deadline_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?,
+                                clock_timestamp() + (? * INTERVAL '1 millisecond'))
+                        ON CONFLICT (owner_user_id, idempotency_key)
+                            WHERE idempotency_key IS NOT NULL DO NOTHING
+                        RETURNING id
+                        """, (result, row) -> result.getObject(1, UUID.class), questionId,
+                        user.id(), knowledgeBaseId, requestId, snapshotId, question,
+                        idempotencyKey, remainingMillis);
+            }
+            if (inserted.isEmpty()) {
+                throw ApiFailure.questionRequestConflict();
+            }
             for (IndexRef index : indexes) {
                 setStatementTimeout(requestStartedAt, cancellation);
                 jdbc.update("""
@@ -244,6 +297,21 @@ public class QuestionService {
             throw new IllegalStateException("Question snapshot transaction returned no result");
         }
         return snapshot;
+    }
+
+    static UUID parseIdempotencyKey(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            UUID parsed = UUID.fromString(value);
+            if (!parsed.toString().equalsIgnoreCase(value)) {
+                throw ApiFailure.invalidRequest();
+            }
+            return parsed;
+        } catch (IllegalArgumentException invalid) {
+            throw ApiFailure.invalidRequest();
+        }
     }
 
     private AnswerResponse saveAnswer(AuthenticatedUser user, QuestionSnapshot snapshot,
@@ -272,11 +340,17 @@ public class QuestionService {
         int updated = jdbc.update("""
                 UPDATE knowflow.questions
                    SET status = 'SUCCEEDED', answer_text = ?, has_answer = ?,
+                       embedding_model_profile_id = ?, llm_model_profile_id = ?,
                        finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND status = 'PROCESSING'
-                """, prepared.answer(), prepared.hasAnswer(), snapshot.questionId());
+                   AND deadline_at > clock_timestamp()
+                """, prepared.answer(), prepared.hasAnswer(),
+                response.modelProfile() == null ? null
+                        : response.modelProfile().embeddingModelProfileId(),
+                response.modelProfile() == null ? null
+                        : response.modelProfile().llmModelProfileId(), snapshot.questionId());
         if (updated != 1) {
-            throw new IllegalStateException("Question was not processing at completion");
+            throw ApiFailure.processingTimeout();
         }
         requireNotCancelled(cancellation);
         remainingBudget(requestStartedAt);
@@ -549,6 +623,7 @@ public class QuestionService {
         private long sequence;
         private boolean sourcesPrepared;
         private AiAnswerResponse pendingAnswer;
+        private ModelProfile modelProfile;
 
         private StreamState(String requestId, QuestionSnapshot snapshot, long requestStartedAt,
                             QuestionCancellation cancellation) {
@@ -564,7 +639,21 @@ public class QuestionService {
                                                        TrustedAnswerRequest request) {
             assertVisible();
             return switch (event.event()) {
-                case "started" -> Flux.empty();
+                case "started" -> Mono.fromCallable(() -> {
+                            ModelProfile profile = event.modelProfile();
+                            modelProfile = profile;
+                            if (profile != null) {
+                                jdbc.update("""
+                                        UPDATE knowflow.questions
+                                           SET embedding_model_profile_id = ?,
+                                               llm_model_profile_id = ?,
+                                               updated_at = CURRENT_TIMESTAMP
+                                         WHERE id = ? AND status = 'PROCESSING'
+                                        """, profile.embeddingModelProfileId(),
+                                        profile.llmModelProfileId(), snapshot.questionId());
+                            }
+                            return Boolean.TRUE;
+                        }).subscribeOn(Schedulers.boundedElastic()).thenMany(Flux.empty());
                 case "delta" -> {
                     answer.append(event.delta());
                     String visible = citations.feed(event.delta());
@@ -617,7 +706,7 @@ public class QuestionService {
                             source.contentVersionId(), source.indexVersionId(), source.chunkId(),
                             source.locator(), source.quote())).toList();
             AiAnswerResponse response = new AiAnswerResponse(ApiError.CONTRACT_VERSION, requestId,
-                    answer.toString(), event.hasAnswer(), sources);
+                    answer.toString(), event.hasAnswer(), sources, modelProfile);
             validateAnswer(response);
             citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId).collect(java.util.stream.Collectors.toSet()));
             return Mono.fromCallable(() -> transactions.execute(status -> {

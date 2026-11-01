@@ -98,12 +98,15 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
     received = {}
     latencies = []
     evidence_total = evidence_hits = full_evidence_questions = 0
+    evidence_hits_at_5 = 0
+    reciprocal_rank_sum = reciprocal_rank_count = 0
     answerability_correct = answerable_count = answerable_answered = 0
     answered_count = 0
     supported_answers = reviewed_answers = 0
     unanswerable_count = unanswerable_refused = 0
     cited_total = cited_gold_overlap = 0
     question_results = []
+    category_stats = {}
     for prediction in payload["predictions"]:
         if (not isinstance(prediction, dict)
                 or set(prediction) != {"question_id", "has_answer", "retrieved_evidence",
@@ -133,6 +136,14 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
             raise ValueError("INVALID_LATENCY")
 
         question = expected[prediction["question_id"]]
+        category = question.get("category", "uncategorized")
+        category_stats.setdefault(category, {
+            "sample_count": 0, "answerability_correct_count": 0,
+            "answerable_count": 0, "answerable_answered_count": 0,
+            "unanswerable_count": 0, "unanswerable_refused_count": 0,
+        })
+        category_result = category_stats[category]
+        category_result["sample_count"] += 1
         if not question["answerable"] and prediction["has_answer"] and judgement == "supported":
             raise ValueError("UNANSWERABLE_MARKED_SUPPORTED")
         if prediction["has_answer"]:
@@ -142,17 +153,30 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
                 supported_answers += judgement == "supported"
         gold = question["evidence"]
         hits = sum(_covered(item, retrieved) for item in gold)
+        hits_at_5 = sum(_covered(item, retrieved[:5]) for item in gold)
+        evidence_hits_at_5 += hits_at_5
         evidence_total += len(gold)
         evidence_hits += hits
         full_evidence_questions += bool(gold) and hits == len(gold)
+        if question["answerable"] and gold:
+            reciprocal_rank_count += 1
+            rank = next((index for index, candidate in enumerate(retrieved[:10], 1)
+                         if any(_covered(item, [candidate]) for item in gold)), None)
+            if rank is not None:
+                reciprocal_rank_sum += 1 / rank
         if question["answerable"]:
             answerable_count += 1
             answerable_answered += prediction["has_answer"]
+            category_result["answerable_count"] += 1
+            category_result["answerable_answered_count"] += prediction["has_answer"]
         else:
             unanswerable_count += 1
             unanswerable_refused += not prediction["has_answer"]
+            category_result["unanswerable_count"] += 1
+            category_result["unanswerable_refused_count"] += not prediction["has_answer"]
         correct_answerability = prediction["has_answer"] == question["answerable"]
         answerability_correct += correct_answerability
+        category_result["answerability_correct_count"] += correct_answerability
         cited_hits = 0
         for index in citations:
             cited_total += 1
@@ -162,6 +186,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         received[prediction["question_id"]] = True
         question_results.append({
             "question_id": question["id"],
+            "category": category,
             "answerable": question["answerable"],
             "has_answer": prediction["has_answer"],
             "answerability_correct": correct_answerability,
@@ -177,6 +202,19 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
     missing = set(expected) - set(received)
     if missing:
         raise ValueError("MISSING_PREDICTIONS")
+    for values in category_stats.values():
+        values["answerability_accuracy"] = round(
+            values["answerability_correct_count"] / values["sample_count"], 4)
+        if values["answerable_count"]:
+            values["answerable_answer_rate"] = round(
+                values["answerable_answered_count"] / values["answerable_count"], 4)
+        else:
+            values["answerable_answer_rate"] = None
+        if values["unanswerable_count"]:
+            values["unanswerable_refusal_rate"] = round(
+                values["unanswerable_refused_count"] / values["unanswerable_count"], 4)
+        else:
+            values["unanswerable_refusal_rate"] = None
     return {
         "report_version": 1,
         "dataset_id": manifest["dataset_id"],
@@ -193,6 +231,11 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
             "gold_evidence_span_hit_count": evidence_hits,
             "gold_evidence_span_recall": round(evidence_hits / evidence_total, 4)
             if evidence_total else None,
+            "recall_at_5": round(evidence_hits_at_5 / evidence_total, 4)
+            if evidence_total else None,
+            "mrr_at_10": round(reciprocal_rank_sum / reciprocal_rank_count, 4)
+            if reciprocal_rank_count else None,
+            "mrr_at_10_question_count": reciprocal_rank_count,
             "answerable_questions_with_evidence_count": sum(
                 bool(item["evidence"]) for item in selected),
             "complete_gold_evidence_question_rate": round(
@@ -216,6 +259,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
             "latency_ms": {"sample_count": len(latencies),
                            "p50_nearest_rank": _percentile(latencies, 0.50),
                            "p95_nearest_rank": _percentile(latencies, 0.95)},
+            "by_category": dict(sorted(category_stats.items())),
         },
         "interpretation": {
             "support_judgement": "manual input; citations or string matching do not prove semantic support",

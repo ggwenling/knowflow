@@ -106,4 +106,14 @@ public final class ApiFailure extends RuntimeException {
         return new ApiFailure(HttpStatus.GATEWAY_TIMEOUT, "PROCESSING_TIMEOUT",
                 "The AI service did not complete the request in time.", true);
     }
+
+    public static ApiFailure questionInProgress() {
+        return new ApiFailure(HttpStatus.CONFLICT, "QUESTION_IN_PROGRESS",
+                "A question cannot be deleted while it is processing.");
+    }
+
+    public static ApiFailure questionRequestConflict() {
+        return new ApiFailure(HttpStatus.CONFLICT, "QUESTION_REQUEST_CONFLICT",
+                "This idempotency key is already associated with a question request.");
+    }
 }

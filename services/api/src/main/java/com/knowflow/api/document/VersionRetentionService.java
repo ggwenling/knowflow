@@ -67,7 +67,12 @@ public class VersionRetentionService {
                             WHERE s.index_version_id = iv.id AND q.status = 'PROCESSING')
                     """, (row, index) -> row.getObject(1, UUID.class), documentId);
             for (UUID index : expired) {
-                jdbc.update("DELETE FROM knowflow.question_sources WHERE index_version_id = ?", index);
+                jdbc.update("""
+                        UPDATE knowflow.question_sources
+                           SET quote = NULL, locator_kind = NULL,
+                               source_page = NULL, source_start = NULL, source_end = NULL
+                         WHERE index_version_id = ?
+                        """, index);
                 jdbc.update("DELETE FROM knowflow.question_scope_indexes WHERE index_version_id = ?", index);
                 jdbc.update("DELETE FROM knowflow.chunk_embeddings WHERE index_version_id = ?", index);
                 jdbc.update("DELETE FROM knowflow.chunks WHERE index_version_id = ?", index);

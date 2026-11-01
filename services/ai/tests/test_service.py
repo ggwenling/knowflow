@@ -194,10 +194,10 @@ async def test_client_disconnect_cancels_answer_operation():
     assert cancelled.is_set()
 
 
-def test_health_consumes_draft9_examples_without_version_fallback(app, client):
-    assert CONTRACT_VERSION == '0.2.0-draft.9'
-    assert SCHEMA_SHA256 == 'fea46866e42e871993ebe37c845643f286105fd60627de4661574852307b2935'
-    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft9.json').read_text(encoding='utf-8'))
+def test_health_consumes_draft10_examples_without_version_fallback(app, client):
+    assert CONTRACT_VERSION == '0.2.0-draft.10'
+    assert SCHEMA_SHA256 == 'd34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c'
+    cases = json.loads((Path(__file__).parent / 'fixtures/internal-health-draft10.json').read_text(encoding='utf-8'))
     for case in cases:
         if case['valid']:
             app.state.contract.validate('InternalHealth', case['payload'])

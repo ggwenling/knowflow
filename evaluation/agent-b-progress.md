@@ -183,3 +183,18 @@ B 修复 SHA 2623a6282b2695a8ef96e3553a849729efd42403：TXT/MD 空文档判断�
 - Python 只读查询按 Java 提供的固定 snapshot tuples 读取未清理的 READY/RETIRED 版本，同时要求 owner、知识库和文档仍可见。新增标注模板与 pending 状态验证；当前数据仍是 10 份合成文档、12 道开发题和 3 道公开留出题，非 60 题、非盲测、未完成人工独立审核。
 - 验证：Python 全量 **219 passed**（1 条既有 Starlette/httpx 弃用警告）；相关 streaming/evaluation/service 定向 **67 passed**；Schema **79 structural cases**；离线 provider 回归 **16 passed**。无真实模型凭证，本轮 provider 网络调用为 0。
 - 真实 provider 的 SSE 兼容、向量排名/答案质量和费用数据仍待配置及独立评测；不据此宣称 KF2-037 完成或质量达标。
+
+## 2026-11-01：local draft.10 评测候选与服务复验
+
+- `ReadOnlyRetriever` 支持本地评测显式指定 `top_k=1..10`（生产默认 5）；runner 增加 Recall@5、MRR@10 和分类 answerability/refusal 汇总。
+- 生成 `evaluation/data/seed-v2-candidate/`：10 份合成资料、60 道待人工核验候选题、45 个 evidence groups；组级分配 40/20，`reviewed=0`，不构成 blind holdout 或真实质量验收。
+- Python 全量 **235 passed**（1 条既有弃用警告）；Schema **85** 项；离线回归 **16 passed**。真实 Java/Python/PostgreSQL/MinIO 合成闭环报告 `services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`，外部模型调用 0。
+- Q/M 独立验收、候选人工审核、真实模型排序/回答质量与成本测量仍未完成；保持开发候选状态。
+
+## 2026-11-01：worker 时序用例收尾
+
+`test_one_codepoint_chunking_keeps_heartbeat_responsive_and_cancellable` 的心跳与取消各自已有 1 秒上限；合计断言也限制为 1 秒会把两个顺序等待和 Windows 调度时间叠加，出现 1.032 秒的偶发失败。保留两个独立 1 秒上限，将合计断言设为 2 秒；定向用例通过，Python 全量最终 **235 passed**（1 条既有弃用警告）。
+
+## 2026-11-01 Review follow-up
+
+Guarded answerable/unanswerable category denominators before computing rates and added single-label regression coverage. Python full suite: **235 passed**; evaluation tests: **10 passed**. No scoring semantics changed when both denominators are present.

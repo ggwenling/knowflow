@@ -17,6 +17,7 @@ def _load(name, path):
 
 runner = _load("evaluation_runner", ROOT / "evaluation/runner/runner.py")
 candidate_tool = _load("candidate_split", ROOT / "evaluation/data/tools/split_candidates.py")
+candidate_seed = _load("candidate_seed", ROOT / "evaluation/data/tools/prepare_candidate_seed.py")
 DATASET = ROOT / "evaluation/data/seed-v1"
 
 
@@ -53,6 +54,8 @@ def test_runner_scores_saved_predictions_and_keeps_human_judgement_explicit(tmp_
     assert report["dataset_provenance"] == "synthetic authored seed; not human-user evaluation"
     assert report["sample_count"] == 12
     assert report["metrics"]["gold_evidence_span_recall"] == 1.0
+    assert report["metrics"]["recall_at_5"] == 1.0
+    assert report["metrics"]["mrr_at_10"] == 1.0
     assert report["metrics"]["complete_gold_evidence_question_rate"] == 1.0
     assert report["metrics"]["answerability_accuracy"] == 1.0
     assert report["metrics"]["unanswerable_refusal_rate"] == 1.0
@@ -60,10 +63,33 @@ def test_runner_scores_saved_predictions_and_keeps_human_judgement_explicit(tmp_
     assert report["metrics"]["human_supported_answer_rate"] == 1.0
     assert report["metrics"]["answerable_question_count"] == 10
     assert report["metrics"]["unanswerable_question_count"] == 2
+    assert report["metrics"]["by_category"]["uncategorized"]["sample_count"] == 12
+    assert report["metrics"]["by_category"]["uncategorized"]["answerability_accuracy"] == 1.0
     assert len(report["question_results"]) == 12
     assert report["metrics"]["latency_ms"] == {
         "sample_count": 12, "p50_nearest_rank": 6.0, "p95_nearest_rank": 12.0}
     assert report["interpretation"]["acceptance_threshold"].startswith("not registered")
+
+
+def test_runner_groups_answerability_metrics_by_question_category(tmp_path, monkeypatch):
+    manifest, questions, documents, sources, dataset_sha = runner._load_dataset(DATASET)
+    for question in questions:
+        question["category"] = "factual" if question["answerable"] else "no_answer"
+    monkeypatch.setattr(runner, "_load_dataset", lambda _root: (
+        manifest, questions, documents, sources, dataset_sha))
+    predictions = tmp_path / "categorized.json"
+    predictions.write_text(json.dumps(_predictions("development")), encoding="utf-8")
+
+    report = runner.evaluate(predictions)
+
+    categories = report["metrics"]["by_category"]
+    assert set(categories) == {"factual", "no_answer"}
+    assert sum(item["sample_count"] for item in categories.values()) == report["sample_count"]
+    assert all("answerability_accuracy" in item for item in categories.values())
+    assert categories["factual"]["answerable_answer_rate"] is not None
+    assert categories["factual"]["unanswerable_refusal_rate"] is None
+    assert categories["no_answer"]["answerable_answer_rate"] is None
+    assert categories["no_answer"]["unanswerable_refusal_rate"] is not None
 
 
 def test_runner_counts_unanswerable_hallucinations_in_support_review_metrics(tmp_path):
@@ -128,7 +154,7 @@ def test_runner_rejects_invalid_spans_and_citation_indexes(tmp_path):
 def test_candidate_split_is_deterministic_and_keeps_leakage_groups_together():
     questions = [{"id": f"c{index:02}", "question": f"候选题 {index}",
                   "leakage_group": f"group-{index // 2}",
-                  "annotation_status": "candidate"}
+                  "annotation_status": "candidate", "category": "factual"}
                  for index in range(60)]
     result = candidate_tool.prepare(questions, DATASET, seed=11)
     repeat = candidate_tool.prepare(questions, DATASET, seed=11)
@@ -143,12 +169,33 @@ def test_candidate_split_is_deterministic_and_keeps_leakage_groups_together():
         result["leakage_groups"]["holdout"])
 
 
+def test_candidate_seed_builds_60_unreviewed_questions_and_exact_40_20_split(tmp_path):
+    dataset_root = tmp_path / "seed-v2-candidate"
+    _documents, count = candidate_seed.build(dataset_root)
+    questions = json.loads((dataset_root / "questions.json").read_text(encoding="utf-8"))
+
+    assert count == 60
+    assert candidate_tool.validate_candidate_questions(questions, dataset_root)[
+        "annotation_status_counts"] == {"candidate": 60, "reviewed": 0}
+    assert {category: sum(item["category"] == category for item in questions)
+            for category in ("factual", "rewrite", "multi_evidence",
+                             "chinese_keyword", "no_answer")} == {
+        "factual": 15, "rewrite": 15, "multi_evidence": 10,
+        "chinese_keyword": 10, "no_answer": 10,
+    }
+    split = candidate_tool.assign_splits(questions)
+    assert len(split["development"]) == 40
+    assert len(split["holdout"]) == 20
+    assert set(split["development_groups"]).isdisjoint(split["holdout_groups"])
+
+
 def test_candidate_annotation_must_match_original_source_and_version():
     _manifest, seed_questions, _documents, _sources, _dataset_sha = runner._load_dataset(DATASET)
     reviewed = dict(seed_questions[0])
     reviewed.pop("split")
     reviewed.pop("annotation")
     reviewed["annotation_status"] = "reviewed"
+    reviewed["category"] = "factual"
     assert candidate_tool.validate_candidate_questions([reviewed], DATASET)[
         "annotation_status_counts"]["reviewed"] == 1
 
@@ -160,7 +207,7 @@ def test_candidate_annotation_must_match_original_source_and_version():
 def test_annotation_template_is_explicitly_unreviewed_and_cannot_be_split():
     template = candidate_tool.annotation_template([
         {"id": "new-q01", "question": "索引何时可读？", "leakage_group": "index",
-         "annotation_status": "candidate"}], DATASET)
+         "annotation_status": "candidate", "category": "factual"}], DATASET)
     assert template["question_count"] == 1
     assert template["questions_marked_reviewed_count"] == 0
     assert template["status"] == "pending_annotations_not_a_blind_holdout"
@@ -175,7 +222,7 @@ def test_annotation_template_is_explicitly_unreviewed_and_cannot_be_split():
 def test_candidate_split_rejects_groups_that_cannot_fill_exact_holdout():
     questions = [{"id": f"c{index:02}", "question": f"候选题 {index}",
                   "leakage_group": f"group-{index // 6}",
-                  "annotation_status": "candidate"}
+                  "annotation_status": "candidate", "category": "factual"}
                  for index in range(60)]
     with pytest.raises(ValueError, match="LEAKAGE_GROUPS_CANNOT_FILL_HOLDOUT"):
         candidate_tool.assign_splits(questions)

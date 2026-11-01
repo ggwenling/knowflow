@@ -614,10 +614,12 @@ async def test_retriever_batches_full_question_and_combines_vectors_by_segment_l
             return None
 
     captured = {}
-    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows",
-                        staticmethod(lambda _url, _query, params, _deadline=None,
-                                            _cancellation=None:
-                                     captured.setdefault("params", params) and []))
+    def fetch_rows(_url, query, params, _deadline=None, _cancellation=None):
+        captured["query"] = query
+        captured["params"] = params
+        return []
+
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(fetch_rows))
     settings = EmbeddingSettings(api_key=EMBEDDING_KEY, max_text_codepoints=3,
                                  max_batch_items=2)
     retriever = ReadOnlyRetriever("postgresql://readonly.invalid/db",
@@ -629,11 +631,26 @@ async def test_retriever_batches_full_question_and_combines_vectors_by_segment_l
         "indexes": [{"document_id": "doc-example-1",
                      "content_version_id": "content-example-1",
                      "index_version_id": "index-example-1"}],
-    }, "answer-test-01")
+    }, "answer-test-01", top_k=10)
 
     assert rows == []
     assert embedded_batches == [["abc", "def"], ["ghi", "j"]]
     assert captured["params"][0] == "[3.4," + ",".join(["3.4"] * 1023) + "]"
+    assert captured["params"][-1] == 10
+    assert "LIMIT %s" in captured["query"]
+
+
+@pytest.mark.parametrize("top_k", [0, 11, True, 5.0])
+@pytest.mark.asyncio
+async def test_retriever_rejects_invalid_top_k_before_embedding(top_k):
+    def unexpected_embedding():
+        raise AssertionError("invalid retrieval limits must be rejected first")
+
+    retriever = ReadOnlyRetriever("postgresql://readonly.invalid/db",
+                                  embedding_factory=unexpected_embedding,
+                                  embedding_settings=EmbeddingSettings(api_key=EMBEDDING_KEY))
+    with pytest.raises(ValueError, match="INVALID_RETRIEVAL_LIMIT"):
+        await retriever.retrieve("question", {"indexes": []}, "answer-test-01", top_k=top_k)
 
 
 @pytest.mark.parametrize("length", [801, 16000])
@@ -729,12 +746,32 @@ async def test_answer_service_returns_only_cited_scope_sources():
     rows = _evidence()
     model = FakeLlm({"answer": "索引 READY 后才可检索。[src-evidence-1]",
                      "has_answer": True, "source_ids": ["src-evidence-1"]})
+    model_profile = {"embedding_model_profile_id": "BAAI/bge-m3",
+                     "llm_model_profile_id": "deepseek-flash"}
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
-                            retriever=FakeRetriever(rows))
+                            retriever=FakeRetriever(rows), model_profile=model_profile)
     response = await service.answer(_request())
     assert response["has_answer"] is True
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
     assert response["sources"][0]["quote"] == rows[0]["text_content"]
+    assert response["model_profile"] == model_profile
+    _contract().validate("AnswerResponse", response)
+
+
+@pytest.mark.asyncio
+async def test_answer_refusal_includes_validated_model_profile_without_provider_call():
+    model_profile = {"embedding_model_profile_id": "BAAI/bge-m3",
+                     "llm_model_profile_id": "deepseek-flash"}
+
+    def unexpected_model_call():
+        raise AssertionError("empty retrieval must not call the model")
+
+    service = AnswerService("unused", _contract(), llm_factory=unexpected_model_call,
+                            retriever=FakeRetriever([]), model_profile=model_profile)
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["model_profile"] == model_profile
     _contract().validate("AnswerResponse", response)
 
 

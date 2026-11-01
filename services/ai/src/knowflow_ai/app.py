@@ -199,9 +199,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not settings.ai_database_url:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
         embedding_settings = EmbeddingSettings.from_environment()
-        LlmSettings.from_environment()
+        llm_settings = LlmSettings.from_environment()
         service = AnswerService(settings.ai_database_url, contract,
-                                embedding_settings=embedding_settings)
+                                embedding_settings=embedding_settings,
+                                model_profile={"embedding_model_profile_id": embedding_settings.model,
+                                               "llm_model_profile_id": llm_settings.model})
         return await await_answer_or_disconnect(request, lambda: service.answer(payload))
 
     @app.post('/internal/v1/answers/stream')
@@ -212,9 +214,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not settings.ai_database_url:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
         embedding_settings = EmbeddingSettings.from_environment()
-        LlmSettings.from_environment()
+        llm_settings = LlmSettings.from_environment()
         service = AnswerService(settings.ai_database_url, contract,
-                                embedding_settings=embedding_settings)
+                                embedding_settings=embedding_settings,
+                                model_profile={"embedding_model_profile_id": embedding_settings.model,
+                                               "llm_model_profile_id": llm_settings.model})
 
         async def frames():
             async with aclosing(service.stream(payload)) as events:
