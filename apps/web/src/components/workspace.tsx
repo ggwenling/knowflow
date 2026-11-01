@@ -43,6 +43,14 @@ export default function Workspace() {
   const [viewing, setViewing] = useState<{ source: Source; document: Document; url: string | null; text: string | null } | null>(null);
   const [openMenu, setOpenMenu] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const questionViewRef = useRef(0);
+
+  function leaveQuestion() {
+    questionViewRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false);
+  }
 
   const refresh = useCallback(async (baseId: string) => {
     const [documentList, historyList] = await Promise.all([
@@ -96,7 +104,7 @@ export default function Workspace() {
 
   async function signOut() {
     try { await api("auth/logout", { method: "POST", body: "{}" }); } catch { /* The proxy clears expired sessions too. */ }
-    abortRef.current?.abort(); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
+    leaveQuestion(); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
   }
 
   async function createBase(event: FormEvent<HTMLFormElement>) {
@@ -117,9 +125,9 @@ export default function Workspace() {
         api<Task>(`tasks/${taskId}`),
       ]);
       setDocuments((previous) => previous.map((item) => item.id === documentId ? document : item));
-      if (document.status === "READY" || terminal.has(task.status)) {
+      if (terminal.has(task.status)) {
         await refresh(baseId);
-        if (document.status !== "READY") setNotice(task.failure_code ?? "索引未能完成；可以检查状态后重建。");
+        if (task.status !== "SUCCEEDED") setNotice(task.failure_code ?? "索引未能完成；可以检查状态后重建。");
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -168,6 +176,8 @@ export default function Workspace() {
     const question = draft.trim();
     setBusy(true); setActiveQuestion(question); setDraft(""); setAnswer(null); setNotice("");
     const controller = new AbortController(); abortRef.current = controller;
+    const questionView = ++questionViewRef.current;
+    const isCurrent = () => questionViewRef.current === questionView;
     try {
       const response = await fetch(`/api/v1/knowledge-bases/${selectedBase}/questions/stream`, {
         method: "POST", credentials: "same-origin", signal: controller.signal,
@@ -178,22 +188,26 @@ export default function Workspace() {
         question_id: "", knowledge_base_id: selectedBase, question, status: "PROCESSING",
         finished_at: null, answer: "", has_answer: null, failure_code: null, sources: [],
       };
+      if (!isCurrent()) return;
       setAnswer(detail);
-      await streamQuestion(response, (delta) => setAnswer((old) => old ? { ...old, answer: (old.answer ?? "") + delta } : old),
-        (sources) => setAnswer((old) => old ? { ...old, sources } : old));
-      setAnswer((old) => old ? { ...old, status: "SUCCEEDED", finished_at: new Date().toISOString() } : old);
+      await streamQuestion(response, (delta) => setAnswer((old) => isCurrent() && old ? { ...old, answer: (old.answer ?? "") + delta } : old),
+        (sources) => setAnswer((old) => isCurrent() && old ? { ...old, sources } : old));
+      if (!isCurrent()) return;
+      setAnswer((old) => isCurrent() && old ? { ...old, status: "SUCCEEDED", finished_at: new Date().toISOString() } : old);
       await refresh(selectedBase).catch((error) => setNotice(messageOf(error)));
     } catch (error) {
+      if (!isCurrent()) return;
       const reason = controller.signal.aborted ? "用户停止生成" : messageOf(error);
-      setAnswer((old) => old ? { ...old, status: controller.signal.aborted ? "CANCELLED" : "FAILED", failure_code: reason } : old);
+      setAnswer((old) => isCurrent() && old ? { ...old, status: controller.signal.aborted ? "CANCELLED" : "FAILED", failure_code: reason } : old);
       if (!controller.signal.aborted) setNotice(messageOf(error));
       await api<{ items: QuestionHistory[] }>("questions?limit=50&offset=0").then((result) => setHistory(result.items)).catch(() => undefined);
-    } finally { abortRef.current = null; setBusy(false); }
+    } finally { if (isCurrent()) { abortRef.current = null; setBusy(false); } }
   }
 
   async function cancelQuestion() { abortRef.current?.abort(); setNotice("正在停止请求。若生成已经开始，请在历史记录里确认状态，不会自动重发。"); }
 
   async function openHistory(item: QuestionHistory) {
+    leaveQuestion();
     try {
       await refresh(item.knowledge_base_id);
       setSelectedBase(item.knowledge_base_id);
@@ -223,7 +237,7 @@ export default function Workspace() {
       }
       const response = await fetch(`/api/v1/documents/${document.id}/contents/${source.content_version_id}/file`, { credentials: "same-origin" });
       if (!response.ok) throw new Error("来源已删除或版本已失效。");
-      if (document.format.toUpperCase() === "PDF") {
+      if (response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() === "application/pdf") {
         const url = URL.createObjectURL(await response.blob());
         setViewing((old) => old ? { ...old, url } : old);
       } else {
@@ -267,7 +281,7 @@ export default function Workspace() {
       <aside className={styles.sidebar}>
         <a className={styles.brand} href="#"><span className={styles.brandMark}>K</span><span>KnowFlow<small>文档核验工作台</small></span></a>
         <div className={styles.sideLabel}>我的知识库</div>
-        <div className={styles.baseList}>{bases.map((base) => <button key={base.id} className={`${styles.baseItem} ${selectedBase === base.id ? styles.activeBase : ""}`} onClick={() => { setSelectedBase(base.id); setAnswer(null); void refresh(base.id).catch((error) => setNotice(messageOf(error))); }}><span className={styles.baseGlyph}>▤</span>{base.name}</button>)}</div>
+        <div className={styles.baseList}>{bases.map((base) => <button key={base.id} className={`${styles.baseItem} ${selectedBase === base.id ? styles.activeBase : ""}`} onClick={() => { leaveQuestion(); setSelectedBase(base.id); setAnswer(null); void refresh(base.id).catch((error) => setNotice(messageOf(error))); }}><span className={styles.baseGlyph}>▤</span>{base.name}</button>)}</div>
         {bases.length === 0 && <p className={styles.sideEmpty}>这里还没有知识库。</p>}
         <form className={styles.newBase} onSubmit={createBase}><input aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
         <div className={styles.sideLabel}>最近问答</div>
