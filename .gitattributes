@@ -3,5 +3,9 @@ contracts/examples/protocol-cases.json text eol=lf
 evaluation/data/seed-v1/documents/** -text
 evaluation/data/seed-v2-candidate/documents/** -text
 evaluation/data/seed-v2-candidate/manifest.json text eol=lf
+evaluation/data/seed-v2-reviewed/documents/** -text
+evaluation/data/seed-v2-reviewed/manifest.json text eol=lf
+evaluation/data/seed-v2-reviewed/questions.json text eol=lf
+evaluation/data/reviews/*.json -text
 services/ai/tests/fixtures/pdf/** -text
 *.pdf binary
