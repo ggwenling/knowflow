@@ -159,6 +159,15 @@ def test_service_outage_rejects_shared_compose_before_touching_services(monkeypa
     assert calls == []
 
 
+def test_index_write_outage_rejects_shared_compose_before_touching_services(monkeypatch):
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", None)
+    calls = []
+    monkeypatch.setattr(recovery, "_run_compose", lambda *args: calls.append(args))
+    with pytest.raises(RuntimeError, match="OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE"):
+        recovery._scenario_postgres_outage_during_index_write(object())
+    assert calls == []
+
+
 def test_run_outage_mode_cannot_start_shared_compose(monkeypatch):
     monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", None)
     with pytest.raises(RuntimeError, match="OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE"):

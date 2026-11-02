@@ -897,6 +897,93 @@ def _scenario_service_outage(harness: RecoveryHarness, service: str) -> dict:
             "cleanup_queues_drained": cleanup == {"unfinished_tasks": 0, "cleanup_queue_rows": 0}}
 
 
+def _scenario_postgres_outage_during_index_write(harness: RecoveryHarness) -> dict:
+    if _ISOLATED_COMPOSE is None:
+        raise RuntimeError("OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE")
+    database_url = harness.database_url
+    env_path = harness.args.env_file
+    harness.stop_python()
+    harness.start_python(prefix="write-outage-initial")
+    base_id = harness.create_knowledge_base("postgres-write-outage")
+    document_id, initial_task = harness.upload_document(base_id, "postgres-write-outage.txt")
+    _wait_task(database_url, initial_task, {"SUCCEEDED"})
+    original = _document_row(database_url, document_id)["active_index_version_id"]
+    if original is None:
+        raise RuntimeError("INITIAL_ACTIVE_INDEX_MISSING")
+    harness.stop_python()
+    harness.start_python(gate_fencings=(1,), prefix="postgres-write-outage")
+    with harness.client() as client:
+        rebuilt = client.post(f"/api/v1/documents/{document_id}/rebuilds",
+                              headers={"Authorization": f"Bearer {harness.token}"})
+    if rebuilt.status_code != 202:
+        raise RuntimeError("DOCUMENT_REBUILD_NOT_ACCEPTED")
+    task_id = rebuilt.json()["task_id"]
+    first = harness.wait_gate("postgres-write-outage", 1)
+    if _document_row(database_url, document_id)["active_index_version_id"] != original:
+        raise RuntimeError("CANDIDATE_PUBLISHED_BEFORE_FAILURE")
+    try:
+        stopped = _run_compose(env_path, ["stop", "postgres"])
+        if stopped.returncode:
+            raise RuntimeError("ISOLATED_SERVICE_STOP_FAILED")
+        state = _run_compose(env_path, ["ps", "--all", "--format", "json"])
+        items = [json.loads(line) for line in state.stdout.splitlines() if line.strip()]
+        if state.returncode or not any(item.get("Service") == "postgres" and
+                                       item.get("State") in {"exited", "stopped"} for item in items):
+            raise RuntimeError("ISOLATED_SERVICE_NOT_STOPPED")
+        try:
+            with harness.client(timeout=8) as client:
+                response = _internal_post(client, harness.dotenv["KNOWFLOW_INTERNAL_SHARED_SECRET"],
+                                          f"/internal/v1/tasks/{task_id}/index-batches", first["batch"])
+            if 200 <= response.status_code < 300:
+                raise RuntimeError("INDEX_WRITE_SUCCEEDED_WITH_POSTGRES_STOPPED")
+        except httpx.TransportError:
+            pass
+        harness.stop_python()
+    finally:
+        _restore_isolated_service(env_path, "postgres")
+    if _document_row(database_url, document_id)["active_index_version_id"] != original:
+        raise RuntimeError("CANDIDATE_PUBLISHED_DURING_OUTAGE")
+    harness.start_python(gate_fencings=(1,), prefix="postgres-write-outage")
+    completed = _wait_task(database_url, task_id, {"SUCCEEDED"}, timeout=90)
+    if (completed["fencing"] <= first["lease"]["fencing"]
+            or completed["attempt_count"] != completed["fencing"]):
+        raise RuntimeError("OUTAGE_RECOVERY_DID_NOT_ADVANCE_FENCING:"
+                           f"first={first['lease']['fencing']},"
+                           f"recovered={completed['fencing']},attempts={completed['attempt_count']}")
+    with harness.client() as client:
+        stale_batch = _internal_post(client, harness.dotenv["KNOWFLOW_INTERNAL_SHARED_SECRET"],
+                                     f"/internal/v1/tasks/{task_id}/index-batches", first["batch"])
+        stale_completion = _internal_post(client, harness.dotenv["KNOWFLOW_INTERNAL_SHARED_SECRET"],
+                                          f"/internal/v1/tasks/{task_id}/completion",
+                                          _stale_success_completion(first))
+    if (stale_batch.status_code != 409 or _error_code(stale_batch) != "LEASE_REJECTED"
+            or stale_completion.status_code != 409 or _error_code(stale_completion) != "LEASE_REJECTED"):
+        raise RuntimeError("STALE_EXECUTION_WAS_NOT_FENCED")
+    active = _document_row(database_url, document_id)
+    if (active["status"] != "ACTIVE" or active["active_index_version_id"] != completed["index_version_id"]
+            or str(active["active_index_version_id"]) == first["lease"]["index_version_id"]):
+        raise RuntimeError("RECOVERED_INDEX_NOT_ACTIVE")
+    old_candidate = _wait_failed_candidate_cleanup(
+        database_url, first["lease"]["index_version_id"], completed["index_version_id"])
+    with harness.client(timeout=20) as client:
+        answer = client.post(f"/api/v1/knowledge-bases/{base_id}/questions",
+                             headers={"Authorization": f"Bearer {harness.token}"},
+                             json={"question": "What does the evidence say?"})
+    sources = answer.json().get("sources", []) if answer.status_code == 200 else []
+    if not sources or sources[0].get("index_version_id") != str(completed["index_version_id"]):
+        raise RuntimeError("RECOVERED_INDEX_NOT_QUERYABLE")
+    cleanup = _wait_cleanup(database_url)
+    return {"passed": True, "service": "postgres", "first_batch_persisted": True,
+            "write_failed_during_outage": True, "old_active_preserved_during_outage": True,
+            "first_fencing": first["lease"]["fencing"], "recovered_fencing": completed["fencing"],
+            "stale_batch_rejected": True, "stale_completion_rejected": True,
+            "stale_candidate_cleaned": old_candidate["cleaned"],
+            "stale_candidate_chunk_rows": old_candidate["chunk_rows"],
+            "stale_candidate_embedding_rows": old_candidate["embedding_rows"],
+            "recovered_index_queryable": True, "cleanup_queues_drained": cleanup == {
+                "unfinished_tasks": 0, "cleanup_queue_rows": 0}}
+
+
 def run(args):
     if getattr(args, "isolated_outages", False) and _ISOLATED_COMPOSE is None:
         raise RuntimeError("OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE")
@@ -960,6 +1047,7 @@ def run(args):
         harness.create_owner()
 
         if getattr(args, "isolated_outages", False):
+            scenarios["postgres_index_write_outage"] = _scenario_postgres_outage_during_index_write(harness)
             scenarios["postgres_outage"] = _scenario_service_outage(harness, "postgres")
             scenarios["minio_outage"] = _scenario_service_outage(harness, "minio")
         else:
