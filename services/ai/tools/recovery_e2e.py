@@ -29,12 +29,31 @@ REPO = AI_ROOT.parents[1]
 BLOCK_ANSWER_MARKER = "KNOWFLOW_RECOVERY_BLOCK_ANSWER"
 DOCUMENT_TEXT = ("Recovery evidence confirms that Java owns publication. "
                  "Synthetic worker restart must preserve the active index.\n") * 36
+LONG_DOCUMENT_TEXT = DOCUMENT_TEXT * 8
 
 
 def _write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n",
                     encoding="utf-8", newline="\n")
+
+
+class SecondBatchFailureEmbedding(local.SyntheticEmbedding):
+    """Synthetic adapter that fails the second indexing embedding batch."""
+
+    def __init__(self, *args, marker: Path, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.marker = marker
+        self.calls = 0
+
+    async def embed(self, texts, *, request_id):
+        from knowflow_ai.adapters import ProcessingError
+
+        self.calls += 1
+        if self.calls == 2:
+            _write_json(self.marker, {"successful_batches": 1, "failed_batch": 2})
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+        return await super().embed(texts, request_id=request_id)
 
 
 def _read_json(path: Path) -> dict:
@@ -265,7 +284,10 @@ def serve_python():
 
     answering.SiliconFlowEmbeddingAdapter = local.SyntheticEmbedding
     answering.DeepSeekAdapter = RecoveryLlm
-    worker.SiliconFlowEmbeddingAdapter = local.SyntheticEmbedding
+    failure_marker = os.environ.get("KNOWFLOW_RECOVERY_SECOND_EMBEDDING_MARKER")
+    worker.SiliconFlowEmbeddingAdapter = (
+        (lambda settings: SecondBatchFailureEmbedding(settings, marker=Path(failure_marker)))
+        if failure_marker else local.SyntheticEmbedding)
 
     original_write_batch = JavaGateway.write_batch
     marker_dir = Path(os.environ["KNOWFLOW_RECOVERY_MARKER_DIR"])
@@ -339,7 +361,8 @@ class RecoveryHarness:
         local.stop(self.java_process)
         self.java_process = None
 
-    def start_python(self, *, gate_fencings=(), prefix="worker", answer_marker=None):
+    def start_python(self, *, gate_fencings=(), prefix="worker", answer_marker=None,
+                     second_embedding_marker=None):
         if self.python_process is not None and self.python_process.poll() is None:
             return
         env = self.python_env.copy()
@@ -350,6 +373,10 @@ class RecoveryHarness:
             env["KNOWFLOW_RECOVERY_ANSWER_MARKER"] = str(answer_marker)
         else:
             env.pop("KNOWFLOW_RECOVERY_ANSWER_MARKER", None)
+        if second_embedding_marker:
+            env["KNOWFLOW_RECOVERY_SECOND_EMBEDDING_MARKER"] = str(second_embedding_marker)
+        else:
+            env.pop("KNOWFLOW_RECOVERY_SECOND_EMBEDDING_MARKER", None)
         self.python_process = subprocess.Popen(
             [sys.executable, str(Path(__file__).resolve()), "--serve"],
             cwd=REPO, env=env, stdout=self.log, stderr=self.log)
@@ -390,10 +417,10 @@ class RecoveryHarness:
         self.knowledge_bases.append(knowledge_base_id)
         return knowledge_base_id
 
-    def upload_document(self, knowledge_base_id, filename):
+    def upload_document(self, knowledge_base_id, filename, contents=DOCUMENT_TEXT):
         with self.client() as client:
             accepted = local.upload(client, self.token, knowledge_base_id,
-                                    filename, DOCUMENT_TEXT)
+                                    filename, contents)
         return accepted["document_id"], accepted["task_id"]
 
     def marker(self, prefix, fencing):
@@ -529,6 +556,60 @@ def _scenario_retry_limit_preserves_active(harness: RecoveryHarness) -> dict:
             "previous_active_index_queryable": True,
             "distinct_failed_candidates": len({
                 item["lease"]["index_version_id"] for item in attempts})}
+
+
+def _scenario_second_embedding_batch_failure(harness: RecoveryHarness) -> dict:
+    harness.stop_python()
+    harness.start_python(prefix="embedding-initial")
+    knowledge_base_id = harness.create_knowledge_base("embedding-failure")
+    document_id, initial_task = harness.upload_document(
+        knowledge_base_id, "embedding-failure.txt", LONG_DOCUMENT_TEXT)
+    _wait_task(harness.database_url, initial_task, {"SUCCEEDED"})
+    original = str(_document_row(harness.database_url, document_id)["active_index_version_id"])
+    if original == "None":
+        raise RuntimeError("INITIAL_ACTIVE_INDEX_MISSING")
+
+    harness.stop_python()
+    marker = harness.marker_dir / "second-embedding-failure.json"
+    harness.start_python(prefix="embedding-failure", second_embedding_marker=marker)
+    with harness.client() as client:
+        rebuilt = client.post(f"/api/v1/documents/{document_id}/rebuilds",
+                              headers={"Authorization": f"Bearer {harness.token}"})
+    if rebuilt.status_code != 202:
+        raise RuntimeError("DOCUMENT_REBUILD_NOT_ACCEPTED")
+    task_id = rebuilt.json()["task_id"]
+    fault = _wait_marker(marker, harness.python_process)
+    failed = _wait_task(harness.database_url, task_id, {"FAILED"})
+    if fault != {"successful_batches": 1, "failed_batch": 2}:
+        raise RuntimeError("SECOND_EMBEDDING_FAILURE_NOT_REACHED")
+    if failed["failure_code"] != "MODEL_FAILURE" or failed["attempt_count"] != 1:
+        raise RuntimeError("SECOND_EMBEDDING_FAILURE_NOT_REPORTED")
+    with psycopg.connect(harness.database_url, autocommit=True) as db:
+        prior_writes = db.execute(
+            "SELECT count(*) FROM knowflow.index_batch_receipts WHERE task_id = %s",
+            (task_id,)).fetchone()[0]
+    if prior_writes < 1:
+        raise RuntimeError("EMBEDDING_FIRST_BATCH_WAS_NOT_PERSISTED")
+    if str(_document_row(harness.database_url, document_id)["active_index_version_id"]) != original:
+        raise RuntimeError("FAILED_EMBEDDING_REPLACED_ACTIVE_INDEX")
+
+    harness.stop_python()
+    harness.start_python(prefix="embedding-verification")
+    with harness.client(timeout=20) as client:
+        answer = client.post(
+            f"/api/v1/knowledge-bases/{knowledge_base_id}/questions",
+            headers={"Authorization": f"Bearer {harness.token}"},
+            json={"question": "What does the active recovery evidence say?"})
+    sources = answer.json().get("sources", []) if answer.status_code == 200 else []
+    if not sources or sources[0].get("index_version_id") != original:
+        raise RuntimeError("PREVIOUS_ACTIVE_INDEX_NOT_QUERYABLE")
+    cleanup = _wait_cleanup(harness.database_url)
+    return {"passed": True, "successful_embedding_batches": 1,
+            "failed_embedding_batch": 2, "prior_persisted_batches": prior_writes,
+            "failure_code": failed["failure_code"], "attempt_count": failed["attempt_count"],
+            "previous_active_index_preserved": True, "previous_active_index_queryable": True,
+            "cleanup_queues_drained": cleanup == {
+                "unfinished_tasks": 0, "cleanup_queue_rows": 0}}
 
 
 def _scenario_java_restart_recovers_question(harness: RecoveryHarness) -> dict:
@@ -722,6 +803,7 @@ def run(args):
             "KNOWFLOW_INDEXING_HEARTBEAT_SECONDS": "1",
             "KNOWFLOW_INDEXING_MAX_ATTEMPTS": "3",
             "KNOWFLOW_INDEXING_POLL_DELAY_MILLIS": "250",
+            "KNOWFLOW_INDEXING_MAX_BATCH_CHUNKS": "8",
             "KNOWFLOW_QUESTIONS_TOTAL_BUDGET_SECONDS": "3",
             "KNOWFLOW_QUESTION_RECOVERY_DELAY_MILLIS": "250",
         })
@@ -739,6 +821,7 @@ def run(args):
 
         scenarios["single_worker_restart"] = _scenario_worker_restarts(harness)
         scenarios["three_worker_losses"] = _scenario_retry_limit_preserves_active(harness)
+        scenarios["second_embedding_batch_failure"] = _scenario_second_embedding_batch_failure(harness)
         scenarios["java_restart_question_recovery"] = (
             _scenario_java_restart_recovers_question(harness))
         scenarios["delete_while_worker_offline"] = (

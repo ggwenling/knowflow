@@ -4,6 +4,12 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+from knowflow_ai.adapters import ProcessingError
+from knowflow_ai.parsing import parse_document
+from knowflow_ai.protocol import ContractConsumer
+from knowflow_ai.worker import IndexWorker
+
 
 SCRIPT = Path(__file__).resolve().parents[1] / "tools/recovery_e2e.py"
 sys.path.insert(0, str(SCRIPT.parent))
@@ -77,3 +83,35 @@ def test_cleanup_stops_only_services_started_by_this_run(monkeypatch, tmp_path):
     recovery._stop_compose_services(tmp_path / ".env", set())
 
     assert calls == [["stop", "minio"]]
+
+
+@pytest.mark.asyncio
+async def test_second_embedding_failure_after_persisted_first_batch(monkeypatch, tmp_path):
+    from test_worker import FakeGateway, _dispatch
+    import knowflow_ai.worker as worker_module
+
+    source = recovery.LONG_DOCUMENT_TEXT.encode("utf-8")
+    dispatch = _dispatch(source)
+    dispatch["runtime_profile"].update(embedding_max_batch_items=16, index_max_batch_chunks=8)
+    lease = dispatch["lease"]
+    parsed = parse_document(source, format="txt", document_id=lease["document_id"],
+                            content_version_id=lease["content_version_id"],
+                            file_id=dispatch["source"]["file_id"])
+
+    async def parsed_source(*_args, **_kwargs):
+        return parsed
+
+    monkeypatch.setattr(worker_module, "parse_document_isolated", parsed_source)
+    gateway = FakeGateway(ContractConsumer(recovery.REPO / "contracts/schemas/protocol.schema.json"), source)
+    marker = tmp_path / "fault.json"
+    embedding = recovery.SecondBatchFailureEmbedding(marker=marker)
+    worker = IndexWorker(gateway)
+
+    with pytest.raises(ProcessingError, match="MODEL_FAILURE") as exc:
+        await worker._index(dispatch, embedding)
+
+    assert not exc.value.retryable
+    assert json.loads(marker.read_text(encoding="utf-8")) == {
+        "successful_batches": 1, "failed_batch": 2}
+    assert len(gateway.batches) >= 1
+    assert gateway.completions == []
