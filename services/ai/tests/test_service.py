@@ -62,6 +62,28 @@ def test_health_does_not_probe_models_or_database(client):
         assert client.post(path, headers=AUTH, json={'owner_id': 'forged'}).status_code == 400
 
 
+@pytest.mark.parametrize('failure', ['factory', 'start', 'close'])
+def test_gateway_is_closed_even_if_injected_worker_lifecycle_fails(monkeypatch, failure):
+    closed = []
+    class Gateway:
+        def __init__(self, *_args): pass
+        async def aclose(self): closed.append('gateway')
+    class Worker:
+        async def start(self):
+            if failure == 'start': raise RuntimeError('start')
+        async def close(self):
+            closed.append('worker')
+            if failure == 'close': raise RuntimeError('close')
+    def factory(_gateway):
+        if failure == 'factory': raise RuntimeError('factory')
+        return Worker()
+    monkeypatch.setattr(ai_app, 'JavaGateway', Gateway)
+    with pytest.raises(RuntimeError, match=failure):
+        with TestClient(create_app(Settings(SECRET), worker_factory=factory)):
+            pass
+    assert closed == (['gateway'] if failure == 'factory' else ['worker', 'gateway'])
+
+
 def test_per_app_factories_are_isolated_for_worker_and_both_answer_routes(monkeypatch):
     from types import SimpleNamespace
     calls = []

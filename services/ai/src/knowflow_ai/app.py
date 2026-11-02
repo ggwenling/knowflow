@@ -140,15 +140,19 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     @asynccontextmanager
     async def lifespan(app):
         gateway = JavaGateway(settings.java_base_url, settings.internal_secret, contract)
-        worker = worker_factory(gateway)
-        app.state.java_gateway = gateway
-        app.state.index_worker = worker
-        await worker.start()
+        worker = None
         try:
+            worker = worker_factory(gateway)
+            app.state.java_gateway = gateway
+            app.state.index_worker = worker
+            await worker.start()
             yield
         finally:
-            await worker.close()
-            await gateway.aclose()
+            try:
+                if worker is not None:
+                    await worker.close()
+            finally:
+                await gateway.aclose()
 
     app = FastAPI(title='KnowFlow internal AI', docs_url=None, redoc_url=None,
                   openapi_url=None, lifespan=lifespan)
