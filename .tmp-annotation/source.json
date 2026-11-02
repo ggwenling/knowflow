@@ -1,0 +1,155 @@
+[
+ {
+  "id": "api",
+  "content_version_id": "content-api-ca47c675c4bd",
+  "path": "documents/索引接口.md",
+  "length": 141,
+  "lines": [
+   "# 合成项目「青竹」接口规范 v1.4",
+   "",
+   "状态：已发布；2026-09-12 生效。",
+   "创建索引任务使用 POST /v1/index-jobs。",
+   "必填字段为 documentId（UUID）和 profileId（字符串）。",
+   "成功响应为 HTTP 202，响应体包含 jobId。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」接口规范 v1.4\n\n状态：已发布；2026-09-12 生效。\n创建索引任务使用 POST /v1/index-jobs。\n必填字段为 documentId（UUID）和 profileId（字符串）。\n成功响应为 HTTP 202，响应体包含 jobId。\n"
+ },
+ {
+  "id": "chunk",
+  "content_version_id": "content-chunk-fe454004d06f",
+  "path": "documents/分段策略.md",
+  "length": 114,
+  "lines": [
+   "# 合成项目「青竹」分段策略 v2",
+   "",
+   "状态：已批准。",
+   "chunkSize 默认 360 个 Unicode 码点，允许 180–720 的整数。",
+   "重叠区默认为 40 个 Unicode 码点。",
+   "每批索引最多包含 16 个分段。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」分段策略 v2\n\n状态：已批准。\nchunkSize 默认 360 个 Unicode 码点，允许 180–720 的整数。\n重叠区默认为 40 个 Unicode 码点。\n每批索引最多包含 16 个分段。\n"
+ },
+ {
+  "id": "draft",
+  "content_version_id": "content-draft-8362e40b7185",
+  "path": "documents/重试草案.md",
+  "length": 74,
+  "lines": [
+   "# 合成项目「青竹」重试草案 v1.2",
+   "",
+   "状态：草案，未批准，不生效。",
+   "编辑日期：2026-09-20。",
+   "提议默认等待 20 秒，上限 60 秒。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」重试草案 v1.2\n\n状态：草案，未批准，不生效。\n编辑日期：2026-09-20。\n提议默认等待 20 秒，上限 60 秒。\n"
+ },
+ {
+  "id": "adr",
+  "content_version_id": "content-adr-bde8b35afd9b",
+  "path": "documents/ADR-017.md",
+  "length": 94,
+  "lines": [
+   "# 合成项目「青竹」ADR-017",
+   "",
+   "状态：已批准；2026-10-01 生效。",
+   "本 ADR 替代重试草案 v1.2 的重试等待参数。",
+   "当前客户端重试等待默认 10 秒，上限 30 秒。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」ADR-017\n\n状态：已批准；2026-10-01 生效。\n本 ADR 替代重试草案 v1.2 的重试等待参数。\n当前客户端重试等待默认 10 秒，上限 30 秒。\n"
+ },
+ {
+  "id": "files",
+  "content_version_id": "content-files-51506fdb87f9",
+  "path": "documents/文件边界.md",
+  "length": 119,
+  "lines": [
+   "# 合成项目「青竹」文件边界 v1",
+   "",
+   "支持 UTF-8 TXT、Markdown 和含可提取文字的 PDF。",
+   "合成演示的单文件上限为 6 MiB，不是 KnowFlow 产品限制。",
+   "扫描 PDF 需要 OCR，本演示版本未实现 OCR。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」文件边界 v1\n\n支持 UTF-8 TXT、Markdown 和含可提取文字的 PDF。\n合成演示的单文件上限为 6 MiB，不是 KnowFlow 产品限制。\n扫描 PDF 需要 OCR，本演示版本未实现 OCR。\n"
+ },
+ {
+  "id": "access",
+  "content_version_id": "content-access-503d4cbc690b",
+  "path": "documents/资源隔离.txt",
+  "length": 115,
+  "lines": [
+   "合成项目「青竹」资源访问规范 v1",
+   "",
+   "owner 只由服务端根据已验证身份生成，客户端传入 owner_id 应拒绝。",
+   "不存在、其他用户或已经删除的资源，对外统一返回 HTTP 404。",
+   "不能因为资源 ID 存在就直接返回原文。",
+   ""
+  ],
+  "text": "合成项目「青竹」资源访问规范 v1\n\nowner 只由服务端根据已验证身份生成，客户端传入 owner_id 应拒绝。\n不存在、其他用户或已经删除的资源，对外统一返回 HTTP 404。\n不能因为资源 ID 存在就直接返回原文。\n"
+ },
+ {
+  "id": "publish",
+  "content_version_id": "content-publish-62776eb7eafa",
+  "path": "documents/索引发布.md",
+  "length": 114,
+  "lines": [
+   "# 合成项目「青竹」发布协议 v3",
+   "",
+   "只有 Java 服务可以发布活动索引版本；Python 只提交候选结果。",
+   "发布前必须核验有效租约、文档可见性、Chunk 清单和向量完整性。",
+   "所有核验与活动版本切换应在同一数据库事务完成。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」发布协议 v3\n\n只有 Java 服务可以发布活动索引版本；Python 只提交候选结果。\n发布前必须核验有效租约、文档可见性、Chunk 清单和向量完整性。\n所有核验与活动版本切换应在同一数据库事务完成。\n"
+ },
+ {
+  "id": "locator",
+  "content_version_id": "content-locator-55da63696276",
+  "path": "documents/来源定位.md",
+  "length": 131,
+  "lines": [
+   "# 合成项目「青竹」来源定位 v1",
+   "",
+   "TXT/MD 偏移以原始文本的 Unicode 码点计数，从 0 开始，区间右端不含。",
+   "PDF 页码从 1 开始，未提取到的页面坐标不得编造。",
+   "示例串「中文🙂A」有 4 个 Unicode 码点；🙂 的区间是 [2,3)。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」来源定位 v1\n\nTXT/MD 偏移以原始文本的 Unicode 码点计数，从 0 开始，区间右端不含。\nPDF 页码从 1 开始，未提取到的页面坐标不得编造。\n示例串「中文🙂A」有 4 个 Unicode 码点；🙂 的区间是 [2,3)。\n"
+ },
+ {
+  "id": "outbound",
+  "content_version_id": "content-outbound-5e20e82abacd",
+  "path": "documents/数据出站.txt",
+  "length": 131,
+  "lines": [
+   "合成项目「青竹」数据出站说明 v1",
+   "",
+   "Embedding 请求发送获准的文档分段文本。",
+   "LLM 请求发送当前问题和检索到的获准片段。",
+   "演示仅使用原创合成内容，不含用户文档、密钥和个人资料。",
+   "供应商价格、保留及训练政策须查询正式供应商记录，本材料不提供这些事实。",
+   ""
+  ],
+  "text": "合成项目「青竹」数据出站说明 v1\n\nEmbedding 请求发送获准的文档分段文本。\nLLM 请求发送当前问题和检索到的获准片段。\n演示仅使用原创合成内容，不含用户文档、密钥和个人资料。\n供应商价格、保留及训练政策须查询正式供应商记录，本材料不提供这些事实。\n"
+ },
+ {
+  "id": "timeout",
+  "content_version_id": "content-timeout-aa50543a6c93",
+  "path": "documents/超时取消.md",
+  "length": 118,
+  "lines": [
+   "# 合成项目「青竹」超时规则 v1",
+   "",
+   "演示的模型请求总期限为 18 秒，自动重试次数为 0。",
+   "超时对外返回 HTTP 504，错误码 PROCESSING_TIMEOUT。",
+   "取消只释放计算资源，不能恢复已删除文档，也不能自行发布索引。",
+   ""
+  ],
+  "text": "# 合成项目「青竹」超时规则 v1\n\n演示的模型请求总期限为 18 秒，自动重试次数为 0。\n超时对外返回 HTTP 504，错误码 PROCESSING_TIMEOUT。\n取消只释放计算资源，不能恢复已删除文档，也不能自行发布索引。\n"
+ }
+]

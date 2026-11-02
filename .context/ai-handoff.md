@@ -8,15 +8,39 @@ status: in_progress
 source_machine: WENLING
 target_machine: same
 branch: local
-commit: 553d2892bd43f72502bd757b5eba589d8b1043d1
+commit: fbe7038c47ed02b2a7837ec033afee0f9224200a
 ---
 
 # AI project handoff
 
 ## Outcome
-继续在 `local` 分支推进 Muse 前端 V1 收尾与 JP-03 Java/Python 工作。实际 HEAD 为 `553d2892bd43f72502bd757b5eba589d8b1043d1`；JP-03 本轮 Java/Python 改动仍未提交。新增双端共享并发上限、SSE 到达时刻 deadline、阶段用量日志、retryable source failure 分类、评测质量门及人工支持复核工具。Python 全量 **263 passed**；Java 编译通过、非容器测试 **37 项，0 failure/error，1 opt-in skip**。Docker 引擎不可用导致全 Maven 的 4 个 Testcontainers 类无法运行；模型凭证未配置，未调用 provider。预测采集/压力基线、数据库/MinIO/批次故障 E2E、Linux parser 限额验证和人工候选复核仍未完成。前端按既定 M 线计划另行实施与独立复验，不提交、不推送、不合并 `main`；独立 Q/M 验收仍单独跟踪。
+在 local 实施 P0/P1/P2 计划：修正数据集审核来源及状态，Sol 独立审阅当前 SHA，Terra 修复问题；随后完成真实 RAG 采集、盲测及恢复验收。用户负责私有盲题和 M 签收。
 
 ## Current state
+- 2026-11-02 最新：local@fbe7038，真实评测入口仍 fail-closed；用户已在本机配置模型凭证，值保存在被忽略的 services/ai/.env，不得输出或提交。provider 成本/token 上界与完整采集链未验证，真实调用仍为0。备份恢复含 schema 所有权的一次隔离演练已通过；绑定提交的重跑及 Sol 审阅进行中。
+- 性能负载报告绑定 9136fcb：10/100 文档并发1/4各8/8成功，并发8各4成功4个可重试AI失败，整体 completed_with_errors。PostgreSQL 写入中断 e391/b776 范围及 Q 复审见计划；保留失败报告。用户现有 Web 样式、next-env、未跟踪审核资料不触碰。
+
+- 2026-11-02 最新：local@9136fcb；用户其他未提交 Web 样式、next-env 和 .tmp-annotation 与审核笔记均保留。e9f115f 远端 CI 三项通过；更新提交须再次确认。Sol 限定复核通过来源、代理、分页、评分引用及预算捕获组件；整体 Q/M 未签收。真实 Java 采集和 provider 预算守卫接线、私有盲题/真实评分仍未完成。
+- PostgreSQL 写入中断 b776bab：首批接收后中断及旧批次重放失败，恢复 fencing 1→3、旧租约拒绝、旧候选清理与新索引可查询；Sol 限定复核通过。未覆盖新批次事务中断或 MinIO 写入故障。性能脚本 61087e2 首次10/100负载在并发8有错误，Sol 发现 SSE 测量与退出码缺陷；9136fcb 已修正，第二次 10/100 负载正在运行，未完成前不可写通过结论。
+
+- 2026-11-02 最新：local@73c94b9；Sol 已限定复核通过代理修复 c075c0f、审核来源 4860ecf、分页竞态 f551a68、恢复清理 79a400d 和评分引用完整性 c19d03f。新增 draft.10 三端待签收清单；整体 Q/M、OpenAPI、远端 CI、真实采集与质量评测仍未完成。最终 SHA 以 git rev-parse HEAD 为准。评分 v2 历史缺字段数据不兼容，方括号按引用标记严格处理。Web 样式及 next-env 存在本轮外改动，保留不覆盖；.tmp-annotation 和原审核笔记亦保留。
+
+- 实施基线 local@b7e83c8；同一提交已在 origin/main、origin/local。工作树的 handoff 为本会话延续，未跟踪 .tmp-annotation/ 和 docs/reviews/2026-11-02-candidate-annotation-notes.md 归属待确认，不触碰。
+- 60 题经用户以 human-reviewer 确认逐题审核；审核确认时间不代表实际完成时间，agent 原记录时间异常未核实。40/20 为公开开发/验证，不是盲测。补充 provenance 后指纹为 023f14ba9e56df87cb2ea635638e01d3a543a4aeb2588856dc2c3aed7f8356b0；原指纹保留于计划历史。
+- Docker 浏览器 E2E 1/1、Java 83（1 skip）、Python 263 和 Web 36 为既有历史证据；远端 CI、独立 Q/M、真实模型评测和私有盲测仍未完成。
+- 2026-11-02 工作中：finalizer 和 manifest 补齐审核来源；Sol 发现代理无 Content-Length 正文可无限读取，修复及回归进行中。
+
+### 以下为历史快照，不代表当前状态
+- 2026-11-02：用户确认 human-reviewer 逐题人工审核。独立保留 agent 原记录，新增人工确认记录并生成 qingzhu-seed-v2-reviewed；60 题、50 可回答、10 不可回答，公开 40/20 非盲测；数据集 SHA-256 4ce66d29dca63b366c01e6aab9573dbd61295207e12cd5a766fb25a907ee94c3。用户确认时间与原 agent 未来时间戳均如实保留。提交已推送；真实 provider 评分、私有盲测和 Q/M 仍未完成。
+
+- 2026-11-02：用户提供 evaluation/data/reviews/2026-11-02-agent-annotation-review.json 并确认逐题人工复核；正在等待用户提供审核者标识。原文件明确为 agent_reviewed，不得覆盖或伪称 human_reviewed；60 题来源摘要、分组和证据结构已只读校验。原 agent 记录时间 15:30 +08 比校验时当前约 15:06 更晚，须保留并注明。获得标识后另存 human_reviewed 记录，保留 agent 来源并运行 finalizer；公开 40/20 非盲测。
+
+- 2026-11-02 最新：用户已修复代理；Docker 构建及浏览器 E2E 1/1 通过，隔离容器、网络与卷已清理。评测 CLI 显式质量门失败或不完整时返回非零，定向 23 项通过。origin/local 已同步当前 HEAD；远端 CI 状态尚未取得。用户正在审核标注；新增未跟踪 .tmp-annotation/source.json 归属待确认，不触碰。Q/M、正式盲测、真实模型评测和计划其他事项仍未完成。
+
+- 2026-11-02 最新：local 和 origin/local 均为 7661e44f5861c1e592e7ad282636c03d220ff1f0；origin/main 为 4bada0b。唯一未提交文件为本交接。CI 和构建上下文修复及计划已提交推送。Python 263、Java 83（1 skip）、Web 36、离线 16 和 schema 85 项通过；宿主 Web 构建通过。Docker 引擎已启动，但 Docker Desktop 代理 127.0.0.1:7890 拒绝连接，无法拉取 node:24-alpine，镜像构建与浏览器 E2E 未执行完成。请启动代理或调整 Docker Desktop 代理，然后运行 node scripts/e2e-web.mjs 并检查远端 CI；Q/M、人工评测及计划其余事项未完成。
+
+- 2026-11-02 基线复核：local@4bada0b，工作树无可见变更；origin/main 同 SHA，origin/local 尚不存在。下方旧 SHA 和未提交状态均为历史记录。当前 schema SHA-256 为 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。Docker 引擎未运行。
+
 - **基线与契约**：分支 `local`，当前 HEAD `553d2892bd43f72502bd757b5eba589d8b1043d1`。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。JP-03 本轮代码和测试仍未提交，按其记录继续推进。
 - **Java**：V7/V8 历史、幂等、deadline、profile 与来源 tombstone 约束已验证。SSE `PROCESSING_TIMEOUT` error event 与异常 timeout 统一记录为 `timeout`。Maven 全量 **81 项，0 failure、0 error、1 opt-in skip**，其中含该分类回归；运行时日志实测 `terminal_status=timeout error_code=PROCESSING_TIMEOUT`。
 - **Python/评测**：profile/tombstone 消费、`top_k=1..10`、Recall@5/MRR@10 与分类汇总已实现。全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告），含新增 `test_http_client.py` 6 项与 `test_recovery_e2e.py` 3 项。Schema **85 structural cases**，offline smoke **16 passed**。候选/待审标注在 runner 被拒绝计分。
@@ -69,6 +93,10 @@ commit: 553d2892bd43f72502bd757b5eba589d8b1043d1
 - [ ] M：全栈成功链、隔离错误场景与中断清理验证通过；M 状态可供独立消费审阅。
 
 ## Start here
+1. 检查 local 工作树及当前提交，继续 Sol 对目标 SHA 的独立审阅并修复其发现；Q/M 未签收前不标 DONE。
+2. 复验 provenance、Web 代理和真实 E2E；按计划继续实现真实评测和故障场景。
+
+### 历史启动记录
 1. 继续在 `D:\konwflow` 的 `local` 分支；基线 HEAD 为 `553d2892bd43f72502bd757b5eba589d8b1043d1`。保护 JP-03 Java/Python 未提交文件；当前交接继续项为隔离 E2E/故障场景、预测采集/性能基线和人工标注。
 2. 查看本节 SHA 与当前变更，勿把计划记录中的历史提交或旧 draft.8/.9 快照当作当前 HEAD。
 3. 下一阶段优先安排人工独立复核 60 道题并绑定明确 holdout；只有真实 provider 凭证可用且资料获准时再开展有调用上限的质量/费用评测。Q 审阅与 M 消费确认独立跟踪。
@@ -86,16 +114,15 @@ commit: 553d2892bd43f72502bd757b5eba589d8b1043d1
 - E2E: 先启动并迁移目标本地数据库，再运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --database-name <safe-local-db> --output services/ai/docs/evidence/local-backend-e2e-draft10-replay.json`。
 
 ## Decisions and guardrails
-- 保持在 `local`；当前 HEAD 为 `013fcf5a2de72b09599037fb997765443f5d61ee`。两项 review 修复仍未提交、未推送或合并 `main`。
+- 保持在 local 开发；当前基线以 git rev-parse HEAD 为准，历史 SHA 和未推送状态不再适用。
 - Java remains sole owner of task, lease/fencing, Chunk/vector writes and publication. Python writes only through authenticated bounded Java endpoints; retrieval uses read-only DB access.
 - 当前 draft.10 是开发候选，不标为冻结或 Q approved；真实模型质量/费用和 Q/M 状态独立报告。
 - 只用合成/获准资料；候选数据不是人工审核结果；报告不得包含 secret、请求正文、模型答案或向量。
 - 不检查 `data/raw/`。
 
 ## Working tree
-- Branch `local` at `013fcf5a2de72b09599037fb997765443f5d61ee`; current uncommitted changes include Java/Python lifecycle/evaluation implementation, tests, candidate tooling/data, recovery harness/evidence, and progress records.
-- `.context/ai-handoff.md` is tracked and modified in the worktree.
-- Local Compose services are stopped; named volumes remain. Temporary E2E database was dropped after successful replay. Ports 8000/8080 were confirmed free by the runner.
+- 分支 local；以 git status 确定当前变更。handoff 是会话自有未提交记录；.tmp-annotation/ 和未跟踪审核说明归属待确认，保留不覆盖。
+- 本轮 provenance、Web 代理和测试为本会话变更，具体状态以 Git 为准。
 
 ## Open questions
 - 60 candidate questions have `reviewed=0`; independent question review and a real blind holdout remain outstanding.
@@ -103,6 +130,26 @@ commit: 553d2892bd43f72502bd757b5eba589d8b1043d1
 - Independent Q review and M consumption confirmation remain pending. Do not change ticket status to DONE without those approvals.
 
 ## Handoff log
+- 2026-11-02 — codex maintained in_progress：用户提供模型配置，转存 ignored .env 并清空已跟踪示例密钥；未输出凭据、未调用 provider。隔离备份恢复与独立审阅进行中。
+
+- 2026-11-02 — codex maintained in_progress：保留初次不完整故障/性能报告，完成修复并重跑；当前评分与预算组件尚未连接真实服务。
+
+- 2026-11-02 — codex maintained in_progress：来源、代理、分页、评分引用及失败候选物理清理均通过 Sol 限定复审；继续 OpenAPI、隔离故障和采集预算工作。
+
+- 2026-11-02 — codex accepted 并设为 in_progress：实施已批准 P0/P1/P2 计划，Sol 独立审阅 b7e83c8，Terra 修正来源及状态。
+
+- 2026-11-02 — codex maintained in_progress: 验证并提交 60 题 human-reviewer 审核数据；未将公开验证集当作盲测。
+
+- 2026-11-02 — codex maintained in_progress: 用户确认已逐题复核 agent 标注，等待人工审核者标识；不改写原始 agent 文件。
+
+- 2026-11-02 — codex maintained in_progress: 代理恢复后全栈浏览器 E2E 通过；质量门退出状态已修复并推送；独立人工审核及远端 CI 状态待确认。
+
+- 2026-11-02 — codex accepted 并设为 in_progress：用户确认 Docker 代理已修复，开始重跑全栈 E2E。
+
+- 2026-11-02T06:46:00Z — codex set status to blocked: Docker Desktop registry 代理不可用；等待恢复后重跑全栈 E2E。
+
+- 2026-11-02 — codex accepted 并设为 in_progress：按已批准 P0/P1 计划继续，保留历史记录。
+
 - `2026-11-01T11:30:21Z` — 最终状态复核发现共享工作树新增 4 个 Muse 前端未提交文件（API proxy route/test 与 source viewer TSX/CSS）；这些不属于 JP-03，本轮未读取 diff、未触碰、未测试，已在 M 状态中标明并保留。
 - `2026-11-01T11:23:14Z` — Codex 在 `local@553d2892` 实施 JP-03 增量：Java/Python 共享并发护栏与 arrival deadline、用量/阶段日志、retryable source failure 映射、dataset-bound quality gate、预测支持判断审核包。Python 263 passed；Java 编译通过、非容器测试 37 项（0 failure/error，1 skip）；全 Maven 的 Testcontainers 因 Docker daemon 不可用失败，未调用真实模型。未提交/推送。
 - `2026-11-01T11:21:51Z` — Codex reconciled this same-machine handoff against the actual tree: branch `local`, HEAD `553d2892bd43f72502bd757b5eba589d8b1043d1`; corrected the prior “clean worktree” snapshot, preserved JP-03 ownership of existing Java/Python changes, and started the separately scoped Muse frontend M lane. No commit or push.

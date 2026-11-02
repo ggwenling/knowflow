@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "started_at": "2026-11-02T12:02:08.697079+00:00",
+  "projects": [
+    "knowflow-restore-115c26942e1b4db3",
+    "knowflow-restore-67054ae1d5364000"
+  ],
+  "checks": {
+    "source_index_ready": true,
+    "schema_owners_match": true,
+    "bytes_match": true,
+    "history_source_accessible": true,
+    "owner_isolation": true,
+    "restored_index_queryable": true
+  },
+  "provider_calls": 0,
+  "source_revision": "fbe7038c47ed02b2a7837ec033afee0f9224200a",
+  "drill_sha256": "f3d170a7780f0f5accea2f61847b3ffd5a695c2e3f12f8592137e7fe17e18ab5",
+  "backup_sha256": {
+    "database": "13853c21ee60ea859673ec66df0bbcc4ffb9bbdb6579d7304f458e636553db13",
+    "objects": "b7c8ac6d820d6dc12b756d862ae19a84e8250e666fb8934bcca5df09cdae305a"
+  },
+  "stage": "start_restored_api",
+  "cleanup": {
+    "knowflow-restore-67054ae1d5364000": true,
+    "knowflow-restore-115c26942e1b4db3": true
+  }
+}

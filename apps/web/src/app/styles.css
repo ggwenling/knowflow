@@ -1,1 +1,2 @@
+:root{--ink:#172b40;--muted:#6d7d8f;--paper:#f4f6f8;--surface:#fff;--line:#e1e7ec;--blue:#2670a8;--blue-dark:#1c5c8d}
 *{box-sizing:border-box}html,body{min-height:100%;margin:0}body{font-family:Arial,"Microsoft YaHei","PingFang SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}button,input,textarea{font-family:inherit}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #8ab7d7;outline-offset:2px}::selection{background:#d5e7f2;color:#173a59}
