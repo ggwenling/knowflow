@@ -1,0 +1,20 @@
+{
+  "status": "incomplete",
+  "started_at": "2026-11-02T11:47:19.091725+00:00",
+  "projects": [
+    "knowflow-restore-897742881f514655",
+    "knowflow-restore-b7f06f0860d5482c"
+  ],
+  "checks": {},
+  "provider_calls": 0,
+  "backup_sha256": {
+    "database": "4bf79606ed147e90e46f4227bae1dacb35cac3ca098b5294c72e6476298d8aae",
+    "objects": "b4566ae1e6e0f6281de919738eb54e96d4275c5585cfec41035f95363ac72d34"
+  },
+  "stage": "restore_database",
+  "failure": "CalledProcessError",
+  "cleanup": {
+    "knowflow-restore-b7f06f0860d5482c": true,
+    "knowflow-restore-897742881f514655": true
+  }
+}

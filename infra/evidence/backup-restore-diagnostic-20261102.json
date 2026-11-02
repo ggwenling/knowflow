@@ -1,0 +1,20 @@
+{
+  "status": "incomplete",
+  "started_at": "2026-11-02T11:54:14.193548+00:00",
+  "projects": [
+    "knowflow-restore-c68a97803dca4dad",
+    "knowflow-restore-30737aeb0aab4c23"
+  ],
+  "checks": {},
+  "provider_calls": 0,
+  "backup_sha256": {
+    "database": "f23f7d4802c6e524c01311b4bddb605a5339277b76f3ab88d5c8df523123cec9",
+    "objects": "bff55d38bb6444618c2a883ab1ed385e4eb4d61a22d9b0b1e7492059ea0e8451"
+  },
+  "stage": "restore_database",
+  "failure": "RuntimeError:RESTORE_DATABASE_OBJECT_ALREADY_EXISTS",
+  "cleanup": {
+    "knowflow-restore-30737aeb0aab4c23": true,
+    "knowflow-restore-c68a97803dca4dad": true
+  }
+}
