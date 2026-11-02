@@ -142,6 +142,78 @@ def test_wiring_preflight_checks_both_prices_and_bounds_without_constructing_pro
     assert calls == []
 
 
+def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from knowflow_ai import app as ai_app
+    from knowflow_ai.answering import ReadOnlyRetriever
+    from knowflow_ai.config import Settings
+    from knowflow_ai.embedding import EmbeddingSettings
+    from knowflow_ai.protocol import CONTRACT_VERSION
+    wiring = load('wiring')
+    ledger_path = tmp_path / 'budget.sqlite3'
+    calls = []
+
+    class Embedding:
+        settings = SimpleNamespace(model='model-a')
+        async def embed(self, texts, *, request_id):
+            calls.append(('embed', request_id))
+            return {'data': [{'embedding': [1.0] * 1024} for _ in texts]}
+        async def aclose(self): pass
+
+    class Llm:
+        settings = SimpleNamespace(model='model-a')
+        async def generate(self, question, evidence, *, request_id):
+            calls.append(('generate', request_id))
+            assert len(evidence) == 5
+            return {'answer': 'insufficient', 'has_answer': False, 'source_ids': []}
+        async def stream_content(self, question, evidence, *, request_id):
+            calls.append(('stream', request_id))
+            assert len(evidence) == 5
+            yield '{"answer":"insufficient","has_answer":false,"source_ids":[]}'
+        async def aclose(self): pass
+
+    def fetch(_url, _query, params, _deadline=None, _cancellation=None):
+        assert params[-1] == 10
+        return [{'document_id': 'd', 'content_version_id': 'c', 'index_version_id': 'i',
+                 'text_content': 'a', 'text_sha256': sha256(b'a').hexdigest(),
+                 'locator_kind': 'text_range', 'source_start': 0, 'source_end': 1,
+                 'source_page': None, 'chunk_id': str(i)} for i in range(10)]
+
+    monkeypatch.setattr(ReadOnlyRetriever, '_fetch_rows', staticmethod(fetch))
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment',
+                        staticmethod(lambda: EmbeddingSettings(api_key='e' * 40)))
+    monkeypatch.setattr(ai_app.LlmSettings, 'from_environment',
+                        staticmethod(lambda: SimpleNamespace(model='model-a')))
+    common = {'provider': 'synthetic', 'model': 'model-a', 'quote': current_quote(),
+              'bound_evidence': current_bound_evidence()}
+    factories = wiring.EvaluationFactories(ledger=wiring.BudgetLedger(ledger_path),
+        embedding={**common, 'adapter_factory': Embedding, 'token_bounds': verified_bounds(lambda *_: (100, 0))},
+        llm={**common, 'adapter_factory': Llm, 'token_bounds': verified_bounds(lambda *_: (100, 1024))})
+    factories.preflight()
+    secret = 'test-only-' + 'a' * 40
+    app = ai_app.create_app(Settings(secret, ai_database_url='postgresql://unused.invalid/db'),
+                            worker_factory=factories.index_worker, answer_service_factory=factories.answer_service)
+    payload = {'contract_version': CONTRACT_VERSION, 'request_id': 'sync', 'question': 'question?',
+               'scope': {'owner_id': 'owner-1', 'knowledge_base_id': 'kb-1', 'snapshot_id': 'snap-1',
+                         'indexes': [{'document_id': 'd', 'content_version_id': 'c', 'index_version_id': 'i'}]}}
+    headers = {'Authorization': f'Bearer {secret}', 'X-Request-ID': 'sync'}
+    with TestClient(app) as client:
+        async def index_probe():
+            adapter = app.state.index_worker._embedding_factory()
+            try: await adapter.embed(['index'], request_id='index')
+            finally: await adapter.aclose()
+        asyncio.run(index_probe())
+        response = client.post('/internal/v1/answers', headers=headers, json=payload)
+        assert response.status_code == 200 and response.json()['has_answer'] is False
+        payload['request_id'] = 'stream'
+        response = client.post('/internal/v1/answers/stream', headers={**headers, 'X-Request-ID': 'stream'}, json=payload)
+        assert response.status_code == 200 and 'event: completed' in response.text
+    assert calls == [('embed', 'index'), ('embed', 'sync'), ('generate', 'sync'),
+                     ('embed', 'stream'), ('stream', 'stream')]
+    with closing(sqlite3.connect(ledger_path)) as db:
+        assert db.execute('SELECT count(*) FROM reservations').fetchone()[0] == 5
+
+
 @pytest.mark.asyncio
 async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use(tmp_path):
     path = tmp_path / "budget.sqlite3"

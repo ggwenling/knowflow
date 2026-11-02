@@ -130,14 +130,17 @@ class BoundaryMiddleware:
                 await safe_send({'type': 'http.response.body', 'body': b''})
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, worker_factory=None,
+               answer_service_factory=None) -> FastAPI:
     settings = settings or Settings.from_environment()
     contract = ContractConsumer(settings.contract_path)
+    worker_factory = worker_factory if worker_factory is not None else IndexWorker
+    answer_service_factory = answer_service_factory if answer_service_factory is not None else AnswerService
 
     @asynccontextmanager
     async def lifespan(app):
         gateway = JavaGateway(settings.java_base_url, settings.internal_secret, contract)
-        worker = IndexWorker(gateway)
+        worker = worker_factory(gateway)
         app.state.java_gateway = gateway
         app.state.index_worker = worker
         await worker.start()
@@ -224,10 +227,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
         embedding_settings = EmbeddingSettings.from_environment()
         llm_settings = LlmSettings.from_environment()
-        service = AnswerService(settings.ai_database_url, contract,
-                                embedding_settings=embedding_settings,
-                                model_profile={"embedding_model_profile_id": embedding_settings.model,
-                                               "llm_model_profile_id": llm_settings.model})
+        service = answer_service_factory(settings.ai_database_url, contract,
+                                         embedding_settings=embedding_settings,
+                                         model_profile={"embedding_model_profile_id": embedding_settings.model,
+                                                        "llm_model_profile_id": llm_settings.model})
         admission = request.app.state.question_admission
         if not admission.try_acquire():
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
@@ -245,10 +248,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
         embedding_settings = EmbeddingSettings.from_environment()
         llm_settings = LlmSettings.from_environment()
-        service = AnswerService(settings.ai_database_url, contract,
-                                embedding_settings=embedding_settings,
-                                model_profile={"embedding_model_profile_id": embedding_settings.model,
-                                               "llm_model_profile_id": llm_settings.model})
+        service = answer_service_factory(settings.ai_database_url, contract,
+                                         embedding_settings=embedding_settings,
+                                         model_profile={"embedding_model_profile_id": embedding_settings.model,
+                                                        "llm_model_profile_id": llm_settings.model})
 
         admission = request.app.state.question_admission
         if not admission.try_acquire():

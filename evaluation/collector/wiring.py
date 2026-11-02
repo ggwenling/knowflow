@@ -1,9 +1,9 @@
 """Evaluation factory wiring prototype; production startup stays disabled.
 
-The current product create_app() constructs its own factories in module-level
-closures and has no per-application injection interface. Monkeypatching those
-globals is unsafe in a process that could host another app. This module does not
-patch the product and does not start a service or make provider calls.
+The product create_app() supports per-application worker and answer factories.
+This module does not start a service or make provider calls. Real evaluation
+startup remains disabled until a trustworthy token-bound policy and process-wide
+budget enforcement have been independently verified.
 """
 import importlib.util
 from pathlib import Path
@@ -74,7 +74,7 @@ class EvaluationFactories:
 
 
 def create_evaluation_app(*_args, **_kwargs):
-    """Fail closed until per-app factory injection and safe budget wiring exist."""
+    """Fail closed until trusted token bounds and full budget enforcement are verified."""
     raise RuntimeError("EVALUATION_SERVICE_NOT_READY")
 
 

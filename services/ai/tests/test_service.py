@@ -62,6 +62,59 @@ def test_health_does_not_probe_models_or_database(client):
         assert client.post(path, headers=AUTH, json={'owner_id': 'forged'}).status_code == 400
 
 
+def test_per_app_factories_are_isolated_for_worker_and_both_answer_routes(monkeypatch):
+    from types import SimpleNamespace
+    calls = []
+    monkeypatch.setattr(EmbeddingSettings, 'from_environment',
+                        staticmethod(lambda: EmbeddingSettings(api_key='e' * 40)))
+    monkeypatch.setattr(ai_app.LlmSettings, 'from_environment',
+                        staticmethod(lambda: SimpleNamespace(model='fake-llm')))
+
+    def factories(name):
+        class Worker:
+            async def start(self): calls.append((name, 'start'))
+            async def close(self): calls.append((name, 'close'))
+            async def accept(self, payload): calls.append((name, 'dispatch', payload['request_id']))
+
+        class Answer:
+            async def answer(self, payload):
+                calls.append((name, 'answer', payload['request_id']))
+                return {'marker': name}
+            async def stream(self, payload):
+                calls.append((name, 'stream', payload['request_id']))
+                yield {'event': 'completed', 'marker': name}
+
+        return (lambda _gateway: Worker(), lambda *_args, **_kwargs: Answer())
+
+    worker_a, answer_a = factories('a')
+    worker_b, answer_b = factories('b')
+    settings = Settings(SECRET, ai_database_url='postgresql://unused.invalid/knowflow')
+    app_a = create_app(settings, worker_factory=worker_a, answer_service_factory=answer_a)
+    app_b = create_app(settings, worker_factory=worker_b, answer_service_factory=answer_b)
+    cases = json.loads((ROOT / 'contracts/examples/protocol-cases.json').read_text(encoding='utf-8'))
+    dispatch = copy.deepcopy(next(case['payload'] for case in cases
+                                  if case['definition'] == 'IndexDispatch' and case['structurally_valid']))
+    dispatch['request_id'] = 'dispatch-a'
+    dispatch['runtime_profile_id'] = 'runtime-default'
+    dispatch['lease_expires_at'] = '2099-01-01T00:00:00+00:00'
+    payload = {'contract_version': CONTRACT_VERSION, 'request_id': 'answer-a', 'question': 'question?',
+               'scope': {'owner_id': 'owner-1', 'knowledge_base_id': 'kb-1', 'snapshot_id': 'snap-1',
+                         'indexes': [{'document_id': 'doc-1', 'content_version_id': 'content-1',
+                                      'index_version_id': 'index-1'}]}}
+    with TestClient(app_a) as client_a, TestClient(app_b) as client_b:
+        response = client_a.post('/internal/v1/index-executions', headers={**AUTH, 'X-Request-ID': 'dispatch-a'}, json=dispatch)
+        assert response.status_code == 202
+        response = client_a.post('/internal/v1/answers', headers={**AUTH, 'X-Request-ID': 'answer-a'}, json=payload)
+        assert response.json() == {'marker': 'a'}
+        payload['request_id'] = 'stream-b'
+        response = client_b.post('/internal/v1/answers/stream', headers={**AUTH, 'X-Request-ID': 'stream-b'}, json=payload)
+        assert response.status_code == 200 and '"marker":"b"' in response.text
+    assert ('a', 'dispatch', 'dispatch-a') in calls
+    assert ('a', 'answer', 'answer-a') in calls
+    assert ('b', 'stream', 'stream-b') in calls
+    assert ('b', 'answer', 'answer-a') not in calls and ('a', 'stream', 'stream-b') not in calls
+
+
 @pytest.mark.parametrize('headers', [{}, {'Authorization': 'Bearer wrong'},
     [('Authorization', f'Bearer {SECRET}'), ('Authorization', 'Bearer wrong')]])
 def test_auth_before_routing(client, headers):
