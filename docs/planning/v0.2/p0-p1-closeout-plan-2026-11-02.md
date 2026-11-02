@@ -30,3 +30,8 @@
 - 评测命令在显式质量门失败或不完整时返回非零；对应三种状态回归通过。该改动不代表真实数据集或质量验收已完成。
 - 60 题人工审核数据集 `qingzhu-seed-v2-reviewed` 原指纹 `4ce66d29dca63b366c01e6aab9573dbd61295207e12cd5a766fb25a907ee94c3`；补充来源后的指纹为 `023f14ba9e56df87cb2ea635638e01d3a543a4aeb2588856dc2c3aed7f8356b0`。40 道开发、20 道公开验证，50 道可回答、10 道不可回答；原 agent 的未来时间戳未核实，人工记录时间为用户确认时间。后续质量门须绑定新指纹。
 - 60 题的人工审核已由用户确认；独立 Q/M 签收、私有盲测、生成答案人工审核及真实 provider 质量和费用尚待完成。
+- Sol High 对 `b7e83c8` 的 Q 审阅为 CHANGES_REQUESTED；代理请求体超限与超时修复 `c075c0f`、来源修复 `4860ecf` 已获限定范围复审通过。分页修复 `24ab858` 待独立复审，完整 Q/M 签收和 OpenAPI 未完成。
+- 2026-11-02 本轮 Python 全量 275 项、Web 全量 43 项、lint/typecheck/build 及分页竞态修复后隔离 Docker E2E 1/1 通过；以上为本地工作树验证，远端 CI 结果尚待核实。
+- Sol 对第二批 Embedding 失败演练提出候选索引物理清理证据缺口；`79a400d` 补充活动知识库内的 FAILED、cleaned_at、零 Chunk/embedding 及旧索引可查询断言，五场景隔离演练通过，Sol 限定复审通过。数据库/MinIO 中断及负载测试仍未完成。
+- Sol 对分页刷新竞态 `f551a68` 与离线评分 v2 引用标记覆盖缺陷修复 `c19d03f` 限定复审通过；真实预测采集及正式评分仍未完成。
+- 项目负责人确认尚未准备 20 题私有盲测；准备和隔离要求见 `docs/evaluation/blind-holdout-protocol.md`。Sol High 的真实采集与评分设计见 `docs/evaluation/real-collection-design.md`，真实采集和正式质量验收仍未完成。
