@@ -139,10 +139,13 @@ def _v2_fixture(tmp_path):
         answered = row.pop("has_answer")
         row.pop("support_judgement")
         indices = row.pop("cited_evidence")
+        for i, span in enumerate(row["retrieved_evidence"]):
+            span["source_id"] = f"src-{i}"
         row["outcome"] = "answered" if answered else "refused"
-        row["answer"] = "测试答案" if answered else "资料不足"
+        row["answer"] = "测试答案" + "".join(f"[src-{i}]" for i in indices) if answered else "资料不足"
         row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
-        row["citations"] = [{"id": f"cite-{i}", "evidence_index": i, "claim": "测试答案"} for i in indices]
+        row["citations"] = [{"id": f"cite-{i}", "source_id": f"src-{i}", "marker_index": marker_index,
+                             "evidence_index": i, "claim": "测试答案"} for marker_index, i in enumerate(indices)]
         row["error_code"] = None
     predictions = tmp_path / "v2-predictions.json"
     predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -206,6 +209,60 @@ def test_v2_citation_review_is_bound_to_each_source(tmp_path):
     review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(ValueError, match="REVIEW_INPUT_MISMATCH"):
         runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+
+
+@pytest.mark.parametrize("defect", ["omitted_marker", "duplicate_position", "unknown_source", "outside_top5", "duplicate_source", "malformed_marker"])
+def test_v2_rejects_unbound_or_ambiguous_citation_markers(tmp_path, defect):
+    payload, predictions, _bundle, _review, _config = _v2_fixture(tmp_path)
+    row = next(r for r in payload["predictions"] if r["outcome"] == "answered" and len(r["citations"]) == 1)
+    first = row["citations"][0]
+    extra = dict(first, id="cite-repeat", marker_index=1)
+    row["answer"] += f"[{first['source_id']}]"
+    if defect == "duplicate_position":
+        extra["marker_index"] = 0
+    elif defect == "unknown_source":
+        row["answer"] = row["answer"].removesuffix(f"[{first['source_id']}]") + "[missing-source]"
+        extra["source_id"] = "missing-source"
+    elif defect == "outside_top5":
+        while len(row["retrieved_evidence"]) < 6:
+            source = dict(row["retrieved_evidence"][0])
+            source["source_id"] = f"extra-{len(row['retrieved_evidence'])}"
+            row["retrieved_evidence"].append(source)
+        extra["evidence_index"] = 5
+        extra["source_id"] = row["retrieved_evidence"][5]["source_id"]
+        row["answer"] = row["answer"].removesuffix(f"[{first['source_id']}]") + f"[{extra['source_id']}]"
+    elif defect == "duplicate_source":
+        row["retrieved_evidence"].append(dict(row["retrieved_evidence"][0]))
+    elif defect == "malformed_marker":
+        row["answer"] += "[bad marker]"
+    if defect != "omitted_marker":
+        row["citations"].append(extra)
+    row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="INVALID_CITATION|INVALID_EVIDENCE_SOURCE_ID"):
+        review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+
+
+def test_v2_repeated_source_markers_require_separate_review(tmp_path):
+    payload, predictions, _bundle, review, config = _v2_fixture(tmp_path)
+    row = next(r for r in payload["predictions"] if r["outcome"] == "answered" and len(r["citations"]) == 1)
+    first = row["citations"][0]
+    row["answer"] += f"[{first['source_id']}]"
+    row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
+    row["citations"].append(dict(first, id="cite-repeat", marker_index=1))
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    bundle = review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+    for entry in bundle["entries"]:
+        if entry["outcome"] == "answered":
+            entry.update(support_judgement="supported", reviewed_by="human", reviewed_at="2026-11-02T07:00:00Z")
+            for cite in entry["citations"]:
+                cite["judgement"] = "supported"
+    entry = next(e for e in bundle["entries"] if e["question_id"] == row["question_id"])
+    entry["citations"][1]["judgement"] = "unreviewed"
+    review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    report = runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+    assert report["quality_gate"]["status"] == "incomplete"
+    assert report["metrics"]["citation_reviewed_count"] == report["metrics"]["citation_count"] - 1
 
 
 def test_v1_cannot_claim_formal_acceptance(tmp_path):

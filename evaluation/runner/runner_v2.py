@@ -15,6 +15,8 @@ MINIMUMS = {"recall_at_5": 0.85, "mrr_at_10": 0.75,
             "human_supported_answer_rate": 0.90, "citation_accuracy": 0.95,
             "unanswerable_refusal_rate": 0.90, "answerable_answer_rate": 0.90,
             "human_support_review_coverage": 1.0, "citation_review_coverage": 1.0}
+SOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
+MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
 
 
 def _sha(value):
@@ -71,18 +73,36 @@ def _load(predictions_path, dataset_root, split):
             raise ValueError("INVALID_ERROR_CODE")
         if row["outcome"] != "answered" and row["citations"]:
             raise ValueError("INVALID_CITATIONS")
+        source_ids = set()
         for span in row["retrieved_evidence"]:
-            legacy._validate_span(span, documents, sources)
+            if (not isinstance(span, dict) or "source_id" not in span
+                    or not isinstance(span["source_id"], str) or not SOURCE_ID.fullmatch(span["source_id"])
+                    or span["source_id"] in source_ids):
+                raise ValueError("INVALID_EVIDENCE_SOURCE_ID")
+            source_ids.add(span["source_id"])
+            legacy._validate_span({key: value for key, value in span.items() if key != "source_id"}, documents, sources)
+        markers = MARKER.findall(row["answer"])
+        if "[" in MARKER.sub("", row["answer"]) or "]" in MARKER.sub("", row["answer"]):
+            raise ValueError("INVALID_CITATION_MARKER")
+        if row["outcome"] != "answered" and markers:
+            raise ValueError("INVALID_CITATIONS")
         ids = set()
+        positions = set()
         for cite in row["citations"]:
-            if (not isinstance(cite, dict) or set(cite) != {"id", "evidence_index", "claim"}
+            if (not isinstance(cite, dict) or set(cite) != {"id", "source_id", "marker_index", "evidence_index", "claim"}
                     or not isinstance(cite["id"], str) or not cite["id"].strip() or cite["id"] in ids
+                    or type(cite["marker_index"]) is not int or not 0 <= cite["marker_index"] < len(markers)
+                    or cite["marker_index"] in positions or cite["source_id"] != markers[cite["marker_index"]]
                     or type(cite["evidence_index"]) is not int
                     or not 0 <= cite["evidence_index"] < min(5, len(row["retrieved_evidence"]))
+                    or row["retrieved_evidence"][cite["evidence_index"]]["source_id"] != cite["source_id"]
                     or not isinstance(cite["claim"], str) or not cite["claim"].strip()
                     or cite["claim"] not in row["answer"]):
                 raise ValueError("INVALID_CITATIONS")
             ids.add(cite["id"])
+            positions.add(cite["marker_index"])
+        if row["outcome"] == "answered" and (not markers or len(positions) != len(markers)):
+            raise ValueError("INVALID_CITATIONS")
         received[row["question_id"]] = row
     if set(received) != set(expected):
         raise ValueError("MISSING_PREDICTIONS")
@@ -96,7 +116,8 @@ def prepare_review(predictions_path, dataset_root, split):
         citations = []
         for cite in row["citations"]:
             span = row["retrieved_evidence"][cite["evidence_index"]]
-            citations.append({"id": cite["id"], "claim": cite["claim"], "evidence": span,
+            citations.append({"id": cite["id"], "source_id": cite["source_id"], "marker_index": cite["marker_index"],
+                              "claim": cite["claim"], "evidence": span,
                               "source_text": sources[span["document_id"]][span["start"]:span["end"]],
                               "judgement": "unreviewed"})
         entries.append({"question_id": row["question_id"], "question": expected[row["question_id"]]["question"],
