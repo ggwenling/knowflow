@@ -58,6 +58,45 @@ async function openWorkspace() {
   await screen.findByText(document.original_name);
 }
 
+it("shows the ninth history item and loads the next document and history pages", async () => {
+  const history = Array.from({ length: 50 }, (_, index) => ({ ...historical, question_id: `q${index}`, question: `问题 ${index}` }));
+  const docs = Array.from({ length: 50 }, (_, index) => ({ ...document, id: `d${index}`, original_name: `资料${index}.md` }));
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "me") return { user_id: "user", email: "user@example.test" };
+    if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
+    if (path.includes("/documents?")) return path.includes("offset=0") ? { items: docs, has_more: true } : { items: [{ ...document, id: "d50", original_name: "第51份.md" }], has_more: false };
+    if (path.startsWith("questions?")) return path.includes("offset=0") ? { items: history, has_more: true } : { items: [{ ...historical, question_id: "q50", question: "第51个问题" }], has_more: false };
+    throw new Error(`Unexpected API path: ${path}`);
+  });
+  render(<Workspace />);
+  expect(await screen.findByText("问题 8")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
+  expect(await screen.findByText("第51份.md")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "加载更多问答" }));
+  expect(await screen.findByText("第51个问题")).toBeVisible();
+  expect(api).toHaveBeenCalledWith("knowledge-bases/kb/documents?limit=50&offset=50");
+  expect(api).toHaveBeenCalledWith("questions?limit=50&offset=50");
+});
+
+it("ignores a late document page after switching knowledge bases", async () => {
+  const pending = deferred<{ items: Document[]; has_more: boolean }>();
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "me") return { user_id: "user", email: "user@example.test" };
+    if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }, { id: "kb-b", name: "第二资料库", status: "ACTIVE" }] };
+    if (path === "knowledge-bases/kb/documents?limit=50&offset=0") return { items: [document], has_more: true };
+    if (path === "knowledge-bases/kb/documents?limit=50&offset=1") return pending.promise;
+    if (path.startsWith("knowledge-bases/kb-b/documents?")) return { items: [] };
+    if (path.startsWith("questions?")) return { items: [] };
+    throw new Error(`Unexpected API path: ${path}`);
+  });
+  await openWorkspace();
+  fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
+  fireEvent.click(screen.getByRole("button", { name: /第二资料库/ }));
+  await screen.findByRole("heading", { name: "第二资料库" });
+  await act(async () => { pending.resolve({ items: [{ ...document, original_name: "迟到资料.md" }], has_more: false }); });
+  expect(screen.queryByText("迟到资料.md")).not.toBeInTheDocument();
+});
+
 describe("index task polling", () => {
   it.each(["重建索引", "更新资料"])("waits for the new task when %s retains a READY index", async (action) => {
     await openWorkspace();

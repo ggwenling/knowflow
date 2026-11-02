@@ -6,6 +6,7 @@ import styles from "./workspace.module.css";
 import SourceViewer from "./source-viewer";
 
 type Task = { task_id: string; status: string; failure_code: string | null };
+type Page<T> = { items: T[]; has_more: boolean };
 const contractVersion = "0.2.0-draft.10";
 const terminal = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 const labels: Record<string, string> = {
@@ -35,6 +36,9 @@ export default function Workspace() {
   const [selectedBase, setSelectedBase] = useState("");
   const [documents, setDocuments] = useState<Document[]>([]);
   const [history, setHistory] = useState<QuestionHistory[]>([]);
+  const [moreDocuments, setMoreDocuments] = useState(false);
+  const [moreHistory, setMoreHistory] = useState(false);
+  const [loadingPage, setLoadingPage] = useState(false);
   const [answer, setAnswer] = useState<QuestionDetail | null>(null);
   const [activeQuestion, setActiveQuestion] = useState("");
   const [draft, setDraft] = useState("");
@@ -48,6 +52,9 @@ export default function Workspace() {
   const selectedBaseRef = useRef("");
   const baseGenerationRef = useRef(0);
   const refreshGenerationRef = useRef(0);
+  const pageLoadingRef = useRef(false);
+  const documentOffsetRef = useRef(0);
+  const historyOffsetRef = useRef(0);
   const pollingTasksRef = useRef(new Set<string>());
 
   const selectBase = useCallback((baseId: string) => {
@@ -55,6 +62,7 @@ export default function Workspace() {
       baseGenerationRef.current += 1;
       setDocuments([]);
       setHistory([]);
+      setMoreDocuments(false); setMoreHistory(false);
       setAnswer(null);
     }
     selectedBaseRef.current = baseId;
@@ -72,14 +80,46 @@ export default function Workspace() {
     const baseGeneration = baseGenerationRef.current;
     const requestGeneration = ++refreshGenerationRef.current;
     const [documentList, historyList] = await Promise.all([
-      api<{ items: Document[] }>(`knowledge-bases/${baseId}/documents?limit=50&offset=0`),
-      api<{ items: QuestionHistory[] }>("questions?limit=50&offset=0"),
+      api<Page<Document>>(`knowledge-bases/${baseId}/documents?limit=50&offset=0`),
+      api<Page<QuestionHistory>>("questions?limit=50&offset=0"),
     ]);
     if (selectedBaseRef.current !== baseId || baseGenerationRef.current !== baseGeneration || refreshGenerationRef.current !== requestGeneration) return null;
     setDocuments(documentList.items);
     setHistory(historyList.items);
+    documentOffsetRef.current = documentList.items.length; historyOffsetRef.current = historyList.items.length;
+    setMoreDocuments(Boolean(documentList.has_more)); setMoreHistory(Boolean(historyList.has_more));
     return documentList.items;
   }, []);
+
+  async function loadMore(kind: "documents" | "history") {
+    if (pageLoadingRef.current || !selectedBaseRef.current) return;
+    pageLoadingRef.current = true; setLoadingPage(true);
+    const baseId = selectedBaseRef.current, generation = baseGenerationRef.current, refreshId = refreshGenerationRef.current;
+    const isCurrent = () => selectedBaseRef.current === baseId && baseGenerationRef.current === generation && refreshGenerationRef.current === refreshId;
+    try {
+      if (kind === "documents") {
+        const result = await api<Page<Document>>(`knowledge-bases/${baseId}/documents?limit=50&offset=${documentOffsetRef.current}`);
+        if (!isCurrent()) return;
+        documentOffsetRef.current += result.items.length;
+        setDocuments((previous) => [...previous, ...result.items.filter((item) => !previous.some((old) => old.id === item.id))]);
+        setMoreDocuments(Boolean(result.has_more));
+        for (const document of result.items) {
+          if (document.latest_task_id && document.latest_task_status && !terminal.has(document.latest_task_status)) {
+            void pollDocument(document.id, document.latest_task_id, baseId).catch((error) => {
+              if (isCurrent()) setNotice(messageOf(error));
+            });
+          }
+        }
+      } else {
+        const result = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${historyOffsetRef.current}`);
+        if (!isCurrent()) return;
+        historyOffsetRef.current += result.items.length;
+        setHistory((previous) => [...previous, ...result.items.filter((item) => !previous.some((old) => old.question_id === item.question_id))]);
+        setMoreHistory(Boolean(result.has_more));
+      }
+    } catch (error) { if (isCurrent()) setNotice(messageOf(error)); }
+    finally { pageLoadingRef.current = false; setLoadingPage(false); }
+  }
 
   const pollDocument = useCallback(async (documentId: string, taskId: string, baseId: string) => {
     const generation = baseGenerationRef.current;
@@ -204,6 +244,7 @@ export default function Workspace() {
     try {
       await api(`documents/${document.id}`, { method: "DELETE" });
       setDocuments((previous) => previous.filter((item) => item.id !== document.id));
+      await refresh(selectedBase);
       if (answer?.sources.some((source) => source.document_id === document.id)) {
         setAnswer(null); setNotice("该文档已删除，相关来源已失效。");
       }
@@ -241,7 +282,7 @@ export default function Workspace() {
       const reason = controller.signal.aborted ? "用户停止生成" : messageOf(error);
       setAnswer((old) => isCurrent() && old ? { ...old, status: controller.signal.aborted ? "CANCELLED" : "FAILED", failure_code: reason } : old);
       if (!controller.signal.aborted) setNotice(messageOf(error));
-      await api<{ items: QuestionHistory[] }>("questions?limit=50&offset=0").then((result) => setHistory(result.items)).catch(() => undefined);
+      await refresh(selectedBase).catch(() => undefined);
     } finally { if (isCurrent()) { abortRef.current = null; setBusy(false); } }
   }
 
@@ -307,7 +348,7 @@ export default function Workspace() {
         {bases.length === 0 && <p className={styles.sideEmpty}>这里还没有知识库。</p>}
         <form className={styles.newBase} onSubmit={createBase}><input aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
         <div className={styles.sideLabel}>最近问答</div>
-        <div className={styles.historyList}>{history.slice(0, 8).map((item) => <button key={item.question_id} className={styles.historyItem} onClick={() => openHistory(item)}><span>{item.question}</span><small>{statusLabel(item.status)}</small></button>)}</div>
+        <div className={styles.historyList}>{history.map((item) => <button key={item.question_id} className={styles.historyItem} onClick={() => openHistory(item)}><span>{item.question}</span><small>{statusLabel(item.status)}</small></button>)}{moreHistory && <button className={styles.textButton} disabled={loadingPage} onClick={() => void loadMore("history")}>加载更多问答</button>}</div>
         <div className={styles.account}><span className={styles.avatar}>{user.email.slice(0, 1).toUpperCase()}</span><span className={styles.accountText}>{user.email}<small>个人空间</small></span><button className={styles.textButton} onClick={signOut}>退出</button></div>
       </aside>
 
@@ -329,6 +370,7 @@ export default function Workspace() {
 
           <aside className={styles.documentPanel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>SOURCE LIBRARY</span><h2>资料 <span className={styles.documentCount}>{documents.length}</span></h2></div><label className={styles.iconUpload} aria-label="上传资料">＋<input type="file" accept=".txt,.md,.pdf" disabled={!selectedBase || working} onChange={(event) => { void upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
             {documents.length === 0 ? <div className={styles.emptyDocuments}><div>＋</div><strong>添加第一份资料</strong><span>支持 TXT、Markdown 和可读取文本的 PDF</span><small>最大 8 MiB · PDF 最多 200 页</small></div> : <div className={styles.documentList}>{documents.map((document) => <article key={document.id} className={styles.documentCard}><div className={styles.fileIcon}>{formatLabel(document.format)}</div><div className={styles.documentInfo}><strong title={document.original_name}>{document.original_name}</strong><span>{(document.byte_size / 1024).toFixed(0)} KB · {statusLabel(document.status)}</span>{document.status === "FAILED" && <small className={styles.failure}>索引失败，可尝试重建。</small>}</div><div className={styles.documentMenu}><button aria-expanded={openMenu === document.id} aria-label={`${document.original_name} 操作`} title="资料操作" onClick={() => setOpenMenu(openMenu === document.id ? "" : document.id)}>···</button>{openMenu === document.id && <div role="menu"><button role="menuitem" onClick={() => { setOpenMenu(""); window.document.getElementById(`update-${document.id}`)?.click(); }}>更新资料</button><button role="menuitem" onClick={() => { setOpenMenu(""); void rebuild(document); }}>重建索引</button><button role="menuitem" onClick={() => { setOpenMenu(""); void removeDocument(document); }}>删除资料</button></div>}<input id={`update-${document.id}`} type="file" accept=".txt,.md,.pdf" hidden onChange={(event) => { void upload(event.target.files?.[0], document); event.currentTarget.value = ""; }} /></div><div className={`${styles.statusDot} ${document.status === "READY" ? styles.statusReady : document.status === "FAILED" ? styles.statusFailed : ""}`} title={statusLabel(document.status)} /></article>)}</div>}
+            {moreDocuments && <button className={styles.textButton} disabled={loadingPage} onClick={() => void loadMore("documents")}>加载更多资料</button>}
             <div className={styles.privacyNote}><span>◈</span><p><strong>资料访问范围</strong><br />仅你可以访问此知识库。上传文档会进入索引流程，只有状态显示“已就绪”后才参与问答。</p></div>
           </aside>
         </div>
