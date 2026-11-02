@@ -120,6 +120,11 @@ def question(base_url, headers, base_id):
     event = None
     terminal = None
     retrieval_request_id = None
+    sequence = 0
+    started_event = False
+    sources_event = False
+    error_code = None
+    retryable = None
     try:
         with httpx.Client(base_url=base_url, timeout=45, trust_env=False) as client:
             with client.stream("POST", f"/api/v1/knowledge-bases/{base_id}/questions/stream",
@@ -139,14 +144,38 @@ def question(base_url, headers, base_id):
                             if retrieval_request_id and retrieval_request_id != event_request_id:
                                 return {"request_id": request_id, "outcome": "stream_error"}
                             retrieval_request_id = event_request_id
-                        if event == "delta" and first_ms is None:
-                            first_ms = round((time.monotonic() - started) * 1000, 2)
-                        if event in ("completed", "error"):
+                        if (not isinstance(data, dict) or not isinstance(event_request_id, str)
+                                or not event_request_id or type(data.get("sequence")) is not int
+                                or data["sequence"] != sequence + 1 or data.get("event") != event):
+                            return {"request_id": request_id, "outcome": "protocol_error"}
+                        sequence += 1
+                        if event == "started" and sequence == 1:
+                            started_event = True
+                        elif event == "delta" and started_event and not sources_event:
+                            if not isinstance(data.get("delta"), str) or not data["delta"]:
+                                return {"request_id": request_id, "outcome": "protocol_error"}
+                            if first_ms is None:
+                                first_ms = round((time.monotonic() - started) * 1000, 2)
+                        elif event == "sources" and started_event and not sources_event:
+                            if not isinstance(data.get("sources"), list) or type(data.get("has_answer")) is not bool:
+                                return {"request_id": request_id, "outcome": "protocol_error"}
+                            sources_event = True
+                        elif event == "completed" and started_event and sources_event and first_ms is not None:
                             terminal = event
                             break
+                        elif event == "error":
+                            code = data.get("code")
+                            if not isinstance(code, str) or not re.fullmatch(r"[A-Z0-9_]{1,80}", code) or type(data.get("retryable")) is not bool:
+                                return {"request_id": request_id, "outcome": "protocol_error"}
+                            error_code, retryable = code, data["retryable"]
+                            terminal = event
+                            break
+                        else:
+                            return {"request_id": request_id, "outcome": "protocol_error"}
                 elapsed = round((time.monotonic() - started) * 1000, 2)
                 return {"request_id": request_id, "outcome": "success" if terminal == "completed" else "stream_error",
-                        "retrieval_request_id": retrieval_request_id, "first_delta_ms": first_ms, "total_ms": elapsed}
+                        "retrieval_request_id": retrieval_request_id, "first_delta_ms": first_ms, "total_ms": elapsed,
+                        "error_code": error_code, "retryable": retryable}
     except httpx.HTTPError:
         return {"request_id": request_id, "outcome": "transport_error"}
 
@@ -158,6 +187,7 @@ def run_questions(base_url, headers, base_id, concurrency, count):
     success = [row for row in rows if row["outcome"] == "success"]
     return {"concurrency": concurrency, "requested": count, "succeeded": len(success),
             "failed": len(rows) - len(success),
+            "retryable_ai_failures": sum(row.get("error_code") == "AI_PROCESSING_FAILED" and row.get("retryable") is True for row in rows),
             "outcomes": {kind: sum(row["outcome"] == kind for row in rows)
                          for kind in sorted({row["outcome"] for row in rows})},
             "first_delta": summarize([r["first_delta_ms"] for r in success if r["first_delta_ms"] is not None]),
@@ -297,7 +327,7 @@ def main():
         parser.error("invalid workload bounds")
     result = run(args)
     print(json.dumps({"status": result["status"], "cases": len(result["cases"]), "output": str(args.output)}))
-    if result["cleanup_exit_code"] != 0:
+    if result["cleanup_exit_code"] != 0 or result["status"] != "completed":
         raise SystemExit(1)
 
 

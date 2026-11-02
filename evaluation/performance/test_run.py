@@ -1,7 +1,9 @@
 import importlib.util
 from pathlib import Path
+import sys
 
 import httpx
+import pytest
 
 spec = importlib.util.spec_from_file_location("perf_runner", Path(__file__).with_name("run.py"))
 perf = importlib.util.module_from_spec(spec)
@@ -31,16 +33,47 @@ def test_missing_latency_evidence_cannot_report_complete():
     assert perf.measurement_status(cases) == "completed_with_errors"
 
 
+@pytest.mark.parametrize("status", ["incomplete", "completed_with_errors"])
+def test_cli_fails_for_nonpassing_measurements(monkeypatch, tmp_path, status):
+    monkeypatch.setattr(sys, "argv", ["run.py", "--output", str(tmp_path / "report.json")])
+    monkeypatch.setattr(perf, "run", lambda _args: {"status": status, "cases": [], "cleanup_exit_code": 0})
+    with pytest.raises(SystemExit) as error:
+        perf.main()
+    assert error.value.code == 1
+
+
 def test_question_records_terminal_status_without_answer_or_credentials(monkeypatch):
     def handler(request):
         assert request.headers["authorization"] == "Bearer private-token"
         return httpx.Response(200, headers={"content-type": "text/event-stream"},
-                              text='event: delta\ndata: {"request_id":"server-1","text":"private answer"}\n\nevent: completed\ndata: {"request_id":"server-1"}\n\n')
+                              text='event: started\ndata: {"event":"started","sequence":1,"request_id":"server-1"}\n\n'
+                                   'event: delta\ndata: {"event":"delta","sequence":2,"request_id":"server-1","delta":"private answer"}\n\n'
+                                   'event: sources\ndata: {"event":"sources","sequence":3,"request_id":"server-1","has_answer":true,"sources":[]}\n\n'
+                                   'event: completed\ndata: {"event":"completed","sequence":4,"request_id":"server-1"}\n\n')
     real_client = httpx.Client
     monkeypatch.setattr(perf.httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
     result = perf.question("http://localhost", {"Authorization": "Bearer private-token"}, "kb")
     assert result["outcome"] == "success" and result["first_delta_ms"] is not None
     assert result["retrieval_request_id"] == "server-1"
+    assert "private" not in str(result)
+
+
+def test_malformed_stream_is_not_counted_as_success(monkeypatch):
+    def handler(request):
+        return httpx.Response(200, text='event: delta\ndata: {"text":"not a delta"}\n\nevent: completed\ndata: {}\n\n')
+    real_client = httpx.Client
+    monkeypatch.setattr(perf.httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
+    assert perf.question("http://localhost", {}, "kb")["outcome"] == "protocol_error"
+
+
+def test_retryable_admission_error_is_recorded_without_message(monkeypatch):
+    def handler(request):
+        return httpx.Response(200, text='event: error\ndata: {"event":"error","sequence":1,"request_id":"s1","code":"AI_PROCESSING_FAILED","retryable":true,"message":"private"}\n\n')
+    real_client = httpx.Client
+    monkeypatch.setattr(perf.httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs))
+    result = perf.question("http://localhost", {}, "kb")
+    assert result["outcome"] == "stream_error"
+    assert result["error_code"] == "AI_PROCESSING_FAILED" and result["retryable"] is True
     assert "private" not in str(result)
 
 
