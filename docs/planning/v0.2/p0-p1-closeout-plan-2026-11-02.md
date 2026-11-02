@@ -40,3 +40,4 @@
 - Sol 对 `379b838` 限定复核通过；`7c4bef8` 发现 trace 二次写入及 locator 附带正文缺口，`3b8784d` 修复后限定复核通过。预算守卫尚未接入服务，真实采集和全局硬预算仍未完成。
 - 远端 [CI run 41430594011](https://github.com/ggwenling/knowflow/actions/runs/41430594011) 的 Web 全栈、Java、Python/契约三项均成功，目标为 `e9f115f`；更新提交必须分别确认 CI。
 - PostgreSQL 在已确认首批写入后中断的隔离演练 `b776bab`：成功报告 fencing 1→3、旧批次/完成回调拒绝、旧候选已物理清理、新索引可查询；Sol 限定复审通过。此前失败报告保留。该场景重放已接收批次，不能代表新批次事务中途断连或 MinIO 写入故障。
+- 隔离合成负载 `baseline-2-20261102.json` 对 10/100 文档、并发 1/4/8 每组 8 请求进行了测量；并发 1 和 4 均为 8/8 成功，并发 8 各有 4 次成功和 4 次可重试 `AI_PROCESSING_FAILED`。该错误码不能单独证明是准入拒绝，整体状态为 `completed_with_errors`，性能验收未通过；真实 provider 调用 0。

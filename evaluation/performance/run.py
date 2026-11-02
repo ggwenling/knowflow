@@ -242,6 +242,11 @@ def summarize_resources(samples):
             if (rows := [r for r in samples if r[0] == service])}
 
 
+def has_resource_coverage(resources):
+    return all(resources.get(service, {}).get("samples", 0) > 0
+               for service in ("api", "ai", "postgres", "minio"))
+
+
 def run(args):
     revision = clean_build_revision()
     project = "knowflow-perf-" + uuid.uuid4().hex[:12]
@@ -308,6 +313,8 @@ def run(args):
             if sampler:
                 sampler.join(timeout=20)
             report["resources"] = summarize_resources(resource_rows)
+            if report["status"] == "completed" and not has_resource_coverage(report["resources"]):
+                report["status"] = "incomplete"
             if started:
                 cleanup = docker([*base, "down", "--volumes", "--remove-orphans"], check=False)
                 report["cleanup_exit_code"] = cleanup.returncode

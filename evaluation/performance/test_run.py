@@ -93,3 +93,10 @@ def test_resource_summary_reports_sampled_maxima():
         "ai": {"samples": 1, "peak_cpu_percent": 1.0, "peak_memory_bytes": 50},
         "api": {"samples": 2, "peak_cpu_percent": 10.0, "peak_memory_bytes": 200},
     }
+
+
+def test_resource_coverage_requires_all_services():
+    resources = {name: {"samples": 1} for name in ("api", "ai", "postgres", "minio")}
+    assert perf.has_resource_coverage(resources)
+    resources["ai"]["samples"] = 0
+    assert not perf.has_resource_coverage(resources)
