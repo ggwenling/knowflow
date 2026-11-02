@@ -4,6 +4,7 @@ This ledger must be invoked by every provider adapter before each request. It is
 not a provider wrapper and does not enforce a budget on calls that bypass it.
 """
 from datetime import datetime, timezone
+from contextlib import closing
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, localcontext
 import json
 from pathlib import Path
@@ -44,7 +45,7 @@ class BudgetLedger:
             raise ValueError("INVALID_BUDGET")
         self.path = Path(path)
         self.limit = limit_microyuan
-        with sqlite3.connect(self.path, timeout=30) as db:
+        with closing(sqlite3.connect(self.path, timeout=30)) as db, db:
             db.execute("CREATE TABLE IF NOT EXISTS budget (id INTEGER PRIMARY KEY CHECK(id = 1), limit_microyuan INTEGER NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS reservations (request_id TEXT PRIMARY KEY, microyuan INTEGER NOT NULL CHECK(microyuan > 0), input_tokens_upper INTEGER NOT NULL, output_tokens_upper INTEGER NOT NULL, price_quote TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO budget VALUES (1, ?)", (limit_microyuan,))
@@ -90,7 +91,7 @@ class BudgetLedger:
             raise ValueError("INVALID_PRICE") from None
         if amount <= 0 or amount > self.limit:
             raise ValueError("BUDGET_EXCEEDED")
-        with sqlite3.connect(self.path, timeout=30, isolation_level=None) as db:
+        with closing(sqlite3.connect(self.path, timeout=30, isolation_level=None)) as db, db:
             db.execute("BEGIN IMMEDIATE")
             spent = db.execute("SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0]
             if db.execute("SELECT 1 FROM reservations WHERE request_id = ?", (request_id,)).fetchone():

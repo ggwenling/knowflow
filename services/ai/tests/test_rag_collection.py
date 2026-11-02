@@ -44,6 +44,8 @@ def test_budget_is_durable_and_duplicate_retries_cannot_reuse_reservation(tmp_pa
     assert reserve(reopened, "retry-3")["remaining_microyuan"] == 0
     with pytest.raises(ValueError, match="BUDGET_LIMIT_MISMATCH"):
         budget.BudgetLedger(path, limit_microyuan=9_000_000)
+    # Windows refuses removal while SQLite connections remain open.
+    path.unlink()
 
 
 def test_budget_reservations_are_serialized_across_independent_connections(tmp_path):
