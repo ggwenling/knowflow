@@ -15,6 +15,7 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v6
       - run: uv run --project services/ai --frozen python contracts/validate.py
+      - run: python -m unittest contracts.test_openapi_draft10 -v
       - run: uv run --project services/ai --frozen pytest services/ai/tests -q
       - run: python -m unittest discover -s evaluation/smoke -p 'test_*.py' -v
 

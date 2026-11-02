@@ -1,0 +1,1699 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "KnowFlow draft.10 candidate API",
+    "version": "0.2.0-draft.10",
+    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。公开 SSE 与部分公开响应的 null 字段和共享 schema 兼容性待运行验证。 不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
+  },
+  "security": [
+    {
+      "userBearer": []
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "summary": "注册",
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/AuthSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/RegisterRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "登录",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/AuthSession"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/LoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "注销",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "当前用户",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/CurrentUser"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases": {
+      "post": {
+        "summary": "创建知识库",
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/KnowledgeBase"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/CreateKnowledgeBase"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "知识库列表",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/KnowledgeBaseList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge-bases/{id}": {
+      "get": {
+        "summary": "知识库详情",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/KnowledgeBase"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "删除知识库",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge-bases/{knowledgeBaseId}/documents": {
+      "post": {
+        "summary": "上传文档",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/DocumentUploadAccepted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "knowledgeBaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "get": {
+        "summary": "文档列表",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/DocumentList"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "knowledgeBaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/contents": {
+      "post": {
+        "summary": "上传新文档版本",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/DocumentUploadAccepted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/rebuilds": {
+      "post": {
+        "summary": "重建索引",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/DocumentUploadAccepted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}": {
+      "get": {
+        "summary": "文档详情",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/Document"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "删除文档",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/documents/{documentId}/contents/{contentVersionId}/file": {
+      "get": {
+        "summary": "读取文件及单段范围",
+        "responses": {
+          "200": {
+            "description": "完整文件",
+            "headers": {
+              "Accept-Ranges": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Source-SHA256": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          },
+          "206": {
+            "description": "单段范围文件",
+            "headers": {
+              "Accept-Ranges": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Source-SHA256": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "范围不可满足",
+            "headers": {
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "contentVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{taskId}": {
+      "get": {
+        "summary": "索引任务状态",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/TaskStatus"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/questions": {
+      "get": {
+        "summary": "问答历史",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/QuestionHistoryListResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/questions/{questionId}": {
+      "get": {
+        "summary": "问答详情",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/QuestionHistoryDetail"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "删除终态问答",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/sources/{sourceId}": {
+      "get": {
+        "summary": "读取来源",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "sourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge-bases/{knowledgeBaseId}/questions": {
+      "post": {
+        "summary": "同步问答",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAnswer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/PublicQuestion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "knowledgeBaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream": {
+      "post": {
+        "summary": "流式问答",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "x-event-schema": {
+              "$ref": "#/components/schemas/PublicStreamEvent"
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/PublicQuestion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "knowledgeBaseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "SSE started、delta、sources、completed；失败以 error 或 cancelled 结束。公开来源 ID 与内部 ID 不同，不承诺断线重放。公开事件字段 null 序列化待消费验证。"
+      }
+    },
+    "/internal/v1/tasks/{taskId}/index-batches": {
+      "post": {
+        "summary": "Python 调用 Java：IndexBatchReceipt",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/IndexBatchReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/IndexBatch"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "description": "请求 ID 必须匹配请求体；另需有效租约和执行令牌。"
+      }
+    },
+    "/internal/v1/tasks/{taskId}/heartbeat": {
+      "post": {
+        "summary": "Python 调用 Java：HeartbeatReceipt",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/HeartbeatReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/Heartbeat"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "description": "请求 ID 必须匹配请求体；另需有效租约和执行令牌。"
+      }
+    },
+    "/internal/v1/tasks/{taskId}/completion": {
+      "post": {
+        "summary": "Python 调用 Java：CompletionReceipt",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/CompletionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/Completion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "description": "请求 ID 必须匹配请求体；另需有效租约和执行令牌。"
+      }
+    },
+    "/internal/v1/tasks/{taskId}/source": {
+      "post": {
+        "summary": "Python 读取 Java 来源文件",
+        "responses": {
+          "200": {
+            "description": "原始文件及来源摘要头",
+            "headers": {
+              "X-Contract-Version": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Task-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Document-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Version-ID": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Source-Format": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Source-SHA256": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/SourceReadRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "description": "路由任务及请求 ID 必须匹配租约；另需有效执行令牌。"
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Python 存活探针",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "UP"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "description": "仅 Python 服务，不执行业务依赖探测。",
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
+    "/internal/v1/health": {
+      "get": {
+        "summary": "Python 内部健康",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/InternalHealth"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
+    "/internal/v1/index-executions": {
+      "post": {
+        "summary": "Java 派发索引",
+        "responses": {
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/IndexExecutionReceipt"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/IndexDispatch"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
+    "/internal/v1/index-executions/{task_id}/cancel": {
+      "post": {
+        "summary": "取消执行代次",
+        "responses": {
+          "204": {
+            "description": "成功"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/CancelExecution"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
+    "/internal/v1/answers": {
+      "post": {
+        "summary": "可信快照问答",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/protocol.schema.json#/$defs/AnswerResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/TrustedAnswerRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
+    "/internal/v1/answers/stream": {
+      "post": {
+        "summary": "可信快照流式问答",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "x-event-schema": {
+              "$ref": "./schemas/protocol.schema.json#/$defs/AnswerStreamEvent"
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/protocol.schema.json#/$defs/TrustedAnswerRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "description": "SSE data 为 AnswerStreamEvent JSON，顺序及字段见 api-draft.md。",
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "userBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Java 用户会话令牌"
+      },
+      "internalBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Java/Python 服务凭证，租约写操作另需执行令牌"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "错误体包含错误码、可重试性与请求 ID",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "./schemas/protocol.schema.json#/$defs/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "PublicSource": {
+        "type": "object",
+        "required": [
+          "contract_version",
+          "source_id",
+          "document_id",
+          "content_version_id",
+          "index_version_id",
+          "chunk_id",
+          "locator",
+          "quote"
+        ],
+        "properties": {
+          "contract_version": {
+            "$ref": "./schemas/protocol.schema.json#/$defs/ContractVersion"
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "index_version_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chunk_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "locator": {
+            "type": "object",
+            "description": "Java SourceResponse.Locator: all five keys are serialized; unused fields may be null.",
+            "required": [
+              "kind",
+              "page",
+              "start",
+              "end",
+              "unit"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "page": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "start": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "end": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "quote": {
+            "type": "string"
+          }
+        }
+      },
+      "PublicAnswer": {
+        "type": "object",
+        "required": [
+          "contract_version",
+          "request_id",
+          "answer",
+          "has_answer",
+          "sources"
+        ],
+        "properties": {
+          "contract_version": {
+            "$ref": "./schemas/protocol.schema.json#/$defs/ContractVersion"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "has_answer": {
+            "type": "boolean"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicSource"
+            }
+          }
+        }
+      },
+      "PublicStreamEvent": {
+        "type": "object",
+        "description": "Java PublicAnswerStreamEvent 的事件 JSON。事件序列语义见 api-draft.md；当前待 Q/M 验证实际 wire 样例。",
+        "required": [
+          "contract_version",
+          "request_id",
+          "sequence",
+          "event"
+        ],
+        "properties": {
+          "contract_version": {
+            "$ref": "./schemas/protocol.schema.json#/$defs/ContractVersion"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "event": {
+            "enum": [
+              "started",
+              "delta",
+              "sources",
+              "completed",
+              "error",
+              "cancelled"
+            ]
+          },
+          "delta": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_answer": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "source_id",
+                    "document_id",
+                    "content_version_id",
+                    "index_version_id",
+                    "chunk_id",
+                    "locator",
+                    "quote"
+                  ],
+                  "properties": {
+                    "source_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "document_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "content_version_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "index_version_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "chunk_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "locator": {
+                      "type": "object",
+                      "description": "Java SourceResponse.Locator: all five keys are serialized; unused fields may be null.",
+                      "required": [
+                        "kind",
+                        "page",
+                        "start",
+                        "end",
+                        "unit"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "page": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "start": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "end": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "unit": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "quote": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "model_profile": {
+            "anyOf": [
+              {
+                "$ref": "./schemas/protocol.schema.json#/$defs/ModelProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Java API；部署地址可不同"
+    }
+  ]
+}

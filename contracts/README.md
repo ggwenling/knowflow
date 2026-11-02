@@ -15,6 +15,7 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 - [认证与 owner 隔离 ADR](../docs/architecture/ADR-003-auth-and-owner-boundary.md)
 - [候选 API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
+- [OpenAPI draft.10 候选](./openapi-draft10.json)：描述 Java/Python 现有路由；公开 SSE 实际序列化与部分 null 字段仍待 Q/M 核验，尚未冻结。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
 - [批次摘要算法](./index_batch_hash.py)：与 Schema 中 `index-batch` 样例配对，固定摘要序列化规则。
 - [A 线执行记录](../docs/tasks/agent-a.md)记录 V0.2 基线决策、KF2-001/004/006 进度和各提交 SHA。
