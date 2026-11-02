@@ -1,12 +1,14 @@
 import importlib.util
 import asyncio
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
+import sqlite3
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -22,6 +24,7 @@ def load(name):
 budget = load("budget")
 mapping = load("mapping")
 capture = load("capture")
+guarded = load("guarded_adapters")
 NOW = datetime(2026, 11, 2, tzinfo=timezone.utc)
 QUOTE = {"provider": "synthetic", "model": "model-a", "input_cny_per_million": "1",
          "output_cny_per_million": "2", "source_url": "https://example.test/prices",
@@ -32,6 +35,147 @@ QUOTE = {"provider": "synthetic", "model": "model-a", "input_cny_per_million": "
 def reserve(ledger, request_id, *, tokens=1_000_000, quote=None, model="model-a"):
     return ledger.reserve(request_id, provider="synthetic", model=model, input_tokens_upper=tokens,
                           output_tokens_upper=0, quote=quote if quote is not None else QUOTE, now=NOW)
+
+
+def current_quote():
+    now = datetime.now(timezone.utc)
+    return {**QUOTE, "verified_at": (now - timedelta(hours=1)).isoformat(),
+            "valid_until": (now + timedelta(hours=1)).isoformat()}
+
+
+def verified_bounds(function):
+    function.policy_id = "synthetic-test-policy"
+    return function
+
+
+def current_bound_evidence():
+    quote = current_quote()
+    return {key: quote[key] for key in ("provider", "model", "source_url", "verified_by", "verified_at", "valid_until")} | {"policy_id": "synthetic-test-policy"}
+
+
+@pytest.mark.asyncio
+async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    ledger = budget.BudgetLedger(path)
+    calls = []
+    def reserved_count():
+        with closing(sqlite3.connect(path)) as db:
+            return db.execute("SELECT count(*) FROM reservations").fetchone()[0]
+    class Adapter:
+        def __init__(self):
+            assert reserved_count() > 0
+        async def embed(self, texts, *, request_id):
+            calls.append(("embed", reserved_count()))
+            return {"data": []}
+        async def generate(self, question, evidence, *, request_id):
+            calls.append(("generate", reserved_count()))
+            raise TimeoutError("synthetic")
+        async def stream_content(self, question, evidence, *, request_id):
+            calls.append(("stream", reserved_count()))
+            yield "first"
+            yield "second"
+        async def aclose(self): pass
+    @verified_bounds
+    def bounds(operation, *_args):
+        return (100, 0 if operation == "embed" else 1024)
+    config = {"adapter_factory": Adapter, "ledger": ledger, "provider": "synthetic",
+              "model": "model-a", "quote": current_quote(), "token_bounds": bounds,
+              "bound_evidence": current_bound_evidence()}
+    embedding = guarded.GuardedEmbedding(**config)
+    llm = guarded.GuardedLlm(**config)
+    await embedding.embed(["a"], request_id="same-request")
+    await embedding.embed(["b"], request_id="same-request")
+    with pytest.raises(TimeoutError):
+        await llm.generate("q", [], request_id="same-request")
+    stream = llm.stream_content("q", [], request_id="same-request")
+    assert reserved_count() == 3  # Merely creating an async generator does not invoke it.
+    assert await anext(stream) == "first"
+    await stream.aclose()
+    assert calls == [("embed", 1), ("embed", 2), ("generate", 3), ("stream", 4)]
+    assert reserved_count() == 4  # Timeout and stream cancellation never refund.
+    await embedding.aclose()
+    await llm.aclose()
+
+
+@pytest.mark.asyncio
+async def test_guard_fails_closed_before_factory_for_unknown_price_or_bound(tmp_path):
+    ledger = budget.BudgetLedger(tmp_path / "budget.sqlite3")
+    calls = []
+    def factory():
+        calls.append("factory")
+        raise AssertionError("must not construct adapter")
+    common = {"adapter_factory": factory, "ledger": ledger, "provider": "synthetic", "model": "model-a"}
+    no_price = guarded.GuardedEmbedding(**common, quote=None, token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=current_bound_evidence())
+    with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
+        await no_price.embed(["a"], request_id="r")
+    no_bound = guarded.GuardedLlm(**common, quote=current_quote(), token_bounds=verified_bounds(lambda *_: None), bound_evidence=current_bound_evidence())
+    with pytest.raises(ValueError, match="TOKEN_BOUNDS_UNAVAILABLE"):
+        await no_bound.generate("q", [], request_id="r")
+    short_output = guarded.GuardedLlm(**common, quote=current_quote(), token_bounds=verified_bounds(lambda *_: (100, 1023)), bound_evidence=current_bound_evidence())
+    with pytest.raises(ValueError, match="TOKEN_BOUNDS_UNAVAILABLE"):
+        await anext(short_output.stream_content("q", [], request_id="r"))
+    unverified = guarded.GuardedEmbedding(**common, quote=current_quote(), token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=None)
+    with pytest.raises(ValueError, match="TOKEN_BOUND_EVIDENCE_REQUIRED"):
+        await unverified.embed(["a"], request_id="r")
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_guard_cancelled_during_reservation_never_calls_provider_or_refunds(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    real_ledger = budget.BudgetLedger(path)
+    entered, release, finished = Event(), Event(), Event()
+    class BlockingLedger:
+        def reserve(self, *args, **kwargs):
+            entered.set()
+            if not release.wait(3): raise RuntimeError("test timeout")
+            try: return real_ledger.reserve(*args, **kwargs)
+            finally: finished.set()
+    called = []
+    adapter = guarded.GuardedEmbedding(adapter_factory=lambda: called.append(True), ledger=BlockingLedger(),
+        provider="synthetic", model="model-a", quote=current_quote(),
+        token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=current_bound_evidence())
+    task = asyncio.create_task(adapter.embed(["a"], request_id="request"))
+    assert await asyncio.to_thread(entered.wait, 3)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    release.set()
+    assert await asyncio.to_thread(finished.wait, 3)
+    assert called == []
+    with closing(sqlite3.connect(path)) as db:
+        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_guard_freezes_evidence_before_estimation_and_reservation(tmp_path):
+    entered, release = Event(), Event()
+    real_ledger = budget.BudgetLedger(tmp_path / "budget.sqlite3")
+    class BlockingLedger:
+        def reserve(self, *args, **kwargs):
+            entered.set()
+            if not release.wait(3): raise RuntimeError("test timeout")
+            return real_ledger.reserve(*args, **kwargs)
+    captured = []
+    class Adapter:
+        async def generate(self, question, evidence, *, request_id):
+            captured.append(evidence)
+            return {}
+        async def aclose(self): pass
+    def estimate(operation, question, evidence):
+        assert evidence == [{"text_content": "original"}]
+        return (100, 1024)
+    adapter = guarded.GuardedLlm(adapter_factory=Adapter, ledger=BlockingLedger(),
+        provider="synthetic", model="model-a", quote=current_quote(),
+        token_bounds=verified_bounds(estimate), bound_evidence=current_bound_evidence())
+    evidence = [{"text_content": "original"}]
+    task = asyncio.create_task(adapter.generate("q", evidence, request_id="request"))
+    assert await asyncio.to_thread(entered.wait, 3)
+    evidence[0]["text_content"] = "changed after estimation"
+    release.set()
+    await task
+    assert captured == [[{"text_content": "original"}]]
+    await adapter.aclose()
 
 
 def test_budget_is_durable_and_duplicate_retries_cannot_reuse_reservation(tmp_path):
@@ -134,6 +278,8 @@ async def test_capture_runs_one_top10_retrieval_and_preserves_generation_top5():
     assert all("text_content" not in row for row in trace)
     with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
         await store.take("r1")
+    with pytest.raises(ValueError, match="INVALID_REQUEST_ID_STATE"):
+        await store.record("r1", rows, scope)
 
 
 @pytest.mark.asyncio
@@ -143,7 +289,7 @@ async def test_capture_isolates_requests_rejects_reuse_and_out_of_scope():
     scope = {"indexes": [{"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
     def row(source_id, document_id="d"):
         return {"document_id": document_id, "content_version_id": "c", "index_version_id": "i",
-                "source_id": source_id, "locator": {"start": 0}, "text_sha256": "a" * 64}
+                "source_id": source_id, "locator": {"kind": "text_range", "unit": "unicode_code_point", "start": 0, "end": 1}, "text_sha256": "a" * 64}
     class Retriever:
         async def retrieve(self, question, scope, request_id, *, deadline, top_k):
             if request_id == "first":
@@ -165,6 +311,21 @@ async def test_capture_isolates_requests_rejects_reuse_and_out_of_scope():
         await retriever.retrieve("q", scope, "bad")
     with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
         await store.take("bad")
+
+
+@pytest.mark.asyncio
+async def test_capture_rejects_locator_with_unexpected_private_data():
+    scope = {"indexes": [{"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+    row = {"document_id": "d", "content_version_id": "c", "index_version_id": "i", "source_id": "src",
+           "locator": {"kind": "text_range", "unit": "unicode_code_point", "start": 0, "end": 1, "text": "private"},
+           "text_sha256": "a" * 64}
+    class Retriever:
+        async def retrieve(self, *args, **kwargs): return [row]
+    store = capture.CaptureStore()
+    with pytest.raises(ValueError, match="INVALID_RETRIEVAL_TRACE"):
+        await capture.CapturingRetriever(Retriever(), store).retrieve("q", scope, "r")
+    with pytest.raises(ValueError, match="INVALID_REQUEST_ID_STATE"):
+        await store.record("r", [{**row, "locator": {k: v for k, v in row["locator"].items() if k != "text"}}], scope)
 
 
 @pytest.mark.asyncio

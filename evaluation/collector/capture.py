@@ -23,6 +23,7 @@ class CaptureStore:
     def __init__(self):
         self._lock = asyncio.Lock()
         self._seen = set()
+        self._pending = set()
         self._traces = {}
 
     async def begin(self, request_id):
@@ -32,6 +33,11 @@ class CaptureStore:
             if request_id in self._seen:
                 raise ValueError("DUPLICATE_REQUEST_ID")
             self._seen.add(request_id)
+            self._pending.add(request_id)
+
+    async def fail(self, request_id):
+        async with self._lock:
+            self._pending.discard(request_id)
 
     async def record(self, request_id, rows, scope):
         if not isinstance(rows, list) or len(rows) > 10 or not isinstance(scope, dict):
@@ -44,15 +50,25 @@ class CaptureStore:
             for row in rows:
                 key = (row["document_id"], row["content_version_id"], row["index_version_id"])
                 source_id = row["source_id"]
-                if key not in allowed or not isinstance(source_id, str) or not source_id or source_id in sources:
+                locator = row["locator"]
+                if (key not in allowed or not isinstance(source_id, str)
+                        or not _REQUEST_ID.fullmatch(source_id) or source_id in sources
+                        or not isinstance(locator, dict)
+                        or set(locator) != {"kind", "unit", "start", "end"}
+                        or locator["kind"] != "text_range" or locator["unit"] != "unicode_code_point"
+                        or type(locator["start"]) is not int or type(locator["end"]) is not int
+                        or not 0 <= locator["start"] < locator["end"]
+                        or not isinstance(row["text_sha256"], str)
+                        or not re.fullmatch(r"[0-9a-f]{64}", row["text_sha256"])):
                     raise ValueError("INVALID_RETRIEVAL_TRACE")
                 sources.add(source_id)
                 trace.append({name: deepcopy(row[name]) for name in _TRACE_FIELDS})
         except (KeyError, TypeError):
             raise ValueError("INVALID_RETRIEVAL_TRACE") from None
         async with self._lock:
-            if request_id not in self._seen or request_id in self._traces:
+            if request_id not in self._pending:
                 raise ValueError("INVALID_REQUEST_ID_STATE")
+            self._pending.remove(request_id)
             self._traces[request_id] = trace
 
     async def take(self, request_id):
@@ -73,7 +89,11 @@ class CapturingRetriever:
         if top_k != 5:
             raise ValueError("UNSUPPORTED_GENERATION_LIMIT")
         await self._store.begin(request_id)
-        rows = await self._retriever.retrieve(question, scope, request_id,
-                                              deadline=deadline, top_k=10)
-        await self._store.record(request_id, rows, scope)
+        try:
+            rows = await self._retriever.retrieve(question, scope, request_id,
+                                                  deadline=deadline, top_k=10)
+            await self._store.record(request_id, rows, scope)
+        except BaseException:
+            await self._store.fail(request_id)
+            raise
         return rows[:5]
