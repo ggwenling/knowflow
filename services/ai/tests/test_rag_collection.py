@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -20,6 +21,7 @@ def load(name):
 
 budget = load("budget")
 mapping = load("mapping")
+capture = load("capture")
 NOW = datetime(2026, 11, 2, tzinfo=timezone.utc)
 QUOTE = {"provider": "synthetic", "model": "model-a", "input_cny_per_million": "1",
          "output_cny_per_million": "2", "source_url": "https://example.test/prices",
@@ -93,6 +95,106 @@ def test_budget_rounds_up_and_reserves_output_upper_bound(tmp_path):
 
 def test_public_id_matches_java_name_uuid():
     assert mapping.public_source_id("550e8400-e29b-41d4-a716-446655440000", "src-1") == "8e12941d-7836-3c6d-87d0-65e9e8b5267b"
+
+
+@pytest.mark.asyncio
+async def test_capture_runs_one_top10_retrieval_and_preserves_generation_top5():
+    from knowflow_ai.answering import AnswerService
+
+    rows = [{"document_id": "d", "content_version_id": "c", "index_version_id": "i",
+             "source_id": f"src-{i}", "text_content": "private text", "text_sha256": "a" * 64,
+             "locator": {"kind": "text_range", "unit": "unicode_code_point", "start": i, "end": i + 1}}
+            for i in range(10)]
+    scope = {"indexes": [{"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+
+    class Retriever:
+        def __init__(self): self.calls = []
+        async def retrieve(self, question, scope, request_id, *, deadline, top_k):
+            self.calls.append((request_id, top_k))
+            return rows
+
+    class Contract:
+        def validate(self, *_args): pass
+
+    class Llm:
+        async def generate(self, question, evidence, *, request_id):
+            assert evidence == rows[:5]
+            return {"answer": "insufficient", "has_answer": False, "source_ids": []}
+        async def aclose(self): pass
+
+    store = capture.CaptureStore()
+    retriever = Retriever()
+    service = AnswerService("unused", Contract(), retriever=capture.CapturingRetriever(retriever, store),
+                            llm_factory=Llm)
+    result = await service.answer({"question": "test", "scope": scope, "request_id": "r1"})
+    assert result["has_answer"] is False
+    assert retriever.calls == [("r1", 10)]
+    trace = await store.take("r1")
+    assert [row["source_id"] for row in trace] == [f"src-{i}" for i in range(10)]
+    assert all("text_content" not in row for row in trace)
+    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
+        await store.take("r1")
+
+
+@pytest.mark.asyncio
+async def test_capture_isolates_requests_rejects_reuse_and_out_of_scope():
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    scope = {"indexes": [{"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+    def row(source_id, document_id="d"):
+        return {"document_id": document_id, "content_version_id": "c", "index_version_id": "i",
+                "source_id": source_id, "locator": {"start": 0}, "text_sha256": "a" * 64}
+    class Retriever:
+        async def retrieve(self, question, scope, request_id, *, deadline, top_k):
+            if request_id == "first":
+                entered.set()
+                await release.wait()
+            return [row(request_id, "other" if request_id == "bad" else "d")]
+    store = capture.CaptureStore()
+    retriever = capture.CapturingRetriever(Retriever(), store)
+    first = asyncio.create_task(retriever.retrieve("q", scope, "first"))
+    await entered.wait()
+    with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
+        await retriever.retrieve("q", scope, "first")
+    assert (await retriever.retrieve("q", scope, "second"))[0]["source_id"] == "second"
+    release.set()
+    await first
+    assert (await store.take("first"))[0]["source_id"] == "first"
+    assert (await store.take("second"))[0]["source_id"] == "second"
+    with pytest.raises(ValueError, match="INVALID_RETRIEVAL_TRACE"):
+        await retriever.retrieve("q", scope, "bad")
+    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
+        await store.take("bad")
+
+
+@pytest.mark.asyncio
+async def test_capture_uses_real_retriever_once_with_top10(monkeypatch):
+    from knowflow_ai.answering import ReadOnlyRetriever
+    from knowflow_ai.embedding import EmbeddingSettings
+    calls = {"embedding": 0, "sql": 0}
+    class Embedding:
+        async def embed(self, texts, *, request_id):
+            calls["embedding"] += 1
+            return {"data": [{"embedding": [1.0] * 1024} for _ in texts]}
+        async def aclose(self): pass
+    def fetch(_url, _query, params, _deadline=None, _cancellation=None):
+        calls["sql"] += 1
+        assert params[-1] == 10
+        return [{"document_id": "d", "content_version_id": "c", "index_version_id": "i",
+                 "text_content": "a", "text_sha256": sha256(b"a").hexdigest(),
+                 "locator_kind": "text_range", "source_start": 0, "source_end": 1,
+                 "source_page": None, "chunk_id": str(i)} for i in range(10)]
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(fetch))
+    real = ReadOnlyRetriever("postgresql://readonly.invalid/db", embedding_factory=Embedding,
+                             embedding_settings=EmbeddingSettings(api_key="test-key" * 8))
+    scope = {"owner_id": "u", "knowledge_base_id": "kb", "indexes": [
+        {"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+    store = capture.CaptureStore()
+    visible = await capture.CapturingRetriever(real, store).retrieve("q", scope, "request")
+    trace = await store.take("request")
+    assert calls == {"embedding": 1, "sql": 1}
+    assert len(visible) == 5 and len(trace) == 10
+    assert [row["source_id"] for row in visible] == [row["source_id"] for row in trace[:5]]
 
 
 def test_trace_maps_unicode_range_and_rejects_wrong_bytes_and_versions():
