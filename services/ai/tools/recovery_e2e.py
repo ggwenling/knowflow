@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import secrets
 import shutil
 import socket
 import subprocess
@@ -30,6 +31,7 @@ BLOCK_ANSWER_MARKER = "KNOWFLOW_RECOVERY_BLOCK_ANSWER"
 DOCUMENT_TEXT = ("Recovery evidence confirms that Java owns publication. "
                  "Synthetic worker restart must preserve the active index.\n") * 36
 LONG_DOCUMENT_TEXT = DOCUMENT_TEXT * 8
+_ISOLATED_COMPOSE = None
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -61,9 +63,15 @@ def _read_json(path: Path) -> dict:
 
 
 def _run_compose(env_path: Path, args: list[str]) -> subprocess.CompletedProcess:
+    command = ["docker", "compose"]
+    if _ISOLATED_COMPOSE is not None:
+        project, override = _ISOLATED_COMPOSE
+        command.extend(["--project-name", project])
+    command.extend(["-f", str(REPO / "services/api/compose.dev.yml")])
+    if _ISOLATED_COMPOSE is not None:
+        command.extend(["-f", str(override)])
     return subprocess.run(
-        ["docker", "compose", "-f", str(REPO / "services/api/compose.dev.yml"),
-         "--env-file", str(env_path), *args],
+        [*command, "--env-file", str(env_path), *args],
         cwd=REPO, capture_output=True, text=True, encoding="utf-8",
         errors="replace", timeout=30)
 
@@ -799,7 +807,99 @@ def _scenario_delete_while_worker_offline(harness: RecoveryHarness) -> dict:
                 "unfinished_tasks": 0, "cleanup_queue_rows": 0}}
 
 
+def _restore_isolated_service(env_path: Path, service: str) -> None:
+    result = _run_compose(env_path, ["up", "-d", service])
+    if result.returncode:
+        raise RuntimeError("ISOLATED_SERVICE_RESTART_FAILED")
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        result = _run_compose(env_path, ["ps", "--format", "json"])
+        if result.returncode == 0:
+            items = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+            if any(item.get("Service") == service and item.get("Health") == "healthy"
+                   for item in items):
+                return
+        time.sleep(0.5)
+    raise RuntimeError("ISOLATED_SERVICE_RESTART_TIMEOUT")
+
+
+def _scenario_service_outage(harness: RecoveryHarness, service: str) -> dict:
+    if _ISOLATED_COMPOSE is None or service not in {"postgres", "minio"}:
+        raise RuntimeError("OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE")
+    env_path = harness.args.env_file
+    harness.start_python(prefix=f"{service}-outage")
+    knowledge_base_id = harness.create_knowledge_base(f"{service}-outage")
+    document_id, task_id = harness.upload_document(knowledge_base_id, f"{service}-outage.txt")
+    _wait_task(harness.database_url, task_id, {"SUCCEEDED"})
+    before = _document_row(harness.database_url, document_id)
+    original = str(before["active_index_version_id"])
+    if before["active_index_version_id"] is None:
+        raise RuntimeError("INITIAL_ACTIVE_INDEX_MISSING")
+    document_path = f"/api/v1/documents/{document_id}"
+    file_path = f"{document_path}/contents/{before['content_version_id']}/file"
+    headers = {"Authorization": f"Bearer {harness.token}"}
+    path = document_path if service == "postgres" else file_path
+    with harness.client(timeout=10) as client:
+        baseline = client.get(path, headers=headers)
+    if baseline.status_code != 200:
+        raise RuntimeError("OUTAGE_BASELINE_REQUEST_FAILED")
+    try:
+        stopped = _run_compose(env_path, ["stop", service])
+        if stopped.returncode:
+            raise RuntimeError("ISOLATED_SERVICE_STOP_FAILED")
+        result = _run_compose(env_path, ["ps", "--all", "--format", "json"])
+        items = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+        if result.returncode or not any(item.get("Service") == service and
+                                        item.get("State") in {"exited", "stopped"}
+                                        for item in items):
+            raise RuntimeError("ISOLATED_SERVICE_NOT_STOPPED")
+        try:
+            with harness.client(timeout=6) as client:
+                response = client.get(path, headers=headers)
+            unavailable = response.status_code != 200
+        except httpx.TransportError:
+            unavailable = True
+        if not unavailable:
+            raise RuntimeError("OUTAGE_REQUEST_UNEXPECTEDLY_SUCCEEDED")
+    finally:
+        _restore_isolated_service(env_path, service)
+
+    deadline = time.monotonic() + 60
+    recovered = False
+    while time.monotonic() < deadline:
+        try:
+            with harness.client(timeout=5) as client:
+                response = client.get(path, headers=headers)
+            if response.status_code == 200:
+                recovered = True
+                break
+        except httpx.TransportError:
+            pass
+        time.sleep(0.5)
+    if not recovered:
+        raise RuntimeError("OUTAGE_REQUEST_DID_NOT_RECOVER")
+    if service == "minio" and (not baseline.content or response.content != baseline.content):
+        raise RuntimeError("RESTORED_SOURCE_BYTES_CHANGED")
+    after = _document_row(harness.database_url, document_id)
+    if after["status"] != "ACTIVE" or str(after["active_index_version_id"]) != original:
+        raise RuntimeError("OUTAGE_REPLACED_ACTIVE_INDEX")
+    with harness.client(timeout=20) as client:
+        answer = client.post(f"/api/v1/knowledge-bases/{knowledge_base_id}/questions",
+                             headers=headers, json={"question": "What does the evidence say?"})
+    sources = answer.json().get("sources", []) if answer.status_code == 200 else []
+    if not sources or sources[0].get("index_version_id") != original:
+        raise RuntimeError("PREVIOUS_ACTIVE_INDEX_NOT_QUERYABLE")
+    cleanup = _wait_cleanup(harness.database_url)
+    return {"passed": True, "service": service, "baseline_request_succeeded": True,
+            "request_failed_during_outage": True, "request_recovered": True,
+            "source_bytes_preserved": True if service == "minio" else None,
+            "previous_active_index_preserved": True, "previous_active_index_queryable": True,
+            "cleanup_queues_drained": cleanup == {"unfinished_tasks": 0, "cleanup_queue_rows": 0}}
+
+
 def run(args):
+    if getattr(args, "isolated_outages", False) and _ISOLATED_COMPOSE is None:
+        raise RuntimeError("OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE")
     branch = subprocess.check_output(
         ["git", "branch", "--show-current"], cwd=REPO, text=True).strip()
     if branch != "local":
@@ -859,13 +959,17 @@ def run(args):
         local.require_idle_database(database_url)
         harness.create_owner()
 
-        scenarios["single_worker_restart"] = _scenario_worker_restarts(harness)
-        scenarios["three_worker_losses"] = _scenario_retry_limit_preserves_active(harness)
-        scenarios["second_embedding_batch_failure"] = _scenario_second_embedding_batch_failure(harness)
-        scenarios["java_restart_question_recovery"] = (
-            _scenario_java_restart_recovers_question(harness))
-        scenarios["delete_while_worker_offline"] = (
-            _scenario_delete_while_worker_offline(harness))
+        if getattr(args, "isolated_outages", False):
+            scenarios["postgres_outage"] = _scenario_service_outage(harness, "postgres")
+            scenarios["minio_outage"] = _scenario_service_outage(harness, "minio")
+        else:
+            scenarios["single_worker_restart"] = _scenario_worker_restarts(harness)
+            scenarios["three_worker_losses"] = _scenario_retry_limit_preserves_active(harness)
+            scenarios["second_embedding_batch_failure"] = _scenario_second_embedding_batch_failure(harness)
+            scenarios["java_restart_question_recovery"] = (
+                _scenario_java_restart_recovers_question(harness))
+            scenarios["delete_while_worker_offline"] = (
+                _scenario_delete_while_worker_offline(harness))
 
         harness.delete_knowledge_bases_and_wait()
         harness.logout()
@@ -900,6 +1004,8 @@ def run(args):
                 database_clean = False
         _stop_compose_services(env_path, compose_started)
 
+    if database_created and not database_clean:
+        failure = failure or "ISOLATED_DATABASE_CLEANUP_FAILED"
     if not all(local.can_bind(port) for port in (8000, 8080)):
         failure = failure or "LOCAL_SERVICE_PORT_STILL_IN_USE"
     if secret_in_logs:
@@ -945,17 +1051,87 @@ def run(args):
     print(f"local Java/Python/PostgreSQL/MinIO recovery E2E passed; evidence: {args.output}")
 
 
+def _assert_isolation_available(project: str) -> None:
+    if (not project.startswith("knowflow-outage-") or len(project) != 30
+            or any(char not in "0123456789abcdef" for char in project[16:])):
+        raise RuntimeError("ISOLATED_PROJECT_NAME_INVALID")
+    checks = [
+        ["docker", "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
+        ["docker", "network", "ls", "-q", "--filter", f"label=com.docker.compose.project={project}"],
+    ]
+    for command in checks:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        if result.returncode or result.stdout.strip():
+            raise RuntimeError("ISOLATED_PROJECT_NOT_EMPTY")
+    for suffix in ("postgres", "minio"):
+        result = subprocess.run(["docker", "volume", "inspect", f"{project}-{suffix}"],
+                                capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            raise RuntimeError("ISOLATED_VOLUME_ALREADY_EXISTS")
+
+
+def run_isolated_outages(args):
+    global _ISOLATED_COMPOSE
+    if _ISOLATED_COMPOSE is not None:
+        raise RuntimeError("ISOLATED_COMPOSE_ALREADY_ACTIVE")
+    for port in (55432, 59000, 59001, 8000, 8080):
+        if not local.can_bind(port):
+            raise RuntimeError(f"LOCAL_PORT_{port}_ALREADY_IN_USE")
+    project = f"knowflow-outage-{uuid.uuid4().hex[:14]}"
+    _assert_isolation_available(project)
+    with tempfile.TemporaryDirectory(prefix="knowflow-outage-config-") as directory:
+        directory = Path(directory)
+        override = directory / "override.yml"
+        override.write_text(
+            "volumes:\n  knowflow-api-dev-postgres:\n"
+            f"    name: {project}-postgres\n  knowflow-api-dev-minio:\n"
+            f"    name: {project}-minio\n", encoding="utf-8")
+        env_path = directory / ".env"
+        names = ("KNOWFLOW_DEV_POSTGRES_PASSWORD", "KNOWFLOW_DEV_MIGRATOR_PASSWORD",
+                 "KNOWFLOW_DEV_APP_PASSWORD", "KNOWFLOW_DEV_AI_PASSWORD",
+                 "KNOWFLOW_DEV_MINIO_ROOT_PASSWORD", "KNOWFLOW_INTERNAL_SHARED_SECRET")
+        env_path.write_text("\n".join(f"{name}={secrets.token_hex(32)}" for name in names)
+                            + "\nKNOWFLOW_DEV_MINIO_ROOT_USER=outageuser\n", encoding="utf-8")
+        isolated_args = argparse.Namespace(**vars(args))
+        isolated_args.env_file = env_path
+        _ISOLATED_COMPOSE = (project, override)
+        cleanup_ok = False
+        try:
+            run(isolated_args)
+        finally:
+            try:
+                cleanup = _run_compose(env_path, ["down", "--volumes", "--remove-orphans"])
+                cleanup_ok = cleanup.returncode == 0
+            finally:
+                _ISOLATED_COMPOSE = None
+            if args.output.is_file():
+                report = _read_json(args.output)
+                report["isolation"] = {"compose_project": project,
+                                       "exclusive_project_and_volumes": True,
+                                       "compose_down_succeeded": cleanup_ok}
+                _write_json(args.output, report)
+            if not cleanup_ok:
+                raise RuntimeError("ISOLATED_COMPOSE_CLEANUP_FAILED")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--env-file", type=Path, default=REPO / "services/api/.env")
     parser.add_argument("--maven-settings", type=Path)
     parser.add_argument("--database-prefix", default="knowflow_recovery")
+    parser.add_argument("--isolated-outages", action="store_true",
+                        help="Run database and object-storage outages in an owned Compose project")
     parser.add_argument("--output", type=Path,
                         default=AI_ROOT / f"docs/evidence/recovery-e2e-draft{CONTRACT_VERSION.rsplit('.', 1)[1]}.json")
     args = parser.parse_args()
     if args.serve:
         serve_python()
+    elif args.isolated_outages:
+        default_output = AI_ROOT / f"docs/evidence/recovery-e2e-draft{CONTRACT_VERSION.rsplit('.', 1)[1]}.json"
+        if args.output == default_output or args.output.exists():
+            parser.error("--isolated-outages requires a new, explicit --output path")
+        run_isolated_outages(args)
     else:
         run(args)
 

@@ -148,3 +148,95 @@ def test_failed_candidate_wait_fails_if_physical_rows_remain(monkeypatch):
     monkeypatch.setattr(recovery.time, "sleep", lambda _seconds: None)
     with pytest.raises(RuntimeError, match="FAILED_CANDIDATE_NOT_PHYSICALLY_CLEANED"):
         recovery._wait_failed_candidate_cleanup("isolated-db", "failed", "original", timeout=1)
+
+
+def test_service_outage_rejects_shared_compose_before_touching_services(monkeypatch):
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", None)
+    calls = []
+    monkeypatch.setattr(recovery, "_run_compose", lambda *args: calls.append(args))
+    with pytest.raises(RuntimeError, match="OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE"):
+        recovery._scenario_service_outage(object(), "postgres")
+    assert calls == []
+
+
+def test_run_outage_mode_cannot_start_shared_compose(monkeypatch):
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", None)
+    with pytest.raises(RuntimeError, match="OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE"):
+        recovery.run(type("Args", (), {"isolated_outages": True})())
+
+
+def test_stopped_isolated_service_is_restored_even_if_fault_setup_fails(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    class Client:
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def get(self, *_args, **_kwargs): return SimpleNamespace(status_code=200)
+
+    harness = SimpleNamespace(args=SimpleNamespace(env_file=tmp_path / ".env"),
+                              start_python=lambda **_kwargs: None,
+                              create_knowledge_base=lambda _label: "kb",
+                              upload_document=lambda *_args: ("doc", "task"),
+                              database_url="db", token="token", client=lambda **_kwargs: Client())
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", ("knowflow-outage-0123456789abcd", tmp_path / "override.yml"))
+    monkeypatch.setattr(recovery, "_wait_task", lambda *_args: {})
+    monkeypatch.setattr(recovery, "_document_row", lambda *_args: {
+        "active_index_version_id": "original", "content_version_id": "version"})
+    commands = []
+    monkeypatch.setattr(recovery, "_run_compose", lambda _path, args: commands.append(args)
+                        or subprocess.CompletedProcess(args, 1 if args[0] == "ps" else 0, "", ""))
+    restored = []
+    monkeypatch.setattr(recovery, "_restore_isolated_service", lambda path, service: restored.append((path, service)))
+    with pytest.raises(RuntimeError, match="ISOLATED_SERVICE_NOT_STOPPED"):
+        recovery._scenario_service_outage(harness, "postgres")
+    assert commands == [["stop", "postgres"], ["ps", "--all", "--format", "json"]]
+    assert restored == [(harness.args.env_file, "postgres")]
+
+
+def test_isolated_compose_targets_owned_project_and_override(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", ("knowflow-outage-0123456789abcd", tmp_path / "override.yml"))
+    monkeypatch.setattr(recovery.subprocess, "run", lambda command, **kwargs: calls.append(command)
+                        or subprocess.CompletedProcess(command, 0, "", ""))
+    recovery._run_compose(tmp_path / ".env", ["stop", "minio"])
+    assert calls[0][:4] == ["docker", "compose", "--project-name", "knowflow-outage-0123456789abcd"]
+    assert str(tmp_path / "override.yml") in calls[0]
+    assert calls[0][-2:] == ["stop", "minio"]
+
+
+def test_isolated_project_collision_is_rejected(monkeypatch):
+    monkeypatch.setattr(recovery.subprocess, "run", lambda command, **kwargs:
+                        subprocess.CompletedProcess(command, 0, "existing-container\n", ""))
+    with pytest.raises(RuntimeError, match="ISOLATED_PROJECT_NOT_EMPTY"):
+        recovery._assert_isolation_available("knowflow-outage-0123456789abcd")
+
+
+def test_isolated_outage_failure_cleans_only_owned_compose(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(recovery, "_ISOLATED_COMPOSE", None)
+    monkeypatch.setattr(recovery.local, "can_bind", lambda _port: True)
+    monkeypatch.setattr(recovery, "_assert_isolation_available", lambda _project: None)
+    calls = []
+
+    def fail_run(args):
+        project, override = recovery._ISOLATED_COMPOSE
+        assert project.startswith("knowflow-outage-")
+        contents = override.read_text(encoding="utf-8")
+        assert f"name: {project}-postgres" in contents
+        assert f"name: {project}-minio" in contents
+        assert args.env_file.is_file()
+        raise RuntimeError("SIMULATED_FAILURE")
+
+    def cleanup(env_path, args):
+        calls.append((recovery._ISOLATED_COMPOSE[0], args, env_path.is_file()))
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(recovery, "run", fail_run)
+    monkeypatch.setattr(recovery, "_run_compose", cleanup)
+    args = SimpleNamespace(isolated_outages=True, output=tmp_path / "report.json")
+    with pytest.raises(RuntimeError, match="SIMULATED_FAILURE"):
+        recovery.run_isolated_outages(args)
+    assert len(calls) == 1 and calls[0][0].startswith("knowflow-outage-")
+    assert calls[0][1:] == (["down", "--volumes", "--remove-orphans"], True)
+    assert recovery._ISOLATED_COMPOSE is None
