@@ -46,7 +46,11 @@ class _GuardedAdapter:
         if self._closed:
             raise ValueError("ADAPTER_CLOSED")
         if self._adapter is None:
-            self._adapter = self._factory()
+            candidate = self._factory()
+            if getattr(getattr(candidate, "settings", None), "model", None) != self._model:
+                await candidate.aclose()
+                raise ValueError("ADAPTER_MODEL_MISMATCH")
+            self._adapter = candidate
         return self._adapter
 
     def _verify_bound_evidence(self):

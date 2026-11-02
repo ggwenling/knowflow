@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
 from threading import Barrier, Event
+from types import SimpleNamespace
 
 import pytest
 import sqlite3
@@ -53,6 +54,94 @@ def current_bound_evidence():
     return {key: quote[key] for key in ("provider", "model", "source_url", "verified_by", "verified_at", "valid_until")} | {"policy_id": "synthetic-test-policy"}
 
 
+def test_real_evaluation_app_is_unconditionally_disabled():
+    create_evaluation_app = load("wiring").create_evaluation_app
+    with pytest.raises(RuntimeError, match="EVALUATION_SERVICE_NOT_READY"):
+        create_evaluation_app()
+    with pytest.raises(RuntimeError, match="EVALUATION_SERVICE_NOT_READY"):
+        create_evaluation_app(object(), ledger=object(), token_bounds=lambda *_: (1, 1024))
+
+
+@pytest.mark.asyncio
+async def test_worker_sync_and_stream_factories_share_ledger_and_capture(monkeypatch, tmp_path):
+    wiring = load("wiring")
+    EvaluationFactories = wiring.EvaluationFactories
+    from knowflow_ai.answering import ReadOnlyRetriever
+    from knowflow_ai.embedding import EmbeddingSettings
+    ledger_path = tmp_path / "budget.sqlite3"
+    ledger = wiring.BudgetLedger(ledger_path)
+    calls = []
+    class Embedding:
+        settings = SimpleNamespace(model="model-a")
+        async def embed(self, texts, *, request_id):
+            calls.append(("embed", request_id))
+            return {"data": [{"embedding": [1.0] * 1024} for _ in texts]}
+        async def aclose(self): pass
+    class Llm:
+        settings = SimpleNamespace(model="model-a")
+        async def generate(self, question, evidence, *, request_id):
+            calls.append(("generate", request_id))
+            assert len(evidence) == 5
+            return {"answer": "insufficient", "has_answer": False, "source_ids": []}
+        async def stream_content(self, question, evidence, *, request_id):
+            calls.append(("stream", request_id))
+            assert len(evidence) == 5
+            yield '{"answer":"insufficient","has_answer":false,"source_ids":[]}'
+        async def aclose(self): pass
+    class Contract:
+        def validate(self, *_args): pass
+    def fetch(_url, _query, params, _deadline=None, _cancellation=None):
+        assert params[-1] == 10
+        return [{"document_id": "d", "content_version_id": "c", "index_version_id": "i",
+                 "text_content": "a", "text_sha256": sha256(b"a").hexdigest(),
+                 "locator_kind": "text_range", "source_start": 0, "source_end": 1,
+                 "source_page": None, "chunk_id": str(i)} for i in range(10)]
+    monkeypatch.setattr(ReadOnlyRetriever, "_fetch_rows", staticmethod(fetch))
+    common = {"provider": "synthetic", "model": "model-a", "quote": current_quote(),
+              "bound_evidence": current_bound_evidence()}
+    factories = EvaluationFactories(ledger=ledger,
+        embedding={**common, "adapter_factory": Embedding, "token_bounds": verified_bounds(lambda *_: (100, 0))},
+        llm={**common, "adapter_factory": Llm, "token_bounds": verified_bounds(lambda *_: (100, 1024))})
+    factories.preflight()
+    assert calls == []
+    worker = factories.index_worker(object())
+    worker_adapter = worker._embedding_factory()
+    await worker_adapter.embed(["index"], request_id="index")
+    await worker_adapter.aclose()
+    settings = EmbeddingSettings(api_key="test-key" * 8)
+    service = factories.answer_service("postgresql://readonly.invalid/db", Contract(), embedding_settings=settings)
+    scope = {"owner_id": "u", "knowledge_base_id": "kb", "indexes": [
+        {"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+    result = await service.answer({"question": "q", "scope": scope, "request_id": "sync"})
+    assert result["has_answer"] is False
+    events = [event async for event in service.stream({"question": "q", "scope": scope, "request_id": "stream"})]
+    assert events[-1]["event"] == "completed"
+    assert len(await factories.traces.take("sync")) == 10
+    assert len(await factories.traces.take("stream")) == 10
+    assert calls == [("embed", "index"), ("embed", "sync"), ("generate", "sync"),
+                     ("embed", "stream"), ("stream", "stream")]
+    with closing(sqlite3.connect(ledger_path)) as db:
+        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 5
+
+
+def test_wiring_preflight_checks_both_prices_and_bounds_without_constructing_provider(tmp_path):
+    wiring = load("wiring")
+    calls = []
+    common = {"provider": "synthetic", "model": "model-a", "quote": current_quote(),
+              "bound_evidence": current_bound_evidence(), "adapter_factory": lambda: calls.append("provider")}
+    embedding = {**common, "token_bounds": verified_bounds(lambda *_: (100, 0))}
+    llm = {**common, "token_bounds": verified_bounds(lambda *_: (100, 1024))}
+    ledger = wiring.BudgetLedger(tmp_path / "budget.sqlite3")
+    wiring.EvaluationFactories(ledger=ledger, embedding=embedding, llm=llm).preflight()
+    for bad_embedding, bad_llm in (({**embedding, "quote": None}, llm),
+                                   (embedding, {**llm, "quote": None}),
+                                   ({**embedding, "bound_evidence": None}, llm),
+                                   (embedding, {**llm, "bound_evidence": None})):
+        with pytest.raises(ValueError):
+            wiring.EvaluationFactories(ledger=ledger, embedding=bad_embedding, llm=bad_llm).preflight()
+    assert calls == []
+
+
 @pytest.mark.asyncio
 async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use(tmp_path):
     path = tmp_path / "budget.sqlite3"
@@ -62,6 +151,7 @@ async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use
         with closing(sqlite3.connect(path)) as db:
             return db.execute("SELECT count(*) FROM reservations").fetchone()[0]
     class Adapter:
+        settings = SimpleNamespace(model="model-a")
         def __init__(self):
             assert reserved_count() > 0
         async def embed(self, texts, *, request_id):
@@ -95,6 +185,25 @@ async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use
     assert reserved_count() == 4  # Timeout and stream cancellation never refund.
     await embedding.aclose()
     await llm.aclose()
+
+
+@pytest.mark.asyncio
+async def test_guard_rejects_factory_using_a_different_model_before_call(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    calls = []
+    class WrongModel:
+        settings = SimpleNamespace(model="different-model")
+        async def embed(self, texts, *, request_id): calls.append("network")
+        async def aclose(self): calls.append("closed")
+    adapter = guarded.GuardedEmbedding(
+        adapter_factory=WrongModel, ledger=budget.BudgetLedger(path), provider="synthetic", model="model-a",
+        quote=current_quote(), token_bounds=verified_bounds(lambda *_: (100, 0)),
+        bound_evidence=current_bound_evidence())
+    with pytest.raises(ValueError, match="ADAPTER_MODEL_MISMATCH"):
+        await adapter.embed(["a"], request_id="request")
+    assert calls == ["closed"]
+    with closing(sqlite3.connect(path)) as db:
+        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 1
 
 
 @pytest.mark.asyncio
@@ -158,6 +267,7 @@ async def test_guard_freezes_evidence_before_estimation_and_reservation(tmp_path
             return real_ledger.reserve(*args, **kwargs)
     captured = []
     class Adapter:
+        settings = SimpleNamespace(model="model-a")
         async def generate(self, question, evidence, *, request_id):
             captured.append(evidence)
             return {}
