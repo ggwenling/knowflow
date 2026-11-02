@@ -220,6 +220,38 @@ def _wait_cleanup(database_url: str, timeout: float = 60) -> dict:
     raise RuntimeError("RECOVERY_CLEANUP_DID_NOT_DRAIN")
 
 
+def _failed_candidate_state(database_url: str, index_version_id) -> dict:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        row = connection.execute("""
+            SELECT iv.status, iv.cleaned_at IS NOT NULL, d.status,
+                   d.active_index_version_id,
+                   (SELECT count(*) FROM knowflow.chunks c WHERE c.index_version_id = iv.id),
+                   (SELECT count(*) FROM knowflow.chunk_embeddings e WHERE e.index_version_id = iv.id)
+              FROM knowflow.index_versions iv
+              JOIN knowflow.documents d ON d.id = iv.document_id
+             WHERE iv.id = %s
+        """, (index_version_id,)).fetchone()
+    if row is None:
+        raise RuntimeError("FAILED_CANDIDATE_NOT_FOUND")
+    return dict(zip(("status", "cleaned", "document_status", "active_index_version_id",
+                     "chunk_rows", "embedding_rows"), row, strict=True))
+
+
+def _wait_failed_candidate_cleanup(database_url: str, index_version_id, original_index,
+                                   timeout: float = 60) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = _failed_candidate_state(database_url, index_version_id)
+        if (state["document_status"] != "ACTIVE"
+                or str(state["active_index_version_id"]) != str(original_index)):
+            raise RuntimeError("FAILED_EMBEDDING_REPLACED_ACTIVE_INDEX")
+        if (state["status"] == "FAILED" and state["cleaned"]
+                and state["chunk_rows"] == 0 and state["embedding_rows"] == 0):
+            return state
+        time.sleep(0.2)
+    raise RuntimeError("FAILED_CANDIDATE_NOT_PHYSICALLY_CLEANED")
+
+
 def _error_code(response: httpx.Response) -> str | None:
     try:
         return response.json().get("code")
@@ -590,6 +622,10 @@ def _scenario_second_embedding_batch_failure(harness: RecoveryHarness) -> dict:
             (task_id,)).fetchone()[0]
     if prior_writes < 1:
         raise RuntimeError("EMBEDDING_FIRST_BATCH_WAS_NOT_PERSISTED")
+    failed_index = failed["index_version_id"]
+    if failed_index is None or str(failed_index) == original:
+        raise RuntimeError("FAILED_CANDIDATE_INDEX_INVALID")
+    candidate = _wait_failed_candidate_cleanup(harness.database_url, failed_index, original)
     if str(_document_row(harness.database_url, document_id)["active_index_version_id"]) != original:
         raise RuntimeError("FAILED_EMBEDDING_REPLACED_ACTIVE_INDEX")
 
@@ -608,6 +644,10 @@ def _scenario_second_embedding_batch_failure(harness: RecoveryHarness) -> dict:
             "failed_embedding_batch": 2, "prior_persisted_batches": prior_writes,
             "failure_code": failed["failure_code"], "attempt_count": failed["attempt_count"],
             "previous_active_index_preserved": True, "previous_active_index_queryable": True,
+            "failed_candidate_status": candidate["status"],
+            "failed_candidate_cleaned": candidate["cleaned"],
+            "failed_candidate_chunk_rows": candidate["chunk_rows"],
+            "failed_candidate_embedding_rows": candidate["embedding_rows"],
             "cleanup_queues_drained": cleanup == {
                 "unfinished_tasks": 0, "cleanup_queue_rows": 0}}
 

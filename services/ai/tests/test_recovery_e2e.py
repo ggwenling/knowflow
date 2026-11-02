@@ -115,3 +115,36 @@ async def test_second_embedding_failure_after_persisted_first_batch(monkeypatch,
         "successful_batches": 1, "failed_batch": 2}
     assert len(gateway.batches) >= 1
     assert gateway.completions == []
+
+
+def test_failed_candidate_wait_requires_physical_cleanup(monkeypatch):
+    pending = {"status": "FAILED", "cleaned": False, "document_status": "ACTIVE",
+               "active_index_version_id": "original", "chunk_rows": 8, "embedding_rows": 8}
+    cleaned = {**pending, "cleaned": True, "chunk_rows": 0, "embedding_rows": 0}
+    states = iter([pending, {**cleaned, "embedding_rows": 1}, cleaned])
+    calls = []
+    monkeypatch.setattr(recovery, "_failed_candidate_state",
+                        lambda db, candidate: calls.append((db, candidate)) or next(states))
+    monkeypatch.setattr(recovery.time, "sleep", lambda _seconds: None)
+
+    assert recovery._wait_failed_candidate_cleanup("isolated-db", "failed", "original") == cleaned
+    assert calls == [("isolated-db", "failed")] * 3
+
+
+def test_failed_candidate_wait_fails_if_active_index_changes(monkeypatch):
+    state = {"status": "FAILED", "cleaned": True, "document_status": "ACTIVE",
+             "active_index_version_id": "wrong", "chunk_rows": 0, "embedding_rows": 0}
+    monkeypatch.setattr(recovery, "_failed_candidate_state", lambda *_args: state)
+    with pytest.raises(RuntimeError, match="FAILED_EMBEDDING_REPLACED_ACTIVE_INDEX"):
+        recovery._wait_failed_candidate_cleanup("isolated-db", "failed", "original")
+
+
+def test_failed_candidate_wait_fails_if_physical_rows_remain(monkeypatch):
+    state = {"status": "FAILED", "cleaned": True, "document_status": "ACTIVE",
+             "active_index_version_id": "original", "chunk_rows": 1, "embedding_rows": 0}
+    monkeypatch.setattr(recovery, "_failed_candidate_state", lambda *_args: state)
+    ticks = iter([0, 0, 2])
+    monkeypatch.setattr(recovery.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(recovery.time, "sleep", lambda _seconds: None)
+    with pytest.raises(RuntimeError, match="FAILED_CANDIDATE_NOT_PHYSICALLY_CLEANED"):
+        recovery._wait_failed_candidate_cleanup("isolated-db", "failed", "original", timeout=1)
