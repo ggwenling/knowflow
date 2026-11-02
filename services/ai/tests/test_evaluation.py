@@ -421,6 +421,8 @@ def test_machine_draft_is_complete_source_grounded_and_still_pending():
 
 def test_human_review_fixture_finalizes_and_runs_through_offline_evaluator(tmp_path):
     _candidates, _split, review = _review_fixture()
+    review["prior_agent_review"] = {"reviewer": {"id": "agent:fixture"}, "sha256": "a" * 64}
+    review["human_review_time_note"] = "Confirmation time; completion time unknown."
     review_path = tmp_path / "review.json"
     output = tmp_path / "reviewed-dataset"
     _write_json(review_path, review)
@@ -435,6 +437,9 @@ def test_human_review_fixture_finalizes_and_runs_through_offline_evaluator(tmp_p
     manifest, questions, _documents, sources, dataset_sha = runner._load_dataset(output)
     assert manifest["dataset_id"] == "qingzhu-seed-v2-reviewed"
     assert manifest["annotation_provenance"]["reviewer_id"] == "test-only-fixture"
+    assert manifest["annotation_provenance"]["review_file_sha256"] == sha256(review_path.read_bytes()).hexdigest()
+    assert manifest["annotation_provenance"]["prior_agent_review"] == review["prior_agent_review"]
+    assert manifest["annotation_provenance"]["human_review_time_note"] == review["human_review_time_note"]
     assert {split: sum(item["split"] == split for item in questions)
             for split in ("development", "holdout")} == {"development": 40, "holdout": 20}
 

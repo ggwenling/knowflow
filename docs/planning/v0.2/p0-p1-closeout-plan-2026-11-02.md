@@ -1,11 +1,11 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。实施基线 `local@4bada0be3705e49a146803129feb57db0d0aec0e`；draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。原交接中的旧提交和未提交状态为历史快照。
+状态：IN_PROGRESS。当前审阅基线 `local@b7e83c8cf475195ac54b7b58a96ba275e44b8625`，此前已合并并推送至 main；draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。独立 Q/M 审阅及真实质量评测仍待完成。
 
 ## P0
 
 - [ ] 将构建上下文保留的 Vitest setup 与实际 Docker 镜像构建、Playwright 全栈测试一起验证；CI 执行 Python、契约、Java Testcontainers 和 Web 全套检查。
-- [ ] 复核工作树归属，分项提交并推送 origin/local；最终验收后通过 PR 更新 main。
+- [ ] 继续复核工作树归属并在 local 分项提交；后续完成验收后通过 PR 更新 main。
 - [ ] Q 审阅具体代码提交和 schema，完成 Java/Python 及前端 draft.10 消费确认；补齐冻结所需 OpenAPI，M/项目负责人签收，修复后复审。
 
 ## P1
@@ -28,5 +28,5 @@
 - Web typecheck、lint、36 项单测通过；离线模型回归 16 项通过。schema 85 项结构校验通过，不能替代运行时授权检查。
 - 2026-11-02 Docker 构建及全栈浏览器 E2E 通过，测试使用合成 AI；隔离容器、网络和卷已清理。Java 全量 83 项（1 skip）通过。远端 CI 结果尚待核实。
 - 评测命令在显式质量门失败或不完整时返回非零；对应三种状态回归通过。该改动不代表真实数据集或质量验收已完成。
-- 60 题人工审核数据集 `qingzhu-seed-v2-reviewed` 指纹 `4ce66d29dca63b366c01e6aab9573dbd61295207e12cd5a766fb25a907ee94c3`：40 道开发、20 道公开验证、50 道可回答和 10 道不可回答；原 agent 审核与人工确认分开记录。原 agent 的未来时间戳未核实，人工记录时间为用户确认时间，不冒充实际完成时间。真正私有盲测与评分尚未运行。
-- 人工审核、独立 Q/M 签收、私有盲测以及真实 provider 质量和费用尚待完成；不将历史合成 E2E 视为质量验收。
+- 60 题人工审核数据集 `qingzhu-seed-v2-reviewed` 原指纹 `4ce66d29dca63b366c01e6aab9573dbd61295207e12cd5a766fb25a907ee94c3`；补充来源后的指纹为 `023f14ba9e56df87cb2ea635638e01d3a543a4aeb2588856dc2c3aed7f8356b0`。40 道开发、20 道公开验证，50 道可回答、10 道不可回答；原 agent 的未来时间戳未核实，人工记录时间为用户确认时间。后续质量门须绑定新指纹。
+- 60 题的人工审核已由用户确认；独立 Q/M 签收、私有盲测、生成答案人工审核及真实 provider 质量和费用尚待完成。

@@ -176,6 +176,12 @@ def finalize(candidates_path, split_manifest_path, review_path, source_root, out
             "split_manifest_sha256": sha256(split_manifest_path.read_bytes()).hexdigest(),
         },
     })
+    provenance = output_manifest["annotation_provenance"]
+    provenance["review_file_sha256"] = sha256(review_path.read_bytes()).hexdigest()
+    if "prior_agent_review" in review:
+        provenance["prior_agent_review"] = review["prior_agent_review"]
+    if "human_review_time_note" in review:
+        provenance["human_review_time_note"] = review["human_review_time_note"]
 
     output_root.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=output_root.name + ".tmp-",

@@ -132,6 +132,17 @@
     "reviewed_at": "2026-11-02T07:08:01.121747Z",
     "source_manifest_sha256": "abac46bdea76a614be035d24585b9eb5b760cc69e6c1ebf6f6035ebbf899d617",
     "candidate_questions_sha256": "44c3f6ed0132c87109db8189b1d363673b6ec27b1380feb5c3952068f5edb894",
-    "split_manifest_sha256": "e9be4fd25faa1821e9f0264b26fe91fb5768e4d3ec0a37bf911ad62fc8c275cf"
+    "split_manifest_sha256": "e9be4fd25faa1821e9f0264b26fe91fb5768e4d3ec0a37bf911ad62fc8c275cf",
+    "review_file_sha256": "69bc080f6601e0267c4b3db29f2fa972df1ec6dc095d5908fb4263f81f42d9ee",
+    "prior_agent_review": {
+      "reviewer": {
+        "id": "agent:little-code-sauce@independent-pass-2026-11-02",
+        "reviewed_at": "2026-11-02T15:30:00+08:00"
+      },
+      "file": "2026-11-02-agent-annotation-review.json",
+      "sha256": "a181a03594aff65db0d59827c990325006e2173e5655e72e44f8c9cc0736217a",
+      "timestamp_note": "Prior agent timestamp is later than human confirmation; unverified."
+    },
+    "human_review_time_note": "reviewed_at records user confirmation time; completion time was not supplied."
   }
 }
