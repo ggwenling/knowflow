@@ -35,3 +35,5 @@
 - Sol 对第二批 Embedding 失败演练提出候选索引物理清理证据缺口；`79a400d` 补充活动知识库内的 FAILED、cleaned_at、零 Chunk/embedding 及旧索引可查询断言，五场景隔离演练通过，Sol 限定复审通过。数据库/MinIO 中断及负载测试仍未完成。
 - Sol 对分页刷新竞态 `f551a68` 与离线评分 v2 引用标记覆盖缺陷修复 `c19d03f` 限定复审通过；真实预测采集及正式评分仍未完成。
 - 项目负责人确认尚未准备 20 题私有盲测；准备和隔离要求见 `docs/evaluation/blind-holdout-protocol.md`。Sol High 的真实采集与评分设计见 `docs/evaluation/real-collection-design.md`，真实采集和正式质量验收仍未完成。
+- draft.10 OpenAPI 候选 `d1ed60c` 经 Sol 限定范围抽查通过，公开 SSE 实际 wire/null、完整错误码与 M 签收仍待验证，候选未冻结。预算账本连接关闭修复 `a2bc020` 经 Sol 限定复核通过；账本尚未接到真实 provider。
+- `379b838` 使用专属隔离环境演练 PostgreSQL/MinIO 读取中断与恢复，原文逐字节一致、原活动索引保留；尚未覆盖索引写入期间中断。`7c4bef8` 增加单次 top-10 捕获并向生成器提供前 5 的组件，但未接入真实 Java 采集或 provider 预算，均待 Sol 复核。
