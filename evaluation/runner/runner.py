@@ -339,6 +339,8 @@ def main():
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf-8")
     print(json.dumps({"split": report["split"], "sample_count": report["sample_count"]}))
+    if args.quality_config is not None and report["quality_gate"]["status"] != "passed":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

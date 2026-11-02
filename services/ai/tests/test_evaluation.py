@@ -2,6 +2,8 @@ import importlib.util
 from hashlib import sha256
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -100,6 +102,32 @@ def test_quality_gate_requires_dataset_bound_explicit_thresholds(tmp_path):
     config.write_text(json.dumps(gate), encoding="utf-8")
     with pytest.raises(ValueError, match="INVALID_QUALITY_CONFIG"):
         runner.evaluate(predictions, quality_config_path=config)
+
+
+@pytest.mark.parametrize("outcome", ["passed", "failed", "incomplete"])
+def test_cli_quality_gate_exit_status(tmp_path, outcome):
+    payload = _predictions("development")
+    if outcome == "failed":
+        payload["predictions"][0]["has_answer"] = False
+        payload["predictions"][0]["cited_evidence"] = []
+        payload["predictions"][0]["support_judgement"] = "not_applicable"
+    elif outcome == "incomplete":
+        for row in payload["predictions"]:
+            if row["has_answer"]:
+                row["support_judgement"] = "unreviewed"
+    predictions = tmp_path / "predictions.json"
+    predictions.write_text(json.dumps(payload), encoding="utf-8")
+    metric = "human_supported_answer_rate" if outcome == "incomplete" else "answerability_accuracy"
+    config = tmp_path / "quality.json"
+    config.write_text(json.dumps({"gate_version": 1, "dataset_id": payload["dataset_id"],
+                                  "dataset_sha256": payload["dataset_sha256"],
+                                  "minimums": {metric: 1.0}}), encoding="utf-8")
+    output = tmp_path / "report.json"
+    result = subprocess.run([sys.executable, str(ROOT / "evaluation/runner/runner.py"),
+                             "--predictions", str(predictions), "--quality-config", str(config),
+                             "--output", str(output)], capture_output=True, text=True)
+    assert result.returncode == (0 if outcome == "passed" else 1), result.stderr
+    assert json.loads(output.read_text(encoding="utf-8"))["quality_gate"]["status"] == outcome
 
 
 def test_support_review_bundle_is_bound_to_predictions_and_requires_reviewer_timestamp(tmp_path):
