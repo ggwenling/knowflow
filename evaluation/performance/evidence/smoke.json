@@ -1,0 +1,27 @@
+{
+  "run_at": "2026-11-02T10:52:49.494324+00:00",
+  "project": "knowflow-perf-d86e73f2e9c3",
+  "source_revision": "f3ed1f85b5aa4da9bdd9b08913b1e851f3a52ed6",
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 20,
+    "docker_cpus": 20,
+    "docker_memory_bytes": 8215244800,
+    "docker_version": "29.8.2",
+    "other_running_container_count": 6,
+    "mode": "synthetic adapters, local Docker, no external model calls",
+    "retrieval": "AI service stage log; excludes question embedding",
+    "first_delta": "client elapsed time until first SSE delta",
+    "resources": "docker stats samples; observed maxima, not continuous peaks"
+  },
+  "source_sha256": {
+    "evaluation\\performance\\run.py": "d67d6059e0a472fec54c832ebdbdc0dfcd9248980137b545ece5308e05a0b8a4",
+    "infra\\compose.yml": "77606246dd822b80c4664457e8cb508f597cfcdf6bc01775a4aaacfc44d6b9bb",
+    "services\\ai\\tools\\browser_e2e_server.py": "b1ffbb53d7e78519e95c1e67fb31433166078d219a531ba30083fd73c6cd5a8b"
+  },
+  "cases": [],
+  "status": "incomplete",
+  "failure": "CalledProcessError",
+  "resources": {},
+  "cleanup_exit_code": 0
+}

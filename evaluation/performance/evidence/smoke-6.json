@@ -1,0 +1,92 @@
+{
+  "run_at": "2026-11-02T11:14:30.966188+00:00",
+  "project": "knowflow-perf-0c3581410e00",
+  "source_revision": "3b732c45b8d2c28bbe4c3a1c251aaa5513f404d3",
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 20,
+    "docker_cpus": 20,
+    "docker_memory_bytes": 8215244800,
+    "docker_version": "29.8.2",
+    "other_running_container_count": 4,
+    "mode": "synthetic adapters, local Docker, no external model calls",
+    "retrieval": "AI service stage log; excludes question embedding",
+    "first_delta": "client elapsed time until first SSE delta",
+    "resources": "docker stats samples; observed maxima, not continuous peaks"
+  },
+  "source_sha256": {
+    "evaluation\\performance\\run.py": "ce4c1ff55f28c3b812a082a04c09d4e43b40b5a5d10d3ba509b8a6f1aee765ad",
+    "infra\\compose.yml": "77606246dd822b80c4664457e8cb508f597cfcdf6bc01775a4aaacfc44d6b9bb",
+    "services\\ai\\tools\\browser_e2e_server.py": "b1ffbb53d7e78519e95c1e67fb31433166078d219a531ba30083fd73c6cd5a8b"
+  },
+  "cases": [
+    {
+      "document_count": 1,
+      "index_elapsed_ms": 1016.0,
+      "loads": [
+        {
+          "concurrency": 1,
+          "requested": 1,
+          "succeeded": 1,
+          "failed": 0,
+          "outcomes": {
+            "success": 1
+          },
+          "first_delta": {
+            "sample_count": 1,
+            "p50_ms": 406.0,
+            "p95_ms": 406.0
+          },
+          "complete": {
+            "sample_count": 1,
+            "p50_ms": 640.0,
+            "p95_ms": 640.0
+          },
+          "requests": [
+            {
+              "request_id": "bc87dacf721948dcbd28e6156a6670fd",
+              "outcome": "success",
+              "first_delta_ms": 406.0,
+              "total_ms": 640.0
+            }
+          ],
+          "retrieval": {
+            "sample_count": 0,
+            "p50_ms": null,
+            "p95_ms": null
+          }
+        }
+      ]
+    }
+  ],
+  "status": "incomplete",
+  "images": {
+    "api": "sha256:a049c2493f744a51636a8bc3be2d3e84e3cb74fdebe0a3875ceb66b08050ffdd",
+    "ai": "sha256:803859192745e32cebfd39f03d6de2c5e7ae8a679fed1397fcf3be267f8e7658",
+    "postgres": "sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337",
+    "minio": "sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01"
+  },
+  "resources": {
+    "ai": {
+      "samples": 1,
+      "peak_cpu_percent": 27.01,
+      "peak_memory_bytes": 59160658
+    },
+    "api": {
+      "samples": 1,
+      "peak_cpu_percent": 36.13,
+      "peak_memory_bytes": 393006285
+    },
+    "minio": {
+      "samples": 1,
+      "peak_cpu_percent": 3.87,
+      "peak_memory_bytes": 236663603
+    },
+    "postgres": {
+      "samples": 1,
+      "peak_cpu_percent": 4.42,
+      "peak_memory_bytes": 45770342
+    }
+  },
+  "cleanup_exit_code": 0
+}
