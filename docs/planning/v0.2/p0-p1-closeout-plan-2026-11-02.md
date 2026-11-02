@@ -37,3 +37,5 @@
 - 项目负责人确认尚未准备 20 题私有盲测；准备和隔离要求见 `docs/evaluation/blind-holdout-protocol.md`。Sol High 的真实采集与评分设计见 `docs/evaluation/real-collection-design.md`，真实采集和正式质量验收仍未完成。
 - draft.10 OpenAPI 候选 `d1ed60c` 经 Sol 限定范围抽查通过，公开 SSE 实际 wire/null、完整错误码与 M 签收仍待验证，候选未冻结。预算账本连接关闭修复 `a2bc020` 经 Sol 限定复核通过；账本尚未接到真实 provider。
 - `379b838` 使用专属隔离环境演练 PostgreSQL/MinIO 读取中断与恢复，原文逐字节一致、原活动索引保留；尚未覆盖索引写入期间中断。`7c4bef8` 增加单次 top-10 捕获并向生成器提供前 5 的组件，但未接入真实 Java 采集或 provider 预算，均待 Sol 复核。
+- Sol 对 `379b838` 限定复核通过；`7c4bef8` 发现 trace 二次写入及 locator 附带正文缺口，`3b8784d` 修复后限定复核通过。预算守卫尚未接入服务，真实采集和全局硬预算仍未完成。
+- 远端 [CI run 41430594011](https://github.com/ggwenling/knowflow/actions/runs/41430594011) 的 Web 全栈、Java、Python/契约三项均成功，目标为 `e9f115f`；更新提交必须分别确认 CI。
