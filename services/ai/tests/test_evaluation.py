@@ -130,6 +130,110 @@ def test_cli_quality_gate_exit_status(tmp_path, outcome):
     assert json.loads(output.read_text(encoding="utf-8"))["quality_gate"]["status"] == outcome
 
 
+def _v2_fixture(tmp_path):
+    payload = _predictions("development")
+    payload["prediction_version"] = 2
+    payload["run"] = {"code_sha": "a" * 40, "schema_sha256": "b" * 64, "model": "fixture",
+                      "config_sha256": "c" * 64, "prompt_sha256": "d" * 64}
+    for row in payload["predictions"]:
+        answered = row.pop("has_answer")
+        row.pop("support_judgement")
+        indices = row.pop("cited_evidence")
+        row["outcome"] = "answered" if answered else "refused"
+        row["answer"] = "测试答案" if answered else "资料不足"
+        row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
+        row["citations"] = [{"id": f"cite-{i}", "evidence_index": i, "claim": "测试答案"} for i in indices]
+        row["error_code"] = None
+    predictions = tmp_path / "v2-predictions.json"
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    bundle = review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+    for entry in bundle["entries"]:
+        if entry["outcome"] == "answered":
+            entry.update(support_judgement="supported", reviewed_by="human", reviewed_at="2026-11-02T07:00:00Z")
+            for citation in entry["citations"]:
+                citation["judgement"] = "supported"
+    review = tmp_path / "v2-review.json"
+    review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    config = tmp_path / "v2-gate.json"
+    config.write_text(json.dumps({"gate_version": 2, "dataset_id": payload["dataset_id"],
+                                  "dataset_sha256": payload["dataset_sha256"],
+                                  "minimums": {"recall_at_5": 0.85, "mrr_at_10": 0.75,
+                                               "human_supported_answer_rate": 0.9, "citation_accuracy": 0.95,
+                                               "unanswerable_refusal_rate": 0.9, "answerable_answer_rate": 0.9,
+                                               "human_support_review_coverage": 1.0, "citation_review_coverage": 1.0}}), encoding="utf-8")
+    return payload, predictions, bundle, review, config
+
+
+def test_v2_scores_actual_answer_and_each_citation_with_hash_binding(tmp_path):
+    payload, predictions, bundle, review, config = _v2_fixture(tmp_path)
+    report = runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+    assert report["quality_gate"]["status"] == "passed"
+    assert report["metrics"]["citation_accuracy"] == 1.0
+    assert report["metrics"]["human_support_review_coverage"] == 1.0
+    assert bundle["entries"][0]["answer"] == payload["predictions"][0]["answer"]
+    assert bundle["entries"][0]["citations"][0]["source_text"]
+    bundle["entries"][0]["answer"] = "篡改答案"
+    review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="REVIEW_INPUT_MISMATCH"):
+        runner.evaluate(predictions, dataset_root=DATASET, review_path=review)
+
+
+def test_v2_incomplete_review_and_execution_error_never_pass(tmp_path):
+    payload, predictions, bundle, review, config = _v2_fixture(tmp_path)
+    no_review = runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config)
+    assert no_review["quality_gate"]["status"] == "incomplete"
+    assert no_review["metrics"]["human_support_review_coverage"] == 0
+    assert no_review["metrics"]["citation_review_coverage"] == 0
+    bundle["entries"][0]["citations"][0]["judgement"] = "unreviewed"
+    review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    report = runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+    assert report["quality_gate"]["status"] == "incomplete"
+    row = next(r for r in payload["predictions"] if r["outcome"] == "refused")
+    row["outcome"] = "error"; row["error_code"] = "MODEL_FAILURE"; row["answer"] = ""
+    row["answer_sha256"] = sha256(b"").hexdigest()
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    report = runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config)
+    assert report["quality_gate"]["status"] == "incomplete"
+    assert report["metrics"]["execution_error_count"] == 1
+    assert report["metrics"]["unanswerable_refused_count"] == 1
+    with pytest.raises(ValueError, match="REVIEW_INPUT_MISMATCH"):
+        runner.evaluate(predictions, dataset_root=DATASET, review_path=review)
+
+
+def test_v2_citation_review_is_bound_to_each_source(tmp_path):
+    _, predictions, bundle, review, config = _v2_fixture(tmp_path)
+    bundle["entries"][0]["citations"][0]["source_text"] = "篡改原文"
+    review.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="REVIEW_INPUT_MISMATCH"):
+        runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+
+
+def test_v1_cannot_claim_formal_acceptance(tmp_path):
+    predictions = tmp_path / "predictions.json"
+    predictions.write_text(json.dumps(_predictions("development")), encoding="utf-8")
+    report = runner.evaluate(predictions)
+    assert report["formal_acceptance"] == {"status": "incomplete", "reason": "V1_NO_SEMANTIC_CITATION_REVIEW"}
+    output = tmp_path / "report.json"
+    result = subprocess.run([sys.executable, str(ROOT / "evaluation/runner/runner.py"),
+                             "--predictions", str(predictions), "--output", str(output), "--formal"],
+                            capture_output=True, text=True)
+    assert result.returncode == 1
+
+
+def test_v2_requires_all_thresholds_and_citations_point_to_generator_evidence(tmp_path):
+    payload, predictions, bundle, review, config = _v2_fixture(tmp_path)
+    gate = json.loads(config.read_text(encoding="utf-8"))
+    del gate["minimums"]["citation_accuracy"]
+    config.write_text(json.dumps(gate), encoding="utf-8")
+    with pytest.raises(ValueError, match="INVALID_QUALITY_CONFIG"):
+        runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
+    row = payload["predictions"][0]
+    row["citations"][0]["claim"] = "不在答案中的声明"
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="INVALID_CITATIONS"):
+        review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+
+
 def test_support_review_bundle_is_bound_to_predictions_and_requires_reviewer_timestamp(tmp_path):
     predictions = tmp_path / "predictions.json"
     predictions.write_text(json.dumps(_predictions("development")), encoding="utf-8")

@@ -97,7 +97,16 @@ def _percentile(values, percentile):
 
 
 def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATASET,
-             quality_config_path=None):
+             quality_config_path=None, review_path=None):
+    initial = _read_json(predictions_path)
+    if isinstance(initial, dict) and initial.get("prediction_version") == 2:
+        spec = importlib.util.spec_from_file_location("runner_v2", Path(__file__).with_name("runner_v2.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.evaluate(predictions_path, split=split, dataset_root=dataset_root,
+                               quality_config_path=quality_config_path, review_path=review_path)
+    if review_path is not None:
+        raise ValueError("V1_REVIEW_PATH_UNSUPPORTED")
     if split not in ("development", "holdout"):
         raise ValueError("INVALID_SPLIT")
     manifest, questions, documents, sources, dataset_sha = _load_dataset(dataset_root)
@@ -322,6 +331,7 @@ def evaluate(predictions_path, *, split="development", dataset_root=DEFAULT_DATA
         }
         report["interpretation"]["acceptance_threshold"] = (
             "explicit dataset-bound thresholds applied; not independent user-quality approval")
+    report["formal_acceptance"] = {"status": "incomplete", "reason": "V1_NO_SEMANTIC_CITATION_REVIEW"}
     return report
 
 
@@ -332,14 +342,17 @@ def main():
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--quality-config", type=Path)
+    parser.add_argument("--review", type=Path, help="Version 2 human review bundle")
+    parser.add_argument("--formal", action="store_true", help="Require a complete version 2 formal quality gate")
     args = parser.parse_args()
     report = evaluate(args.predictions, split=args.split, dataset_root=args.dataset,
-                      quality_config_path=args.quality_config)
+                      quality_config_path=args.quality_config, review_path=args.review)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n",
                            encoding="utf-8")
     print(json.dumps({"split": report["split"], "sample_count": report["sample_count"]}))
-    if args.quality_config is not None and report["quality_gate"]["status"] != "passed":
+    if ((args.formal and (report.get("report_version") != 2 or report["quality_gate"]["status"] != "passed"))
+            or (args.quality_config is not None and report["quality_gate"]["status"] != "passed")):
         raise SystemExit(1)
 
 

@@ -1,5 +1,6 @@
 """Create and merge a dataset-bound human support review bundle."""
 import argparse
+import importlib.util
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -19,9 +20,14 @@ def _timestamp(value):
         return False
 
 
-def prepare_bundle(predictions_path, *, created_at=None):
+def prepare_bundle(predictions_path, *, created_at=None, dataset_root=None, split="development"):
     raw = Path(predictions_path).read_bytes()
     payload = json.loads(raw)
+    if isinstance(payload, dict) and payload.get("prediction_version") == 2:
+        spec = importlib.util.spec_from_file_location("runner_v2", Path(__file__).with_name("runner_v2.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.prepare_review(predictions_path, dataset_root or module.legacy.DEFAULT_DATASET, split)
     if (not isinstance(payload, dict)
             or set(payload) != {"dataset_id", "dataset_sha256", "predictions"}
             or not isinstance(payload["predictions"], list)):
@@ -94,12 +100,16 @@ def main():
     parser.add_argument("--predictions", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--review", type=Path)
+    parser.add_argument("--dataset", type=Path)
+    parser.add_argument("--split", choices=("development", "holdout"), default="development")
     args = parser.parse_args()
     if args.review is None:
-        result = prepare_bundle(args.predictions)
+        result = prepare_bundle(args.predictions, dataset_root=args.dataset, split=args.split)
         args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n",
                                encoding="utf-8")
     else:
+        if _read(args.predictions).get("prediction_version") == 2:
+            raise ValueError("V2_PASS_REVIEW_DIRECTLY_TO_RUNNER")
         merge_reviews(args.predictions, args.review, args.output)
 
 
