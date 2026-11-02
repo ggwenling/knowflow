@@ -20,8 +20,9 @@ let taskStatus: string;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 beforeEach(() => {
@@ -95,6 +96,58 @@ it("ignores a late document page after switching knowledge bases", async () => {
   await screen.findByRole("heading", { name: "第二资料库" });
   await act(async () => { pending.resolve({ items: [{ ...document, original_name: "迟到资料.md" }], has_more: false }); });
   expect(screen.queryByText("迟到资料.md")).not.toBeInTheDocument();
+});
+
+it("blocks pagination while refreshing and resumes at the refreshed offset", async () => {
+  const pending = deferred<{ items: Document[]; has_more: boolean }>();
+  const first = Array.from({ length: 50 }, (_, i) => ({ ...document, id: `d${i}`, original_name: `资料${i}.md` }));
+  const second = Array.from({ length: 50 }, (_, i) => ({ ...document, id: `d${i + 50}`, original_name: `资料${i + 50}.md` }));
+  let firstPageCalls = 0;
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "me") return { user_id: "user", email: "user@example.test" };
+    if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
+    if (path === "knowledge-bases/kb/documents?limit=50&offset=0") return ++firstPageCalls === 1 ? { items: first, has_more: true } : pending.promise;
+    if (path === "knowledge-bases/kb/documents?limit=50&offset=50") return { items: second, has_more: true };
+    if (path.startsWith("questions?")) return { items: [], has_more: true };
+    throw new Error(`Unexpected API path: ${path}`);
+  });
+  render(<Workspace />);
+  await screen.findByText("资料0.md");
+  fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
+  await screen.findByText("资料99.md");
+  fireEvent.click(screen.getByRole("button", { name: /^▤\s*资料库$/ }));
+  await waitFor(() => expect(firstPageCalls).toBe(2));
+  expect(screen.getByRole("button", { name: "加载更多资料" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "加载更多问答" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
+  expect(api).not.toHaveBeenCalledWith("knowledge-bases/kb/documents?limit=50&offset=100");
+  await act(async () => { pending.resolve({ items: first, has_more: true }); });
+  await waitFor(() => expect(screen.getByRole("button", { name: "加载更多资料" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
+  await screen.findByText("资料99.md");
+  expect(vi.mocked(api).mock.calls.filter(([path]) => path === "knowledge-bases/kb/documents?limit=50&offset=50")).toHaveLength(2);
+});
+
+it("keeps pagination blocked until the newest overlapping refresh finishes", async () => {
+  const old = deferred<{ items: Document[]; has_more: boolean }>();
+  const latest = deferred<{ items: Document[]; has_more: boolean }>();
+  let calls = 0;
+  vi.mocked(api).mockImplementation(async (path) => {
+    if (path === "me") return { user_id: "user", email: "user@example.test" };
+    if (path.startsWith("knowledge-bases?")) return { items: [{ id: "kb", name: "资料库", status: "ACTIVE" }] };
+    if (path.startsWith("knowledge-bases/kb/documents?")) return ++calls === 1 ? { items: [document], has_more: true } : calls === 2 ? old.promise : latest.promise;
+    if (path.startsWith("questions?")) return { items: [] };
+    throw new Error(`Unexpected API path: ${path}`);
+  });
+  await openWorkspace();
+  const base = screen.getByRole("button", { name: /^▤\s*资料库$/ });
+  fireEvent.click(base); fireEvent.click(base);
+  await waitFor(() => expect(calls).toBe(3));
+  await act(async () => { old.reject(new Error("旧刷新失败")); });
+  expect(screen.getByRole("button", { name: "加载更多资料" })).toBeDisabled();
+  expect(screen.queryByText("旧刷新失败")).not.toBeInTheDocument();
+  await act(async () => { latest.resolve({ items: [document], has_more: true }); });
+  await waitFor(() => expect(screen.getByRole("button", { name: "加载更多资料" })).toBeEnabled());
 });
 
 describe("index task polling", () => {

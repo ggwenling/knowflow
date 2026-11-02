@@ -39,6 +39,7 @@ export default function Workspace() {
   const [moreDocuments, setMoreDocuments] = useState(false);
   const [moreHistory, setMoreHistory] = useState(false);
   const [loadingPage, setLoadingPage] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [answer, setAnswer] = useState<QuestionDetail | null>(null);
   const [activeQuestion, setActiveQuestion] = useState("");
   const [draft, setDraft] = useState("");
@@ -52,6 +53,7 @@ export default function Workspace() {
   const selectedBaseRef = useRef("");
   const baseGenerationRef = useRef(0);
   const refreshGenerationRef = useRef(0);
+  const refreshInFlightRef = useRef<number | null>(null);
   const pageLoadingRef = useRef(false);
   const documentOffsetRef = useRef(0);
   const historyOffsetRef = useRef(0);
@@ -60,6 +62,7 @@ export default function Workspace() {
   const selectBase = useCallback((baseId: string) => {
     if (selectedBaseRef.current !== baseId) {
       baseGenerationRef.current += 1;
+      refreshInFlightRef.current = null; setRefreshing(false);
       setDocuments([]);
       setHistory([]);
       setMoreDocuments(false); setMoreHistory(false);
@@ -79,6 +82,9 @@ export default function Workspace() {
   const applyRefresh = useCallback(async (baseId: string) => {
     const baseGeneration = baseGenerationRef.current;
     const requestGeneration = ++refreshGenerationRef.current;
+    refreshInFlightRef.current = requestGeneration;
+    setRefreshing(true);
+    try {
     const [documentList, historyList] = await Promise.all([
       api<Page<Document>>(`knowledge-bases/${baseId}/documents?limit=50&offset=0`),
       api<Page<QuestionHistory>>("questions?limit=50&offset=0"),
@@ -89,17 +95,27 @@ export default function Workspace() {
     documentOffsetRef.current = documentList.items.length; historyOffsetRef.current = historyList.items.length;
     setMoreDocuments(Boolean(documentList.has_more)); setMoreHistory(Boolean(historyList.has_more));
     return documentList.items;
+    } catch (error) {
+      if (selectedBaseRef.current !== baseId || baseGenerationRef.current !== baseGeneration || refreshGenerationRef.current !== requestGeneration) return null;
+      throw error;
+    } finally {
+      if (refreshInFlightRef.current === requestGeneration) {
+        refreshInFlightRef.current = null;
+        setRefreshing(false);
+      }
+    }
   }, []);
 
   async function loadMore(kind: "documents" | "history") {
-    if (pageLoadingRef.current || !selectedBaseRef.current) return;
+    if (pageLoadingRef.current || refreshInFlightRef.current !== null || !selectedBaseRef.current) return;
     pageLoadingRef.current = true; setLoadingPage(true);
     const baseId = selectedBaseRef.current, generation = baseGenerationRef.current, refreshId = refreshGenerationRef.current;
     const isCurrent = () => selectedBaseRef.current === baseId && baseGenerationRef.current === generation && refreshGenerationRef.current === refreshId;
     try {
       if (kind === "documents") {
-        const result = await api<Page<Document>>(`knowledge-bases/${baseId}/documents?limit=50&offset=${documentOffsetRef.current}`);
-        if (!isCurrent()) return;
+        const offset = documentOffsetRef.current;
+        const result = await api<Page<Document>>(`knowledge-bases/${baseId}/documents?limit=50&offset=${offset}`);
+        if (!isCurrent() || documentOffsetRef.current !== offset) return;
         documentOffsetRef.current += result.items.length;
         setDocuments((previous) => [...previous, ...result.items.filter((item) => !previous.some((old) => old.id === item.id))]);
         setMoreDocuments(Boolean(result.has_more));
@@ -111,8 +127,9 @@ export default function Workspace() {
           }
         }
       } else {
-        const result = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${historyOffsetRef.current}`);
-        if (!isCurrent()) return;
+        const offset = historyOffsetRef.current;
+        const result = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${offset}`);
+        if (!isCurrent() || historyOffsetRef.current !== offset) return;
         historyOffsetRef.current += result.items.length;
         setHistory((previous) => [...previous, ...result.items.filter((item) => !previous.some((old) => old.question_id === item.question_id))]);
         setMoreHistory(Boolean(result.has_more));
@@ -348,7 +365,7 @@ export default function Workspace() {
         {bases.length === 0 && <p className={styles.sideEmpty}>这里还没有知识库。</p>}
         <form className={styles.newBase} onSubmit={createBase}><input aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
         <div className={styles.sideLabel}>最近问答</div>
-        <div className={styles.historyList}>{history.map((item) => <button key={item.question_id} className={styles.historyItem} onClick={() => openHistory(item)}><span>{item.question}</span><small>{statusLabel(item.status)}</small></button>)}{moreHistory && <button className={styles.textButton} disabled={loadingPage} onClick={() => void loadMore("history")}>加载更多问答</button>}</div>
+        <div className={styles.historyList}>{history.map((item) => <button key={item.question_id} className={styles.historyItem} onClick={() => openHistory(item)}><span>{item.question}</span><small>{statusLabel(item.status)}</small></button>)}{moreHistory && <button className={styles.textButton} disabled={loadingPage || refreshing} onClick={() => void loadMore("history")}>加载更多问答</button>}</div>
         <div className={styles.account}><span className={styles.avatar}>{user.email.slice(0, 1).toUpperCase()}</span><span className={styles.accountText}>{user.email}<small>个人空间</small></span><button className={styles.textButton} onClick={signOut}>退出</button></div>
       </aside>
 
@@ -370,7 +387,7 @@ export default function Workspace() {
 
           <aside className={styles.documentPanel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>SOURCE LIBRARY</span><h2>资料 <span className={styles.documentCount}>{documents.length}</span></h2></div><label className={styles.iconUpload} aria-label="上传资料">＋<input type="file" accept=".txt,.md,.pdf" disabled={!selectedBase || working} onChange={(event) => { void upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
             {documents.length === 0 ? <div className={styles.emptyDocuments}><div>＋</div><strong>添加第一份资料</strong><span>支持 TXT、Markdown 和可读取文本的 PDF</span><small>最大 8 MiB · PDF 最多 200 页</small></div> : <div className={styles.documentList}>{documents.map((document) => <article key={document.id} className={styles.documentCard}><div className={styles.fileIcon}>{formatLabel(document.format)}</div><div className={styles.documentInfo}><strong title={document.original_name}>{document.original_name}</strong><span>{(document.byte_size / 1024).toFixed(0)} KB · {statusLabel(document.status)}</span>{document.status === "FAILED" && <small className={styles.failure}>索引失败，可尝试重建。</small>}</div><div className={styles.documentMenu}><button aria-expanded={openMenu === document.id} aria-label={`${document.original_name} 操作`} title="资料操作" onClick={() => setOpenMenu(openMenu === document.id ? "" : document.id)}>···</button>{openMenu === document.id && <div role="menu"><button role="menuitem" onClick={() => { setOpenMenu(""); window.document.getElementById(`update-${document.id}`)?.click(); }}>更新资料</button><button role="menuitem" onClick={() => { setOpenMenu(""); void rebuild(document); }}>重建索引</button><button role="menuitem" onClick={() => { setOpenMenu(""); void removeDocument(document); }}>删除资料</button></div>}<input id={`update-${document.id}`} type="file" accept=".txt,.md,.pdf" hidden onChange={(event) => { void upload(event.target.files?.[0], document); event.currentTarget.value = ""; }} /></div><div className={`${styles.statusDot} ${document.status === "READY" ? styles.statusReady : document.status === "FAILED" ? styles.statusFailed : ""}`} title={statusLabel(document.status)} /></article>)}</div>}
-            {moreDocuments && <button className={styles.textButton} disabled={loadingPage} onClick={() => void loadMore("documents")}>加载更多资料</button>}
+            {moreDocuments && <button className={styles.textButton} disabled={loadingPage || refreshing} onClick={() => void loadMore("documents")}>加载更多资料</button>}
             <div className={styles.privacyNote}><span>◈</span><p><strong>资料访问范围</strong><br />仅你可以访问此知识库。上传文档会进入索引流程，只有状态显示“已就绪”后才参与问答。</p></div>
           </aside>
         </div>
