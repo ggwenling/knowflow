@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const cookieName = "knowflow_session";
+const maxBodyBytes = 9 * 1024 * 1024;
 const forwardedHeaders = [
   "accept",
   "content-type",
@@ -36,6 +37,36 @@ function expireSession(response: Response) {
   response.headers.append("Set-Cookie", `${cookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${process.env.NODE_ENV === "production" ? "; Secure" : ""}`);
 }
 
+async function readBody(request: NextRequest, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer> | null> {
+  if (!request.body) return new Uint8Array();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new Error("REQUEST_ABORTED"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) onAbort();
+  });
+  try {
+    while (true) {
+      const { value, done } = await Promise.race([reader.read(), aborted]);
+      if (done) {
+        const body = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+        return body;
+      }
+      total += value.byteLength;
+      if (total > maxBodyBytes) return null;
+      chunks.push(value);
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    void reader.cancel().catch(() => {});
+  }
+}
+
 async function proxy(request: NextRequest, { params }: RouteContext) {
   const path = (await params).path;
   const pathname = `/api/v1/${path.map(encodeURIComponent).join("/")}`;
@@ -49,7 +80,7 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
     return response;
   };
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (declaredLength > 9 * 1024 * 1024) return finish(failure(413, "REQUEST_TOO_LARGE"));
+  if (declaredLength > maxBodyBytes) return finish(failure(413, "REQUEST_TOO_LARGE"));
 
   const token = request.cookies.get(cookieName)?.value;
   if (!authPath && !token) return finish(failure(401, "UNAUTHENTICATED"));
@@ -65,13 +96,14 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
   if (token && !authPath) headers.set("authorization", `Bearer ${token}`);
 
   try {
-    const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
-    if (body && body.byteLength > 9 * 1024 * 1024) return finish(failure(413, "REQUEST_TOO_LARGE"));
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(40_000)]);
+    const body = request.method === "GET" || request.method === "HEAD" ? undefined : await readBody(request, signal);
+    if (body === null) return finish(failure(413, "REQUEST_TOO_LARGE"));
     const upstream = await fetch(`${apiBase.replace(/\/$/, "")}${pathname}${request.nextUrl.search}`, {
       method: request.method,
       headers,
       body,
-      signal: AbortSignal.any([request.signal, AbortSignal.timeout(40_000)]),
+      signal,
       cache: "no-store",
     });
 

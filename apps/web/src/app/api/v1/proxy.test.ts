@@ -173,6 +173,64 @@ describe("same-origin API proxy", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("stops reading an oversized chunked body before receiving the remainder", async () => {
+    vi.stubEnv("KNOWFLOW_API_BASE_URL", "http://java:8080");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(9 * 1024 * 1024 + 1)); },
+      cancel() { cancelled = true; },
+    });
+    const request = new NextRequest("http://web.test/api/v1/documents", {
+      method: "POST", headers: { origin: "http://web.test", cookie: "knowflow_session=secret" },
+      body: stream, duplex: "half",
+    } as NonNullable<ConstructorParameters<typeof NextRequest>[1]> & { duplex: "half" });
+    const response = await POST(request, context(["documents"]));
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("stops waiting for an unfinished request body when the client aborts", async () => {
+    vi.stubEnv("KNOWFLOW_API_BASE_URL", "http://java:8080");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const browser = new AbortController();
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+    const request = new NextRequest("http://web.test/api/v1/documents", {
+      method: "POST", headers: { origin: "http://web.test", cookie: "knowflow_session=secret" },
+      body: stream, signal: browser.signal, duplex: "half",
+    } as NonNullable<ConstructorParameters<typeof NextRequest>[1]> & { duplex: "half" });
+    const pending = POST(request, context(["documents"]));
+    browser.abort();
+    expect((await pending).status).toBe(502);
+    expect(cancelled).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("applies the upstream timeout while waiting for the request body", async () => {
+    vi.stubEnv("KNOWFLOW_API_BASE_URL", "http://java:8080");
+    const timeout = new AbortController();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout").mockReturnValue(timeout.signal);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+    const request = new NextRequest("http://web.test/api/v1/documents", {
+      method: "POST", headers: { origin: "http://web.test", cookie: "knowflow_session=secret" },
+      body: stream, duplex: "half",
+    } as NonNullable<ConstructorParameters<typeof NextRequest>[1]> & { duplex: "half" });
+    const pending = POST(request, context(["documents"]));
+    await vi.waitFor(() => expect(timeoutSpy).toHaveBeenCalledWith(40_000));
+    timeout.abort();
+    expect((await pending).status).toBe(502);
+    expect(cancelled).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+    timeoutSpy.mockRestore();
+  });
+
   it("preserves unsatisfiable range status and size metadata", async () => {
     vi.stubEnv("KNOWFLOW_API_BASE_URL", "http://java:8080");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(null, {
