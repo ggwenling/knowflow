@@ -1,8 +1,14 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。候选 `local@79678830b14047aabc41e3cd5f607f564728fb6a` 已推送，`origin/local` 与其同步；当时 `origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；M/项目负责人签收及真实模型质量验收仍待完成。
+状态：IN_PROGRESS。当前代码候选为 `local@802fe48e7d4c689c224c72273a937ac1c8472d73`，执行及审阅见下方最新检查点。较早代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。较早候选 `7967883` 当时已推送并与 `origin/local` 同步；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。先前约定 Luna 实现、Sol 独立审阅；本次 Luna 服务不可用后由根代理实施，Sol 独立审阅。M/项目负责人签收及真实模型质量验收仍待完成。
 
-## 2026-11-03 当前检查点
+## 2026-11-03 SSE 消费补验
+
+- 当前代码候选 `local@802fe48e7d4c689c224c72273a937ac1c8472d73` 已经 Sol 精确 SHA 审阅 APPROVED 并推送；`main` 未合并。此前文档候选 `65774c4` 也获 Sol 批准，PR CI run #18 三个 job 全绿。代码候选 [PR CI #20](https://github.com/ggwenling/knowflow/actions/runs/41596593798) 三个 job 全绿：Java 84（1 skip）、Linux Python 335 passed（3 skipped）、Web/Docker E2E 1/1（14.3秒）；最终四类 SSE 捕获共享 Schema/顺序及主动停止历史检查通过。
+- 修复上游 cancelled 被前端误报为 FAILED；补充真实全栈 synthetic error/cancelled 与主动停止的 UI、历史持久化及不自动重发检查。Python 338 项、Web 46 项、typecheck/相关 lint、Schema 85 项和 OpenAPI 4 项通过。完整验证边界及本地 Docker 网络失败记录见 `docs/reviews/2026-11-03-sse-consumption.md`；Java/Python/M 的正式完整消费签收仍未完成。
+- 用户给出 `services/ai/.env.example` 作为预算信息位置；仅检查变量名及是否有值，没有硬 cap 或超额拒绝证明，继续零真实 provider 调用。用户确认新增私有盲测和生产目标环境目前均无更新。
+
+## 2026-11-03 较早检查点（历史证据）
 
 - 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查正常 TXT/PDF 问答的 draft.10 SSE 帧、注册、上传/READY、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。错误/取消 SSE 路径及完整消费语义仍待验收。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
 - 合成负载报告 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` 绑定 `9c9b4a0`：10/100 文档 × 并发 1/4/8 × 每组 8 个请求，48/48 成功；合成环境 Java API 与 AI 准入上限均为 8。100 文档下首个 SSE delta p95 为 360/485/532 ms，完整回答 p95 为 625/844/1094 ms（并发 1/4/8）。报告有容器资源采样并确认清理。仅证明该 Windows Docker 合成适配器负载，不代表真实 provider 延迟、成本或生产容量。

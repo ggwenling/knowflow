@@ -2,7 +2,13 @@
 
 状态：IN_REVIEW；本文是待签收清单，不代表契约已冻结。当前共享 Schema SHA-256：`20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。验收时填写目标提交、验证结果及执行者；修复改变目标后重新复核受影响项目。
 
-## 2026-11-03 本地证据（尚未签收）
+## 2026-11-03 SSE 补验（尚未签收）
+
+- 代码目标 `802fe48e7d4c689c224c72273a937ac1c8472d73`；Sol 精确 SHA 复核 APPROVED。补齐部分输出后的错误、上游取消及用户主动停止，修复取消被显示为失败；详见 `docs/reviews/2026-11-03-sse-consumption.md`。
+- 目标代码本地 Python 338 项、Web 46 项、typecheck/相关 lint、Schema 85 项和 OpenAPI 4 项通过。本地中间工作树全栈 E2E 1/1；最终两项测试收紧定向 15 项通过，目标 SHA 本地重跑因镜像仓库网络失败未执行测试。最终目标 [PR CI #20](https://github.com/ggwenling/knowflow/actions/runs/41596593798) 三个 job 全绿：Java 84（1 skip）、Linux Python 335 passed（3 skipped）、Web/Docker E2E 1/1（14.3秒），正常 TXT/PDF、error/cancelled 共享 Schema 与顺序，以及历史/主动停止断言通过。
+- 以上补验不替代下方三端完整消费清单及负责人签收；所有正式签收框保持未勾选。
+
+## 2026-11-03 较早本地证据（历史，尚未签收）
 
 - 验证代码基线：`local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；随后 `9c9b4a0` 增加备份证据，未改动代码。Schema 指纹如上。Web typecheck/lint/43 项单测通过，Docker production Web 镜像与全栈 Chromium E2E 1/1 通过；Java Maven/Testcontainers 83 项（1 skip），Python 324 项，Schema 85 项、OpenAPI 4 项通过。
 - 浏览器 E2E 覆盖注册、上传至 READY、正常 TXT/PDF draft.10 SSE 问答帧及共享 schema、来源查看、owner 隔离、删除和移动视口；错误/取消 SSE 路径及完整消费语义仍未覆盖。这属于本地执行证据，不等于 M/项目负责人已签收。
