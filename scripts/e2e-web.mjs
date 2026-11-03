@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 const root = resolve(import.meta.dirname, "..");
 const temp = await mkdtemp(resolve(tmpdir(), "knowflow-e2e-"));
 const envFile = resolve(temp, ".env");
+const streamCapture = resolve(temp, "answer-stream-events.json");
 const project = `knowflow-e2e-${randomBytes(5).toString("hex")}`;
 const compose = ["compose", "--project-name", project, "-f", "infra/compose.yml", "--env-file", envFile];
 
@@ -60,8 +61,11 @@ try {
   await waitForWeb(baseUrl);
   run(process.execPath, [resolve(root, "apps/web/node_modules/@playwright/test/cli.js"), "test"], {
     cwd: resolve(root, "apps/web"),
-    env: { ...process.env, KNOWFLOW_E2E_BASE_URL: baseUrl },
+    env: { ...process.env, KNOWFLOW_E2E_BASE_URL: baseUrl,
+      KNOWFLOW_E2E_STREAM_CAPTURE: streamCapture },
   });
+  run("uv", ["run", "--project", "services/ai", "--frozen", "python",
+    "contracts/validate_sse_capture.py", streamCapture]);
 } finally {
   try { run("docker", [...compose, "down", "--volumes", "--remove-orphans"]); }
   finally { await rm(temp, { recursive: true, force: true }); }

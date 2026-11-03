@@ -76,17 +76,19 @@ class EvaluationFactories:
         return AnswerService(database_url, contract, retriever=CapturingRetriever(retriever, self.traces),
                              llm_factory=self.llm_factory, model_profile=model_profile)
 
-    async def prediction_from_response(self, *, request_id, question_id, mappings,
-                                       response, latency_ms):
+    async def prediction_from_response(self, *, request_id, question_id,
+                                       runtime_question_id, mappings, response, latency_ms):
         return await _prediction.bind_response(
             trace_store=self.traces, request_id=request_id, question_id=question_id,
-            mappings=mappings, response=response, latency_ms=latency_ms)
+            runtime_question_id=runtime_question_id, mappings=mappings,
+            response=response, latency_ms=latency_ms)
 
-    async def prediction_from_error(self, *, request_id, question_id, mappings,
-                                    error_code, latency_ms):
+    async def prediction_from_error(self, *, request_id, question_id,
+                                    runtime_question_id, mappings, error_code, latency_ms):
         return await _prediction.bind_error(
             trace_store=self.traces, request_id=request_id, question_id=question_id,
-            mappings=mappings, error_code=error_code, latency_ms=latency_ms)
+            runtime_question_id=runtime_question_id, mappings=mappings,
+            error_code=error_code, latency_ms=latency_ms)
 
 
 def create_evaluation_app(*_args, **_kwargs):

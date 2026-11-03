@@ -601,6 +601,7 @@ class DocumentApiIntegrationTest {
         String body = streamed.getResponse().getContentAsString();
         assertThat(body).contains("event:started", "event:delta", "event:sources", "event:completed")
                 .doesNotContain("stream-source");
+        assertSseContractFrames(body);
         assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE request_id = ?",
                 String.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo("SUCCEEDED");
         assertThat(jdbc.queryForObject("""
@@ -633,7 +634,7 @@ class DocumentApiIntegrationTest {
                                     evidence.codePointCount(0, evidence.length()), "unicode_code_point"), evidence)));
         });
 
-        for (String terminal : List.of("error", "truncated")) {
+        for (String terminal : List.of("error", "truncated", "cancelled")) {
             AI_STREAM_TERMINAL_EVENT.set(terminal);
             CountDownLatch terminalGate = new CountDownLatch("truncated".equals(terminal) ? 1 : 0);
             AI_STREAM_TERMINAL_GATE.set(terminalGate);
@@ -659,13 +660,17 @@ class DocumentApiIntegrationTest {
             }
             String requestId = AI_RECEIVED_REQUEST_ID.get();
             String body = streamed.getResponse().getContentAsString();
-            assertThat(body).contains("event:sources", "event:error")
+            assertThat(body).contains("event:sources",
+                    "event:" + ("cancelled".equals(terminal) ? "cancelled" : "error"))
                     .doesNotContain("event:completed");
+            assertSseContractFrames(body);
             var failed = jdbc.queryForMap("""
                     SELECT status, failure_code, answer_text FROM knowflow.questions WHERE request_id = ?
                     """, requestId);
-            assertThat(failed.get("status")).isEqualTo("FAILED");
-            assertThat(failed.get("failure_code")).isEqualTo("AI_PROCESSING_FAILED");
+            boolean cancelled = "cancelled".equals(terminal);
+            assertThat(failed.get("status")).isEqualTo(cancelled ? "CANCELLED" : "FAILED");
+            assertThat(failed.get("failure_code"))
+                    .isEqualTo(cancelled ? null : "AI_PROCESSING_FAILED");
             assertThat(failed.get("answer_text")).isNull();
             assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM knowflow.question_sources qs
@@ -2183,6 +2188,64 @@ class DocumentApiIntegrationTest {
                 (int) com.knowflow.api.document.UploadLimits.MAX_FILE_BYTES)).isEqualTo(expected);
     }
 
+    private void assertSseContractFrames(String body) throws Exception {
+        int sequence = 1;
+        for (String frame : body.split("\\r?\\n\\r?\\n")) {
+            if (frame.isBlank()) {
+                continue;
+            }
+            String name = frame.lines().filter(line -> line.startsWith("event:"))
+                    .map(line -> line.substring("event:".length()).trim())
+                    .findFirst().orElseThrow();
+            String data = frame.lines().filter(line -> line.startsWith("data:"))
+                    .map(line -> line.substring("data:".length()).trim())
+                    .findFirst().orElseThrow();
+            JsonNode event = objectMapper.readTree(data);
+            assertThat(event.path("event").asText()).isEqualTo(name);
+            assertThat(event.path("contract_version").asText()).isEqualTo("0.2.0-draft.10");
+            assertThat(event.path("sequence").asInt()).isEqualTo(sequence++);
+            switch (name) {
+                case "started" -> {
+                    if (event.has("model_profile")) {
+                        assertJsonKeys(event, "contract_version", "request_id", "sequence", "event",
+                                "model_profile");
+                        assertJsonKeys(event.path("model_profile"), "embedding_model_profile_id",
+                                "llm_model_profile_id");
+                    } else {
+                        assertJsonKeys(event, "contract_version", "request_id", "sequence", "event");
+                    }
+                }
+                case "delta" -> assertJsonKeys(event, "contract_version", "request_id", "sequence",
+                        "event", "delta");
+                case "sources" -> {
+                    assertJsonKeys(event, "contract_version", "request_id", "sequence", "event",
+                            "has_answer", "sources");
+                    for (JsonNode source : event.path("sources")) {
+                        assertJsonKeys(source, "source_id", "document_id", "content_version_id",
+                                "index_version_id", "chunk_id", "locator", "quote");
+                        JsonNode locator = source.path("locator");
+                        if ("pdf_page".equals(locator.path("kind").asText())) {
+                            assertJsonKeys(locator, "kind", "page");
+                        } else {
+                            assertJsonKeys(locator, "kind", "start", "end", "unit");
+                        }
+                    }
+                }
+                case "completed", "cancelled" -> assertJsonKeys(event, "contract_version",
+                        "request_id", "sequence", "event");
+                case "error" -> assertJsonKeys(event, "contract_version", "request_id", "sequence",
+                        "event", "code", "message", "retryable");
+                default -> throw new AssertionError("Unexpected SSE event: " + name);
+            }
+        }
+    }
+
+    private static void assertJsonKeys(JsonNode node, String... expected) {
+        List<String> fields = new ArrayList<>();
+        node.fieldNames().forEachRemaining(fields::add);
+        assertThat(fields).containsExactlyInAnyOrder(expected);
+    }
+
     private static HttpServer startAiServer() {
         try {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -2294,7 +2357,8 @@ class DocumentApiIntegrationTest {
                     terminal.put("code", "AI_PROCESSING_FAILED");
                     terminal.put("message", "Stream failed after sources");
                     terminal.put("retryable", true);
-                } else if (!"completed".equals(terminalEvent)) {
+                } else if (!"completed".equals(terminalEvent)
+                        && !"cancelled".equals(terminalEvent)) {
                     throw new java.io.IOException("Unknown test stream terminal event");
                 }
                 output.write(("event: " + terminalEvent + "\ndata: " + terminal + "\n\n")

@@ -1,5 +1,6 @@
 import importlib.util
 import asyncio
+import json
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -606,7 +607,8 @@ async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tm
 
     result = await factories.prediction_from_response(
         request_id="req-answer", question_id=question_id,
-        mappings=mappings, response=response, latency_ms=123.5)
+        runtime_question_id=question_id, mappings=mappings,
+        response=response, latency_ms=123.5)
 
     public_ids = [mapping.public_source_id(question_id, "src-0"),
                   mapping.public_source_id(question_id, "src-4")]
@@ -628,6 +630,59 @@ async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tm
         await store.take("req-answer")
 
 
+def test_collected_citation_claim_passes_runner_v2_score_entry(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "runner_v2_claim_test", ROOT / "evaluation" / "runner" / "runner_v2.py")
+    runner_v2 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner_v2)
+    dataset_root = ROOT / "evaluation" / "data" / "seed-v2-reviewed"
+    manifest, questions, _documents, sources, dataset_sha = runner_v2.legacy._load_dataset(
+        dataset_root)
+    question = next(item for item in questions
+                    if item["split"] == "development" and item["answerable"] and item["evidence"])
+    gold = question["evidence"][0]
+    runtime = ("runtime-document", "runtime-content", "runtime-index")
+    source = sources[gold["document_id"]].encode("utf-8")
+    locator = {"kind": "text_range", "unit": "unicode_code_point",
+               "start": gold["start"], "end": gold["end"]}
+    span_sha256 = sha256(sources[gold["document_id"]][gold["start"]:gold["end"]]
+                         .encode("utf-8")).hexdigest()
+    trace = [{"document_id": runtime[0], "content_version_id": runtime[1],
+              "index_version_id": runtime[2], "source_id": "src-0", "locator": locator,
+              "text_sha256": span_sha256}]
+    result = prediction.answer_prediction(
+        question_id=question["id"],
+        runtime_question_id="550e8400-e29b-41d4-a716-446655440000", trace=trace,
+        mappings={runtime: {"dataset_document_id": gold["document_id"],
+                            "dataset_content_version_id": gold["content_version_id"],
+                            "source_bytes": source,
+                            "source_sha256": sha256(source).hexdigest()}},
+        response={"request_id": "req-runner-v2", "answer": "测试结论[src-0]。",
+                  "has_answer": True,
+                  "sources": [{"source_id": "src-0", "document_id": runtime[0],
+                               "content_version_id": runtime[1], "index_version_id": runtime[2],
+                               "locator": locator}]},
+        latency_ms=1)
+    rows = [{"question_id": item["id"], "outcome": "refused", "answer": "资料不足",
+             "answer_sha256": sha256("资料不足".encode("utf-8")).hexdigest(),
+             "retrieved_evidence": [], "citations": [], "latency_ms": 0,
+             "error_code": None} for item in questions if item["split"] == "development"]
+    rows = [result if item["question_id"] == question["id"] else item for item in rows]
+    payload = {"prediction_version": 2, "dataset_id": manifest["dataset_id"],
+               "dataset_sha256": dataset_sha,
+               "run": {"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                       "model": "fixture", "config_sha256": "c" * 64,
+                       "prompt_sha256": "d" * 64},
+               "predictions": rows}
+    predictions_path = tmp_path / "runner-v2-claim-predictions.json"
+    predictions_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    report = runner_v2.evaluate(predictions_path, split="development", dataset_root=dataset_root)
+
+    assert report["sample_count"] == sum(item["split"] == "development" for item in questions)
+    assert report["quality_gate"]["status"] == "incomplete"
+
+
 @pytest.mark.asyncio
 async def test_prediction_rejects_citation_outside_generation_top5_and_request_mismatch():
     question_id, rows, mappings, scope = _prediction_fixture()
@@ -645,14 +700,16 @@ async def test_prediction_rejects_citation_outside_generation_top5_and_request_m
     with pytest.raises(ValueError, match="CITATION_OUTSIDE_TOP5"):
         await prediction.bind_response(
             trace_store=store, request_id="req-rank", question_id=question_id,
-            mappings=mappings, response=response, latency_ms=10)
+            runtime_question_id=question_id, mappings=mappings,
+            response=response, latency_ms=10)
 
     await store.begin("req-wrong")
     await store.record("req-wrong", rows, scope)
     with pytest.raises(ValueError, match="ANSWER_TRACE_REQUEST_MISMATCH"):
         await prediction.bind_response(
             trace_store=store, request_id="req-wrong", question_id=question_id,
-            mappings=mappings, response={**response, "request_id": "other"},
+            runtime_question_id=question_id, mappings=mappings,
+            response={**response, "request_id": "other"},
             latency_ms=10)
     with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
         await store.take("req-wrong")
@@ -668,7 +725,8 @@ async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tm
     await store.begin("req-refused")
     await store.record("req-refused", [], scope)
     refused = await factories.prediction_from_response(
-        request_id="req-refused", question_id=question_id, mappings=mappings,
+        request_id="req-refused", question_id=question_id,
+        runtime_question_id=question_id, mappings=mappings,
         response={"request_id": "req-refused", "answer": "没有足够证据。",
                   "has_answer": False, "sources": []},
         latency_ms=8)
@@ -677,13 +735,13 @@ async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tm
     await store.begin("req-error")
     await store.record("req-error", [], scope)
     error = await factories.prediction_from_error(
-        request_id="req-error", question_id=question_id,
+        request_id="req-error", question_id=question_id, runtime_question_id=question_id,
         mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
     assert error["outcome"] == "error" and error["answer"] == ""
     assert error["citations"] == [] and error["error_code"] == "MODEL_TIMEOUT"
     with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
         await factories.prediction_from_error(
-            request_id="missing", question_id=question_id,
+            request_id="missing", question_id=question_id, runtime_question_id=question_id,
             mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
 
 

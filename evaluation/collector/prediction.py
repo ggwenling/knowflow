@@ -24,13 +24,13 @@ def _latency(value):
         raise ValueError("INVALID_LATENCY")
 
 
-def _mapped_trace(question_id, trace, mappings, latency_ms):
+def _mapped_trace(runtime_question_id, trace, mappings, latency_ms):
     _latency(latency_ms)
     if not isinstance(trace, list):
         raise ValueError("TRACE_NOT_AVAILABLE")
-    evidence = _mapping.map_retrieval(question_id, trace, mappings)
+    evidence = _mapping.map_retrieval(runtime_question_id, trace, mappings)
     runtime_to_public = {
-        row["source_id"]: _mapping.public_source_id(question_id, row["source_id"])
+        row["source_id"]: _mapping.public_source_id(runtime_question_id, row["source_id"])
         for row in trace
     }
     return evidence, runtime_to_public
@@ -45,9 +45,10 @@ def _claim(answer, start, end):
     return result or answer[start:end]
 
 
-def answer_prediction(*, question_id, trace, mappings, response, latency_ms):
-    """Build an answered/refused row from an AnswerService response and its trace."""
-    evidence, runtime_to_public = _mapped_trace(question_id, trace, mappings, latency_ms)
+def answer_prediction(*, question_id, runtime_question_id, trace, mappings, response, latency_ms):
+    """Build a dataset-keyed row from one runtime question and its captured trace."""
+    evidence, runtime_to_public = _mapped_trace(
+        runtime_question_id, trace, mappings, latency_ms)
     required = {"request_id", "answer", "has_answer", "sources"}
     if (not isinstance(response, dict) or not required <= response.keys()
             or not isinstance(response["request_id"], str)
@@ -101,10 +102,11 @@ def answer_prediction(*, question_id, trace, mappings, response, latency_ms):
                 "source_id": public_id,
                 "marker_index": marker_index,
                 "evidence_index": evidence_index,
-                "claim": _claim(answer, marker.start(), marker.end()),
             })
         remapped_answer = _MARKER.sub(
             lambda match: "[" + replacements[match.group(1)] + "]", answer)
+        for citation, marker in zip(citations, _MARKER.finditer(remapped_answer), strict=True):
+            citation["claim"] = _claim(remapped_answer, marker.start(), marker.end())
 
     return {
         "question_id": question_id,
@@ -118,9 +120,10 @@ def answer_prediction(*, question_id, trace, mappings, response, latency_ms):
     }
 
 
-def error_prediction(*, question_id, trace, mappings, error_code, latency_ms):
+def error_prediction(*, question_id, runtime_question_id, trace, mappings,
+                     error_code, latency_ms):
     """Build an error row; callers must still supply the captured request trace."""
-    evidence, _ = _mapped_trace(question_id, trace, mappings, latency_ms)
+    evidence, _ = _mapped_trace(runtime_question_id, trace, mappings, latency_ms)
     if not isinstance(error_code, str) or not _ERROR_CODE.fullmatch(error_code):
         raise ValueError("INVALID_ERROR_CODE")
     return {
@@ -135,19 +138,21 @@ def error_prediction(*, question_id, trace, mappings, error_code, latency_ms):
     }
 
 
-async def bind_response(*, trace_store, request_id, question_id, mappings,
-                        response, latency_ms):
+async def bind_response(*, trace_store, request_id, question_id, runtime_question_id,
+                        mappings, response, latency_ms):
     """Consume the request's single-use trace and build its response row."""
     trace = await trace_store.take(request_id)
     if not isinstance(response, dict) or response.get("request_id") != request_id:
         raise ValueError("ANSWER_TRACE_REQUEST_MISMATCH")
-    return answer_prediction(question_id=question_id, trace=trace, mappings=mappings,
-                             response=response, latency_ms=latency_ms)
+    return answer_prediction(question_id=question_id, runtime_question_id=runtime_question_id,
+                             trace=trace, mappings=mappings, response=response,
+                             latency_ms=latency_ms)
 
 
-async def bind_error(*, trace_store, request_id, question_id, mappings,
-                     error_code, latency_ms):
+async def bind_error(*, trace_store, request_id, question_id, runtime_question_id,
+                     mappings, error_code, latency_ms):
     """Consume the request's single-use trace and build its error row."""
     trace = await trace_store.take(request_id)
-    return error_prediction(question_id=question_id, trace=trace, mappings=mappings,
-                            error_code=error_code, latency_ms=latency_ms)
+    return error_prediction(question_id=question_id, runtime_question_id=runtime_question_id,
+                            trace=trace, mappings=mappings, error_code=error_code,
+                            latency_ms=latency_ms)

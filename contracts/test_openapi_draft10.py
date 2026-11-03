@@ -76,6 +76,15 @@ class OpenApiDraft10Test(unittest.TestCase):
                 if path == "/health/live" or path.startswith("/internal/") and not path.startswith("/internal/v1/tasks/"):
                     self.assertEqual(operation["servers"][0]["url"], "http://localhost:8000", path)
 
+    def test_public_stream_and_source_locators_use_shared_closed_schema(self):
+        schemas = self.spec["components"]["schemas"]
+        self.assertEqual(
+            schemas["PublicStreamEvent"]["$ref"],
+            "./schemas/protocol.schema.json#/$defs/AnswerStreamEvent")
+        self.assertEqual(
+            schemas["PublicSource"]["properties"]["locator"]["$ref"],
+            "./schemas/protocol.schema.json#/$defs/Locator")
+
 
 if __name__ == "__main__":
     unittest.main()

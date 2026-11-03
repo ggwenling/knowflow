@@ -1,11 +1,21 @@
 import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 let firstPage: Page | undefined;
 let firstKnowledgeBase = "";
 let secondKnowledgeBase = "";
+
+function parseSseEvents(body: string) {
+  return body.split(/\r?\n\r?\n/).filter((frame) => frame.includes("data:")).map((frame) => {
+    const lines = frame.split(/\r?\n/);
+    return {
+      name: lines.find((line) => line.startsWith("event:"))?.slice(6).trim(),
+      data: JSON.parse(lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n")),
+    };
+  });
+}
 
 test.afterEach(async () => {
   if (firstPage) {
@@ -63,14 +73,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const streamResponse = page.waitForResponse((response) => response.url().includes("/questions/stream"));
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("什么时候允许使用这份资料进行问答？");
   await page.getByRole("button", { name: "提问" }).click();
-  const streamBody = await (await streamResponse).text();
-  const streamEvents = streamBody.split(/\r?\n\r?\n/).filter((frame) => frame.includes("data:")).map((frame) => {
-    const lines = frame.split(/\r?\n/);
-    return {
-      name: lines.find((line) => line.startsWith("event:"))?.slice(6).trim(),
-      data: JSON.parse(lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n")),
-    };
-  });
+  const streamEvents = parseSseEvents(await (await streamResponse).text());
   expect(streamEvents[0].name).toBe("started");
   expect(streamEvents.some(({ name }) => name === "delta")).toBeTruthy();
   expect(streamEvents.at(-1)?.name).toBe("completed");
@@ -131,12 +134,15 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await page.getByRole("button", { name: "提问" }).click();
   const pdfBody = await (await pdfStream).text();
   expect(pdfBody).toMatch(/event:[ \t]*completed/);
-  const pdfSources = pdfBody.split(/\r?\n\r?\n/).find((frame) => /^event:[ \t]*sources$/m.test(frame));
-  const pdfSource = JSON.parse(pdfSources!.split(/\r?\n/).find((line) => line.startsWith("data:"))!.slice(5)).sources[0] as { document_id: string; content_version_id: string; locator: { page: number } };
+  const pdfEvents = parseSseEvents(pdfBody);
+  const pdfSource = (pdfEvents.find(({ name }) => name === "sources")!.data.sources[0]) as { document_id: string; content_version_id: string; locator: { page: number } };
   expect(pdfSource.document_id).toBeTruthy();
   expect(pdfSource.content_version_id).toBeTruthy();
   expect([1, 3]).toContain(pdfSource.locator.page);
   await page.getByRole("button").filter({ hasText: pdfName }).filter({ hasText: `第 ${pdfSource.locator.page} 页` }).first().click();
   await expect(page.getByRole("dialog", { name: "原文依据" }).locator("iframe")).toHaveAttribute("src", new RegExp(`#page=${pdfSource.locator.page}$`));
   expect(uploaded.document_id).toBe(source.document_id);
+  const capturePath = process.env.KNOWFLOW_E2E_STREAM_CAPTURE;
+  if (!capturePath) throw new Error("KNOWFLOW_E2E_STREAM_CAPTURE is required");
+  await writeFile(capturePath, JSON.stringify({ text: streamEvents, pdf: pdfEvents }, null, 2), "utf8");
 });

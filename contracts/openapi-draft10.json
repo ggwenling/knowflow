@@ -3,7 +3,7 @@
   "info": {
     "title": "KnowFlow draft.10 candidate API",
     "version": "0.2.0-draft.10",
-    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。公开 SSE 与部分公开响应的 null 字段和共享 schema 兼容性待运行验证。 不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
+    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。公开 SSE 事件按事件类型省略未使用字段；具体 wire 帧由浏览器 E2E 对共享 schema 校验。部分公开响应的其余 null 字段兼容性仍待运行验证。 不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
   },
   "security": [
     {
@@ -853,7 +853,7 @@
             }
           }
         ],
-        "description": "SSE started、delta、sources、completed；失败以 error 或 cancelled 结束。公开来源 ID 与内部 ID 不同，不承诺断线重放。公开事件字段 null 序列化待消费验证。"
+        "description": "公开 SSE 每帧按 event 联合类型省略未使用字段，并由共享 AnswerStreamEvent schema 校验；错误以 error 或 cancelled 结束。公开来源 ID 与内部 ID 不同，不承诺断线重放。"
       }
     },
     "/internal/v1/tasks/{taskId}/index-batches": {
@@ -1454,46 +1454,7 @@
             "type": "string",
             "format": "uuid"
           },
-          "locator": {
-            "type": "object",
-            "description": "Java SourceResponse.Locator: all five keys are serialized; unused fields may be null.",
-            "required": [
-              "kind",
-              "page",
-              "start",
-              "end",
-              "unit"
-            ],
-            "properties": {
-              "kind": {
-                "type": "string"
-              },
-              "page": {
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "start": {
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "end": {
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "unit": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            }
-          },
+          "locator": {"$ref": "./schemas/protocol.schema.json#/$defs/Locator"},
           "quote": {
             "type": "string"
           }
@@ -1530,163 +1491,7 @@
         }
       },
       "PublicStreamEvent": {
-        "type": "object",
-        "description": "Java PublicAnswerStreamEvent 的事件 JSON。事件序列语义见 api-draft.md；当前待 Q/M 验证实际 wire 样例。",
-        "required": [
-          "contract_version",
-          "request_id",
-          "sequence",
-          "event"
-        ],
-        "properties": {
-          "contract_version": {
-            "$ref": "./schemas/protocol.schema.json#/$defs/ContractVersion"
-          },
-          "request_id": {
-            "type": "string"
-          },
-          "sequence": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "event": {
-            "enum": [
-              "started",
-              "delta",
-              "sources",
-              "completed",
-              "error",
-              "cancelled"
-            ]
-          },
-          "delta": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "has_answer": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "sources": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": [
-                    "source_id",
-                    "document_id",
-                    "content_version_id",
-                    "index_version_id",
-                    "chunk_id",
-                    "locator",
-                    "quote"
-                  ],
-                  "properties": {
-                    "source_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "document_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "content_version_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "index_version_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "chunk_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "locator": {
-                      "type": "object",
-                      "description": "Java SourceResponse.Locator: all five keys are serialized; unused fields may be null.",
-                      "required": [
-                        "kind",
-                        "page",
-                        "start",
-                        "end",
-                        "unit"
-                      ],
-                      "properties": {
-                        "kind": {
-                          "type": "string"
-                        },
-                        "page": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "start": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "end": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ]
-                        },
-                        "unit": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      }
-                    },
-                    "quote": {
-                      "type": "string"
-                    }
-                  }
-                }
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "message": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "retryable": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "model_profile": {
-            "anyOf": [
-              {
-                "$ref": "./schemas/protocol.schema.json#/$defs/ModelProfile"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        }
+        "$ref": "./schemas/protocol.schema.json#/$defs/AnswerStreamEvent"
       }
     }
   },
