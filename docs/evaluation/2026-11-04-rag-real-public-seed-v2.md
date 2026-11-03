@@ -83,3 +83,8 @@
 ## 结论
 
 公开集 development + holdout **均达到质量门槛**；本会话真实预留花费 **≈0.074 CNY**，远低于 soft 8 / hard 10。无需本轮改进迭代。待负责人签核正式 PRICE/POLICY 后，可用同一流程复跑并替换草稿声明。盲测请负责人按 `docs/evaluation/windows-blind-eval-runbook.md` 在本地执行。
+
+## 文档修订与审阅
+
+- Windows 盲测 runbook 在 `b8a8a60` 按真实 CLI/`<repo>/.blindtest` 路径修订；Sol High 复审 `docs/reviews/2026-11-04-sol-b8a8a60.md`：**APPROVED（限 F1–F4）**。
+- 公开集指标报告本体审阅见 `docs/reviews/2026-11-04-sol-cf923ba.md`（报告与 assets 通过；当时 runbook 为 CHANGES_REQUESTED，已关闭）。
