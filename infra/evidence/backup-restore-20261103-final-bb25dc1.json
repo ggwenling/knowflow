@@ -1,0 +1,522 @@
+{
+  "status": "passed",
+  "started_at": "2026-11-03T06:01:46.517959+00:00",
+  "projects": [
+    "knowflow-restore-b7db008a5f43415c",
+    "knowflow-restore-c05eed676e3647d1"
+  ],
+  "checks": {
+    "source_index_ready": true,
+    "schema_owners_match": true,
+    "bytes_match": true,
+    "history_answer_restored": true,
+    "history_source_accessible": true,
+    "owner_isolation": true,
+    "restored_index_queryable": true
+  },
+  "provider_calls": 0,
+  "source_revision": "bb25dc194fc1aeb3b0c21b7f57d364988308c8ea",
+  "drill_sha256": "f1668af8f4c2dcfa842a09bf4c1e75844f02b18239279e0d4e1c2e1e15b1949d",
+  "command": "uv run --project services/ai --frozen python infra/backup_restore_e2e.py --output infra/evidence/backup-restore-20261103-final-bb25dc1.json",
+  "machine": {
+    "os": "Windows",
+    "release": "11",
+    "architecture": "AMD64",
+    "docker_server": "29.8.2",
+    "compose": "5.6.0"
+  },
+  "images": {
+    "source_api": "sha256:8a01cdfe6298201a61f77130f34834a0be986031a017e8af5639b0c00a85fc78",
+    "source_ai": "sha256:5e7f79347adcc3e39a01e08dd4975d7d2d4a151a07b97759e44422c9d7db67bc",
+    "restored_api": "sha256:43020eabebbf8a044525efadf8b73c5f6cad05de6e06dbc341abe051629bb05a",
+    "restored_ai": "sha256:868e6e90aacc413c1697f9e31967d27af02c30d0f00870293049cacc2876ff1b"
+  },
+  "migration_versions": {
+    "source": "8",
+    "restored": "8"
+  },
+  "stage": "start_restored_api",
+  "backup_sha256": {
+    "database": "a3147af9fd50f887173b7f1ddd21590b79a111891aeaef70547d9bb18e1eb6da",
+    "objects": "0a835a9ad248db422e25caee15371f17b6d4490b662337aa6695fa29059c0c9a"
+  },
+  "cleanup": {
+    "knowflow-restore-c05eed676e3647d1": {
+      "down_exit_code": 0,
+      "remaining_resources": {
+        "containers": 0,
+        "networks": 0,
+        "volumes": 0
+      },
+      "verified_empty": true
+    },
+    "knowflow-restore-b7db008a5f43415c": {
+      "down_exit_code": 0,
+      "remaining_resources": {
+        "containers": 0,
+        "networks": 0,
+        "volumes": 0
+      },
+      "verified_empty": true
+    }
+  },
+  "cleanup_verified": true,
+  "commands": [
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "version",
+      "--format",
+      "{{.Server.Version}}"
+    ],
+    [
+      "docker",
+      "compose",
+      "version",
+      "--short"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "up",
+      "--build",
+      "--quiet-build",
+      "--wait",
+      "--wait-timeout",
+      "240",
+      "api"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "stop",
+      "api",
+      "ai",
+      "minio"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "postgres"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "minio"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "api"
+    ],
+    [
+      "docker",
+      "inspect",
+      "--format",
+      "{{.Image}}",
+      "710dd05b31073288fc73dfa0c3956eff687d045b3e3add3624486b1bf0c46170"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "ai"
+    ],
+    [
+      "docker",
+      "inspect",
+      "--format",
+      "{{.Image}}",
+      "5ef43ae0167a783ee2ea7183bb59446e4ff99a08c34188ebaea508edf2ee758e"
+    ],
+    [
+      "docker",
+      "exec",
+      "c6e3b0ee7275d765d19cec4a0a6f9c271d69e5a1f5ab4182dc4d197df18dccdc",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "knowflow",
+      "-At",
+      "-c",
+      "SELECT version FROM knowflow_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"
+    ],
+    [
+      "docker",
+      "exec",
+      "c6e3b0ee7275d765d19cec4a0a6f9c271d69e5a1f5ab4182dc4d197df18dccdc",
+      "pg_dump",
+      "-U",
+      "postgres",
+      "--format=custom",
+      "--no-owner",
+      "knowflow"
+    ],
+    [
+      "docker",
+      "cp",
+      "-a",
+      "70eb9b99e0afdc22b0282bdd3f6fe0a01a79d2a8ee3a7cd104c91848208a60f8:/bitnami/minio/data/.",
+      "-"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "up",
+      "--wait",
+      "--wait-timeout",
+      "120",
+      "postgres",
+      "minio"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "stop",
+      "minio"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "postgres"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "minio"
+    ],
+    [
+      "docker",
+      "exec",
+      "-i",
+      "1005c15d93ed32044be093e5f35cc0e921a0dcbb7db2bff415e1a99d6fe942d2",
+      "pg_restore",
+      "-U",
+      "postgres",
+      "--exit-on-error",
+      "--clean",
+      "--if-exists",
+      "-d",
+      "knowflow"
+    ],
+    [
+      "docker",
+      "exec",
+      "1005c15d93ed32044be093e5f35cc0e921a0dcbb7db2bff415e1a99d6fe942d2",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "knowflow",
+      "-At",
+      "-c",
+      "SELECT nspname || '=' || pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname IN ('knowflow', 'knowflow_flyway') ORDER BY nspname"
+    ],
+    [
+      "docker",
+      "exec",
+      "1005c15d93ed32044be093e5f35cc0e921a0dcbb7db2bff415e1a99d6fe942d2",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "knowflow",
+      "-At",
+      "-c",
+      "SELECT version FROM knowflow_flyway.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"
+    ],
+    [
+      "docker",
+      "cp",
+      "-a",
+      "-",
+      "cac007869977622e0bb1be5255fbc3d6cfd3da979d5682e47e6e8e1ec43a01b0:/bitnami/minio/data"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "up",
+      "--build",
+      "--quiet-build",
+      "--wait",
+      "--wait-timeout",
+      "240",
+      "api"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "api"
+    ],
+    [
+      "docker",
+      "inspect",
+      "--format",
+      "{{.Image}}",
+      "a83c35ea72a8933ced92bd28de52d8904cf305cbbdab770b45fbe78a7dfb149f"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "ps",
+      "--all",
+      "-q",
+      "ai"
+    ],
+    [
+      "docker",
+      "inspect",
+      "--format",
+      "{{.Image}}",
+      "23214859e8742b2b287dc38b56049bc71e974382f99a88a77255f355f802f10a"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-c05eed676e3647d1",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-1.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "down",
+      "--volumes",
+      "--remove-orphans"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-c05eed676e3647d1"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-b7db008a5f43415c",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-j8ow1lls\\.env",
+      "down",
+      "--volumes",
+      "--remove-orphans"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-b7db008a5f43415c"
+    ]
+  ],
+  "docker_errors": [],
+  "finished_at": "2026-11-03T06:02:46.047301+00:00"
+}
