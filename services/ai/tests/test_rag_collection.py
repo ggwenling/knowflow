@@ -283,8 +283,6 @@ async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use
             return db.execute("SELECT count(*) FROM reservations").fetchone()[0]
     class Adapter:
         settings = SimpleNamespace(model="model-a")
-        def __init__(self):
-            assert reserved_count() > 0
         async def embed(self, texts, *, request_id):
             calls.append(("embed", reserved_count()))
             return {"data": []}
@@ -326,24 +324,61 @@ async def test_guard_rejects_factory_using_a_different_model_before_call(tmp_pat
         settings = SimpleNamespace(model="different-model")
         async def embed(self, texts, *, request_id): calls.append("network")
         async def aclose(self): calls.append("closed")
-    adapter = guarded.GuardedEmbedding(
-        adapter_factory=WrongModel, ledger=budget.BudgetLedger(path), provider="synthetic", model="model-a",
-        quote=current_quote(), token_bounds=verified_bounds(lambda *_: (100, 0)),
-        bound_evidence=current_bound_evidence())
+    wiring = load("wiring")
+    ledger = wiring.BudgetLedger(path)
+    config = {"adapter_factory": lambda: WrongModel(), "provider": "synthetic", "model": "model-a",
+              "quote": current_quote(), "token_bounds": verified_bounds(lambda *_: (100, 0)),
+              "bound_evidence": current_bound_evidence()}
+    factories = wiring.EvaluationFactories(ledger=ledger, embedding=config, llm=config)
+    factories.preflight()
+    adapter = factories.embedding_factory()
     with pytest.raises(ValueError, match="ADAPTER_MODEL_MISMATCH"):
         await adapter.embed(["a"], request_id="request")
     assert calls == ["closed"]
     with closing(sqlite3.connect(path)) as db:
-        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_guard_checks_authoritative_adapter_ledger_path_before_reservation(monkeypatch, tmp_path):
+    wiring = load("wiring")
+    ledger_path = tmp_path / "ledger.sqlite3"
+    monkeypatch.setenv("KNOWFLOW_BUDGET_LEDGER_PATH", str(tmp_path / "different.sqlite3"))
+    closed = []
+    class ProductAdapter:
+        budgeted_provider_adapter = True
+        settings = SimpleNamespace(model="model-a")
+        async def embed(self, *_args, **_kwargs): pytest.fail("must reject before HTTP")
+        async def aclose(self): closed.append(True)
+
+    config = {"adapter_factory": lambda: ProductAdapter(), "provider": "synthetic", "model": "model-a",
+              "quote": current_quote(), "token_bounds": verified_bounds(lambda *_: (100, 0)),
+              "bound_evidence": current_bound_evidence()}
+    factories = wiring.EvaluationFactories(ledger=wiring.BudgetLedger(ledger_path),
+                                           embedding=config, llm=config)
+    factories.preflight()
+    guard = factories.embedding_factory()
+    with pytest.raises(ValueError, match="BUDGET_LEDGER_CONFIGURATION_MISMATCH"):
+        await guard.embed(["synthetic"], request_id="r")
+    assert closed == [True]
+    with closing(sqlite3.connect(ledger_path)) as db:
+        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 0
 
 
 @pytest.mark.asyncio
 async def test_guard_fails_closed_before_factory_for_unknown_price_or_bound(tmp_path):
     ledger = budget.BudgetLedger(tmp_path / "budget.sqlite3")
     calls = []
+    class Adapter:
+        settings = SimpleNamespace(model="model-a")
+        async def embed(self, *_args, **_kwargs): pass
+        async def generate(self, *_args, **_kwargs): pass
+        async def stream_content(self, *_args, **_kwargs):
+            if False: yield None
+        async def aclose(self): pass
     def factory():
         calls.append("factory")
-        raise AssertionError("must not construct adapter")
+        return Adapter()
     common = {"adapter_factory": factory, "ledger": ledger, "provider": "synthetic", "model": "model-a"}
     no_price = guarded.GuardedEmbedding(**common, quote=None, token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=current_bound_evidence())
     with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
@@ -357,7 +392,7 @@ async def test_guard_fails_closed_before_factory_for_unknown_price_or_bound(tmp_
     unverified = guarded.GuardedEmbedding(**common, quote=current_quote(), token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=None)
     with pytest.raises(ValueError, match="TOKEN_BOUND_EVIDENCE_REQUIRED"):
         await unverified.embed(["a"], request_id="r")
-    assert calls == []
+    assert calls == ["factory"]
 
 
 @pytest.mark.asyncio
@@ -372,7 +407,11 @@ async def test_guard_cancelled_during_reservation_never_calls_provider_or_refund
             try: return real_ledger.reserve(*args, **kwargs)
             finally: finished.set()
     called = []
-    adapter = guarded.GuardedEmbedding(adapter_factory=lambda: called.append(True), ledger=BlockingLedger(),
+    class Adapter:
+        settings = SimpleNamespace(model="model-a")
+        async def embed(self, *_args, **_kwargs): called.append("http")
+        async def aclose(self): pass
+    adapter = guarded.GuardedEmbedding(adapter_factory=Adapter, ledger=BlockingLedger(),
         provider="synthetic", model="model-a", quote=current_quote(),
         token_bounds=verified_bounds(lambda *_: (100, 0)), bound_evidence=current_bound_evidence())
     task = asyncio.create_task(adapter.embed(["a"], request_id="request"))
@@ -889,8 +928,14 @@ async def test_zero_price_quote_is_enabled_only_for_embedding_guard(tmp_path):
     llm_evidence = {key: llm_quote[key] for key in ("provider", "model", "source_url", "verified_by",
                                                     "verified_at", "valid_until")}
     llm_evidence["policy_id"] = "synthetic-test-policy"
+    class UnusedLlm:
+        settings = SimpleNamespace(model="deepseek-flash")
+        async def generate(self, *_args, **_kwargs): pass
+        async def stream_content(self, *_args, **_kwargs):
+            if False: yield None
+        async def aclose(self): pass
     llm = guarded.GuardedLlm(
-        adapter_factory=lambda: pytest.fail("LLM adapter must not be constructed"),
+        adapter_factory=UnusedLlm,
         ledger=ledger, provider="deepseek", model="deepseek-flash", quote=llm_quote,
         token_bounds=verified_bounds(lambda *_: (100, 1024)), bound_evidence=llm_evidence)
     with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):

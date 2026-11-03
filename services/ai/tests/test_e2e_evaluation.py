@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[2] / "scripts/e2e-evaluation.py"
+SCRIPT = Path(__file__).resolve().parents[3] / "scripts/e2e-evaluation.py"
 spec = importlib.util.spec_from_file_location("evaluation_e2e", SCRIPT)
 e2e = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(e2e)

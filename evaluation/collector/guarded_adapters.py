@@ -27,6 +27,7 @@ class _GuardedAdapter:
         self._token_bounds = token_bounds
         self._bound_evidence = deepcopy(bound_evidence)
         self._adapter = None
+        self._authoritative_adapter_boundary = None
         self._closed = False
 
     async def _reserve(self, operation, *inputs):
@@ -39,11 +40,26 @@ class _GuardedAdapter:
                 or type(bounds[1]) is not int or bounds[1] < 0
                 or (operation in ("generate", "stream") and bounds[1] < 1024)):
             raise ValueError("TOKEN_BOUNDS_UNAVAILABLE")
-        authoritative_adapter_boundary = getattr(self._factory, "budgeted_provider_adapter", False)
+        # Resolve the boundary from the produced adapter, before making any
+        # irreversible reservation. Factories may be ordinary lambdas or
+        # partials, so their attributes are not authoritative.
+        if self._adapter is None:
+            candidate = self._factory()
+            if getattr(getattr(candidate, "settings", None), "model", None) != self._model:
+                await candidate.aclose()
+                raise ValueError("ADAPTER_MODEL_MISMATCH")
+            self._adapter = candidate
+            self._authoritative_adapter_boundary = bool(
+                getattr(candidate, "budgeted_provider_adapter", False))
+
+        authoritative_adapter_boundary = self._authoritative_adapter_boundary
         if authoritative_adapter_boundary:
             configured_path = os.environ.get("KNOWFLOW_BUDGET_LEDGER_PATH")
             if (not configured_path
                     or Path(configured_path).resolve() != self._ledger.path.resolve()):
+                await self._adapter.aclose()
+                self._adapter = None
+                self._authoritative_adapter_boundary = None
                 raise ValueError("BUDGET_LEDGER_CONFIGURATION_MISMATCH")
             # The real adapter owns the sole reservation immediately before each
             # HTTP attempt. Its runtime policy and ledger are authoritative.
@@ -58,16 +74,6 @@ class _GuardedAdapter:
                                             and self._quote.get("input_cny_per_million") == "0"))
         if self._closed:
             raise ValueError("ADAPTER_CLOSED")
-        if self._adapter is None:
-            candidate = self._factory()
-            if getattr(getattr(candidate, "settings", None), "model", None) != self._model:
-                await candidate.aclose()
-                raise ValueError("ADAPTER_MODEL_MISMATCH")
-            if (getattr(candidate, "budgeted_provider_adapter", False)
-                    and not authoritative_adapter_boundary):
-                await candidate.aclose()
-                raise ValueError("AUTHORITATIVE_BUDGET_BOUNDARY_REQUIRED")
-            self._adapter = candidate
         return self._adapter
 
     def _verify_bound_evidence(self):
