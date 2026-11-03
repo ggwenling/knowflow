@@ -991,6 +991,14 @@ def run(args):
         ["git", "branch", "--show-current"], cwd=REPO, text=True).strip()
     if branch != "local":
         raise RuntimeError("RECOVERY_E2E_REQUIRES_LOCAL_BRANCH")
+    code_status = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--",
+         "infra/compose.yml", "services/api", "services/ai/src",
+         "services/ai/tools", "contracts/schemas"], cwd=REPO, text=True)
+    if code_status.strip():
+        raise RuntimeError("RECOVERY_CODE_INPUTS_DIRTY")
+    head_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
     subprocess.run(["git", "merge-base", "--is-ancestor", "main", "HEAD"],
                    cwd=REPO, check=True)
     base_commit = subprocess.check_output(
@@ -1050,6 +1058,8 @@ def run(args):
             scenarios["postgres_index_write_outage"] = _scenario_postgres_outage_during_index_write(harness)
             scenarios["postgres_outage"] = _scenario_service_outage(harness, "postgres")
             scenarios["minio_outage"] = _scenario_service_outage(harness, "minio")
+            scenarios["second_embedding_batch_failure"] = (
+                _scenario_second_embedding_batch_failure(harness))
         else:
             scenarios["single_worker_restart"] = _scenario_worker_restarts(harness)
             scenarios["three_worker_losses"] = _scenario_retry_limit_preserves_active(harness)
@@ -1106,6 +1116,7 @@ def run(args):
                   else "DEVELOPMENT_INCOMPLETE",
         "failure": failure,
         "branch": branch,
+        "head_commit": head_commit,
         "base_commit": base_commit,
         "database_name": database_name,
         "database_dropped_after_cleanup": database_created and database_clean,
