@@ -423,6 +423,7 @@ def test_budget_rounds_up_and_reserves_output_upper_bound(tmp_path):
 
 def test_public_id_matches_java_name_uuid():
     assert mapping.public_source_id("550e8400-e29b-41d4-a716-446655440000", "src-1") == "8e12941d-7836-3c6d-87d0-65e9e8b5267b"
+    assert mapping.normalize_question_id("550E8400-E29B-41D4-A716-446655440000") == "550e8400-e29b-41d4-a716-446655440000"
 
 
 @pytest.mark.asyncio
@@ -739,6 +740,12 @@ async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tm
         mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
     assert error["outcome"] == "error" and error["answer"] == ""
     assert error["citations"] == [] and error["error_code"] == "MODEL_TIMEOUT"
+    with pytest.raises(ValueError, match="INVALID_QUESTION_ID"):
+        prediction.answer_prediction(
+            question_id=question_id, runtime_question_id="dataset-question-id", trace=[],
+            mappings={}, response={"request_id": "req-invalid-runtime", "answer": "资料不足",
+                                  "has_answer": False, "sources": []},
+            latency_ms=1)
     with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
         await factories.prediction_from_error(
             request_id="missing", question_id=question_id, runtime_question_id=question_id,

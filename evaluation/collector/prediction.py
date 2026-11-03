@@ -28,6 +28,7 @@ def _mapped_trace(runtime_question_id, trace, mappings, latency_ms):
     _latency(latency_ms)
     if not isinstance(trace, list):
         raise ValueError("TRACE_NOT_AVAILABLE")
+    runtime_question_id = _mapping.normalize_question_id(runtime_question_id)
     evidence = _mapping.map_retrieval(runtime_question_id, trace, mappings)
     runtime_to_public = {
         row["source_id"]: _mapping.public_source_id(runtime_question_id, row["source_id"])

@@ -8,15 +8,19 @@ _SOURCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z", re.ASCII)
 
 
 def public_source_id(question_id, source_id):
-    try:
-        question = str(UUID(question_id))
-    except (ValueError, TypeError, AttributeError):
-        raise ValueError("INVALID_QUESTION_ID") from None
+    question = normalize_question_id(question_id)
     if not isinstance(source_id, str) or not _SOURCE.fullmatch(source_id):
         raise ValueError("INVALID_SOURCE_ID")
     # Java UUID.nameUUIDFromBytes hashes the bytes directly (no namespace).
     digest = md5((question + ":" + source_id).encode("utf-8"), usedforsecurity=False).digest()
     return str(UUID(bytes=digest, version=3))
+
+
+def normalize_question_id(question_id):
+    try:
+        return str(UUID(question_id))
+    except (ValueError, TypeError, AttributeError):
+        raise ValueError("INVALID_QUESTION_ID") from None
 
 
 def map_retrieval(question_id, rows, mappings):
