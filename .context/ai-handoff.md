@@ -1,14 +1,14 @@
 ---
 schema_version: 1
-handoff_id: 20261103-063959
-updated_at: 2026-11-03T09:26:41Z
+handoff_id: 20261103-113301
+updated_at: 2026-11-03T11:47:23Z
 from: codex
 to: codex
-status: in_progress
+status: ready
 source_machine: WENLING
 target_machine: same
 branch: local
-commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
+commit: be958d4848285ebcc32a299079ed6dc94d149b08
 ---
 
 # AI project handoff
@@ -17,20 +17,27 @@ commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
 继续在 `local` 完成 P0 契约与工程签收、P1 真实 RAG 和独立盲测，以及 P2 部署恢复与真实用户试用；保持已完成证据可追溯，按实际结果更新状态。
 
 ## Current state
-- 最新用户两条评审已实施c724c79c62e8423724feb1cc52d232a40c00f2e2：删除成功立即functional invalidation，再await列表刷新，刷新后无answer更新；错误notice按知识库和questionView guard。新增4回归before4失败，after Web69/tsc/相关lint通过。示例本地两处provider key已清空，原值安全保存在ignored services/ai/.env（不覆盖已有配置、不输出值、不调用provider）；验证HEAD/origin及全部3个可达示例文件历史版本均不含这些当前本地key值。它们此前是用户未提交改动，清空后相对HEAD仅多安全注释；实际.env未stage。尚未通过供应商后台撤销/轮换真实key，无可用管理入口，须用户处理。Sol已对精确SHA c724c79 APPROVED；两次push因GitHub TLS/443不可达失败，提交仅在local，origin/local仍84681d4。网络恢复后使用git -c http.sslVerify=true push origin local。
-- 最新评审三项P2已修复并提交84681d4b6ec184bc067112627f4fd09660177401，Sol exact-SHA APPROVED：desktop历史min-height0/overflow滚动并保持account；DELETE返回时先guard当前知识库避免旧刷新破坏B；collector/runner沿用AnswerService marker regex，不误拒[2,3)等普通文本，来源绑定负例保留。before复现三项失败，after Python全量344、Web65/typecheck/相关lint、Chromium1280x900 layout1/1通过。Docker两次均因镜像鉴权TLS超时在构建阶段失败（ghcr.io、auth.docker.io），未执行全栈，不计通过；首次push连接重置，重试成功，HEAD=origin/local=84681d4，远端CI待完成。用户.review-current-run产物保留，未递归删除。
-- 用户追问 SSE 未完成后继续工程收尾：代码 `a30394a9042383fafaab9e6ca6c71d64f7b5a156` 修复 HTTP/事件/内部请求/历史 ID 关联、Web 阶段/版本/终态校验、sources 元数据及失败清引用、completed 无需等 EOF；补充真实 Python deadline、拒答及幂等冲突全栈检查。Java 84（1 skip）、Web 64/typecheck/lint、Windows Python341、Schema85/OpenAPI4 已通过。首轮 E2E 因 reader.cancel 后 Chromium 无法抓取 response body 失败，改用非主动停止流的 clone 字节副本，最终 Docker1/1（场景43.0秒、总44.3秒）；六组捕获text4/pdf4/error3/cancelled3/timeout3/refusal4通过，项目dbccb0ed2a容器/网络/卷为空，真实模型0。Sol 对代码a30394a及文档2833417精确SHA均APPROVED，两提交已推local；人工签收独立。此条取代下方将请求 ID 问题仅保留为观察的旧状态。代码PR CI41600122093与push CI41600113965均全部success；远端Web64及Docker1/1（总43.8秒）、六组捕获通过，CI隔离资源清理。Linux Python338passed/3skipped/3warnings，不等于Windows341。最新文档候选PR41600428669/push41600421766的Java、Python/契约、Web三job也均success。
-- 本会话接续：最新 `local@4db75a987028a8f177711bb981a13de0a72bf8e3`（验收文档），代码目标 `802fe48e7d4c689c224c72273a937ac1c8472d73`；两提交均经 Sol 精确 SHA 审阅 APPROVED 并推送。`origin/main` 仍为 `b7e83c8cf475195ac54b7b58a96ba275e44b8625`，PR #3 未合并。Luna 两次服务 503 后由根代理实施，不冒称 Luna 已完成实现。
-- 修复 SSE 上游 cancelled 被前端误报为 FAILED；补充 error/cancelled/主动停止的全栈消费和历史持久化检查。最终本地 Python 338、Web 46、typecheck/相关 lint、Schema 85、OpenAPI 4 通过。Sol 两项测试发现已关闭，详见 `docs/reviews/2026-11-03-sse-consumption.md`。
+- Terra High 接收本轮收尾；接收基线 `be958d4848285ebcc32a299079ed6dc94d149b08`，`local` 与经过 TLS 校验 fetch 的 `origin/local` 一致。frontmatter 的 commit 是接收基线，不是包含本交接更新的最终 SHA。
+- 本轮实现与独立签审分离：状态为“待独立审阅”。已有 `docs/reviews/2026-11-03-codex-25c8dc3.md` 对 `25c8dc3` 的增量结论为 CHANGES_REQUESTED；不得继承缺少独立审阅文件的历史口头批准。
+- 本轮已实施：移除误入的 `grok bot/`、`.workbuddy/` 并忽略；修正交接；修复 #14 L1 的 Java 上传异常日志并补测试；按当前锁文件重采 39/39 包及隔离构建依赖证据，留存 9 份许可证原文。计划候选 SHA 保持不变。
+- 提交前本地验证：Java L1 定向 2 项通过（修复前同两项均失败）；Python 349、Web 69、typecheck/lint、Schema 85、OpenAPI 4、离线 smoke 16 通过。项目自身许可证和完整镜像／Maven/npm 发行证据未完成；不把采集器结果当作许可签收。
+- 用户已明确授权本轮 commit 和普通 push 到 `origin/local`，包括已跟踪的交接文件。最终 SHA 与三个 CI job 结果以交付记录和 GitHub 实际状态为准；此刻未完成，不预写通过。
+
+### 提交前历史快照（以下旧 HEAD、远端和工作树状态不代表当前）
+- 最新用户两条评审已实施c724c79c62e8423724feb1cc52d232a40c00f2e2：删除成功立即functional invalidation，再await列表刷新，刷新后无answer更新；错误notice按知识库和questionView guard。新增4回归before4失败，after Web69/tsc/相关lint通过。示例本地两处provider key已清空，原值安全保存在ignored services/ai/.env（不覆盖已有配置、不输出值、不调用provider）；验证HEAD/origin及全部3个可达示例文件历史版本均不含这些当前本地key值。它们此前是用户未提交改动，清空后相对HEAD仅多安全注释；实际.env未stage。尚未通过供应商后台撤销/轮换真实key，无可用管理入口，须用户处理。c724c79 待独立审阅（缺少对应独立审阅文件）；两次push因GitHub TLS/443不可达失败，提交仅在local，origin/local仍84681d4。网络恢复后使用git -c http.sslVerify=true push origin local。
+- 最新评审三项P2已修复并提交84681d4b6ec184bc067112627f4fd09660177401，84681d4 待独立审阅（缺少对应独立审阅文件）：desktop历史min-height0/overflow滚动并保持account；DELETE返回时先guard当前知识库避免旧刷新破坏B；collector/runner沿用AnswerService marker regex，不误拒[2,3)等普通文本，来源绑定负例保留。before复现三项失败，after Python全量344、Web65/typecheck/相关lint、Chromium1280x900 layout1/1通过。Docker两次均因镜像鉴权TLS超时在构建阶段失败（ghcr.io、auth.docker.io），未执行全栈，不计通过；首次push连接重置，重试成功，HEAD=origin/local=84681d4，远端CI待完成。用户.review-current-run产物保留，未递归删除。
+- 用户追问 SSE 未完成后继续工程收尾：代码 `a30394a9042383fafaab9e6ca6c71d64f7b5a156` 修复 HTTP/事件/内部请求/历史 ID 关联、Web 阶段/版本/终态校验、sources 元数据及失败清引用、completed 无需等 EOF；补充真实 Python deadline、拒答及幂等冲突全栈检查。Java 84（1 skip）、Web 64/typecheck/lint、Windows Python341、Schema85/OpenAPI4 已通过。首轮 E2E 因 reader.cancel 后 Chromium 无法抓取 response body 失败，改用非主动停止流的 clone 字节副本，最终 Docker1/1（场景43.0秒、总44.3秒）；六组捕获text4/pdf4/error3/cancelled3/timeout3/refusal4通过，项目dbccb0ed2a容器/网络/卷为空，真实模型0。代码 a30394a 及文档 2833417 待独立审阅（缺少对应独立审阅文件），两提交已推local；人工签收独立。此条取代下方将请求 ID 问题仅保留为观察的旧状态。代码PR CI41600122093与push CI41600113965均全部success；远端Web64及Docker1/1（总43.8秒）、六组捕获通过，CI隔离资源清理。Linux Python338passed/3skipped/3warnings，不等于Windows341。最新文档候选PR41600428669/push41600421766的Java、Python/契约、Web三job也均success。
+- 本会话接续：最新 `local@4db75a987028a8f177711bb981a13de0a72bf8e3`（验收文档），代码目标 `802fe48e7d4c689c224c72273a937ac1c8472d73`；两提交已推送；缺少对应独立审阅文件，状态为待独立审阅。`origin/main` 仍为 `b7e83c8cf475195ac54b7b58a96ba275e44b8625`，PR #3 未合并。Luna 两次服务 503 后由根代理实施，不冒称 Luna 已完成实现。
+- 修复 SSE 上游 cancelled 被前端误报为 FAILED；补充 error/cancelled/主动停止的全栈消费和历史持久化检查。最终本地 Python 338、Web 46、typecheck/相关 lint、Schema 85、OpenAPI 4 通过。历史实现记录称已修复两项测试发现，待独立审阅，详见 `docs/reviews/2026-11-03-sse-consumption.md`。
 - 本地中间工作树 Docker E2E 1/1 通过（16.8 秒，TXT/PDF 各4帧、error/cancelled各3帧）。最终测试收紧定向15项通过；目标SHA本地重跑因 ghcr.io 鉴权端点网络不可达而未执行测试。目标SHA远端PR CI #20（41596593798）三个job全绿：Java84（1skip）、Linux Python335passed（3skipped）、Web/Docker E2E1/1（14.3秒），最终四类SSE捕获及主动停止检查均通过。各次本地及CI隔离容器/网络/卷已清零，其他用户服务保留。
-- 先前待推送 `65774c4` 已经 Sol 批准并推送，PR CI #18（41594635319）三项成功。两次推送均使用单次命令 `http.sslVerify=true` 成功；发现用户全局配置仍为false，未改写全局配置。
+- 先前待推送 `65774c4` 已推送，待独立审阅（缺少对应独立审阅文件），PR CI #18（41594635319）三项成功。两次推送均使用单次命令 `http.sslVerify=true` 成功；发现用户全局配置仍为false，未改写全局配置。
 - 用户指定 `services/ai/.env.example` 为预算信息位置；仅检查变量名及是否有值，未输出值。没有供应商硬预算cap/超额拒绝证明；真实provider调用仍为0，评测入口保持fail-closed。用户确认新增私有盲测及生产环境目前均无更新，真实采集运行器也仍未贯通。
 - 正式Java/Python/M及负责人完整消费签收仍未完成，不因SSE限定补验伪造勾选，不合并PR #3。诊断观察：Java问答流ID与HTTP X-Request-ID可能不同，本轮未改Java，也不声称修复诊断关联问题。
 - `802fe48` 的 push CI #19（41596588549）与PR CI #20均success；最新文档提交 `4db75a9` 的[push #21](https://github.com/ggwenling/knowflow/actions/runs/41597715943)与[PR #22](https://github.com/ggwenling/knowflow/actions/runs/41597723462)也均已完成success。HEAD与origin/local均为4db75a9，main未改变。三份验收文档已提交，handoff按技能保留为本地未提交审计记录。
 
 ### 2026-11-03 06:39 UTC 接收前快照（已被上述状态取代）
 - 2026-11-03 06:39 UTC：`local@65774c47506ddc0e83ac9b6fd5054a32af590e3b`，相对 `origin/local@79678830b14047aabc41e3cd5f607f564728fb6a` ahead 1；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625`。`65774c4` 仅更新计划与消费清单中的远端 CI / Q 审阅状态，尚未由 Sol 复核或推送。继续前先 `git fetch origin` 核对远端是否变化。
-- Sol High 对 `79678830b14047aabc41e3cd5f607f564728fb6a` 的代码/契约审阅为 APPROVED；正式 Q/M 整体验收仍 CHANGES_REQUESTED：Java/Python 消费确认与 M/负责人签收、错误/取消 SSE 路径和完整消费语义未完成。`contracts/consumer-draft10-checklist.md` 的正式签收框仍未签。新文档提交须按最新 SHA 再请 Sol 复核。
+- `79678830b14047aabc41e3cd5f607f564728fb6a` 的代码/契约待独立审阅（缺少对应独立审阅文件）；正式 Q/M 整体验收仍 CHANGES_REQUESTED：Java/Python 消费确认与 M/负责人签收、错误/取消 SSE 路径和完整消费语义未完成。`contracts/consumer-draft10-checklist.md` 的正式签收框仍未签。新文档提交须按最新 SHA 再请 Sol 复核。
 - `7967883` 的 GitHub Actions [push run #15](https://github.com/ggwenling/knowflow/actions/runs/41590144065) 和 [PR run #16](https://github.com/ggwenling/knowflow/actions/runs/41590148290) 均成功，Python/契约、Java、Web/Docker E2E 三个 job 全绿。计划文档在 `65774c4` 记录时 PR run 尚在运行，后续应以此处的最新结果和 GitHub 为准。已有 [PR #3](https://github.com/ggwenling/knowflow/pull/3)，local → main，尚未合并；其记录要求项目负责人明确签收后合并。
 - 本地 `bb25dc1` 验证：Docker 四镜像和 Chromium E2E 1/1，Java 83 项（1 skip）、Python 324、Web 43、Schema 85、OpenAPI 4、offline smoke 16 通过。`8828637` 补充 Java MVC null/字段省略运行时断言，3 个 Testcontainers 方法通过；正常 TXT/PDF SSE 帧已按共享 schema 验证，错误/取消路径及完整消费仍需验收。
 - 隔离 PostgreSQL/MinIO/第二批 Embedding 故障恢复与备份恢复通过，绑定 `bb25dc1`；合成负载绑定 `9c9b4a0`，10/100 文档、并发 1/4/8 共 48/48 成功，非真实 provider 性能。证据路径见计划。生产升级回滚尚未验证。
@@ -85,11 +92,10 @@ commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
 - 真实 Embedding/LLM 凭证未使用。`.gitattributes` 约束 schema/JSON 行尾和原始数据/PDF 字节。Windows Git 对部分 seed/PDF 报出旧工作区状态，但逐文件 HEAD/index/work SHA-1 一致且 `git diff` 无内容差异；不要为了消除显示状态改写这些原始字节。
 
 ## Acceptance criteria
-- [x] 接收前待推送文档 `65774c4` 由Sol精确复核并推送，PR CI #18三项成功。
-- [x] SSE上游取消误报失败已修复；错误/取消/主动停止全栈补验、捕获顺序及负例提交为`802fe48`，Sol APPROVED，目标push/PR CI均成功。
-- [x] 六项Java/Python消费证据映射与验收边界已写入补验记录；三份文档提交`4db75a9`经Sol精确SHA批准并推送，未代签正式清单。
-- [x] 最新文档提交`4db75a9`的push #21与PR #22最终CI均success，交接保留完整提交/证据边界，不再为状态更新触发额外提交。
-- [x] 本轮SSE有限工程收尾、回归及全栈补验完成，代码a30394a和文档2833417均经Sol精确SHA批准并推送。
+- [x] 本轮误入目录通过 `git rm -r` 删除，`.gitignore` 覆盖，工作树无目录残留；提交树检查见交付。
+- [x] handoff 不再自述未经文件佐证的签审，状态为待独立审阅；历史快照与当前状态分开。
+- [x] #14 L1 已修复并记录复现／复测；许可证证据覆盖实际锁文件，缺项如实标未完成。
+- [ ] 提交前快照：commit / 普通 push 及实际新 SHA 的 python-contract / java / web 尚待执行；最终交付须另查远端，不继承基线 CI。
 - [ ] Java/Python 与 M/负责人正式消费签收及Q/M总体验收；工程补验完成不代替人工签收，不合并PR #3。
 - [ ] 推送经复核的 `local`，核实最新 SHA 的远端 Python/契约、Java、Web/Docker E2E CI；M/项目负责人明确签收后才合并 PR #3 到 main，合并后核对远端 SHA 和 CI。
 - [ ] 完整真实 RAG 采集覆盖索引、授权、top-10 检索、回答和逐引用人工审核；经预算门禁与 Sol 复审后运行，报告 Recall@5、MRR@10、支持率、引用准确率、拒答与误拒答率及分母，按计划质量门判定。
@@ -97,8 +103,8 @@ commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
 - [ ] 完成 Linux 解析资源/许可、真实 provider 延迟成本、生产部署和升级失败回滚、备份恢复目标环境验收，以及至少两周真实用户试用；没有证据的项目保持未完成。
 
 ## Start here
-1. `cd D:\konwflow`；先核对实际 HEAD/工作树/远端，保留用户 `next-env.d.ts`、`.env.example` 和未知目录；不要输出环境配置值。
-2. 读取 `docs/reviews/2026-11-03-sse-consumption.md` 与计划的最新SSE补验段；核实目标SHA最新CI及文档提交状态，勿沿用接收前快照的“65774c4待推送”指令。
+1. `cd D:\konwflow`；先核对实际 HEAD/工作树/远端，以本轮修复提交为审阅目标。不要输出环境配置值；误入目录清理已获用户授权。
+2. 读取 `docs/reviews/2026-11-03-terra-closeout-be958d4.md` 和两份 `issue-14-*-audit-25c8dc3.md` 的处置节；独立审阅包含本轮修复的最终提交，核对该 SHA 的三个 CI job，不沿用历史批准。
 3. 按消费清单完成其余Java/Python/M的完整签收，负责人明确签收前不合并PR #3；不能把代码审阅或自动化验证冒充人工签收。
 4. 真实RAG采集驱动仍可继续设计/实现，但真实provider启用须先有可核验硬预算证据或明确获批软预算政策，再由Sol复核；当前入口继续fail-closed。新增私有20题与生产环境由用户准备，本轮确认仍无更新。
 
@@ -110,16 +116,17 @@ commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
 - 全栈 E2E：`node scripts/e2e-web.mjs`；Java：在 `services/api` 运行 `.\mvnw.cmd -B test`；AI：`uv run --project services/ai --frozen pytest services/ai/tests -q`；契约：`uv run --project services/ai --frozen python contracts/validate.py` 与 `python -m unittest contracts.test_openapi_draft10 -v`。按需运行，避免重复无关测试。
 
 ## Decisions and guardrails
-- 始终使用 `local`；实现 Luna、独立审阅 Sol。用户此前授权推送 local 和合并 main，但本次计划及 PR #3 的明确 M/负责人签收门槛尚未满足。签收完成前不合并，不伪造确认。
+- 始终使用 `local`；本轮实现者 Terra High，交付状态为待独立审阅。禁止合并 main、强推、删除远端分支、部署、调用任何付费模型/API、修改盲测集或自签。仅授权普通 commit / push 到 origin/local；不改计划候选 SHA。
 - 独立私有盲测须人工保管，公开 60 题不可充作盲测。真实 provider 调用、索引和重试必须纳入批准预算及经过复核的门禁；不能以调用后统计冒充硬限额。
 - 不查看 `data/raw/` 或密钥文件；不输出凭据、原始私有题或答案。故障/性能和备份通过仅限所记录的隔离合成环境。
 
 ## Working tree
-- `.context/ai-handoff.md`：本交接自有未提交改动，按 handoff 技能不要自动提交或推送。
-- `apps/web/next-env.d.ts`：用户已有未提交改动，保留不暂存、不覆盖。
-- `services/ai/.env.example`：用户最新明确授权清除两处provider key，已空值并提交安全注释；原值仅保存在ignored services/ai/.env，不输出、不暂存.env。
-- `grok bot/`：未跟踪目录，归属未知，保留不读取、不暂存或清理。
-- 历史 `.review-*` 目录在 `git status` 中出现权限警告，保留；不要为消除警告递归删除。
+- 接收基线的已跟踪文件无未提交差异；handoff、`next-env.d.ts` 和两个误入目录此前均已跟踪，不能再称为未跟踪文件。
+- 本轮修改归属 Terra High：`.gitignore`、本交接、#14 修复代码／回归测试及许可证证据／处置文档；按用户明确授权提交并推送。最终文件清单以修复提交的 `git show --name-status` 为准。
+- `grok bot/`、`.workbuddy/` 按授权 `git rm -r`，并加入根 `.gitignore`；不再作为执行入口。
+- `apps/web/next-env.d.ts`、计划候选 SHA、契约消费签收和盲测资料不属于本轮修改范围。
+- `.env.example` 只允许空值／示例占位符。实际 `.env` 不读取、不暂存、不输出；供应商撤销／轮换未核实。
+- 历史 `.review-*` 权限目录保留，不递归删除。
 
 ## Open questions
 - 上轮记录的删除后refresh期间切B旧answer清除竞态已按本轮用户明确要求修复并加回归，见c724c79。真实provider key撤销/轮换尚未执行，需供应商管理后台处理。
@@ -128,21 +135,26 @@ commit: c724c79c62e8423724feb1cc52d232a40c00f2e2
 - 生产目标环境、备份/升级回滚策略及真实用户试用负责人和时间尚未确定。
 
 ## Handoff log
+- `2026-11-03T11:33:01Z` — `codex` / Terra High accepted 并设为 in_progress：核对 be958d4 与 origin/local 一致，接收用户授权的目录清理、交接修正与 #14 修复；待独立审阅，不改计划候选，不自签。
+
+- `2026-11-03` — `codex` / Terra High 设为 ready：目录清理、交接与 #14 实施和本地验证完成；按用户授权准备提交／普通推送，远端 CI 和独立审阅在此提交前快照中待完成。
+
+### 历史日志（实现者记录，不作为独立批准证据）
 - `2026-11-03T09:26:41Z` — `codex` 实施两条评审c724c79：删除引用立即失效/防旧视图回写，Web69及tsc/lint通过；示例key清空、原值仅ignored.env、未验证调用/撤销provider。记录不含key值，handoff不自动提交。
-- `2026-11-03T08:56:26Z` — `codex` 完成用户三条评审修复84681d4，8files，Sol批准；Python344/Web65/desktop Chromium布局通过，Docker构建网络阻断未误称通过；保留用户文件和.review-current-run。
+- `2026-11-03T08:56:26Z` — `codex` 完成用户三条评审修复84681d4，8files，待独立审阅（缺少对应独立文件）；Python344/Web65/desktop Chromium布局通过，Docker构建网络阻断未误称通过；保留用户文件和.review-current-run。
 - `2026-11-03T08:10:18Z` — `codex` 最终核验：代码a30394a和文档2833417的push/PR CI全部成功；SSE工程项关闭，剩余人工签收/真实评测/生产条件与SSE工程区分。HEAD=origin/local=2833417，main未变；handoff保留本地审计。
-- `2026-11-03T08:03:05Z` — `codex` 完成本轮SSE工程收尾并保留整体任务in_progress：代码a30394a、文档2833417均Sol批准并推local；Java84/Python341/Web64/Schema85/OpenAPI4及Docker六类捕获通过；最终远端CI待核对。保持用户next-env.d.ts/.env.example及grok bot未触碰，不自动提交handoff。
+- `2026-11-03T08:03:05Z` — `codex` 完成本轮SSE工程收尾并保留整体任务in_progress：代码a30394a、文档2833417已推local，待独立审阅（缺少对应独立文件）；Java84/Python341/Web64/Schema85/OpenAPI4及Docker六类捕获通过；最终远端CI待核对。保持用户next-env.d.ts/.env.example及grok bot未触碰，不自动提交handoff。
 - `2026-11-03T07:44:35Z` — `codex` maintained `in_progress`: 最终local/origin/local=4db75a9，push #21与PR #22均success；本轮工程补验交付，main未合并。全项目仍有正式三端/负责人签收、预算证据及真实采集、私有盲测、生产/试用待办，不标complete。
-- `2026-11-03T07:40:48Z` — `codex` maintained `in_progress`: 完成SSE补验与取消状态修复，代码802fe48、文档4db75a9均Sol批准并推送；代码push/PR CI成功，文档CI待核实。真实调用0，保留用户env/next-env及未知目录；正式签收、预算证明、私有题及生产环境仍待条件。
+- `2026-11-03T07:40:48Z` — `codex` maintained `in_progress`: 完成SSE补验与取消状态修复，代码802fe48、文档4db75a9已推送，待独立审阅（缺少对应独立文件）；代码push/PR CI成功，文档CI待核实。真实调用0，保留用户env/next-env及未知目录；正式签收、预算证明、私有题及生产环境仍待条件。
 - `2026-11-03T06:53:40Z` — `codex` set status to `in_progress`: 接续 P0，先复核 65774c4 文档提交并补 SSE 错误/取消消费证据；真实 provider 继续 fail-closed，不伪造人工签收。
 - `2026-11-03T06:53:40Z` — `codex` set status to `accepted`: 核对 local@65774c4 与 origin/local@7967883、origin/main@b7e83c8，fetch 成功且远端未变化；保留用户 next-env.d.ts、未知 grok bot/ 和 review 目录。
-- `2026-11-03T06:39:59Z` — `codex` set status to `ready`: 交接 `local@65774c4`；`7967883` Sol 代码审阅通过、push/PR CI 均成功，最新状态文档提交待 Sol 复核和推送，正式 Q/M、真实 RAG、私有盲测和生产验收未完成。
+- `2026-11-03T06:39:59Z` — `codex` set status to `ready`: 交接 `local@65774c4`；`7967883` 待独立审阅（缺少对应独立文件）、历史记录称 push/PR CI 均成功，最新状态文档提交待 Sol 复核和推送，正式 Q/M、真实 RAG、私有盲测和生产验收未完成。
 - `2026-11-03T03:45:53Z` — `codex` maintained status `in_progress`: 接续 `local@38252b3`；确认隔离备份恢复报告通过，真实评测仍 fail-closed；后续按 Luna 实现、Sol 独立审阅推进。
 - 2026-11-02 — codex maintained in_progress：用户提供模型配置，转存 ignored .env 并清空已跟踪示例密钥；未输出凭据、未调用 provider。隔离备份恢复与独立审阅进行中。
 
 - 2026-11-02 — codex maintained in_progress：保留初次不完整故障/性能报告，完成修复并重跑；当前评分与预算组件尚未连接真实服务。
 
-- 2026-11-02 — codex maintained in_progress：来源、代理、分页、评分引用及失败候选物理清理均通过 Sol 限定复审；继续 OpenAPI、隔离故障和采集预算工作。
+- 2026-11-02 — codex maintained in_progress：来源、代理、分页、评分引用及失败候选物理清理的实现记录已保留，缺少对应独立文件的项目均待独立审阅；继续 OpenAPI、隔离故障和采集预算工作。
 
 - 2026-11-02 — codex accepted 并设为 in_progress：实施已批准 P0/P1/P2 计划，Sol 独立审阅 b7e83c8，Terra 修正来源及状态。
 

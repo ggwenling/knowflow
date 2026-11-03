@@ -1,264 +1,448 @@
 {
-  "scope": "Installed Linux CPython 3.12 runtime + dev metadata, not legal approval. Wheel/sdist hashes in uv.lock; platform-only packages not installed remain unreviewed.",
-  "lock_sha256": "b19e93809daf649e1b2050a29a1bc1e9ac4e39fc8699a7f95b28b1bfed7c58a7",
-  "build_backend": "uv_build==0.12.23 (isolated build dependency; not installed metadata)",
+  "schema_version": 2,
+  "scope": "Local installed metadata for every lock entry plus isolated build requirements; not legal approval. Platform markers are not evaluated for scope classification. Installed metadata does not prove wheel/sdist byte identity or Linux image contents.",
+  "base_sha": "be958d4848285ebcc32a299079ed6dc94d149b08",
+  "environment": {
+    "system": "Windows",
+    "python": "3.12.13"
+  },
+  "hash_normalization": "lock_sha256 and pyproject_sha256 hash LF-normalized bytes (CRLF -> LF); worktree hashes retain original bytes. Compare canonical values with Git blobs and Linux checkouts.",
+  "lock_sha256": "d5b6adc8cdaae9511748cb5b181c207c75f7ac4e1eaaa3e156eb2a26292a8935",
+  "lock_worktree_sha256": "a9bc533d8a029a6d6c10297bddeaf83cea11420d80427fb824ee790894d357c2",
+  "pyproject_sha256": "7ca8410b81de25641f6cea72cfcd0be5412a0b4687feaaf334fc812ee3779cc0",
+  "pyproject_worktree_sha256": "a5d5a8ad62949ef35330db66af49aa946087bf6119236735f2fc35cd53c72978",
+  "build_backend": "uv_build",
   "packages": [
     {
       "name": "annotated-doc",
       "version": "0.0.5",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "annotated_doc-0.0.5.dist-info/licenses/LICENSE",
           "sha256": "fff170779a6acbf65abdb405c087f1cee1786691e4a96a4034517e4a504a0cdf"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.0.5",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "8c24d70c5d9153d22123353a906042fd7603df2d15c2196290b0f8a962558c46",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "annotated-types",
       "version": "0.8.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "annotated_types-0.8.0.dist-info/licenses/LICENSE",
           "sha256": "fe1049884b1a0d9342901e88e07f32925d24b3121d9972b6a6805fb9824b095d"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.8.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "metadata_sha256": "614985b278f601b8ef863f82783b991cc3ada4b89f592eb71c7c48c5f2ef2298",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "anyio",
       "version": "4.15.1",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "anyio-4.15.1.dist-info/licenses/LICENSE",
           "sha256": "5361ac9dc58f2ef5fd2e9b09c68297c17f04950909bbc8023bdb82eacf22c2b0"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "4.15.1",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "043aecb571af7189e8a6c528f5d8e32545f1b2cdfaaf761d51e6d5b67ea3ca81",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "attrs",
       "version": "26.1.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "attrs-26.1.0.dist-info/licenses/LICENSE",
           "sha256": "882115c95dfc2af1eeb6714f8ec6d5cbcabf667caff8729f42420da63f714e9f"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "26.1.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "4cd40e690f23bf37cbcad34efd6758e062df1df07c86833f7e3ce95bf1fa38cc",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "certifi",
       "version": "2026.10.23",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MPL-2.0",
-      "license_classifiers": [
-        "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "certifi-2026.10.23.dist-info/licenses/LICENSE",
           "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2026.10.23",
+      "license_expression": null,
+      "license_metadata": "MPL-2.0",
+      "license_classifiers": [
+        "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)"
+      ],
+      "metadata_sha256": "e463e38f7fe7da36a11e6d3fecc5dfa5b97be8c8022620400750d79ae7d842bc",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "charset-normalizer",
       "version": "3.5.2",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MIT",
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "charset_normalizer-3.5.2.dist-info/licenses/LICENSE",
-          "sha256": "6d0d41bfe170ac6c7dc248c9a63e254d0fb45a60d50a8257d0af92c6e249b887"
+          "sha256": "18577485d3704f1a479ded8e573c0976cfed315fd2fd17983fa988da4c2f70d1"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "3.5.2",
+      "license_expression": null,
+      "license_metadata": "MIT",
+      "license_classifiers": [],
+      "metadata_sha256": "49e955a09e1a159e0846872798006e8db7d518d8d70c637066fefdb08d3d9f7b",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "click",
       "version": "8.5.0",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "click-8.5.0.dist-info/licenses/LICENSE.txt",
           "sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "8.5.0",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "e87bce0bd194de70dfb8e708e0a6b0483009f25611804eaf87bfeb63e6c20501",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "colorama",
       "version": "0.4.6",
-      "installed": false,
-      "unknown_reason": "Not installed on this platform; license not inspected."
+      "installed": true,
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
+      "license_files": [
+        {
+          "path": "colorama-0.4.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "cac35c02686e5d04a5a7140bfb3b36e73aed496656e891102e428886d7930318",
+          "evidence_path": "services/ai/docs/evidence/license-texts/colorama-0.4.6/01-LICENSE.txt"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.4.6",
+      "license_expression": null,
+      "license_metadata": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "metadata_sha256": "7baed29eb50c3b29bdb33ff84e3177bf1bc05784f7685ecdcaa4471c7dd810cc",
+      "scopes": [
+        "development_candidate"
+      ]
     },
     {
       "name": "fastapi",
       "version": "0.162.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "fastapi-0.162.0.dist-info/licenses/LICENSE",
           "sha256": "4ec89ffc81485b97fec584b2d4a961032eeffe834453894fd9c1274906cc744e"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.162.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "71eccf0418f121959670e72e343ec964105ea0190783e5048eef970a539c4e63",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "h11",
       "version": "0.16.0",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "h11-0.16.0.dist-info/licenses/LICENSE.txt",
           "sha256": "37db5bb85926db28a427a25867f10b1232003aea1be69ccb851138adb8e6f361"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.16.0",
+      "license_expression": null,
+      "license_metadata": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "metadata_sha256": "28f326098ac09fcba79b8f180f96087c841fe2456215cb7b872a9c7d5cd19d64",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "httpcore",
       "version": "1.0.9",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [
-        "License :: OSI Approved :: BSD License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "httpcore-1.0.9.dist-info/licenses/LICENSE.md",
           "sha256": "fdcb59154c74cbaba16a11242f7740bea9f23d6feb5547917d8c5f94a80392a5"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.0.9",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "metadata_sha256": "fe2d4fda6199128978779e0cf27f3c045c531863fcdd987eacc74f3a18d41c21",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "httpx",
       "version": "0.28.1",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "BSD-3-Clause",
-      "license_classifiers": [
-        "License :: OSI Approved :: BSD License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "httpx-0.28.1.dist-info/licenses/LICENSE.md",
           "sha256": "4ec59d544f12b5f539a3a716fd321ac58ccd8030b465221f2c880200cdf28d8d"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.28.1",
+      "license_expression": null,
+      "license_metadata": "BSD-3-Clause",
+      "license_classifiers": [
+        "License :: OSI Approved :: BSD License"
+      ],
+      "metadata_sha256": "febb9b0f8f3e80d57c8199c304f35c4336e8581d1d18d7983c92766b82793b25",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "idna",
       "version": "3.20",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "idna-3.20.dist-info/licenses/LICENSE.md",
           "sha256": "1a9a4f0e3d479a27240ddd59a9137a66ab4a0f9dfdc8ca6188cc0bfd85187f04"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "3.20",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "dbd8c14c1e4ca1e0c9824a6dbc7cbbf78884f38eb52d91148cd3025f671e4b85",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "iniconfig",
       "version": "2.3.1",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "iniconfig-2.3.1.dist-info/licenses/LICENSE",
           "sha256": "3409fa91f7ace557894632676656e32264fe5ef7581535725dc9a23774551bd4"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2.3.1",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "47c2c35d936f5c649d8074c6464719a42966a67b5cebad01e3e5784cf090cfb6",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "jsonschema",
       "version": "4.26.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "jsonschema-4.26.0.dist-info/licenses/COPYING",
           "sha256": "4f92a015a13c4d1a040bef018aa13430b4f1bc73b41b16bb846c346766de7439"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "4.26.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "05b189866ca98a96da3934bf6b83687ced3ff85325273b77e16b705f6d8b26d2",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "jsonschema-specifications",
       "version": "2025.9.1",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "jsonschema_specifications-2025.9.1.dist-info/licenses/COPYING",
           "sha256": "42dcd63495f87b4eb7c7757afa379bb55a53f94afd7a5f657d9adf57236e515c"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2025.9.1",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "35abd41757f32b4ea24756920ded47b70173d77cbc052a5a6d3ab583b2e8d89d",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "knowflow-ai",
       "version": "0.1.0",
       "installed": true,
+      "source": {
+        "editable": "."
+      },
+      "license_files": [],
+      "review_status": "未完成",
+      "observed_version": "0.1.0",
       "license_expression": null,
       "license_metadata": null,
       "license_classifiers": [],
-      "license_files": []
+      "metadata_sha256": "d7a7b52c0e9ee7ffd8ade98d7e824749b9d66c88805ab724026e8ff2c5bbd162",
+      "unknown_reason": "No license text found in this distribution; owner/upstream confirmation required.",
+      "scopes": [
+        "first_party_or_unclassified"
+      ]
     },
     {
       "name": "opentelemetry-api",
       "version": "1.45.2",
       "installed": true,
-      "license_expression": "Apache-2.0",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "opentelemetry_api-1.45.2.dist-info/licenses/LICENSE",
           "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.45.2",
+      "license_expression": "Apache-2.0",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "aa93f63be0d6d1f662966e67b22a77c0d9966752e3a32ad87c1347f595cea7cb",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "packaging",
       "version": "26.3",
       "installed": true,
-      "license_expression": "Apache-2.0 OR BSD-2-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "packaging-26.3.dist-info/licenses/LICENSE",
@@ -280,73 +464,166 @@
           "path": "packaging/licenses/_spdx.py",
           "sha256": "596ec35e2ca0ebcba9fd8343ff0a51625af548786257815f24b41f7e08613314"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "26.3",
+      "license_expression": "Apache-2.0 OR BSD-2-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "70fdb89fc4d4a9a043bf7372b8972bcc883fddff34ab55e9cf80d73875384763",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "pillow",
       "version": "13.0.0",
       "installed": true,
-      "license_expression": "MIT-CMU",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pillow-13.0.0.dist-info/licenses/LICENSE",
-          "sha256": "dda12a98c1979cf3d94df1cff45d27a4cb3f04a60c76f76902ac54cac03ec0ce"
+          "sha256": "988ffe8ab3480b0f4e9a0ab2702bffd73d9fb6b47198043fb3ba101a62fac236"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "13.0.0",
+      "license_expression": "MIT-CMU",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "140f39cb31ec9b46109828a6286f034a4848621263d6aab38d2f142083dd06c5",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "pluggy",
       "version": "1.7.0",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pluggy-1.7.0.dist-info/licenses/LICENSE",
           "sha256": "d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.7.0",
+      "license_expression": null,
+      "license_metadata": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "metadata_sha256": "20ac8237e37f1d6e7e75500cd663015177ba80c1a1a595ff6bae18a539ff8a2c",
+      "scopes": [
+        "development_candidate"
+      ]
+    },
+    {
+      "name": "psycopg",
+      "version": "3.3.6",
+      "installed": true,
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
+      "license_files": [
+        {
+          "path": "psycopg-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+          "evidence_path": "services/ai/docs/evidence/license-texts/psycopg-3.3.6/01-LICENSE.txt"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "3.3.6",
+      "license_expression": "LGPL-3.0-only",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "351960397d6b386beae931f5bfd945e8c1212e9505017d1b15c72d4c33bb00af",
+      "scopes": [
+        "runtime_candidate"
+      ]
+    },
+    {
+      "name": "psycopg-binary",
+      "version": "3.3.6",
+      "installed": true,
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
+      "license_files": [
+        {
+          "path": "psycopg_binary-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "7d3a95e5e06978064ed3f8e2b7c8f845e7fd8a405294727cc708f94cb83b8059",
+          "evidence_path": "services/ai/docs/evidence/license-texts/psycopg-binary-3.3.6/01-LICENSE.txt"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "3.3.6",
+      "license_expression": "LGPL-3.0-only",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "f2c36698ee3d46dc3bdc90d87baa7001914abc3535b20bd6f260d4e422b88463",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "pydantic",
       "version": "2.14.2",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pydantic-2.14.2.dist-info/licenses/LICENSE",
           "sha256": "a9e186f3ca16b5eef84318e7a701721351a00cb7b8ae3a4394b67b49e3529ef3"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2.14.2",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "5e27715d350cc99bc33877404deba2a9491221ae972db8f8c79f64032bee3a01",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "pydantic-core",
       "version": "2.50.2",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pydantic_core-2.50.2.dist-info/licenses/LICENSE",
-          "sha256": "2afdd30d54b4d62b6f488a6bcc1546e84ec5061f13f4209c03d012348783795a"
+          "sha256": "fbe7f615f18d135c07000e5a86325db27f42c7729699ef166ac1f7a3f4586bf4"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2.50.2",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "2a6baeaa81c7bd920bd1a326d6f99ac3e6c62f282ff73b90ec782c2053072010",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "pygments",
       "version": "2.21.0",
       "installed": true,
-      "license_expression": "BSD-2-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pygments-2.21.0.dist-info/licenses/AUTHORS",
@@ -356,185 +633,375 @@
           "path": "pygments-2.21.0.dist-info/licenses/LICENSE",
           "sha256": "a9d66f1d526df02e29dce73436d34e56e8632f46c275bbdffc70569e882f9f17"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2.21.0",
+      "license_expression": "BSD-2-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "1dde075570136774c706bf0009183a793fe0ee262e4a5590cc6eff8453eedd43",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "pypdf",
       "version": "6.21.4",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pypdf-6.21.4.dist-info/licenses/LICENSE",
           "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "6.21.4",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "383b3d4cd588005f67afc74b113cbe19ea008691cdf18db3795601116a3d8139",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "pytest",
       "version": "9.2.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pytest-9.2.0.dist-info/licenses/LICENSE",
           "sha256": "ca836a5f9ecca3b2f350230faa20a48fb8b145653b5568d784862df864706b9b"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "9.2.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "006823d1759e40b4546ff4296945eda3f0692e799f724bb235edd0512d42eead",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "pytest-asyncio",
       "version": "1.4.1",
       "installed": true,
-      "license_expression": "Apache-2.0",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "pytest_asyncio-1.4.1.dist-info/licenses/LICENSE",
           "sha256": "a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4ae"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.4.1",
+      "license_expression": "Apache-2.0",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "8c76044f065bd0f3ed911b75994cf41594b6cfc52e736ec7333ff6945dfca7c0",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "referencing",
       "version": "0.37.0",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "referencing-0.37.0.dist-info/licenses/COPYING",
           "sha256": "42dcd63495f87b4eb7c7757afa379bb55a53f94afd7a5f657d9adf57236e515c"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.37.0",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "c93b00e6ab1524fd60848376604c189a114374776475c25a31d57be47b29de6a",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "reportlab",
       "version": "5.1.0",
       "installed": true,
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
+      "license_files": [
+        {
+          "path": "reportlab-5.1.0.dist-info/licenses/LICENSE",
+          "sha256": "ef831761646313921375fc2cb888e8eeaf7da213d0b92852c10c42f3a0b4d138",
+          "evidence_path": "services/ai/docs/evidence/license-texts/reportlab-5.1.0/01-LICENSE"
+        },
+        {
+          "path": "reportlab/license.txt",
+          "sha256": "a02a6aeb5dde4c4194494bc0b10d5ed62a32628ccd2882c363fdb9a7874ab2b8",
+          "evidence_path": "services/ai/docs/evidence/license-texts/reportlab-5.1.0/02-license.txt"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "5.1.0",
       "license_expression": null,
       "license_metadata": "BSD license (see license.txt for details), Copyright (c) 2000-2025, ReportLab Inc.",
       "license_classifiers": [
         "License :: OSI Approved :: BSD License"
       ],
-      "license_files": [
-        {
-          "path": "reportlab-5.1.0.dist-info/licenses/LICENSE",
-          "sha256": "ef831761646313921375fc2cb888e8eeaf7da213d0b92852c10c42f3a0b4d138"
-        },
-        {
-          "path": "reportlab/license.txt",
-          "sha256": "a02a6aeb5dde4c4194494bc0b10d5ed62a32628ccd2882c363fdb9a7874ab2b8"
-        }
+      "metadata_sha256": "86667f600392d769e71fa5922887c9b1366f2393aced8bea31e72542088a9cca",
+      "scopes": [
+        "development_candidate"
       ]
     },
     {
       "name": "rfc3339-validator",
       "version": "0.1.4",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MIT license",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "rfc3339_validator-0.1.4.dist-info/LICENSE",
           "sha256": "5ba1a4f03626ccca6dcbf53a554545e4f776a335bfdaa233ec3bfe9bb7fac15d"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.1.4",
+      "license_expression": null,
+      "license_metadata": "MIT license",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "metadata_sha256": "ac4dc2cdea6a8b61c16babbf35c0e9fa6e22e45f1c0338e66e089108dde872d2",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "rpds-py",
       "version": "2026.9.1",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "rpds_py-2026.9.1.dist-info/licenses/LICENSE",
-          "sha256": "314e4e91be3baa93c0fb4bccc9e4e97cd643eb839b065af921782c2175fe9909"
+          "sha256": "8bcb72c82ea8ae74802293c41d93ad7d51434001b0ae45a603a5af0f507aee0a"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2026.9.1",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "778fb36890d26c5657d256db3e61a05a637468aa4cf607f8d1059c5079fcefd8",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "six",
       "version": "1.17.0",
       "installed": true,
-      "license_expression": null,
-      "license_metadata": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "six-1.17.0.dist-info/LICENSE",
           "sha256": "4375ba20e2b9c6c4e7cad2940a628fd90e95cc3d50ee92aae755715d8ba1fbd0"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.17.0",
+      "license_expression": null,
+      "license_metadata": "MIT",
+      "license_classifiers": [
+        "License :: OSI Approved :: MIT License"
+      ],
+      "metadata_sha256": "562042078c2752549f6d8a7c86dbc5dd708088a7be6d80672ec7b07100b72468",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "starlette",
       "version": "1.10.0",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "starlette-1.10.0.dist-info/licenses/LICENSE.md",
           "sha256": "dcb95677a02240243187e964f941847d19b17821cf99e5afae684fab328c19bf"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "1.10.0",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "82f72dde2c5c3c55d45d9461adce5e30973481f7f3e10b59e497bbc5b8abf598",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "typing-extensions",
       "version": "4.16.0",
       "installed": true,
-      "license_expression": "PSF-2.0",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "typing_extensions-4.16.0.dist-info/licenses/LICENSE",
           "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "4.16.0",
+      "license_expression": "PSF-2.0",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "b05084ca1d50879865178d9fff9fabeab61bdfb1f361bfbde95421ffc8f9be46",
+      "scopes": [
+        "runtime_candidate",
+        "development_candidate"
       ]
     },
     {
       "name": "typing-inspection",
       "version": "0.4.4",
       "installed": true,
-      "license_expression": "MIT",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "typing_inspection-0.4.4.dist-info/licenses/LICENSE",
           "sha256": "804b59b25f2c31bd278f9202a19ae49a3945aa2664387e2d0a128c7cacc61ec3"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.4.4",
+      "license_expression": "MIT",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "bad3d9e6342ef6750cf5128ec942327b8bebdce0b6e4d6f67cb15b27ae5118da",
+      "scopes": [
+        "runtime_candidate"
+      ]
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.6",
+      "installed": true,
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
+      "license_files": [
+        {
+          "path": "tzdata-2026.6.dist-info/licenses/LICENSE",
+          "sha256": "df58f69ea88683035d720b5375bcef0cf5aeaa98a1d098d572e0992c378deb46",
+          "evidence_path": "services/ai/docs/evidence/license-texts/tzdata-2026.6/01-LICENSE"
+        },
+        {
+          "path": "tzdata-2026.6.dist-info/licenses/licenses/LICENSE_APACHE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "evidence_path": "services/ai/docs/evidence/license-texts/tzdata-2026.6/02-LICENSE_APACHE"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "2026.6",
+      "license_expression": null,
+      "license_metadata": "Apache-2.0",
+      "license_classifiers": [],
+      "metadata_sha256": "8173da8700dd125e60c9caf7663d02ee3318851ee60d387b2b080f23a74a86a8",
+      "scopes": [
+        "runtime_candidate"
       ]
     },
     {
       "name": "uvicorn",
       "version": "0.54.0",
       "installed": true,
-      "license_expression": "BSD-3-Clause",
-      "license_metadata": null,
-      "license_classifiers": [],
+      "source": {
+        "registry": "https://pypi.org/simple"
+      },
       "license_files": [
         {
           "path": "uvicorn-0.54.0.dist-info/licenses/LICENSE.md",
           "sha256": "efe1acf3e62fb99c288b0ec73e5a773b7268ef4320fe757ea994214e4b63c371"
         }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.54.0",
+      "license_expression": "BSD-3-Clause",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "9399e5ddda3d26e842d6fb5420c38b0857aac568d53badbdc224b3a21339efa8",
+      "scopes": [
+        "runtime_candidate"
       ]
     }
-  ]
+  ],
+  "build_dependencies": [
+    {
+      "name": "uv_build",
+      "version": "0.12.23",
+      "installed": false,
+      "source": {},
+      "license_files": [
+        {
+          "path": "uv_build-0.12.23.dist-info/licenses/LICENSE-APACHE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "evidence_path": "services/ai/docs/evidence/license-texts/uv-build-0.12.23/01-LICENSE-APACHE"
+        },
+        {
+          "path": "uv_build-0.12.23.dist-info/licenses/LICENSE-MIT",
+          "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c",
+          "evidence_path": "services/ai/docs/evidence/license-texts/uv-build-0.12.23/02-LICENSE-MIT"
+        }
+      ],
+      "review_status": "证据已采集，待独立审阅",
+      "observed_version": "0.12.23",
+      "license_expression": "MIT OR Apache-2.0",
+      "license_metadata": null,
+      "license_classifiers": [],
+      "metadata_sha256": "0e6fcb2d2b07e9ded8cc5a2a4a7e8b90a41a31244527c0766bd28cd7d9eebb7f",
+      "scopes": [
+        "isolated_build"
+      ],
+      "metadata_source": "explicit_local_dist_info",
+      "matching_cached_metadata": true
+    }
+  ],
+  "summary": {
+    "lock_entries": 39,
+    "evidence_rows": 39,
+    "matching_installed_metadata": 39,
+    "packages_with_license_text": 38,
+    "incomplete": [
+      "knowflow-ai"
+    ]
+  },
+  "approval": "待独立审阅；项目自身授权、发行义务及非 Python 发行工件仍未完成。"
 }

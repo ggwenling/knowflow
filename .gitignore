@@ -42,6 +42,10 @@ model-cache/
 *.safetensors
 *.gguf
 
+# Local agent workspaces and external dispatch drafts
+/grok bot/
+/.workbuddy/
+
 # Editor and operating-system noise
 .DS_Store
 Thumbs.db

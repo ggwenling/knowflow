@@ -66,7 +66,8 @@ public class DocumentService {
         } catch (ObjectStoreException storageFailure) {
             String causeType = storageFailure.getCause() == null ? "none"
                     : storageFailure.getCause().getClass().getSimpleName();
-            LOGGER.warn("Source upload failed: {} ({})", storageFailure.getMessage(), causeType);
+            LOGGER.warn("stage=source_upload outcome=failure code=OBJECT_STORAGE_FAILED cause_type={}",
+                    causeType);
             compensateUpload(objectKey);
             throw storageFailure;
         }
