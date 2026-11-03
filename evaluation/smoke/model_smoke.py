@@ -16,6 +16,12 @@ import subprocess
 import time
 from urllib import error, parse, request
 from zoneinfo import ZoneInfo
+import sys
+
+AI_SRC = Path(__file__).resolve().parents[2] / "services/ai/src"
+if str(AI_SRC) not in sys.path:
+    sys.path.insert(0, str(AI_SRC))
+from knowflow_ai.provider_budget import reserve_provider_call_sync
 
 FIXTURE = Path(__file__).with_name("fixture.json")
 MAX_RESPONSE_BYTES = 1_048_576
@@ -216,12 +222,15 @@ def run(env, timeout):
             "max_attempts_per_endpoint": 1,
             "llm_thinking": config["llm"]["thinking"],
         }
+        checks = report["checks"]
+        embedding_payload = {
+            "model": config["embedding"]["model"], "input": fixture["embedding_inputs"],
+        }
+        reserve_provider_call_sync("siliconflow", config["embedding"]["model"], embedding_payload,
+                                  environ=env)
         opener = request.build_opener(NoRedirect())
         report["network_attempted"] = True
-        checks = report["checks"]
-        checks["embedding"], result = post_json(opener, config["embedding"], "/embeddings", {
-            "model": config["embedding"]["model"], "input": fixture["embedding_inputs"],
-        }, timeout)
+        checks["embedding"], result = post_json(opener, config["embedding"], "/embeddings", embedding_payload, timeout)
         if result is not None:
             try:
                 validate_provider_model(result, config["embedding"]["model"])
@@ -244,6 +253,7 @@ def run(env, timeout):
         }
         if config["llm"]["thinking"] != "default":
             payload["thinking"] = {"type": config["llm"]["thinking"]}
+        reserve_provider_call_sync("deepseek", config["llm"]["model"], payload, environ=env)
         checks["chat"], result = post_json(opener, config["llm"], "/chat/completions", payload, timeout)
         if result is not None:
             try:

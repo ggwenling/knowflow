@@ -10,6 +10,7 @@ from knowflow_ai.embedding import SiliconFlowEmbeddingAdapter, EmbeddingSettings
 from knowflow_ai.budget import BudgetLedger
 from pathlib import Path
 import os
+import importlib.util
 
 
 @pytest.mark.asyncio
@@ -95,3 +96,58 @@ async def test_provider_thresholds_stop_before_http(monkeypatch, caplog, spent, 
     assert reason in caplog.text
     assert calls == []
     assert ledger.summary()["paid_reservations"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["embed", "generate", "stream"])
+async def test_guarded_real_adapters_reserve_once_per_failed_http_attempt(monkeypatch, operation):
+    root = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location(
+        "provider_budget_guarded_adapters", root / "evaluation/collector/guarded_adapters.py")
+    guarded = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guarded)
+    ledger_path = Path(os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"])
+    ledger_path.unlink(missing_ok=True)
+    calls = []
+    async def transport(request):
+        calls.append(request)
+        return httpx.Response(503)
+
+    now = datetime.now(timezone.utc)
+    model = "BAAI/bge-m3" if operation == "embed" else "deepseek-flash"
+    provider = "siliconflow" if operation == "embed" else "deepseek"
+    quote = json.loads(Path(os.environ["KNOWFLOW_BUDGET_PRICE_FILE"]).read_text())[model]
+    bounds = lambda *_: (10_000, 0 if operation == "embed" else 1024)
+    bounds.policy_id = "synthetic-test-policy"
+    evidence = {"provider": provider, "model": model, "policy_id": bounds.policy_id,
+                "source_url": "https://example.test/policy", "verified_by": "synthetic-test",
+                "verified_at": (now - timedelta(hours=1)).isoformat(),
+                "valid_until": (now + timedelta(hours=1)).isoformat()}
+    ledger = BudgetLedger(ledger_path)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        if operation == "embed":
+            adapter = SiliconFlowEmbeddingAdapter(EmbeddingSettings(api_key="fake-key-" * 8), client)
+            wrapper = guarded.GuardedEmbedding
+            arguments = {"texts": ["synthetic"], "request_id": "same-request"}
+            invoke = lambda guard: guard.embed(**arguments)
+        else:
+            adapter = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+            wrapper = guarded.GuardedLlm
+            arguments = {"question": "synthetic", "evidence": [], "request_id": "same-request"}
+            invoke = (lambda guard: guard.generate(**arguments)) if operation == "generate" else (
+                lambda guard: guard.stream_content(**arguments))
+        config = {"adapter_factory": lambda: adapter, "ledger": ledger, "provider": provider,
+                  "model": model, "quote": quote, "token_bounds": bounds, "bound_evidence": evidence}
+        config["adapter_factory"].budgeted_provider_adapter = True
+        guard = wrapper(**{key: value for key, value in config.items() if key != "ledger"}, ledger=ledger)
+        for _ in range(2):
+            if operation == "stream":
+                with pytest.raises(ProcessingError):
+                    async for _fragment in invoke(guard):
+                        pass
+            else:
+                with pytest.raises(ProcessingError):
+                    await invoke(guard)
+    summary = ledger.summary()
+    assert len(calls) == 2
+    assert summary["paid_reservations"] == 2

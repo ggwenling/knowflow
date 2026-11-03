@@ -9,6 +9,8 @@ import asyncio
 from contextlib import aclosing
 from copy import deepcopy
 from datetime import datetime, timezone
+import os
+from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -37,14 +39,23 @@ class _GuardedAdapter:
                 or type(bounds[1]) is not int or bounds[1] < 0
                 or (operation in ("generate", "stream") and bounds[1] < 1024)):
             raise ValueError("TOKEN_BOUNDS_UNAVAILABLE")
-        # A fresh reservation ID for each attempt: retries and split batches can
-        # share a product request ID but must never share a budget reservation.
-        attempt_id = "eval:" + uuid4().hex
-        await asyncio.to_thread(
-            self._ledger.reserve, attempt_id, provider=self._provider, model=self._model,
-            input_tokens_upper=bounds[0], output_tokens_upper=bounds[1], quote=self._quote,
-            allow_zero_price_embedding=(operation == "embed" and isinstance(self._quote, dict)
-                                        and self._quote.get("input_cny_per_million") == "0"))
+        authoritative_adapter_boundary = getattr(self._factory, "budgeted_provider_adapter", False)
+        if authoritative_adapter_boundary:
+            configured_path = os.environ.get("KNOWFLOW_BUDGET_LEDGER_PATH")
+            if (not configured_path
+                    or Path(configured_path).resolve() != self._ledger.path.resolve()):
+                raise ValueError("BUDGET_LEDGER_CONFIGURATION_MISMATCH")
+            # The real adapter owns the sole reservation immediately before each
+            # HTTP attempt. Its runtime policy and ledger are authoritative.
+        else:
+            # Fake providers have no product adapter boundary, so the evaluation
+            # wrapper records their attempted work in the shared ledger.
+            attempt_id = "eval:" + uuid4().hex
+            await asyncio.to_thread(
+                self._ledger.reserve, attempt_id, provider=self._provider, model=self._model,
+                input_tokens_upper=bounds[0], output_tokens_upper=bounds[1], quote=self._quote,
+                allow_zero_price_embedding=(operation == "embed" and isinstance(self._quote, dict)
+                                            and self._quote.get("input_cny_per_million") == "0"))
         if self._closed:
             raise ValueError("ADAPTER_CLOSED")
         if self._adapter is None:
@@ -52,6 +63,10 @@ class _GuardedAdapter:
             if getattr(getattr(candidate, "settings", None), "model", None) != self._model:
                 await candidate.aclose()
                 raise ValueError("ADAPTER_MODEL_MISMATCH")
+            if (getattr(candidate, "budgeted_provider_adapter", False)
+                    and not authoritative_adapter_boundary):
+                await candidate.aclose()
+                raise ValueError("AUTHORITATIVE_BUDGET_BOUNDARY_REQUIRED")
             self._adapter = candidate
         return self._adapter
 

@@ -13,12 +13,12 @@ from .adapters import ProcessingError
 from .budget import BudgetLedger, _instant
 
 
-async def reserve_provider_call(provider, model, payload):
-    """Reserve a verified model-context upper bound for each individual attempt."""
+def _reserve_provider_call(provider, model, payload, environ):
     try:
-        ledger_path = os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"]
-        prices = json.loads(Path(os.environ["KNOWFLOW_BUDGET_PRICE_FILE"]).read_text(encoding="utf-8"))
-        policies = json.loads(Path(os.environ["KNOWFLOW_BUDGET_POLICY_FILE"]).read_text(encoding="utf-8"))
+        env = os.environ if environ is None else environ
+        ledger_path = env["KNOWFLOW_BUDGET_LEDGER_PATH"]
+        prices = json.loads(Path(env["KNOWFLOW_BUDGET_PRICE_FILE"]).read_text(encoding="utf-8"))
+        policies = json.loads(Path(env["KNOWFLOW_BUDGET_POLICY_FILE"]).read_text(encoding="utf-8"))
         policy = policies[model]
         source = urlsplit(policy["source_url"])
         now = datetime.now(timezone.utc)
@@ -35,8 +35,7 @@ async def reserve_provider_call(provider, model, payload):
         if type(output) is not int or not 0 <= output <= policy["output_tokens_upper"]:
             raise ValueError("INVALID_OUTPUT_BOUND")
         ledger = BudgetLedger(ledger_path)
-        await asyncio.to_thread(
-            ledger.reserve, "provider:" + uuid4().hex, provider=provider, model=model,
+        ledger.reserve("provider:" + uuid4().hex, provider=provider, model=model,
             input_tokens_upper=policy["input_tokens_upper"], output_tokens_upper=output,
             quote=prices[model], allow_zero_price_embedding=(provider == "siliconflow"))
     except (KeyError, TypeError, ValueError, OSError, sqlite3.Error) as error:
@@ -45,3 +44,13 @@ async def reserve_provider_call(provider, model, payload):
             reason = "BUDGET_CONFIGURATION_REQUIRED"
         logging.getLogger(__name__).warning("provider_budget_stopped reason=%s", reason)
         raise ProcessingError("AI_PROCESSING_FAILED", 503, retryable=False) from None
+
+
+async def reserve_provider_call(provider, model, payload, *, environ=None):
+    """Reserve a verified model-context upper bound for each individual attempt."""
+    await asyncio.to_thread(_reserve_provider_call, provider, model, payload, environ)
+
+
+def reserve_provider_call_sync(provider, model, payload, *, environ=None):
+    """Synchronous counterpart for the standard-library live smoke client."""
+    _reserve_provider_call(provider, model, payload, environ)

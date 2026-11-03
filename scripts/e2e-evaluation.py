@@ -34,6 +34,25 @@ def resource_counts(project):
     return result
 
 
+def assert_fake_evaluation_success(payload, scorer_result, expected_samples):
+    """Require completed QA rows and the deterministic fake's answer/citation contract."""
+    predictions = payload.get("predictions") if isinstance(payload, dict) else None
+    if not isinstance(predictions, list) or len(predictions) != expected_samples:
+        raise RuntimeError("EVALUATION_SAMPLE_COUNT_MISMATCH")
+    metrics = scorer_result.get("metrics", {})
+    if (scorer_result.get("sample_count") != expected_samples
+            or metrics.get("execution_error_count") != 0):
+        raise RuntimeError("EVALUATION_EXECUTION_ERRORS")
+    for row in predictions:
+        citations = row.get("citations") if isinstance(row, dict) else None
+        if (row.get("outcome") != "answered" or not isinstance(citations, list)
+                or len(citations) != 1 or not isinstance(citations[0].get("source_id"), str)
+                or row.get("answer") != "Synthetic answer [" + citations[0]["source_id"] + "]"
+                or not any(item.get("source_id") == citations[0]["source_id"]
+                           for item in row.get("retrieved_evidence", []))):
+            raise RuntimeError("DETERMINISTIC_FAKE_ANSWER_MISMATCH")
+
+
 def run(output):
     for port in (55432, 59000, 59001, 8000, 8080):
         if not recovery.local.can_bind(port):
@@ -98,6 +117,10 @@ def run(output):
                             fetch_row=fetch, ledger=collector.BudgetLedger(temp / "budget.sqlite3"))
             payload = asyncio.run(collect())
             scorer = collector.scorer.evaluate(temp / "predictions.json", dataset_root=ROOT / "evaluation/data/seed-v1")
+            _manifest, expected_questions, _documents, _sources, _fingerprint = collector.scorer._load_dataset(
+                ROOT / "evaluation/data/seed-v1")
+            expected_samples = sum(question["split"] == "development" for question in expected_questions)
+            assert_fake_evaluation_success(payload, scorer, expected_samples)
             recovery._wait_cleanup(database_url)
             harness.logout()
             report.update(passed=True, predictions=len(payload["predictions"]),

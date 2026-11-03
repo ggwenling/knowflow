@@ -5,9 +5,11 @@ import json
 import math
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 from urllib import error
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import model_smoke as smoke
@@ -17,11 +19,35 @@ class SmokeTests(unittest.TestCase):
     def setUp(self):
         self.env = {
             "KNOWFLOW_MODEL_BASE_URL": "https://example.invalid/v1",
-            "KNOWFLOW_EMBEDDING_MODEL": "example-embedding-v1",
-            "KNOWFLOW_LLM_MODEL": "example-chat-v1",
+            "KNOWFLOW_EMBEDDING_MODEL": "BAAI/bge-m3",
+            "KNOWFLOW_LLM_MODEL": "deepseek-flash",
             "KNOWFLOW_EMBEDDING_DIMENSIONS": "2",
             "OPENAI_API_KEY": "secret-must-never-appear",
         }
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name)
+        now = datetime.now(timezone.utc)
+        times = {"verified_at": (now - timedelta(hours=1)).isoformat(),
+                 "valid_until": (now + timedelta(hours=1)).isoformat()}
+        quotes, policies = {}, {}
+        for provider, model, source in (("siliconflow", "BAAI/bge-m3", "https://siliconflow.cn/pricing"),
+                                        ("deepseek", "deepseek-flash", "https://example.test/prices")):
+            quotes[model] = {"provider": provider, "model": model, "input_cny_per_million": "1",
+                             "output_cny_per_million": "2", "source_url": source,
+                             "verified_by": "synthetic-smoke-test", **times}
+            policies[model] = {"provider": provider, "bound_kind": "provider_context_limit",
+                               "source_url": source, "verified_by": "synthetic-smoke-test", **times,
+                               "input_tokens_upper": 10_000, "output_tokens_upper": 128,
+                               "max_payload_bytes": 100_000}
+        self.price_path, self.policy_path, self.ledger_path = root / "prices.json", root / "policies.json", root / "ledger.sqlite3"
+        self.price_path.write_text(json.dumps(quotes), encoding="utf-8")
+        self.policy_path.write_text(json.dumps(policies), encoding="utf-8")
+        self.env.update({"KNOWFLOW_BUDGET_LEDGER_PATH": str(self.ledger_path),
+                         "KNOWFLOW_BUDGET_PRICE_FILE": str(self.price_path),
+                         "KNOWFLOW_BUDGET_POLICY_FILE": str(self.policy_path)})
+
+    def tearDown(self):
+        self.temp.cleanup()
 
     def test_no_configuration_never_opens_network(self):
         with patch.object(smoke.request, "build_opener") as build:
@@ -29,6 +55,49 @@ class SmokeTests(unittest.TestCase):
         build.assert_not_called()
         self.assertEqual((report["status"], code), ("WAITING_INPUT", 2))
         self.assertFalse(report["network_attempted"])
+
+    def test_model_smoke_requires_budget_configuration_before_opener(self):
+        from knowflow_ai.budget import BudgetLedger
+        env = {key: value for key, value in self.env.items()
+               if key != "KNOWFLOW_BUDGET_LEDGER_PATH"}
+        with patch.object(smoke.request, "build_opener") as build:
+            report, code = smoke.run(env, 1)
+        self.assertEqual(code, 1)
+        self.assertFalse(report["network_attempted"])
+        build.assert_not_called()
+        self.assertEqual(BudgetLedger(self.ledger_path).summary()["paid_reservations"], 0)
+
+    def test_budget_soft_and_hard_limits_stop_before_opener(self):
+        from knowflow_ai.budget import BudgetLedger
+        quote = json.loads(self.price_path.read_text())["BAAI/bge-m3"]
+        for spent in (8_000_000, None):
+            with self.subTest(spent=spent):
+                ledger_path = Path(self.temp.name) / (str(spent) + ".sqlite3")
+                self.env["KNOWFLOW_BUDGET_LEDGER_PATH"] = str(ledger_path)
+                ledger = BudgetLedger(ledger_path)
+                if spent is not None:
+                    ledger.reserve("seed", provider="siliconflow", model="BAAI/bge-m3",
+                                   input_tokens_upper=spent, output_tokens_upper=0, quote=quote,
+                                   allow_zero_price_embedding=False)
+                else:
+                    policies = json.loads(self.policy_path.read_text())
+                    policies["BAAI/bge-m3"]["input_tokens_upper"] = 11_000_000
+                    self.policy_path.write_text(json.dumps(policies), encoding="utf-8")
+                with patch.object(smoke.request, "build_opener") as build:
+                    report, code = smoke.run(self.env, 1)
+                build.assert_not_called()
+                self.assertFalse(report["network_attempted"])
+                self.assertEqual(code, 1)
+                self.assertEqual(ledger.summary()["paid_reservations"], 1 if spent is not None else 0)
+                self.assertEqual(report["status"], "FAILED")
+
+    def test_missing_budget_files_fail_closed_before_opener(self):
+        env = {key: value for key, value in self.env.items() if not key.startswith("KNOWFLOW_BUDGET_")}
+        with patch.object(smoke.request, "build_opener") as build:
+            report, code = smoke.run(env, 1)
+        build.assert_not_called()
+        self.assertFalse(report["network_attempted"])
+        self.assertEqual(code, 1)
 
     def test_rejects_unsafe_base_urls_before_network(self):
         for url in ("http://example.invalid/v1", "https://user:pass@example.invalid/v1",
@@ -100,11 +169,11 @@ class SmokeTests(unittest.TestCase):
                 self.assertEqual((report["error"], code), (expected, 1))
 
     def test_success_path_redacts_provider_text_and_vectors(self):
-        embedding = {"model": "example-embedding-v1",
+        embedding = {"model": "BAAI/bge-m3",
                      "data": [{"index": 0, "embedding": [0.5, 0.7]},
                                {"index": 1, "embedding": [0.1, 0.3]}],
                      "usage": {"total_tokens": 20, "private": "secret"}}
-        chat = {"model": "example-chat-v1",
+        chat = {"model": "deepseek-flash",
                 "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
         responses = [io.BytesIO(json.dumps(value).encode()) for value in (embedding, chat)]
         with patch.object(smoke.request.OpenerDirector, "open", side_effect=responses) as opened:
@@ -119,7 +188,7 @@ class SmokeTests(unittest.TestCase):
 
     def test_requested_and_returned_model_ids_must_match(self):
         good_embedding = {
-            "model": "example-embedding-v1",
+            "model": "BAAI/bge-m3",
             "data": [{"index": i, "embedding": [1, 2]} for i in range(2)],
         }
         wrong_embedding = {
@@ -130,7 +199,7 @@ class SmokeTests(unittest.TestCase):
             "data": [{"index": i, "embedding": [1, 2]} for i in range(2)],
         }
         good_chat = {
-            "model": "example-chat-v1",
+            "model": "deepseek-flash",
             "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}],
         }
         wrong_chat = {
@@ -163,9 +232,9 @@ class SmokeTests(unittest.TestCase):
                "KNOWFLOW_LLM_KEY_ENV": "CHAT_API_KEY",
                "CHAT_API_KEY": "chat-only-secret",
                "KNOWFLOW_LLM_THINKING": "disabled"}
-        embedding = {"model": "example-embedding-v1",
+        embedding = {"model": "BAAI/bge-m3",
                      "data": [{"index": i, "embedding": [1, 2]} for i in range(2)]}
-        chat = {"model": "example-chat-v1",
+        chat = {"model": "deepseek-flash",
                 "choices": [{"message": {"content": "限制是 8 MiB。"}, "finish_reason": "stop"}]}
         responses = [io.BytesIO(json.dumps(value).encode()) for value in (embedding, chat)]
         with patch.object(smoke.request.OpenerDirector, "open", side_effect=responses) as opened:

@@ -105,7 +105,7 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                                   (key, knowledge_base_id))
             return {name: str(value) if name == "id" else value for name, value in row.items()} if row else None
 
-        for question in selected:
+        for question_index, question in enumerate(selected):
             if ledger.summary()["reserved_microyuan"] >= 8_000_000:
                 raise ValueError("BUDGET_SOFT_STOP")
             try:
@@ -122,7 +122,8 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             status["budget_steps"].append({"stage": "question", **ledger.summary()})
             write_json(output, payload)
             write_json(output.with_suffix(".status.json"), status)
-            if ledger.summary()["reserved_microyuan"] >= 8_000_000:
+            if (question_index + 1 < len(selected)
+                    and ledger.summary()["reserved_microyuan"] >= 8_000_000):
                 raise ValueError("BUDGET_SOFT_STOP")
         status["complete"] = not status["failures"]
         write_json(output.with_suffix(".status.json"), status)

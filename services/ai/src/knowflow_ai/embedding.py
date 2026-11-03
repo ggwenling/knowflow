@@ -98,6 +98,7 @@ class EmbeddingSettings:
 
 class SiliconFlowEmbeddingAdapter:
     """One-request, no-retry adapter. The injected HTTP client remains caller-owned."""
+    budgeted_provider_adapter = True
 
     def __init__(self, settings: EmbeddingSettings, client: httpx.AsyncClient | None = None):
         self.settings = settings
