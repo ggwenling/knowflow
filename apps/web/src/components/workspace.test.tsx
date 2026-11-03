@@ -185,6 +185,35 @@ describe("index task polling", () => {
 });
 
 describe("knowledge-base refresh isolation", () => {
+  it("does not invalidate B's pending refresh when deletion in A completes", async () => {
+    const deletion = deferred<void>();
+    const secondRefresh = deferred<{ items: Document[] }>();
+    const secondDocument = { ...document, id: "doc-b", original_name: "第二资料.md" };
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(api).mockImplementation(async (path, init) => {
+      if (path === "me") return { user_id: "user", email: "user@example.test" };
+      if (path.startsWith("knowledge-bases?")) return { items: [
+        { id: "kb", name: "资料库", status: "ACTIVE" }, { id: "kb-b", name: "第二资料库", status: "ACTIVE" },
+      ] };
+      if (path === "documents/doc" && init?.method === "DELETE") return deletion.promise;
+      if (path.startsWith("knowledge-bases/kb/documents?")) return { items: [document] };
+      if (path.startsWith("knowledge-bases/kb-b/documents?")) return secondRefresh.promise;
+      if (path.startsWith("questions?")) return { items: [] };
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: "当前资料.md 操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除资料" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("documents/doc", { method: "DELETE" }));
+    fireEvent.click(screen.getByRole("button", { name: /第二资料库/ }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("knowledge-bases/kb-b/documents?limit=50&offset=0"));
+    await act(async () => { deletion.resolve(); });
+    await act(async () => { secondRefresh.resolve({ items: [secondDocument] }); });
+    expect(await screen.findByText("第二资料.md")).toBeVisible();
+    expect(screen.queryByText("当前资料.md")).not.toBeInTheDocument();
+    expect(vi.mocked(api).mock.calls.filter(([path]) => path.startsWith("knowledge-bases/kb/documents?"))).toHaveLength(1);
+  });
+
   it("ignores a stale response after switching A to B and back to A", async () => {
     const stale = deferred<{ items: Document[] }>();
     let calls = 0;

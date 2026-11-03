@@ -260,6 +260,7 @@ export default function Workspace() {
     setWorking(true); setNotice("");
     try {
       await api(`documents/${document.id}`, { method: "DELETE" });
+      if (selectedBaseRef.current !== selectedBase) return;
       setDocuments((previous) => previous.filter((item) => item.id !== document.id));
       await refresh(selectedBase);
       if (answer?.sources.some((source) => source.document_id === document.id)) {

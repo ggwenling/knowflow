@@ -631,7 +631,8 @@ async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tm
         await store.take("req-answer")
 
 
-def test_collected_citation_claim_passes_runner_v2_score_entry(tmp_path):
+@pytest.mark.parametrize("answer", ["测试结论[src-0]。", "The emoji range is [2,3). [src-0]", "括号文本 [中文]、[bad marker] 与右括号 ]。[src-0]"])
+def test_collected_citation_claim_passes_runner_v2_score_entry(tmp_path, answer):
     spec = importlib.util.spec_from_file_location(
         "runner_v2_claim_test", ROOT / "evaluation" / "runner" / "runner_v2.py")
     runner_v2 = importlib.util.module_from_spec(spec)
@@ -658,12 +659,15 @@ def test_collected_citation_claim_passes_runner_v2_score_entry(tmp_path):
                             "dataset_content_version_id": gold["content_version_id"],
                             "source_bytes": source,
                             "source_sha256": sha256(source).hexdigest()}},
-        response={"request_id": "req-runner-v2", "answer": "测试结论[src-0]。",
+        response={"request_id": "req-runner-v2", "answer": answer,
                   "has_answer": True,
                   "sources": [{"source_id": "src-0", "document_id": runtime[0],
                                "content_version_id": runtime[1], "index_version_id": runtime[2],
                                "locator": locator}]},
         latency_ms=1)
+    public_id = result["citations"][0]["source_id"]
+    assert result["answer"] == answer.replace("[src-0]", f"[{public_id}]")
+    assert len(result["citations"]) == 1
     rows = [{"question_id": item["id"], "outcome": "refused", "answer": "资料不足",
              "answer_sha256": sha256("资料不足".encode("utf-8")).hexdigest(),
              "retrieved_evidence": [], "citations": [], "latency_ms": 0,

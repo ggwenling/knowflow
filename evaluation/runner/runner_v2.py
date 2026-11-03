@@ -81,9 +81,8 @@ def _load(predictions_path, dataset_root, split):
                 raise ValueError("INVALID_EVIDENCE_SOURCE_ID")
             source_ids.add(span["source_id"])
             legacy._validate_span({key: value for key, value in span.items() if key != "source_id"}, documents, sources)
+        # Keep the collector/AnswerService distinction between markers and literal brackets.
         markers = MARKER.findall(row["answer"])
-        if "[" in MARKER.sub("", row["answer"]) or "]" in MARKER.sub("", row["answer"]):
-            raise ValueError("INVALID_CITATION_MARKER")
         if row["outcome"] != "answered" and markers:
             raise ValueError("INVALID_CITATIONS")
         ids = set()

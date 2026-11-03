@@ -211,7 +211,7 @@ def test_v2_citation_review_is_bound_to_each_source(tmp_path):
         runner.evaluate(predictions, dataset_root=DATASET, quality_config_path=config, review_path=review)
 
 
-@pytest.mark.parametrize("defect", ["omitted_marker", "duplicate_position", "unknown_source", "outside_top5", "duplicate_source", "malformed_marker"])
+@pytest.mark.parametrize("defect", ["omitted_marker", "duplicate_position", "unknown_source", "outside_top5", "duplicate_source"])
 def test_v2_rejects_unbound_or_ambiguous_citation_markers(tmp_path, defect):
     payload, predictions, _bundle, _review, _config = _v2_fixture(tmp_path)
     row = next(r for r in payload["predictions"] if r["outcome"] == "answered" and len(r["citations"]) == 1)
@@ -233,14 +233,25 @@ def test_v2_rejects_unbound_or_ambiguous_citation_markers(tmp_path, defect):
         row["answer"] = row["answer"].removesuffix(f"[{first['source_id']}]") + f"[{extra['source_id']}]"
     elif defect == "duplicate_source":
         row["retrieved_evidence"].append(dict(row["retrieved_evidence"][0]))
-    elif defect == "malformed_marker":
-        row["answer"] += "[bad marker]"
     if defect != "omitted_marker":
         row["citations"].append(extra)
     row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
     predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(ValueError, match="INVALID_CITATION|INVALID_EVIDENCE_SOURCE_ID"):
         review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+
+
+@pytest.mark.parametrize("literal", ["The emoji range is [2,3). ", "[中文] [bad marker] ] "])
+def test_v2_preserves_literal_brackets_in_review_bundle(tmp_path, literal):
+    payload, predictions, _bundle, _review, _config = _v2_fixture(tmp_path)
+    row = next(r for r in payload["predictions"] if r["outcome"] == "answered")
+    row["answer"] = literal + row["answer"]
+    row["answer_sha256"] = sha256(row["answer"].encode("utf-8")).hexdigest()
+    predictions.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    bundle = review_tool.prepare_bundle(predictions, dataset_root=DATASET)
+    entry = next(item for item in bundle["entries"] if item["question_id"] == row["question_id"])
+    assert entry["answer"] == row["answer"]
+    assert len(entry["citations"]) == len(row["citations"])
 
 
 def test_v2_repeated_source_markers_require_separate_review(tmp_path):

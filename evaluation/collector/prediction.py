@@ -58,9 +58,8 @@ def answer_prediction(*, question_id, runtime_question_id, trace, mappings, resp
             or not isinstance(response["sources"], list)):
         raise ValueError("INVALID_SERVICE_RESPONSE")
     answer = response["answer"]
+    # Match AnswerService citation syntax; other brackets are literal answer text.
     markers = list(_MARKER.finditer(answer))
-    if "[" in _MARKER.sub("", answer) or "]" in _MARKER.sub("", answer):
-        raise ValueError("INVALID_CITATION_MARKER")
     source_rows = {}
     for source in response["sources"]:
         if not isinstance(source, dict) or not isinstance(source.get("source_id"), str):
