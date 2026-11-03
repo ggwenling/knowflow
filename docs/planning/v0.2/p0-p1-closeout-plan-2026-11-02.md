@@ -1,15 +1,15 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。当前代码验证目标为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；当前分支 HEAD `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7` 在该代码之后加入备份恢复证据。推送前记录的远端跟踪基线为 `origin/local@1d0fd5e78a6b3f31a16ae7cfbd98c4de68d80cb7`、`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625`；它不是推送后的远端状态。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；最终 Q/M 签收及真实模型质量验收仍待完成。
+状态：IN_PROGRESS。代码测试基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。推送前远端跟踪基线为 `origin/local@1d0fd5e78a6b3f31a16ae7cfbd98c4de68d80cb7`、`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625`；它不是推送后的远端状态。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；最终 Q/M 签收及真实模型质量验收仍待完成。
 
 ## 2026-11-03 当前检查点
 
 - 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查 draft.10 SSE、注册、上传/READY、问答、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
 - 合成负载报告 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` 绑定 `9c9b4a0`：10/100 文档 × 并发 1/4/8 × 每组 8 个请求，48/48 成功；合成环境 Java API 与 AI 准入上限均为 8。100 文档下首个 SSE delta p95 为 360/485/532 ms，完整回答 p95 为 625/844/1094 ms（并发 1/4/8）。报告有容器资源采样并确认清理。仅证明该 Windows Docker 合成适配器负载，不代表真实 provider 延迟、成本或生产容量。
 - 故障恢复报告 `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json` 绑定 `bb25dc1`：PostgreSQL 读/索引写中断、MinIO 中断后 ready 与真实 PUT/GET/DELETE canary、第二批 Embedding 失败四项通过；临时数据库和服务端口清理，provider 调用 0。隔离备份恢复报告 `infra/evidence/backup-restore-20261103-final-bb25dc1.json` 同样绑定 `bb25dc1`，数据库/MinIO 恢复、字节一致、历史来源、owner 隔离、恢复后查询及两套 Compose 清理通过，迁移版本 8→8。均未测试生产升级回滚或真实用户环境。
-- 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；目标定向测试 24 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或重新批准可接受的软预算策略。
+- 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
 - 项目负责人此前确认尚未准备 20 题私有盲测；不生成、不查看或评分私有题。60 题开发/公开验证集人工审核者为 `human-reviewer`，不能代替新增私有盲测。
-- Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时当前 SHA 的完整证据与 M/项目负责人签收未齐，未指出新增契约代码缺陷。Sol 对恢复改动的代码复核已无阻断，且已独立核对本轮恢复通过报告；仍需对最终提交 SHA 给出正式 Q 结论。M 签收仍待项目负责人。
+- Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时当前 SHA 的完整证据与 M/项目负责人签收未齐，未指出新增契约代码缺陷。Sol 对恢复改动的代码复核已无代码阻断，且已独立核对本轮恢复通过报告。对前一候选 `857cec5` 的正式 Q 复核发现本文的 HEAD 记录和 collector 测试数各有一处不一致；本次已修正，须由 Sol 对新提交 SHA 复验。M 签收仍待项目负责人。
 
 ## P0
 
