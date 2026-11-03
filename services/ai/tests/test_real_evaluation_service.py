@@ -215,6 +215,22 @@ def test_ledger_insert_trigger_failure_fails_closed(monkeypatch, tmp_path):
     assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
 
 
+def test_ledger_ignore_trigger_fails_closed(monkeypatch, tmp_path):
+    configure_real_service(monkeypatch, tmp_path)
+    from knowflow_ai.budget import BudgetLedger
+    BudgetLedger(tmp_path / "ledger.sqlite3")
+    with sqlite3.connect(tmp_path / "ledger.sqlite3") as db:
+        db.execute(
+            "CREATE TRIGGER ignore_reservations BEFORE INSERT ON reservations "
+            "BEGIN SELECT RAISE(IGNORE); END")
+        db.commit()
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
+
+
 def test_soft_stopped_shared_ledger_fails_closed(monkeypatch, tmp_path):
     prices, _policies, _price_file, _policy_file = configure_real_service(monkeypatch, tmp_path)
     from knowflow_ai.budget import BudgetLedger, SOFT_STOP_MICROYUAN

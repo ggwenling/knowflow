@@ -74,6 +74,16 @@ def _assert_shared_ledger_ready(path):
                     "INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
                     ("__evaluation_ledger_probe_zero__", 1, 0, "{}"),
                 )
+                paid = db.execute(
+                    "SELECT COUNT(*) FROM reservations WHERE request_id = ?",
+                    ("__evaluation_ledger_probe__",),
+                ).fetchone()[0]
+                zero = db.execute(
+                    "SELECT COUNT(*) FROM zero_price_reservations WHERE request_id = ?",
+                    ("__evaluation_ledger_probe_zero__",),
+                ).fetchone()[0]
+                if paid != 1 or zero != 1:
+                    raise ValueError
                 db.execute(
                     "DELETE FROM reservations WHERE request_id = ?",
                     ("__evaluation_ledger_probe__",),
