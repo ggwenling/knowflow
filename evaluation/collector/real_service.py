@@ -228,7 +228,20 @@ def create_real_app():
 
     try:
         wiring = _load_wiring()
+        from knowflow_ai.budget import SOFT_STOP_MICROYUAN
         ledger = wiring.BudgetLedger(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
+    except Exception:
+        _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+    try:
+        snapshot = ledger.summary()
+    except Exception:
+        _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+    if (not isinstance(snapshot, dict)
+            or type(snapshot.get("reserved_microyuan")) is not int
+            or snapshot["reserved_microyuan"] < 0
+            or snapshot["reserved_microyuan"] >= SOFT_STOP_MICROYUAN):
+        _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+    try:
         app = wiring.create_evaluation_app(
             service_settings,
             ledger=ledger,

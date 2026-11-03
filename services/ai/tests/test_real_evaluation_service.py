@@ -1,11 +1,33 @@
 import asyncio
+import importlib.util
 import json
+import socket
+import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 import pytest
 
-from evaluation.collector import real_service
+ROOT = Path(__file__).resolve().parents[3]
+_SPEC = importlib.util.spec_from_file_location(
+    "real_evaluation_service", ROOT / "evaluation/collector/real_service.py")
+real_service = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(real_service)
+
+
+@pytest.fixture(autouse=True)
+def block_external_network(monkeypatch):
+    """Reject real outbound network; loopback MockTransport paths stay local."""
+
+    def refuse(*_args, **_kwargs):
+        raise RuntimeError("EXTERNAL_NETWORK_DISABLED_IN_TEST")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+    monkeypatch.setattr(socket.socket, "sendto", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
 
 
 def configure_real_service(monkeypatch, tmp_path):
@@ -150,7 +172,95 @@ def test_expired_price_fails_closed(monkeypatch, tmp_path):
     assert "test-reviewer" not in message
 
 
+def test_corrupt_shared_ledger_fails_closed(monkeypatch, tmp_path):
+    configure_real_service(monkeypatch, tmp_path)
+    ledger_path = tmp_path / "ledger.sqlite3"
+    with sqlite3.connect(ledger_path) as db:
+        db.execute("CREATE TABLE reservations (unexpected INTEGER)")
+        db.commit()
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
+
+
+def test_soft_stopped_shared_ledger_fails_closed(monkeypatch, tmp_path):
+    prices, _policies, _price_file, _policy_file = configure_real_service(monkeypatch, tmp_path)
+    from knowflow_ai.budget import BudgetLedger, SOFT_STOP_MICROYUAN
+
+    ledger = BudgetLedger(tmp_path / "ledger.sqlite3")
+    quote = prices["deepseek-flash"]
+    # One large paid reservation to reach soft stop exactly.
+    ledger.reserve(
+        "soft-stop-seed",
+        provider="deepseek",
+        model="deepseek-flash",
+        input_tokens_upper=SOFT_STOP_MICROYUAN,
+        output_tokens_upper=0,
+        quote=quote,
+    )
+    assert ledger.summary()["reserved_microyuan"] >= SOFT_STOP_MICROYUAN
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
+
+
 def test_real_app_uses_product_adapters_with_mock_transport(monkeypatch, tmp_path):
+    configure_real_service(monkeypatch, tmp_path)
+    from knowflow_ai import answering, embedding
+
+    requests_seen = []
+
+    def mock_client(timeout, **_kwargs):
+        def handler(request):
+            requests_seen.append(str(request.url))
+            return httpx.Response(500)
+
+        return httpx.AsyncClient(timeout=timeout, trust_env=False,
+                                 transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(embedding, "build_async_client", mock_client)
+    monkeypatch.setattr(answering, "build_async_client", mock_client)
+
+    app = real_service.create_real_app()
+    assert app.state.evaluation_ai_port == 8000
+    factories = app.state.evaluation_factories
+    embedding_adapter = factories._embedding["adapter_factory"]()
+    llm_adapter = factories._llm["adapter_factory"]()
+    embedding_guard = factories.embedding_factory()
+    llm_guard = factories.llm_factory()
+    try:
+        assert isinstance(embedding_adapter, embedding.SiliconFlowEmbeddingAdapter)
+        assert isinstance(llm_adapter, answering.DeepSeekAdapter)
+        assert embedding_adapter.settings.model == "BAAI/bge-m3"
+        assert embedding_adapter.settings.dimensions == 1024
+        assert llm_adapter.settings.model == "deepseek-flash"
+
+        async def exercise_guards():
+            with pytest.raises(Exception):
+                await embedding_guard.embed(["hello"], request_id="emb-test-1")
+            with pytest.raises(Exception):
+                await llm_guard.generate(
+                    "q", [{"source_id": "s1", "text": "t"}], request_id="llm-test-1")
+
+        before = factories._ledger.summary()["paid_reservations"]
+        asyncio.run(exercise_guards())
+        after = factories._ledger.summary()["paid_reservations"]
+        assert after > before
+        assert requests_seen
+    finally:
+        async def close_adapters():
+            await embedding_adapter.aclose()
+            await llm_adapter.aclose()
+            await embedding_guard.aclose()
+            await llm_guard.aclose()
+        asyncio.run(close_adapters())
+
+
+def test_main_binds_loopback_only(monkeypatch, tmp_path):
     configure_real_service(monkeypatch, tmp_path)
     from knowflow_ai import answering, embedding
 
@@ -161,20 +271,15 @@ def test_real_app_uses_product_adapters_with_mock_transport(monkeypatch, tmp_pat
 
     monkeypatch.setattr(embedding, "build_async_client", mock_client)
     monkeypatch.setattr(answering, "build_async_client", mock_client)
+    captured = {}
 
-    app = real_service.create_real_app()
-    assert app.state.evaluation_ai_port == 8000
-    factories = app.state.evaluation_factories
-    embedding_adapter = factories._embedding["adapter_factory"]()
-    llm_adapter = factories._llm["adapter_factory"]()
-    try:
-        assert isinstance(embedding_adapter, embedding.SiliconFlowEmbeddingAdapter)
-        assert isinstance(llm_adapter, answering.DeepSeekAdapter)
-        assert embedding_adapter.settings.model == "BAAI/bge-m3"
-        assert embedding_adapter.settings.dimensions == 1024
-        assert llm_adapter.settings.model == "deepseek-flash"
-    finally:
-        async def close_adapters():
-            await embedding_adapter.aclose()
-            await llm_adapter.aclose()
-        asyncio.run(close_adapters())
+    def fake_run(app, host, port, **_kwargs):
+        captured["host"] = host
+        captured["port"] = port
+        captured["app"] = app
+
+    import uvicorn
+    monkeypatch.setattr(uvicorn, "run", fake_run)
+    real_service.main()
+    assert captured["host"] == "127.0.0.1"
+    assert captured["port"] == 8000
