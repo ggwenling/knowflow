@@ -185,6 +185,65 @@ describe("index task polling", () => {
 });
 
 describe("knowledge-base refresh isolation", () => {
+  it.each(["documents", "history"])("clears deleted-source answers even when the %s refresh fails", async (failedList) => {
+    const originalApi = vi.mocked(api).getMockImplementation()!;
+    let deleted = false;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(api).mockImplementation(async (path, init) => {
+      if (path === "documents/doc" && init?.method === "DELETE") { deleted = true; return; }
+      if (deleted && (failedList === "documents" ? path.includes("/documents?") : path.startsWith("questions?"))) {
+        throw new Error("列表刷新失败");
+      }
+      return originalApi(path, init);
+    });
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /历史问题/ }));
+    await screen.findByText("历史回答");
+    fireEvent.click(screen.getByRole("button", { name: "当前资料.md 操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除资料" }));
+    await screen.findByText("列表刷新失败");
+    expect(screen.queryByText("历史回答")).not.toBeInTheDocument();
+    expect(screen.queryByText("历史引用")).not.toBeInTheDocument();
+  });
+
+  it.each(["resolve", "reject"])("preserves B's answer when A's post-delete refresh later %s", async (outcome) => {
+    const originalApi = vi.mocked(api).getMockImplementation()!;
+    const pendingRefresh = deferred<{ items: Document[] }>();
+    const secondHistory = { ...historical, question_id: "question-b", knowledge_base_id: "kb-b", question: "第二问题", answer: "第二回答", sources: [] };
+    let deleted = false;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(api).mockImplementation(async (path, init) => {
+      if (path.startsWith("knowledge-bases?")) return { items: [
+        { id: "kb", name: "资料库", status: "ACTIVE" }, { id: "kb-b", name: "第二资料库", status: "ACTIVE" },
+      ] };
+      if (path === "documents/doc" && init?.method === "DELETE") { deleted = true; return; }
+      if (deleted && path.startsWith("knowledge-bases/kb/documents?")) return pendingRefresh.promise;
+      if (path.startsWith("knowledge-bases/kb-b/documents?")) return { items: [] };
+      if (path.startsWith("questions?")) return { items: [historical, secondHistory] };
+      if (path === "questions/question-b") return secondHistory;
+      return originalApi(path, init);
+    });
+    await openWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: /历史问题/ }));
+    await screen.findByText("历史回答");
+    fireEvent.click(screen.getByRole("button", { name: "当前资料.md 操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "删除资料" }));
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([path]) => path.startsWith("knowledge-bases/kb/documents?"))).toHaveLength(3));
+    fireEvent.click(screen.getByRole("button", { name: /第二资料库/ }));
+    await screen.findByRole("heading", { name: "第二资料库" });
+    fireEvent.click(await screen.findByRole("button", { name: /第二问题/ }));
+    await screen.findByText("第二回答");
+    const closeNotice = screen.queryByRole("button", { name: "关闭提示" });
+    if (closeNotice) fireEvent.click(closeNotice);
+    await act(async () => {
+      if (outcome === "resolve") pendingRefresh.resolve({ items: [] });
+      else pendingRefresh.reject(new Error("旧知识库刷新失败"));
+    });
+    expect(screen.getByText("第二回答")).toBeVisible();
+    expect(screen.queryByText("该文档已删除，相关来源已失效。")).not.toBeInTheDocument();
+    expect(screen.queryByText("旧知识库刷新失败")).not.toBeInTheDocument();
+  });
+
   it("does not invalidate B's pending refresh when deletion in A completes", async () => {
     const deletion = deferred<void>();
     const secondRefresh = deferred<{ items: Document[] }>();

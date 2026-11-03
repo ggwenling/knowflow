@@ -257,16 +257,20 @@ export default function Workspace() {
 
   async function removeDocument(document: Document) {
     if (!window.confirm(`删除“${document.original_name}”？删除后，新问答和原文来源将无法访问。`)) return;
+    const questionView = questionViewRef.current;
     setWorking(true); setNotice("");
     try {
       await api(`documents/${document.id}`, { method: "DELETE" });
       if (selectedBaseRef.current !== selectedBase) return;
       setDocuments((previous) => previous.filter((item) => item.id !== document.id));
-      await refresh(selectedBase);
-      if (answer?.sources.some((source) => source.document_id === document.id)) {
-        setAnswer(null); setNotice("该文档已删除，相关来源已失效。");
+      setAnswer((current) => current?.sources.some((source) => source.document_id === document.id) ? null : current);
+      if (questionViewRef.current === questionView && answer?.sources.some((source) => source.document_id === document.id)) {
+        setNotice("该文档已删除，相关来源已失效。");
       }
-    } catch (error) { setNotice(messageOf(error)); }
+      await refresh(selectedBase);
+    } catch (error) {
+      if (selectedBaseRef.current === selectedBase && questionViewRef.current === questionView) setNotice(messageOf(error));
+    }
     finally { setWorking(false); }
   }
 
