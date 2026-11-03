@@ -247,6 +247,31 @@ def has_resource_coverage(resources):
                for service in ("api", "ai", "postgres", "minio"))
 
 
+def project_resource_counts(project):
+    counts = {}
+    for kind, args in (
+            ("containers", ["ps", "-aq"]),
+            ("networks", ["network", "ls", "-q"]),
+            ("volumes", ["volume", "ls", "-q"])):
+        rows = docker([*args, "--filter", f"label=com.docker.compose.project={project}"]).stdout.splitlines()
+        counts[kind] = sum(bool(row.strip()) for row in rows)
+    tags = docker(["image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]
+                  ).stdout.splitlines()
+    counts["temporary_image_tags"] = sum(tag.startswith(project + "-") for tag in tags)
+    return counts
+
+
+def cleanup_project(base, project):
+    down = docker([*base, "down", "--volumes", "--remove-orphans"], check=False)
+    image_remove = docker(["image", "rm", "--force",
+                           *(f"{project}-{service}:latest" for service in ("api", "ai", "migrate"))],
+                         check=False)
+    remaining = project_resource_counts(project)
+    return {"down_exit_code": down.returncode, "image_remove_exit_code": image_remove.returncode,
+            "remaining_resources": remaining,
+            "verified_empty": down.returncode == 0 and not any(remaining.values())}
+
+
 def run(args):
     revision = clean_build_revision()
     project = "knowflow-perf-" + uuid.uuid4().hex[:12]
@@ -285,8 +310,8 @@ def run(args):
             if clean_build_revision() != revision:
                 raise RuntimeError("BUILD_INPUTS_CHANGED")
             report["images"] = {}
-            for service in ("api", "ai", "postgres", "minio"):
-                container_id = docker([*base, "ps", "-q", service]).stdout.strip()
+            for service in ("api", "ai", "migrate", "postgres", "minio"):
+                container_id = docker([*base, "ps", "--all", "-q", service]).stdout.strip()
                 report["images"][service] = docker(["inspect", "--format", "{{.Image}}", container_id]).stdout.strip()
             sampler = threading.Thread(target=resource_samples, args=(base, project, stop, resource_rows), daemon=True)
             sampler.start()
@@ -318,8 +343,11 @@ def run(args):
             if report["status"] == "completed" and not has_resource_coverage(report["resources"]):
                 report["status"] = "incomplete"
             if started:
-                cleanup = docker([*base, "down", "--volumes", "--remove-orphans"], check=False)
-                report["cleanup_exit_code"] = cleanup.returncode
+                report["cleanup"] = cleanup_project(base, project)
+                report["cleanup_exit_code"] = report["cleanup"]["down_exit_code"]
+                report["cleanup_verified"] = report["cleanup"]["verified_empty"]
+                if not report["cleanup_verified"]:
+                    report["status"] = "incomplete"
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return report
@@ -336,7 +364,7 @@ def main():
         parser.error("invalid workload bounds")
     result = run(args)
     print(json.dumps({"status": result["status"], "cases": len(result["cases"]), "output": str(args.output)}))
-    if result["cleanup_exit_code"] != 0 or result["status"] != "completed":
+    if result["cleanup_exit_code"] != 0 or not result.get("cleanup_verified") or result["status"] != "completed":
         raise SystemExit(1)
 
 

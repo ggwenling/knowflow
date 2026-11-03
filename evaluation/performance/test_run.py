@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -107,3 +108,37 @@ def test_compose_admission_limit_covers_requested_concurrency(tmp_path):
     config = override.read_text(encoding="utf-8")
     assert config.count('KNOWFLOW_QUESTION_MAX_CONCURRENT: "8"') == 2
     assert config.index("  api:") < config.index("  ai:")
+
+
+def test_cleanup_removes_only_the_projects_images_and_verifies_resources(monkeypatch):
+    calls = []
+    def fake_docker(args, **kwargs):
+        calls.append((args, kwargs))
+        if args[0:2] == ["image", "ls"]:
+            return SimpleNamespace(returncode=0, stdout="other-project-api:latest\n")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+    monkeypatch.setattr(perf, "docker", fake_docker)
+
+    result = perf.cleanup_project(["compose", "--project-name", "knowflow-perf-a"],
+                                  "knowflow-perf-a")
+
+    assert result == {"down_exit_code": 0, "image_remove_exit_code": 0,
+                      "remaining_resources": {"containers": 0, "networks": 0,
+                                               "volumes": 0, "temporary_image_tags": 0},
+                      "verified_empty": True}
+    image_remove = next(args for args, _kwargs in calls if args[0:2] == ["image", "rm"])
+    assert image_remove[-3:] == ["knowflow-perf-a-api:latest", "knowflow-perf-a-ai:latest",
+                                 "knowflow-perf-a-migrate:latest"]
+
+
+def test_cleanup_rejects_a_leftover_temporary_image_tag(monkeypatch):
+    def fake_docker(args, **kwargs):
+        output = "knowflow-perf-a-api:latest\n" if args[0:2] == ["image", "ls"] else ""
+        return SimpleNamespace(returncode=0, stdout=output, stderr="")
+    monkeypatch.setattr(perf, "docker", fake_docker)
+
+    result = perf.cleanup_project(["compose", "--project-name", "knowflow-perf-a"],
+                                  "knowflow-perf-a")
+
+    assert result["remaining_resources"]["temporary_image_tags"] == 1
+    assert result["verified_empty"] is False
