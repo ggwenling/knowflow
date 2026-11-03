@@ -1,6 +1,6 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。代码测试基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。推送前远端跟踪基线为 `origin/local@1d0fd5e78a6b3f31a16ae7cfbd98c4de68d80cb7`、`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625`；它不是推送后的远端状态。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；最终 Q/M 签收及真实模型质量验收仍待完成。
+状态：IN_PROGRESS。代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。候选 `local@79678830b14047aabc41e3cd5f607f564728fb6a` 已推送，`origin/local` 与其同步；当时 `origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；M/项目负责人签收及真实模型质量验收仍待完成。
 
 ## 2026-11-03 当前检查点
 
@@ -9,14 +9,17 @@
 - 故障恢复报告 `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json` 绑定 `bb25dc1`：PostgreSQL 读/索引写中断、MinIO 中断后 ready 与真实 PUT/GET/DELETE canary、第二批 Embedding 失败四项通过；临时数据库和服务端口清理，provider 调用 0。隔离备份恢复报告 `infra/evidence/backup-restore-20261103-final-bb25dc1.json` 同样绑定 `bb25dc1`，数据库/MinIO 恢复、字节一致、历史来源、owner 隔离、恢复后查询及两套 Compose 清理通过，迁移版本 8→8。均未测试生产升级回滚或真实用户环境。
 - 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
 - Java `DocumentApiIntegrationTest` 增加 3 项 MVC wire 回归：可选空 `active_index_version_id` / `failure_code` 不输出，processing 历史和过期来源的 required nullable 字段显式为 JSON `null`。3 个 Testcontainers 方法、OpenAPI 4 项、Schema 85 structural cases 通过。此验证仅覆盖列出的字段与端点，不代表全部公开 JSON 响应或 SSE 消费验收。
+- 远端 push workflow [#15](https://github.com/ggwenling/knowflow/actions/runs/41590144065) 在候选 `7967883` 上 4m48s 完成，`python-contract`、Java、Web/Docker E2E 三个 job 均成功。现有 PR [#3](https://github.com/ggwenling/knowflow/pull/3) 的 pull_request workflow [#16](https://github.com/ggwenling/knowflow/actions/runs/41590148290) 在本次记录时仍运行中（python-contract 与 Java 已成功，Web job 未结束）。`main` 尚未更新。
+- Sol High 对候选 `79678830b14047aabc41e3cd5f607f564728fb6a` 的代码/契约复核为 APPROVED，无代码阻断；正式 Q/M 仍 CHANGES_REQUESTED，Java/Python 与 M 的消费清单未签、错误/取消 SSE 路径及完整消费语义待完成。
 - 项目负责人此前确认尚未准备 20 题私有盲测；不生成、不查看或评分私有题。60 题开发/公开验证集人工审核者为 `human-reviewer`，不能代替新增私有盲测。
 - Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时完整证据及 M 签收未齐，未指出新增契约代码缺陷。Sol 对 `00147f6` 的正式 Q/M 结论仍为 CHANGES_REQUESTED：代码无剩余 blocker；Java/Python 和 M 的消费签收、远端 CI、错误/取消 SSE 路径及完整消费语义尚缺。该次审阅指出的 OpenAPI null 兼容问题已由本节所列定向运行时测试覆盖；本轮代码/契约变更仍须由 Sol 在新最终 SHA 复核。M 签收仍待项目负责人。
 
 ## P0
 
 - [x] 本地实际构建 Docker Web/API/AI/migrate 镜像并通过 Playwright Chromium 全栈 E2E 1/1；Web、Java、Python、Schema、OpenAPI 检查结果见上方当前检查点。
-- [ ] 将本轮受控改动与通过证据提交并推送 `local`，随后核实远端 Web E2E、Java、Python/契约 CI 结果及远端 HEAD。
-- [ ] Q 绑定最终提交 SHA 与 schema 审阅三端消费、运行时授权/租约边界和版本化 OpenAPI；关闭阻断项并签收。M/项目负责人在该 SHA 完成前端与项目验收签收；main 合并须等该签收完成。
+- [x] 受控改动和证据已提交并推送 `local`；push run #15 的 Web E2E、Java、Python/契约三个 job 全绿，远端 `local` 与推送候选同步。
+- [x] Sol 在候选 `7967883` 对代码及契约给出 APPROVED，无剩余代码 blocker。
+- [ ] 在最新目标 SHA 上完成 Java/Python 消费和 M/项目负责人前端签收；覆盖未测的错误/取消 SSE 路径及完整消费语义，并由 Q 记录最终结论。PR #3 合并到 main 前仍须项目负责人签收。
 
 ## P1
 

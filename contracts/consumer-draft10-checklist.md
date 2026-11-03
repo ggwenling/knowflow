@@ -7,8 +7,9 @@
 - 验证代码基线：`local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；随后 `9c9b4a0` 增加备份证据，未改动代码。Schema 指纹如上。Web typecheck/lint/43 项单测通过，Docker production Web 镜像与全栈 Chromium E2E 1/1 通过；Java Maven/Testcontainers 83 项（1 skip），Python 324 项，Schema 85 项、OpenAPI 4 项通过。
 - 浏览器 E2E 覆盖注册、上传至 READY、正常 TXT/PDF draft.10 SSE 问答帧及共享 schema、来源查看、owner 隔离、删除和移动视口；错误/取消 SSE 路径及完整消费语义仍未覆盖。这属于本地执行证据，不等于 M/项目负责人已签收。
 - Java Testcontainers 新增 3 项实际 MVC wire 断言：Document 的空活动索引 ID 与 QUEUED Task 的空 failure code 确实不输出该键；processing 问答历史及过期来源的 nullable 字段显式输出 JSON `null`。OpenAPI 单测 4 项、Schema 85 structural cases 均通过。覆盖范围仅限这些已命名字段与端点。
+- 候选 `79678830b14047aabc41e3cd5f607f564728fb6a` 已推送；push-triggered GitHub Actions run #15 的 `python-contract`、Java、Web/Docker E2E 三个 job 全部成功。PR #3 的重复 pull_request run #16 在本记录时 Web job 仍运行中。Sol High 对该候选的代码/契约复核为 APPROVED，但 Java/Python 与 M 消费者签收、最终 Q/M 结论仍未完成。
 - 这些检查未替代 Q 对当前提交的独立代码/契约审阅，也未逐项证明下方所有授权、租约、超时和数据保留断言。因此所有 Q/M 复核框继续保持未勾选，直至审核者在最终目标 SHA 上记录结论、阻断项和日期。
-- 远端 CI 尚待推送本轮提交后核实。版本化 OpenAPI 候选的测试通过不等于 Q/M 已冻结契约。
+- push-triggered 远端 CI run #15 已在候选 `7967883` 上通过三项 job；PR #3 的 pull_request run #16 在本记录时 Web job 仍运行中。版本化 OpenAPI 候选的测试通过不等于 Q/M 已冻结契约。
 
 ## Java / API
 
