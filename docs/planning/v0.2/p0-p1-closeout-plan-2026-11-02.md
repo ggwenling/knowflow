@@ -4,7 +4,7 @@
 
 ## 2026-11-03 当前检查点
 
-- 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查 draft.10 SSE、注册、上传/READY、问答、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
+- 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查正常 TXT/PDF 问答的 draft.10 SSE 帧、注册、上传/READY、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。错误/取消 SSE 路径及完整消费语义仍待验收。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
 - 合成负载报告 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` 绑定 `9c9b4a0`：10/100 文档 × 并发 1/4/8 × 每组 8 个请求，48/48 成功；合成环境 Java API 与 AI 准入上限均为 8。100 文档下首个 SSE delta p95 为 360/485/532 ms，完整回答 p95 为 625/844/1094 ms（并发 1/4/8）。报告有容器资源采样并确认清理。仅证明该 Windows Docker 合成适配器负载，不代表真实 provider 延迟、成本或生产容量。
 - 故障恢复报告 `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json` 绑定 `bb25dc1`：PostgreSQL 读/索引写中断、MinIO 中断后 ready 与真实 PUT/GET/DELETE canary、第二批 Embedding 失败四项通过；临时数据库和服务端口清理，provider 调用 0。隔离备份恢复报告 `infra/evidence/backup-restore-20261103-final-bb25dc1.json` 同样绑定 `bb25dc1`，数据库/MinIO 恢复、字节一致、历史来源、owner 隔离、恢复后查询及两套 Compose 清理通过，迁移版本 8→8。均未测试生产升级回滚或真实用户环境。
 - 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
