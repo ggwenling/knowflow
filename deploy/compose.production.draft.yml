@@ -1,0 +1,200 @@
+# KnowFlow 生产形态 Compose —— 草案
+#
+# 状态：DRAFT / NOT VALIDATED。
+#   * 从未执行过 `docker compose config`，更没有起过容器。
+#   * 资源上限（mem_limit / cpus）是保守估值，不是压测结论。
+#   * 不要在未走完 PRODUCTION-CHECKLIST.md 的情况下把它当生产配置使用。
+#
+# 与 infra/compose.yml 的差异（那份是 E2E/开发用，不要改它）：
+#   1. ai 跑真实应用入口，而不是 browser_e2e_server.py
+#   2. 没有 E2E dummy key，没有 synthetic 模型模式
+#   3. 全部服务有 restart 策略、日志上限、停止宽限期
+#   4. 只有 web 暴露宿主端口，且默认绑 127.0.0.1
+#
+# 用法：
+#   cp deploy/env/production.env.example deploy/.env.production   # 填写后再用
+#   docker compose --env-file deploy/.env.production -f deploy/compose.production.draft.yml config
+#   docker compose --env-file deploy/.env.production -f deploy/compose.production.draft.yml up -d
+
+name: knowflow
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${KNOWFLOW_LOG_MAX_SIZE:-50m}"
+    max-file: "${KNOWFLOW_LOG_MAX_FILE:-5}"
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg16@sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_DB: knowflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KNOWFLOW_POSTGRES_SUPERUSER_PASSWORD:?set KNOWFLOW_POSTGRES_SUPERUSER_PASSWORD}
+      KNOWFLOW_DEV_MIGRATOR_PASSWORD: ${KNOWFLOW_MIGRATION_DATABASE_PASSWORD:?set KNOWFLOW_MIGRATION_DATABASE_PASSWORD}
+      KNOWFLOW_DEV_APP_PASSWORD: ${KNOWFLOW_DATABASE_PASSWORD:?set KNOWFLOW_DATABASE_PASSWORD}
+      KNOWFLOW_DEV_AI_PASSWORD: ${KNOWFLOW_AI_DATABASE_PASSWORD:?set KNOWFLOW_AI_DATABASE_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../services/api/src/main/resources/db/bootstrap-roles.sql:/docker-entrypoint-initdb.d/10-bootstrap-roles.sql:ro
+      - ../services/api/docker/dev/20-set-role-passwords.sh:/docker-entrypoint-initdb.d/20-set-role-passwords.sh:ro
+      - ../services/api/docker/dev/20-set-role-passwords.sql:/tmp/20-set-role-passwords.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    logging: *default-logging
+    mem_limit: 2g
+    networks: [knowflow]
+
+  minio:
+    image: bitnamilegacy/minio:2025.4.22@sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      MINIO_ROOT_USER: ${KNOWFLOW_STORAGE_ACCESS_KEY:?set KNOWFLOW_STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${KNOWFLOW_STORAGE_SECRET_KEY:?set KNOWFLOW_STORAGE_SECRET_KEY}
+    volumes:
+      - object-data:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    logging: *default-logging
+    mem_limit: 1g
+    networks: [knowflow]
+
+  migrate:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    image: knowflow-api:${KNOWFLOW_RELEASE:-local}
+    command: ["--migrate-only"]
+    restart: "no"
+    environment:
+      KNOWFLOW_MIGRATION_DATABASE_URL: ${KNOWFLOW_MIGRATION_DATABASE_URL:?set KNOWFLOW_MIGRATION_DATABASE_URL}
+      KNOWFLOW_MIGRATION_DATABASE_USERNAME: ${KNOWFLOW_MIGRATION_DATABASE_USERNAME:?set KNOWFLOW_MIGRATION_DATABASE_USERNAME}
+      KNOWFLOW_MIGRATION_DATABASE_PASSWORD: ${KNOWFLOW_MIGRATION_DATABASE_PASSWORD:?set KNOWFLOW_MIGRATION_DATABASE_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    networks: [knowflow]
+
+  ai:
+    build:
+      context: ..
+      dockerfile: services/ai/Dockerfile
+    image: knowflow-ai:${KNOWFLOW_RELEASE:-local}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: ["uvicorn", "knowflow_ai.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      KNOWFLOW_INTERNAL_SHARED_SECRET: ${KNOWFLOW_INTERNAL_SHARED_SECRET:?set KNOWFLOW_INTERNAL_SHARED_SECRET}
+      KNOWFLOW_CONTRACT_PATH: /workspace/contracts/schemas/protocol.schema.json
+      KNOWFLOW_JAVA_BASE_URL: http://api:8080
+      KNOWFLOW_AI_DATABASE_URL: ${KNOWFLOW_AI_DATABASE_URL:?set KNOWFLOW_AI_DATABASE_URL}
+      KNOWFLOW_RUNTIME_PROFILE_ID: ${KNOWFLOW_RUNTIME_PROFILE_ID:?set KNOWFLOW_RUNTIME_PROFILE_ID}
+      KNOWFLOW_QUESTION_MAX_CONCURRENT: ${KNOWFLOW_QUESTION_MAX_CONCURRENT:-4}
+      KNOWFLOW_EMBEDDING_BASE_URL: ${KNOWFLOW_EMBEDDING_BASE_URL:?set KNOWFLOW_EMBEDDING_BASE_URL}
+      KNOWFLOW_EMBEDDING_MODEL: ${KNOWFLOW_EMBEDDING_MODEL:?set KNOWFLOW_EMBEDDING_MODEL}
+      KNOWFLOW_EMBEDDING_DIMENSIONS: ${KNOWFLOW_EMBEDDING_DIMENSIONS:?set KNOWFLOW_EMBEDDING_DIMENSIONS}
+      KNOWFLOW_EMBEDDING_KEY_ENV: ${KNOWFLOW_EMBEDDING_KEY_ENV:?set KNOWFLOW_EMBEDDING_KEY_ENV}
+      KNOWFLOW_EMBEDDING_TIMEOUT_SECONDS: ${KNOWFLOW_EMBEDDING_TIMEOUT_SECONDS:-20}
+      KNOWFLOW_EMBEDDING_MAX_BATCH_ITEMS: ${KNOWFLOW_EMBEDDING_MAX_BATCH_ITEMS:-32}
+      KNOWFLOW_EMBEDDING_MAX_TEXT_CODEPOINTS: ${KNOWFLOW_EMBEDDING_MAX_TEXT_CODEPOINTS:-800}
+      KNOWFLOW_LLM_BASE_URL: ${KNOWFLOW_LLM_BASE_URL:-https://api.deepseek.com}
+      KNOWFLOW_LLM_MODEL: ${KNOWFLOW_LLM_MODEL:-deepseek-flash}
+      KNOWFLOW_LLM_KEY_ENV: ${KNOWFLOW_LLM_KEY_ENV:?set KNOWFLOW_LLM_KEY_ENV}
+      # 供应商密钥通过 KEY_ENV 间接注入，下面两个键名必须与 KEY_ENV 的值一致
+      KNOWFLOW_EMBEDDING_API_KEY: ${KNOWFLOW_EMBEDDING_API_KEY:?set KNOWFLOW_EMBEDDING_API_KEY}
+      KNOWFLOW_LLM_API_KEY: ${KNOWFLOW_LLM_API_KEY:?set KNOWFLOW_LLM_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *default-logging
+    mem_limit: 2g
+    networks: [knowflow]
+
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    image: knowflow-api:${KNOWFLOW_RELEASE:-local}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      SPRING_PROFILES_ACTIVE: database,storage
+      KNOWFLOW_DATABASE_URL: ${KNOWFLOW_DATABASE_URL:?set KNOWFLOW_DATABASE_URL}
+      KNOWFLOW_DATABASE_USERNAME: ${KNOWFLOW_DATABASE_USERNAME:?set KNOWFLOW_DATABASE_USERNAME}
+      KNOWFLOW_DATABASE_PASSWORD: ${KNOWFLOW_DATABASE_PASSWORD:?set KNOWFLOW_DATABASE_PASSWORD}
+      KNOWFLOW_STORAGE_ENDPOINT: ${KNOWFLOW_STORAGE_ENDPOINT:?set KNOWFLOW_STORAGE_ENDPOINT}
+      KNOWFLOW_STORAGE_BUCKET: ${KNOWFLOW_STORAGE_BUCKET:?set KNOWFLOW_STORAGE_BUCKET}
+      KNOWFLOW_STORAGE_ACCESS_KEY: ${KNOWFLOW_STORAGE_ACCESS_KEY:?set KNOWFLOW_STORAGE_ACCESS_KEY}
+      KNOWFLOW_STORAGE_SECRET_KEY: ${KNOWFLOW_STORAGE_SECRET_KEY:?set KNOWFLOW_STORAGE_SECRET_KEY}
+      KNOWFLOW_AI_BASE_URL: http://ai:8000
+      KNOWFLOW_INTERNAL_SHARED_SECRET: ${KNOWFLOW_INTERNAL_SHARED_SECRET:?set KNOWFLOW_INTERNAL_SHARED_SECRET}
+      KNOWFLOW_QUESTION_MAX_CONCURRENT: ${KNOWFLOW_QUESTION_MAX_CONCURRENT:-4}
+      KNOWFLOW_INDEXING_SCHEDULER_ENABLED: "true"
+      KNOWFLOW_INDEXING_POLL_DELAY_MILLIS: "250"
+      KNOWFLOW_INDEXING_RUNTIME_PROFILE_ID: ${KNOWFLOW_RUNTIME_PROFILE_ID:?set KNOWFLOW_RUNTIME_PROFILE_ID}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *default-logging
+    mem_limit: 2g
+    networks: [knowflow]
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    image: knowflow-web:${KNOWFLOW_RELEASE:-local}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      NODE_ENV: production
+      KNOWFLOW_API_BASE_URL: http://api:8080
+      KNOWFLOW_WEB_MODEL_MODE: ${KNOWFLOW_WEB_MODEL_MODE:?set KNOWFLOW_WEB_MODEL_MODE}
+    ports:
+      - "${KNOWFLOW_WEB_HOST_BIND:-127.0.0.1}:${KNOWFLOW_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/mode').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *default-logging
+    mem_limit: 1g
+    networks: [knowflow, web-edge]
+
+volumes:
+  postgres-data:
+  object-data:
+
+networks:
+  knowflow:
+    internal: true
+  web-edge:
