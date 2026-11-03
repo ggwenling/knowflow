@@ -14,6 +14,9 @@ from urllib.parse import urlparse
 
 
 MAX_MICROYUAN = 10_000_000  # CNY 10
+ZERO_PRICE_EMBEDDING_PROVIDER = "siliconflow"
+ZERO_PRICE_EMBEDDING_MODEL = "BAAI/bge-m3"
+ZERO_PRICE_EMBEDDING_SOURCE = "siliconflow.cn"
 
 
 def _instant(value):
@@ -48,11 +51,13 @@ class BudgetLedger:
         with closing(sqlite3.connect(self.path, timeout=30)) as db, db:
             db.execute("CREATE TABLE IF NOT EXISTS budget (id INTEGER PRIMARY KEY CHECK(id = 1), limit_microyuan INTEGER NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS reservations (request_id TEXT PRIMARY KEY, microyuan INTEGER NOT NULL CHECK(microyuan > 0), input_tokens_upper INTEGER NOT NULL, output_tokens_upper INTEGER NOT NULL, price_quote TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS zero_price_reservations (request_id TEXT PRIMARY KEY, input_tokens_upper INTEGER NOT NULL, output_tokens_upper INTEGER NOT NULL CHECK(output_tokens_upper = 0), price_quote TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO budget VALUES (1, ?)", (limit_microyuan,))
             if db.execute("SELECT limit_microyuan FROM budget WHERE id = 1").fetchone()[0] != limit_microyuan:
                 raise ValueError("BUDGET_LIMIT_MISMATCH")
 
-    def reserve(self, request_id, *, provider, model, input_tokens_upper, output_tokens_upper, quote, now=None):
+    def reserve(self, request_id, *, provider, model, input_tokens_upper, output_tokens_upper,
+                quote, now=None, allow_zero_price_embedding=False):
         """Reserve worst-case CNY using explicitly verified CNY per million tokens.
 
         ``input_tokens_upper`` and ``output_tokens_upper`` must be conservative
@@ -81,7 +86,17 @@ class BudgetLedger:
             raise ValueError("INVALID_PRICE_TIME")
         if not _instant(quote["verified_at"]) <= current.astimezone(timezone.utc) <= _instant(quote["valid_until"]):
             raise ValueError("PRICE_EXPIRED_OR_UNVERIFIED")
-        input_price = _price(quote["input_cny_per_million"])
+        if type(allow_zero_price_embedding) is not bool:
+            raise ValueError("UNVERIFIED_PRICE")
+        if allow_zero_price_embedding and (output_tokens_upper != 0
+                                           or provider != ZERO_PRICE_EMBEDDING_PROVIDER
+                                           or model != ZERO_PRICE_EMBEDDING_MODEL
+                                           or parsed.hostname not in (
+                                               ZERO_PRICE_EMBEDDING_SOURCE,
+                                               "www." + ZERO_PRICE_EMBEDDING_SOURCE,
+                                               "cloud-rd." + ZERO_PRICE_EMBEDDING_SOURCE)):
+            raise ValueError("UNVERIFIED_PRICE")
+        input_price = _price(quote["input_cny_per_million"], zero_allowed=allow_zero_price_embedding)
         output_price = _price(quote["output_cny_per_million"], zero_allowed=output_tokens_upper == 0)
         try:
             with localcontext() as context:
@@ -89,18 +104,27 @@ class BudgetLedger:
                 amount = int((input_price * input_tokens_upper + output_price * output_tokens_upper).to_integral_value(rounding=ROUND_CEILING))
         except (InvalidOperation, OverflowError):
             raise ValueError("INVALID_PRICE") from None
-        if amount <= 0 or amount > self.limit:
+        zero_price = amount == 0
+        if zero_price and not allow_zero_price_embedding:
+            raise ValueError("UNVERIFIED_PRICE")
+        if amount > self.limit:
             raise ValueError("BUDGET_EXCEEDED")
         with closing(sqlite3.connect(self.path, timeout=30, isolation_level=None)) as db, db:
             db.execute("BEGIN IMMEDIATE")
             spent = db.execute("SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0]
-            if db.execute("SELECT 1 FROM reservations WHERE request_id = ?", (request_id,)).fetchone():
+            if (db.execute("SELECT 1 FROM reservations WHERE request_id = ?", (request_id,)).fetchone()
+                    or db.execute("SELECT 1 FROM zero_price_reservations WHERE request_id = ?", (request_id,)).fetchone()):
                 raise ValueError("DUPLICATE_REQUEST_ID")
             if spent + amount > self.limit:
                 raise ValueError("BUDGET_EXCEEDED")
-            db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
-                       (request_id, amount, input_tokens_upper, output_tokens_upper,
-                        json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+            if zero_price:
+                db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
+                           (request_id, input_tokens_upper, output_tokens_upper,
+                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+            else:
+                db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
+                           (request_id, amount, input_tokens_upper, output_tokens_upper,
+                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
             db.commit()
         return {"reserved_microyuan": amount, "total_reserved_microyuan": spent + amount,
                 "remaining_microyuan": self.limit - spent - amount}

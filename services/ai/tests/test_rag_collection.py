@@ -26,6 +26,7 @@ budget = load("budget")
 mapping = load("mapping")
 capture = load("capture")
 guarded = load("guarded_adapters")
+prediction = load("prediction")
 NOW = datetime(2026, 11, 2, tzinfo=timezone.utc)
 QUOTE = {"provider": "synthetic", "model": "model-a", "input_cny_per_million": "1",
          "output_cny_per_million": "2", "source_url": "https://example.test/prices",
@@ -558,3 +559,211 @@ def test_trace_maps_unicode_range_and_rejects_wrong_bytes_and_versions():
         mapping.map_retrieval(question, [{**row, "index_version_id": "old-index"}], {key: entry})
     with pytest.raises(ValueError, match="DUPLICATE_SOURCE_ID"):
         mapping.map_retrieval(question, [row, row], {key: entry})
+
+
+def _prediction_fixture():
+    question_id = "550e8400-e29b-41d4-a716-446655440000"
+    key = ("runtime-document", "runtime-content", "runtime-index")
+    source = "evidence text".encode("utf-8")
+    entry = {"dataset_document_id": "dataset-doc", "dataset_content_version_id": "dataset-version",
+             "source_bytes": source, "source_sha256": sha256(source).hexdigest()}
+    rows = [{
+        "document_id": key[0], "content_version_id": key[1], "index_version_id": key[2],
+        "source_id": f"src-{index}", "locator": {
+            "kind": "text_range", "unit": "unicode_code_point", "start": 0, "end": 8},
+        "text_sha256": sha256(source[:8]).hexdigest(),
+    } for index in range(6)]
+    mappings = {key: entry}
+    scope = {"indexes": [{"document_id": key[0], "content_version_id": key[1],
+                          "index_version_id": key[2]}]}
+    return question_id, rows, mappings, scope
+
+
+@pytest.mark.asyncio
+async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "runner_v2_test", ROOT / "evaluation" / "runner" / "runner_v2.py")
+    runner_v2 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner_v2)
+
+    question_id, rows, mappings, scope = _prediction_fixture()
+    wiring = load("wiring")
+    factories = wiring.EvaluationFactories(
+        ledger=wiring.BudgetLedger(tmp_path / "prediction-ledger.sqlite3"), embedding={}, llm={})
+    store = factories.traces
+    await store.begin("req-answer")
+    await store.record("req-answer", rows, scope)
+    response = {
+        "request_id": "req-answer", "answer": "事实[src-0]成立，再由[src-4]佐证[src-0]。",
+        "has_answer": True,
+        "sources": [{
+            "source_id": source_id, "document_id": rows[index]["document_id"],
+            "content_version_id": rows[index]["content_version_id"],
+            "index_version_id": rows[index]["index_version_id"],
+            "locator": rows[index]["locator"],
+        } for index, source_id in ((0, "src-0"), (4, "src-4"))],
+    }
+
+    result = await factories.prediction_from_response(
+        request_id="req-answer", question_id=question_id,
+        mappings=mappings, response=response, latency_ms=123.5)
+
+    public_ids = [mapping.public_source_id(question_id, "src-0"),
+                  mapping.public_source_id(question_id, "src-4")]
+    assert result["outcome"] == "answered"
+    assert result["answer"].count("[" + public_ids[0] + "]") == 2
+    assert result["answer"].count("[" + public_ids[1] + "]") == 1
+    assert result["answer_sha256"] == sha256(result["answer"].encode()).hexdigest()
+    assert [cite["marker_index"] for cite in result["citations"]] == [0, 1, 2]
+    assert [cite["evidence_index"] for cite in result["citations"]] == [0, 4, 0]
+    assert [(cite["source_id"], cite["evidence_index"]) for cite in result["citations"]] == [
+        (public_ids[0], 0), (public_ids[1], 4), (public_ids[0], 0)]
+    assert runner_v2.SOURCE_ID.fullmatch(public_ids[0])
+    assert runner_v2.MARKER.findall(result["answer"]) == [public_ids[0], public_ids[1], public_ids[0]]
+    assert set(result) == {
+        "question_id", "outcome", "answer", "answer_sha256", "retrieved_evidence",
+        "citations", "latency_ms", "error_code",
+    }
+    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
+        await store.take("req-answer")
+
+
+@pytest.mark.asyncio
+async def test_prediction_rejects_citation_outside_generation_top5_and_request_mismatch():
+    question_id, rows, mappings, scope = _prediction_fixture()
+    store = capture.CaptureStore()
+    await store.begin("req-rank")
+    await store.record("req-rank", rows, scope)
+    response = {
+        "request_id": "req-rank", "answer": "事实[src-5]成立。",
+        "has_answer": True,
+        "sources": [{"source_id": "src-5", "document_id": rows[5]["document_id"],
+                     "content_version_id": rows[5]["content_version_id"],
+                     "index_version_id": rows[5]["index_version_id"],
+                     "locator": rows[5]["locator"]}],
+    }
+    with pytest.raises(ValueError, match="CITATION_OUTSIDE_TOP5"):
+        await prediction.bind_response(
+            trace_store=store, request_id="req-rank", question_id=question_id,
+            mappings=mappings, response=response, latency_ms=10)
+
+    await store.begin("req-wrong")
+    await store.record("req-wrong", rows, scope)
+    with pytest.raises(ValueError, match="ANSWER_TRACE_REQUEST_MISMATCH"):
+        await prediction.bind_response(
+            trace_store=store, request_id="req-wrong", question_id=question_id,
+            mappings=mappings, response={**response, "request_id": "other"},
+            latency_ms=10)
+    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
+        await store.take("req-wrong")
+
+
+@pytest.mark.asyncio
+async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tmp_path):
+    question_id, _rows, mappings, scope = _prediction_fixture()
+    wiring = load("wiring")
+    factories = wiring.EvaluationFactories(
+        ledger=wiring.BudgetLedger(tmp_path / "prediction-ledger.sqlite3"), embedding={}, llm={})
+    store = factories.traces
+    await store.begin("req-refused")
+    await store.record("req-refused", [], scope)
+    refused = await factories.prediction_from_response(
+        request_id="req-refused", question_id=question_id, mappings=mappings,
+        response={"request_id": "req-refused", "answer": "没有足够证据。",
+                  "has_answer": False, "sources": []},
+        latency_ms=8)
+    assert refused["outcome"] == "refused" and refused["error_code"] is None
+
+    await store.begin("req-error")
+    await store.record("req-error", [], scope)
+    error = await factories.prediction_from_error(
+        request_id="req-error", question_id=question_id,
+        mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
+    assert error["outcome"] == "error" and error["answer"] == ""
+    assert error["citations"] == [] and error["error_code"] == "MODEL_TIMEOUT"
+    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
+        await factories.prediction_from_error(
+            request_id="missing", question_id=question_id,
+            mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
+
+
+def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_exempt(tmp_path):
+    path = tmp_path / "zero-budget.sqlite3"
+    ledger = budget.BudgetLedger(path, limit_microyuan=1)
+    quote = {"provider": "siliconflow", "model": "BAAI/bge-m3",
+             "input_cny_per_million": "0", "output_cny_per_million": "0",
+             "source_url": "https://siliconflow.cn/pricing", "verified_by": "reviewer",
+             "verified_at": "2026-11-01T00:00:00Z", "valid_until": "2026-11-03T00:00:00Z"}
+    arguments = {"provider": "siliconflow", "model": "BAAI/bge-m3",
+                 "input_tokens_upper": 100, "output_tokens_upper": 0, "quote": quote, "now": NOW}
+
+    with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
+        ledger.reserve("free-embedding", **arguments)
+    with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
+        ledger.reserve("misused-zero-embedding", **{
+            **arguments, "provider": "deepseek", "model": "deepseek-flash",
+            "quote": {**quote, "provider": "deepseek", "model": "deepseek-flash",
+                      "input_cny_per_million": "0", "output_cny_per_million": "8",
+                      "source_url": "https://api-docs.deepseek.com/pricing"},
+            "output_tokens_upper": 1024,
+        }, allow_zero_price_embedding=True)
+    result = ledger.reserve("free-embedding", **arguments, allow_zero_price_embedding=True)
+    assert result == {"reserved_microyuan": 0, "total_reserved_microyuan": 0,
+                      "remaining_microyuan": 1}
+
+    reopened = budget.BudgetLedger(path, limit_microyuan=1)
+    with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
+        reopened.reserve("free-embedding", **arguments, allow_zero_price_embedding=True)
+    with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
+        reserve(reopened, "free-embedding", tokens=1)
+    with closing(sqlite3.connect(path)) as db:
+        assert db.execute("SELECT count(*) FROM zero_price_reservations").fetchone()[0] == 1
+        assert db.execute("SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0] == 0
+
+    reserve(reopened, "paid-embedding", tokens=1)
+    with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
+        reserve(reopened, "over-limit", tokens=1)
+
+
+@pytest.mark.asyncio
+async def test_zero_price_quote_is_enabled_only_for_embedding_guard(tmp_path):
+    ledger = budget.BudgetLedger(tmp_path / "guard-zero.sqlite3")
+    now = datetime.now(timezone.utc)
+    quote = {"provider": "siliconflow", "model": "BAAI/bge-m3",
+             "input_cny_per_million": "0", "output_cny_per_million": "0",
+             "source_url": "https://siliconflow.cn/pricing", "verified_by": "reviewer",
+             "verified_at": (now - timedelta(minutes=1)).isoformat(),
+             "valid_until": (now + timedelta(minutes=1)).isoformat()}
+    evidence = {key: quote[key] for key in ("provider", "model", "source_url", "verified_by",
+                                             "verified_at", "valid_until")}
+    evidence["policy_id"] = "synthetic-test-policy"
+    bounds = verified_bounds(lambda *_: (100, 0))
+    calls = []
+
+    class SyntheticEmbedding:
+        settings = SimpleNamespace(model="BAAI/bge-m3")
+        async def embed(self, texts, *, request_id):
+            calls.append(("embed", request_id))
+            return {"data": [{"embedding": [1.0]} for _ in texts]}
+        async def aclose(self): pass
+
+    embedding = guarded.GuardedEmbedding(
+        adapter_factory=SyntheticEmbedding, ledger=ledger, provider="siliconflow",
+        model="BAAI/bge-m3", quote=quote, token_bounds=bounds, bound_evidence=evidence)
+    await embedding.embed(["synthetic"], request_id="synthetic-embedding")
+    await embedding.aclose()
+    assert calls == [("embed", "synthetic-embedding")]
+
+    llm_quote = {**quote, "provider": "deepseek", "model": "deepseek-flash",
+                 "source_url": "https://deepseek.com/pricing"}
+    llm_evidence = {key: llm_quote[key] for key in ("provider", "model", "source_url", "verified_by",
+                                                    "verified_at", "valid_until")}
+    llm_evidence["policy_id"] = "synthetic-test-policy"
+    llm = guarded.GuardedLlm(
+        adapter_factory=lambda: pytest.fail("LLM adapter must not be constructed"),
+        ledger=ledger, provider="deepseek", model="deepseek-flash", quote=llm_quote,
+        token_bounds=verified_bounds(lambda *_: (100, 1024)), bound_evidence=llm_evidence)
+    with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
+        await llm.generate("synthetic", [], request_id="synthetic-llm")
+    with closing(sqlite3.connect(ledger.path)) as db:
+        assert db.execute("SELECT count(*) FROM zero_price_reservations").fetchone()[0] == 1

@@ -42,7 +42,9 @@ class _GuardedAdapter:
         attempt_id = "eval:" + uuid4().hex
         await asyncio.to_thread(
             self._ledger.reserve, attempt_id, provider=self._provider, model=self._model,
-            input_tokens_upper=bounds[0], output_tokens_upper=bounds[1], quote=self._quote)
+            input_tokens_upper=bounds[0], output_tokens_upper=bounds[1], quote=self._quote,
+            allow_zero_price_embedding=(operation == "embed" and isinstance(self._quote, dict)
+                                        and self._quote.get("input_cny_per_million") == "0"))
         if self._closed:
             raise ValueError("ADAPTER_CLOSED")
         if self._adapter is None:

@@ -21,6 +21,7 @@ _capture = _local("capture")
 CaptureStore, CapturingRetriever = _capture.CaptureStore, _capture.CapturingRetriever
 _guards = _local("guarded_adapters")
 GuardedEmbedding, GuardedLlm = _guards.GuardedEmbedding, _guards.GuardedLlm
+_prediction = _local("prediction")
 BudgetLedger = _local("budget").BudgetLedger
 from knowflow_ai.answering import AnswerService, ReadOnlyRetriever
 from knowflow_ai.worker import IndexWorker
@@ -55,7 +56,10 @@ class EvaluationFactories:
                 guard = cls(ledger=probe, **config)
                 guard._verify_bound_evidence()
                 probe.reserve("preflight:" + name, provider=config["provider"], model=config["model"],
-                              input_tokens_upper=1, output_tokens_upper=output_bound, quote=config["quote"])
+                              input_tokens_upper=1, output_tokens_upper=output_bound, quote=config["quote"],
+                              allow_zero_price_embedding=(
+                                  name == "embedding" and isinstance(config["quote"], dict)
+                                  and config["quote"].get("input_cny_per_million") == "0"))
 
     def embedding_factory(self):
         return GuardedEmbedding(ledger=self._ledger, **self._embedding)
@@ -71,6 +75,18 @@ class EvaluationFactories:
                                       embedding_settings=embedding_settings)
         return AnswerService(database_url, contract, retriever=CapturingRetriever(retriever, self.traces),
                              llm_factory=self.llm_factory, model_profile=model_profile)
+
+    async def prediction_from_response(self, *, request_id, question_id, mappings,
+                                       response, latency_ms):
+        return await _prediction.bind_response(
+            trace_store=self.traces, request_id=request_id, question_id=question_id,
+            mappings=mappings, response=response, latency_ms=latency_ms)
+
+    async def prediction_from_error(self, *, request_id, question_id, mappings,
+                                    error_code, latency_ms):
+        return await _prediction.bind_error(
+            trace_store=self.traces, request_id=request_id, question_id=question_id,
+            mappings=mappings, error_code=error_code, latency_ms=latency_ms)
 
 
 def create_evaluation_app(*_args, **_kwargs):
