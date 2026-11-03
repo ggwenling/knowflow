@@ -27,3 +27,10 @@
 - PostgreSQL 备份 SHA-256：`957fbcf6054e8d142dc053a0f3468c0c9fa53a494635f7b852e75614fa58192a`；MinIO 归档 SHA-256：`3e37e65fd76bb3569535c256cf9b0ec1b3ab5b5cec8434458328c64d90a58faa`。全程真实 provider 调用数为 0。
 - 两个随机 Compose 项目清理成功；最终容器、网络、卷均为 0。运行环境为 Windows 11、Docker Engine 29.8.2、Compose 5.6.0。
 - 未模拟升级失败或数据库回滚；该演练不代表生产环境部署、灾难恢复或两周真实用户试用已经验收。
+
+## 2026-11-03 当前提交复验
+
+- 结果：通过；报告为 [`infra/evidence/backup-restore-20261103-final-bb25dc1.json`](../../infra/evidence/backup-restore-20261103-final-bb25dc1.json)，绑定代码 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`，演练脚本 SHA-256 `f1668af8f4c2dcfa842a09bf4c1e75844f02b18239279e0d4e1c2e1e15b1949d`。
+- PostgreSQL 与 MinIO 备份/恢复后，原文摘要、schema owner、问答历史和来源访问、owner 隔离、恢复后索引查询均通过；Flyway 版本为 8→8，provider 调用 0。
+- 源与恢复 API/AI 镜像 ID、数据库及对象备份 SHA-256 记录在报告中。两套随机 Compose 项目的容器、网络和卷均清理为 0，`cleanup_verified=true`。
+- 未覆盖升级失败回滚、生产目标环境、数据库降级或两周用户试用；不得据此声称生产备份恢复验收完成。

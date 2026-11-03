@@ -1,0 +1,79 @@
+{
+  "run_date": "2026-11-03",
+  "result": "DEVELOPMENT_PASS_SYNTHETIC_RECOVERY",
+  "failure": null,
+  "branch": "local",
+  "base_commit": "b7e83c8cf475195ac54b7b58a96ba275e44b8625",
+  "database_name": "knowflow_recovery_94f8768f39e5",
+  "database_dropped_after_cleanup": true,
+  "contract_version": "0.2.0-draft.10",
+  "schema_sha256": "20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f",
+  "scenarios": {
+    "postgres_index_write_outage": {
+      "passed": true,
+      "service": "postgres",
+      "first_batch_persisted": true,
+      "write_failed_during_outage": true,
+      "old_active_preserved_during_outage": true,
+      "first_fencing": 1,
+      "recovered_fencing": 3,
+      "stale_batch_rejected": true,
+      "stale_completion_rejected": true,
+      "stale_candidate_cleaned": true,
+      "stale_candidate_chunk_rows": 0,
+      "stale_candidate_embedding_rows": 0,
+      "recovered_index_queryable": true,
+      "cleanup_queues_drained": true
+    },
+    "postgres_outage": {
+      "passed": true,
+      "service": "postgres",
+      "baseline_request_succeeded": true,
+      "request_failed_during_outage": true,
+      "request_recovered": true,
+      "source_bytes_preserved": null,
+      "previous_active_index_preserved": true,
+      "previous_active_index_queryable": true,
+      "cleanup_queues_drained": true
+    },
+    "minio_outage": {
+      "passed": true,
+      "service": "minio",
+      "baseline_request_succeeded": true,
+      "request_failed_during_outage": true,
+      "request_recovered": true,
+      "source_bytes_preserved": true,
+      "previous_active_index_preserved": true,
+      "previous_active_index_queryable": true,
+      "cleanup_queues_drained": true
+    }
+  },
+  "cleanup": {
+    "isolated_database_created": true,
+    "isolated_database_clean": true,
+    "services_ports_released": true,
+    "secret_in_process_logs": false
+  },
+  "model_calls": {
+    "embedding_adapter": "local deterministic synthetic adapter",
+    "llm_adapter": "local deterministic synthetic adapter",
+    "external_model_calls": 0
+  },
+  "code_sha256": {
+    "recovery_script": "b4e643b7ac2ca78a513b0eb60a805d88fd995d0f56fa05d23bbe7ffb55881302",
+    "worker": "64a4e7c6d4df3e4f3695f1488bdd49a51eb320cfff97d1a281e76a93c69a730a",
+    "question_service": "647673d8034c01fd29f8595109be48d5228ceb38817cc761e86949a09130c36b",
+    "question_recovery_service": "3f0b6fc47011a4ef587050be073ea9fcafde59e86a4a36cb8844e2859e9f42d3",
+    "source_read_service": "8e81db8ef6fd16f34574f3337808458aeecb40dbe0e7d72c3cc10f793d1118ca"
+  },
+  "limitations": [
+    "All model adapters were deterministic synthetic test implementations; no provider quality claim is made.",
+    "The 40/20 candidate allocation remains public and is not a blind holdout.",
+    "Independent Q review and M consumption confirmation remain pending."
+  ],
+  "isolation": {
+    "compose_project": "knowflow-outage-c8b645e79ff046",
+    "exclusive_project_and_volumes": true,
+    "compose_down_succeeded": true
+  }
+}

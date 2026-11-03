@@ -7,7 +7,9 @@ Sol High 基于 b7e83c8 独立规划。本文不代表真实采集、模型调�
 - 已有 `evaluation/collector/prediction.py` 将单次 request-id trace 与 AnswerService 响应/错误组装为 runner-v2 行；`EvaluationFactories` 暴露薄 wrapper，测试覆盖 answered/refused/error、top-5 引用约束和逐 marker 映射。`create_evaluation_app()` 仍 fail-closed，生产启动没有变化。
 - 已有预算账本只允许精确登记 SiliconFlow `BAAI/bge-m3` 的核验零价 embedding；零价 request ID 单独持久化，并在同一 SQLite 写事务内与付费 reservation 去重。价格真实性仍需人工依据官方来源确认，账本不在线抓价。
 - 还没有从 Java 授权/索引/问答链路生成完整预测文件的真实运行器；也没有真实回答、人工支持/引用审核或正式 v2 质量报告。provider 调用数为 0。
-- Sol High 预算审阅指出现有离线 token 估算不能证明人民币 10 元硬上限；没有供应商侧硬支出 cap 证明。真实评测入口继续关闭。只有在输入 token 上限可证明且覆盖在途请求的总预算护栏复审通过后，才可启用真实评测。
+- Sol High 预算审阅指出本地 token 字节/固定开销估算不能证明人民币 10 元硬上限；当前也没有供应商侧支出上限及超额拒绝证明。真实评测入口继续 fail-closed，provider 调用保持 0。要启用真实评测，须补交可核验的供应商硬支出 cap/超额拒绝证据，或由项目负责人明确批准软预算策略，再由 Sol 复核覆盖在途请求和所有重试的预算门禁。
+- 当前工作仍没有贯通 Java 授权写入、索引 READY、真实检索、真实回答、trace 对齐和正式预测产物的单一采集运行器。`EvaluationFactories` 与 collector wrapper 是局部实现，不作为“真实采集已完成”的证据。
+- 用户确认新增 20 题私有盲测尚未准备。不得从公开 60 题拆分、推导或填充该盲测；题目、答案及其独立资料须由人工管理员在仓库外保管并在候选冻结后再交给执行者。
 
 评测专用服务使用真实 provider、真实只读检索器及 Java 写入/授权链路。采集器注册、建库、上传、等待 READY、发起问答，并以唯一 request ID 关联 trace。建立数据集文档和运行时 document/content/index ID 的映射并核对来源哈希。检索器包装调用一次 top_k=10，保存完整顺序，只向生成器返回前 5；不得将最终引用当作完整检索结果。trace 缺失、ID 重复或映射不符时拒绝输出正式预测。
 

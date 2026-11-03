@@ -1,31 +1,46 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。当前审阅基线 `local@b7e83c8cf475195ac54b7b58a96ba275e44b8625`，此前已合并并推送至 main；draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。独立 Q/M 审阅及真实质量评测仍待完成。
+状态：IN_PROGRESS。当前代码验证目标为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；当前分支 HEAD `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7` 在该代码之后加入备份恢复证据。推送前记录的远端跟踪基线为 `origin/local@1d0fd5e78a6b3f31a16ae7cfbd98c4de68d80cb7`、`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625`；它不是推送后的远端状态。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本轮实现由 Luna 负责，Sol 保持独立审阅；最终 Q/M 签收及真实模型质量验收仍待完成。
+
+## 2026-11-03 当前检查点
+
+- 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查 draft.10 SSE、注册、上传/READY、问答、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
+- 合成负载报告 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` 绑定 `9c9b4a0`：10/100 文档 × 并发 1/4/8 × 每组 8 个请求，48/48 成功；合成环境 Java API 与 AI 准入上限均为 8。100 文档下首个 SSE delta p95 为 360/485/532 ms，完整回答 p95 为 625/844/1094 ms（并发 1/4/8）。报告有容器资源采样并确认清理。仅证明该 Windows Docker 合成适配器负载，不代表真实 provider 延迟、成本或生产容量。
+- 故障恢复报告 `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json` 绑定 `bb25dc1`：PostgreSQL 读/索引写中断、MinIO 中断后 ready 与真实 PUT/GET/DELETE canary、第二批 Embedding 失败四项通过；临时数据库和服务端口清理，provider 调用 0。隔离备份恢复报告 `infra/evidence/backup-restore-20261103-final-bb25dc1.json` 同样绑定 `bb25dc1`，数据库/MinIO 恢复、字节一致、历史来源、owner 隔离、恢复后查询及两套 Compose 清理通过，迁移版本 8→8。均未测试生产升级回滚或真实用户环境。
+- 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；目标定向测试 24 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或重新批准可接受的软预算策略。
+- 项目负责人此前确认尚未准备 20 题私有盲测；不生成、不查看或评分私有题。60 题开发/公开验证集人工审核者为 `human-reviewer`，不能代替新增私有盲测。
+- Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时当前 SHA 的完整证据与 M/项目负责人签收未齐，未指出新增契约代码缺陷。Sol 对恢复改动的代码复核已无阻断，且已独立核对本轮恢复通过报告；仍需对最终提交 SHA 给出正式 Q 结论。M 签收仍待项目负责人。
 
 ## P0
 
-- [ ] 将构建上下文保留的 Vitest setup 与实际 Docker 镜像构建、Playwright 全栈测试一起验证；CI 执行 Python、契约、Java Testcontainers 和 Web 全套检查。
-- [ ] 继续复核工作树归属并在 local 分项提交；后续完成验收后通过 PR 更新 main。
-- [ ] Q 审阅具体代码提交和 schema，完成 Java/Python 及前端 draft.10 消费确认；补齐冻结所需 OpenAPI，M/项目负责人签收，修复后复审。
+- [x] 本地实际构建 Docker Web/API/AI/migrate 镜像并通过 Playwright Chromium 全栈 E2E 1/1；Web、Java、Python、Schema、OpenAPI 检查结果见上方当前检查点。
+- [ ] 将本轮受控改动与通过证据提交并推送 `local`，随后核实远端 Web E2E、Java、Python/契约 CI 结果及远端 HEAD。
+- [ ] Q 绑定最终提交 SHA 与 schema 审阅三端消费、运行时授权/租约边界和版本化 OpenAPI；关闭阻断项并签收。M/项目负责人在该 SHA 完成前端与项目验收签收；main 合并须等该签收完成。
 
 ## P1
 
 - [x] 用户确认逐题审核现有 60 题，审核者 `human-reviewer`；保留公开 40/20 开发/验证划分，不声称双人人工一致性。
 - [ ] 用户私下保管新增 20 道盲测题（15 道可回答、5 道不可回答），使用新合成资料和事实组；冻结候选后独立运行。
-- [ ] 实现真实链路预测采集、前 10 名检索记录、回答和逐引用人工审核、错误与拒答区分及质量门失败退出；私有答案和盲测题不提交仓库。
+- [ ] 接通 Java 授权写入/索引/问答与真实 provider 的完整预测采集，保存前 10 名检索记录，完成人工答案支持和逐引用审核、错误/拒答区分及正式质量门；先通过经 Sol 复核的支出上限门禁。私有答案和盲测题不提交仓库。
 - [ ] 门槛：Recall@5 ≥ 0.85、MRR@10 ≥ 0.75、答案支持率 ≥ 0.90、引用准确率 ≥ 0.95、不可回答题拒答率 ≥ 0.90、可回答题误拒答率 ≤ 0.10、人工审核覆盖率 100%。记录分子、分母和分类结果。
-- [ ] 真实模型调用总预算人民币 10 元，覆盖索引、问答及重试；调用前核验价格并预留，无法可靠估算或额度不足时停止。
-- [ ] 当前提交重跑恢复演练，补 PostgreSQL/MinIO 中断和第二批 Embedding 失败；验证 Linux 解析资源边界及依赖许可。
-- [ ] 测量开发机 10/100 文档、并发 1/4/8 的合成负载；分别记录真实 provider 的延迟和成本。核对用户数据出站说明、日志脱敏及故障排查。
-- [ ] 在隔离环境验证干净部署、升级及数据库和对象备份恢复；生产目标环境未知时不宣称生产验收。
+- [ ] 真实模型调用总预算人民币 10 元，覆盖索引、问答、重试和在途请求；需有可核验的供应商侧硬支出上限及超额拒绝证据，或经负责人批准的软预算政策，并由 Sol 复核。仅本地 token 估算不构成硬上限；未解锁前保持零 provider 调用。
+- [x] 在 `bb25dc1` 隔离恢复 E2E 中验证 PostgreSQL 读/写中断、MinIO ready+写入 canary 和第二批 Embedding 失败；恢复报告见当前检查点。
+- [x] 在 `9c9b4a0` 完成 10/100 文档、并发 1/4/8 的合成负载测量。
+- [ ] 测量真实 provider 的延迟与成本；先解决预算门禁。
+- [ ] 验证 Linux 解析资源边界与依赖许可；完成数据出站说明、日志脱敏及生产故障排查核对。
+- [ ] 在隔离环境完成干净部署、升级失败回滚和数据库/对象备份恢复；当前恢复报告不是生产部署或数据库降级证明。生产目标环境确定后单独验收。
 
 ## P2
 
-- [ ] 由项目负责人组织至少两周真实试用，样本不足时保持未完成；不阻塞工程 PR，单独记录产品验收状态。
+- [ ] 由项目负责人组织至少两周真实用户试用，记录样本量、问题、修复和复测；当前尚无试用证据。可与工程 PR 分开验收。
 
 ## 当前验证与阻塞
 
-- Web typecheck、lint、36 项单测通过；离线模型回归 16 项通过。schema 85 项结构校验通过，不能替代运行时授权检查。
+- 历史故障定位：并发 8 曾在默认准入上限 4 时各 4/8 成功；Java QuestionService 会在 AI 请求前拒绝超额请求。诊断见 `evaluation/performance/evidence/diagnostic-concurrency8-repro-20261103.json`。随后合成 runner 同时将 API 与 AI 的测试上限设为 8，当前 9c9b4a0 报告 48/48 成功；生产默认值未改。
+- evaluation/performance/run.py 现按目标并发上限为 synthetic Compose 的 Java API 和 AI 同时设置 KNOWFLOW_QUESTION_MAX_CONCURRENT，并在报告写明两个服务及上限；生产默认值未改。只提高 AI 上限的中间报告 baseline-cap8-20261103.json 仍为 4/8，保留为失败证据。
+- 2026-11-03 最新 cap=8 报告为 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json`，绑定 `9c9b4a0` runner 和 Compose 输入，48/48 成功；旧 `baseline-cap8-current-20261103.json` 为较早的 `38252b3` 快照，不是当前报告。
+
+- 历史记录（2026-11-02）：Web typecheck、lint、36 项单测及离线模型回归 16 项通过；schema 85 项结构校验通过，不能替代运行时授权检查。当前计数见本节开头 2026-11-03 检查点。
 - 2026-11-02 Docker 构建及全栈浏览器 E2E 通过，测试使用合成 AI；隔离容器、网络和卷已清理。Java 全量 83 项（1 skip）通过。远端 CI 结果尚待核实。
 - 评测命令在显式质量门失败或不完整时返回非零；对应三种状态回归通过。该改动不代表真实数据集或质量验收已完成。
 - 60 题人工审核数据集 `qingzhu-seed-v2-reviewed` 原指纹 `4ce66d29dca63b366c01e6aab9573dbd61295207e12cd5a766fb25a907ee94c3`；补充来源后的指纹为 `023f14ba9e56df87cb2ea635638e01d3a543a4aeb2588856dc2c3aed7f8356b0`。40 道开发、20 道公开验证，50 道可回答、10 道不可回答；原 agent 的未来时间戳未核实，人工记录时间为用户确认时间。后续质量门须绑定新指纹。
