@@ -3,6 +3,7 @@
 - 报告日期：2026-11-03（Asia/Hong_Kong）
 - 报告基线：`local@c17b68d37bddcf5bcbbde1f127f4c9a4c7674365`（与 `origin/local` 同步）
 - 报告性质：**只读**。未删除、重命名、创建或推送任何分支；未开启分支保护；未改业务文件。唯一写入是本文件。
+- 执行记录：§1–§8 为批准前的只读盘点（数据均取自 `c17b68d`）；§9 为 2026-11-03 经项目经理批准后的实际执行结果，两部分请分开引用。
 - 前序盘点：`agent/audit-20261103` 上的 `docs/reviews/2026-11-03-branch-hygiene.md`（基线 `84681d4`）。本报告按其口径复核，并将全部计数更新至 `c17b68d`，作为 Issue #11 的正式交付。
 
 ## 1. 验收标准对照
@@ -86,7 +87,7 @@
 
 相对 Issue 创建时的证据更新：`java` 落后数由 ~79 → **103**，`python` 由 ~73 → **89**，`next` 由 behind ~114 → **behind 167 / ahead 6**（`local` 在此期间新增提交）。
 
-## 6. 处置建议（均待项目经理批准，本轮一律未执行）
+## 6. 处置建议（批准前建议；实际执行结果见 §9）
 
 | 对象 | 建议动作 | 风险 | 需批准方 |
 |---|---|---|---|
@@ -120,4 +121,37 @@ curl -s https://api.github.com/repos/ggwenling/knowflow/branches
 - 本报告只覆盖分支引用与 compare 状态，不包含代码质量、CI 结果与合并可行性评估。
 - 工作树未跟踪产物（`.review-*/` 约 10 MB、`docs/reviews/` 下并行会话草稿）与 `grok bot/` 误入历史文件不属于分支卫生范围，见验收报告 §4/§5，需另行授权处置。
 - 远端是否有未 fetch 的新提交：数据反映执行时刻（2026-11-03 18:2x）。
-- 分支删除、tag 创建、分支保护开启均需批准后另行执行，本报告不构成执行记录。
+- 分支删除、tag 创建、分支保护开启均已按批准执行，执行结果见 §9。
+
+## 9. 执行记录（2026-11-03 18:54–19:05，经项目经理批准）
+
+执行前的安全校验（全部通过后才动分支）：每个待删引用的 `git rev-list --count local..<ref>` 均为 0，且 `git merge-base --is-ancestor <ref> local` 均成立。
+
+| # | 动作 | 对象 | 原 tip | 结果 |
+|---|---|---|---|---|
+| 1 | 删除远端分支 | `origin/java`、`origin/python` | `26e1aca`、`b463940` | 已删除 |
+| 2 | 删除本地分支 | `java`、`python`、`codex/integration-20261031` | `a70ce15`、`c6bfb1a`、`493112d` | 已删除 |
+| 3 | 归档标签 | `archive/next-20261031`（附注标签，指向 `61f5edc`） | — | 已创建并推送（tag 对象 `95dc407`），确认远端存在后才删分支 |
+| 4 | 删除远端分支 | `origin/next` | `61f5edc` | 已删除（内容由标签保留） |
+| 5 | 吸收独有提交 | `agent/audit-20261103@1c6b37d` → `local@64fa79a`；`agent/deploy-prep@21a6069` → `local@92f65f6` | — | cherry-pick 完成并推送，随后删除两个本地分支 |
+| 6 | 开启分支保护 | `main` | — | 200 OK，`protected: true` |
+
+### 9.1 `main` 保护规则实测值
+
+| 规则 | 值 |
+|---|---|
+| 要求 PR 后方可合并 | 是（必需批准数 0，允许自行合并） |
+| force push | 禁止 |
+| 删除分支 | 禁止 |
+| 强制规则对管理员生效（`enforce_admins`） | 否 —— 保留负责人应急旁路 |
+| 必需状态检查 | 未设置（避免网络/CI 抖动阻断合并） |
+
+### 9.2 执行后状态
+
+- 分支：本地与远端均只剩 `local`、`main` 两条。
+- Tag：1 个 —— `archive/next-20261031`。
+- 保护状态：`main` = protected，`local` = 未保护（当前集成分支，暂不需要）。
+- PR #3：不受影响，仍 open（base `main`、head `local`）。
+- 被吸收的文档：`docs/reviews/2026-11-03-branch-hygiene.md`（旧基线 `84681d4` 的盘点，保留作历史）、`docs/reviews/2026-11-03-dependency-inventory.json`、`docs/reviews/2026-11-03-license-log-redaction-audit.md`、`scripts/audit-dependencies.py`、`deploy/` 部署草案。
+- 恢复路径：删除的远端分支可由仓库管理员在 GitHub「Branches → Deleted branches」中恢复；`next` 也可由 `archive/next-20261031` 标签重建。
+
