@@ -34,6 +34,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await expect(page.getByLabel("新知识库名称")).toBeVisible();
   await expect(page.getByText("我的知识库")).toBeVisible();
   await expect(page.getByText("最近问答")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBeTruthy();
   const baseResponse = page.waitForResponse((response) => response.url().endsWith("/api/v1/knowledge-bases") && response.request().method() === "POST");
   const firstBaseName = `浏览器验收 ${randomUUID().slice(0, 8)}`;
   await page.getByLabel("新知识库名称").fill(firstBaseName);
@@ -63,18 +64,37 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("什么时候允许使用这份资料进行问答？");
   await page.getByRole("button", { name: "提问" }).click();
   const streamBody = await (await streamResponse).text();
-  expect(streamBody).toMatch(/event:[ \t]*delta/);
-  expect(streamBody).toMatch(/event:[ \t]*completed/);
-  const sourceFrame = streamBody.split(/\r?\n\r?\n/).find((frame) => /^event:[ \t]*sources$/m.test(frame));
-  expect(sourceFrame).toBeTruthy();
-  const source = JSON.parse(sourceFrame!.split(/\r?\n/).find((line) => line.startsWith("data:"))!.slice(5))
-    .sources[0] as { source_id: string; document_id: string; content_version_id: string };
+  const streamEvents = streamBody.split(/\r?\n\r?\n/).filter((frame) => frame.includes("data:")).map((frame) => {
+    const lines = frame.split(/\r?\n/);
+    return {
+      name: lines.find((line) => line.startsWith("event:"))?.slice(6).trim(),
+      data: JSON.parse(lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n")),
+    };
+  });
+  expect(streamEvents[0].name).toBe("started");
+  expect(streamEvents.some(({ name }) => name === "delta")).toBeTruthy();
+  expect(streamEvents.at(-1)?.name).toBe("completed");
+  const requestId = streamEvents[0].data.request_id;
+  streamEvents.forEach(({ name, data }, index) => {
+    expect(data).toMatchObject({ contract_version: "0.2.0-draft.10", request_id: requestId, sequence: index + 1, event: name });
+  });
+  const sourceEvent = streamEvents.find(({ name }) => name === "sources");
+  expect(sourceEvent).toBeTruthy();
+  const source = sourceEvent!.data.sources[0] as { source_id: string; document_id: string; content_version_id: string };
   await expect(page.getByText("本地合成验证", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: /什么时候允许使用这份资料进行问答/ })).toBeVisible();
-  await page.getByRole("button").filter({ hasText: "索引状态只有 READY" }).first().click();
-  await expect(page.getByRole("dialog", { name: "原文依据" }).locator("pre")).toContainText("索引状态只有 READY");
-  await expect(page.getByRole("dialog", { name: "原文依据" }).locator("pre")).toContainText(markdown.trim());
-  await page.getByRole("button", { name: "关闭原文" }).click();
+  const citationButton = page.getByRole("button").filter({ hasText: "索引状态只有 READY" }).first();
+  await citationButton.click();
+  const textDialog = page.getByRole("dialog", { name: "原文依据" });
+  await expect(textDialog.locator("pre")).toContainText("索引状态只有 READY");
+  await expect(textDialog.locator("pre")).toContainText(markdown.trim());
+  const closeSource = page.getByRole("button", { name: "关闭原文" });
+  await expect(closeSource).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(closeSource).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(textDialog).toHaveCount(0);
+  await expect(citationButton).toBeFocused();
 
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
