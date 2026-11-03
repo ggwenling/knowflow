@@ -11,6 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 import sqlite3
+import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -40,15 +42,62 @@ def reserve(ledger, request_id, *, tokens=1_000_000, quote=None, model="model-a"
                           output_tokens_upper=0, quote=quote if quote is not None else QUOTE, now=NOW)
 
 
+def test_three_yuan_budget_summary_persists_and_closes_connections(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    ledger = budget.BudgetLedger(path, limit_microyuan=3_000_000)
+    reserve(ledger, "attempt-1", tokens=1_000_000)
+    reserve(ledger, "attempt-2", tokens=500_000)
+    reopened = budget.BudgetLedger(path, limit_microyuan=3_000_000)
+    assert reopened.summary() == {
+        "limit_microyuan": 3_000_000, "reserved_microyuan": 1_500_000,
+        "remaining_microyuan": 1_500_000, "paid_reservations": 2,
+        "zero_price_reservations": 0,
+    }
+    with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
+        reserve(reopened, "attempt-3", tokens=1_500_001)
+    with closing(sqlite3.connect(path, timeout=0)) as db:
+        db.execute("BEGIN EXCLUSIVE")
+
+
 def current_quote():
     now = datetime.now(timezone.utc)
     return {**QUOTE, "verified_at": (now - timedelta(hours=1)).isoformat(),
             "valid_until": (now + timedelta(hours=1)).isoformat()}
 
 
+def test_estimate_cli_stops_at_soft_limit_without_touching_a_ledger(tmp_path):
+    path = tmp_path / "requests.json"
+    path.write_text(json.dumps([
+        {"request_id": f"request-{i}", "provider": "synthetic", "model": "model-a",
+         "input_tokens_upper": 4_000_000, "output_tokens_upper": 0,
+         "quote": current_quote()}
+        for i in range(3)
+    ]), encoding="utf-8")
+    result = subprocess.run([sys.executable, str(ROOT / "evaluation/collector/estimate.py"), str(path)],
+                            capture_output=True, text=True, encoding="utf-8", check=False)
+    assert result.returncode == 1
+    output = json.loads(result.stdout)
+    assert output["reason"] == "BUDGET_SOFT_STOP"
+    assert output["stopped_at"] == 2
+    assert output["summary"]["reserved_microyuan"] == 8_000_000
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def verified_bounds(function):
     function.policy_id = "synthetic-test-policy"
     return function
+
+
+@pytest.mark.asyncio
+async def test_response_request_id_mismatch_does_not_consume_trace():
+    store = capture.CaptureStore()
+    await store.begin("expected")
+    await store.record("expected", [], {"indexes": []})
+    with pytest.raises(ValueError, match="ANSWER_TRACE_REQUEST_MISMATCH"):
+        await prediction.bind_response(trace_store=store, request_id="expected", question_id="q",
+                                       runtime_question_id="unused", mappings={},
+                                       response={"request_id": "different"}, latency_ms=0)
+    assert await store.take("expected") == []
 
 
 def current_bound_evidence():
@@ -188,18 +237,18 @@ def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatc
                         staticmethod(lambda: SimpleNamespace(model='model-a')))
     common = {'provider': 'synthetic', 'model': 'model-a', 'quote': current_quote(),
               'bound_evidence': current_bound_evidence()}
-    factories = wiring.EvaluationFactories(ledger=wiring.BudgetLedger(ledger_path),
+    secret = 'test-only-' + 'a' * 40
+    app = wiring.create_evaluation_app(
+        Settings(secret, ai_database_url='postgresql://unused.invalid/db'),
+        control_secret='control-' + 'c' * 40,
+        ledger=wiring.BudgetLedger(ledger_path),
         embedding={**common, 'adapter_factory': Embedding, 'token_bounds': verified_bounds(lambda *_: (100, 0))},
         llm={**common, 'adapter_factory': Llm, 'token_bounds': verified_bounds(lambda *_: (100, 1024))})
-    factories.preflight()
-    secret = 'test-only-' + 'a' * 40
-    app = ai_app.create_app(Settings(secret, ai_database_url='postgresql://unused.invalid/db'),
-                            worker_factory=factories.index_worker, answer_service_factory=factories.answer_service)
     payload = {'contract_version': CONTRACT_VERSION, 'request_id': 'sync', 'question': 'question?',
                'scope': {'owner_id': 'owner-1', 'knowledge_base_id': 'kb-1', 'snapshot_id': 'snap-1',
                          'indexes': [{'document_id': 'd', 'content_version_id': 'c', 'index_version_id': 'i'}]}}
     headers = {'Authorization': f'Bearer {secret}', 'X-Request-ID': 'sync'}
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         async def index_probe():
             adapter = app.state.index_worker._embedding_factory()
             try: await adapter.embed(['index'], request_id='index')
@@ -207,6 +256,14 @@ def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatc
         asyncio.run(index_probe())
         response = client.post('/internal/v1/answers', headers=headers, json=payload)
         assert response.status_code == 200 and response.json()['has_answer'] is False
+        capture_url = '/internal/evaluation/results/sync'
+        assert client.post(capture_url, headers=headers).status_code == 403
+        control_headers = {**headers, 'X-Evaluation-Secret': 'control-' + 'c' * 40}
+        captured = client.post(capture_url, headers=control_headers)
+        assert captured.status_code == 200
+        assert len(captured.json()['trace']) == 10
+        assert captured.json()['response']['request_id'] == 'sync'
+        assert client.post(capture_url, headers=control_headers).status_code == 404
         payload['request_id'] = 'stream'
         response = client.post('/internal/v1/answers/stream', headers={**headers, 'X-Request-ID': 'stream'}, json=payload)
         assert response.status_code == 200 and 'event: completed' in response.text
@@ -369,9 +426,10 @@ def test_budget_is_durable_and_duplicate_retries_cannot_reuse_reservation(tmp_pa
     reopened = budget.BudgetLedger(path)
     with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
         reserve(reopened, "request-1", tokens=1)
-    with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
+    with pytest.raises(ValueError, match="BUDGET_SOFT_STOP"):
         reserve(reopened, "retry-2", tokens=1_000_001)
-    assert reserve(reopened, "retry-3")["remaining_microyuan"] == 0
+    with pytest.raises(ValueError, match="BUDGET_SOFT_STOP"):
+        reserve(reopened, "retry-3")
     with pytest.raises(ValueError, match="BUDGET_LIMIT_MISMATCH"):
         budget.BudgetLedger(path, limit_microyuan=9_000_000)
     # Windows refuses removal while SQLite connections remain open.
@@ -394,7 +452,7 @@ def test_budget_reservations_are_serialized_across_independent_connections(tmp_p
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         results = list(pool.map(run, range(3)))
-    assert sorted(results) == ["BUDGET_EXCEEDED", "reserved", "reserved"]
+    assert sorted(results) == ["BUDGET_SOFT_STOP", "reserved", "reserved"]
 
 
 def test_budget_rejects_unknown_expired_or_wrong_model_prices(tmp_path):
@@ -716,8 +774,7 @@ async def test_prediction_rejects_citation_outside_generation_top5_and_request_m
             runtime_question_id=question_id, mappings=mappings,
             response={**response, "request_id": "other"},
             latency_ms=10)
-    with pytest.raises(ValueError, match="TRACE_NOT_AVAILABLE"):
-        await store.take("req-wrong")
+    assert len(await store.take("req-wrong")) == len(rows)
 
 
 @pytest.mark.asyncio
@@ -790,6 +847,10 @@ def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_
         assert db.execute("SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0] == 0
 
     reserve(reopened, "paid-embedding", tokens=1)
+    assert reopened.summary() == {
+        "limit_microyuan": 1, "reserved_microyuan": 1, "remaining_microyuan": 0,
+        "paid_reservations": 1, "zero_price_reservations": 1,
+    }
     with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
         reserve(reopened, "over-limit", tokens=1)
 

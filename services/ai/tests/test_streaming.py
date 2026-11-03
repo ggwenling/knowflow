@@ -176,13 +176,15 @@ async def test_stream_cancellation_closes_provider_and_yields_one_terminal():
 @pytest.mark.asyncio
 async def test_stream_deadline_closes_provider_and_returns_timeout(monkeypatch):
     import knowflow_ai.answering as answering
-    monkeypatch.setattr(answering, 'ANSWER_DEADLINE_SECONDS', .02)
+    # Include durable budget reservation before the deliberately blocked stream.
+    monkeypatch.setattr(answering, 'ANSWER_DEADLINE_SECONDS', .5)
     stream = ProviderStream([], block=True)
     service, client, _calls = _service(stream)
     async with client:
         events = [event async for event in service.stream(_request())]
     assert events[-1]['event'] == 'error'
     assert events[-1]['code'] == 'PROCESSING_TIMEOUT'
+    assert stream.waiting.is_set()
     assert stream.closed
 
 

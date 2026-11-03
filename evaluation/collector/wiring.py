@@ -1,10 +1,4 @@
-"""Evaluation factory wiring prototype; production startup stays disabled.
-
-The product create_app() supports per-application worker and answer factories.
-This module does not start a service or make provider calls. Real evaluation
-startup remains disabled until a trustworthy token-bound policy and process-wide
-budget enforcement have been independently verified.
-"""
+"""Explicitly configured evaluation service with shared guarded factories."""
 import importlib.util
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -24,16 +18,12 @@ GuardedEmbedding, GuardedLlm = _guards.GuardedEmbedding, _guards.GuardedLlm
 _prediction = _local("prediction")
 BudgetLedger = _local("budget").BudgetLedger
 from knowflow_ai.answering import AnswerService, ReadOnlyRetriever
+from knowflow_ai.config import Settings
 from knowflow_ai.worker import IndexWorker
 
 
 class EvaluationFactories:
-    """Construct the worker and answer factories for synthetic verification.
-
-    Both guarded factories use the very same ledger. Supplying arbitrary
-    factories or estimates is not evidence of a trustworthy token upper bound;
-    real service startup remains disabled until the whole path is audited.
-    """
+    """Construct worker and answer factories using one ledger and trace store."""
     def __init__(self, *, ledger, embedding, llm):
         if not isinstance(ledger, BudgetLedger) or not isinstance(embedding, dict) or not isinstance(llm, dict):
             raise ValueError("EVALUATION_CONFIGURATION_REQUIRED")
@@ -41,13 +31,11 @@ class EvaluationFactories:
         self._embedding = dict(embedding)
         self._llm = dict(llm)
         self.traces = CaptureStore()
+        self.results = {}
+        self.record_results = False
 
     def preflight(self):
-        """Check both configurations without constructing a provider or spending.
-
-        Policy evidence does not prove that a token-bound implementation is
-        correct; the actual startup path remains unconditionally disabled.
-        """
+        """Validate prices and bound declarations without creating a provider."""
         with TemporaryDirectory(prefix="knowflow-eval-preflight-") as temp:
             probe = BudgetLedger(Path(temp) / "probe.sqlite3")
             for name, cls, config, output_bound in (
@@ -73,8 +61,11 @@ class EvaluationFactories:
     def answer_service(self, database_url, contract, *, embedding_settings, model_profile=None):
         retriever = ReadOnlyRetriever(database_url, embedding_factory=self.embedding_factory,
                                       embedding_settings=embedding_settings)
-        return AnswerService(database_url, contract, retriever=CapturingRetriever(retriever, self.traces),
-                             llm_factory=self.llm_factory, model_profile=model_profile)
+        service = AnswerService(database_url, contract, retriever=CapturingRetriever(retriever, self.traces),
+                                llm_factory=self.llm_factory, model_profile=model_profile)
+        if self.record_results:
+            return _local("results").RecordingAnswerService(service, self)
+        return service
 
     async def prediction_from_response(self, *, request_id, question_id,
                                        runtime_question_id, mappings, response, latency_ms):
@@ -91,9 +82,50 @@ class EvaluationFactories:
             error_code=error_code, latency_ms=latency_ms)
 
 
-def create_evaluation_app(*_args, **_kwargs):
-    """Fail closed until trusted token bounds and full budget enforcement are verified."""
-    raise RuntimeError("EVALUATION_SERVICE_NOT_READY")
+def create_evaluation_app(settings=None, *, ledger=None, embedding=None, llm=None,
+                          control_secret=None, **unknown):
+    """Create an evaluation app only when every guarded dependency is supplied."""
+    missing = []
+    if not isinstance(settings, Settings):
+        missing.append("settings")
+    elif not settings.ai_database_url:
+        missing.append("ai_database_url")
+    if not isinstance(ledger, BudgetLedger):
+        missing.append("ledger")
+    if not isinstance(embedding, dict):
+        missing.append("embedding")
+    if not isinstance(llm, dict):
+        missing.append("llm")
+    if not isinstance(control_secret, str) or len(control_secret) < 32:
+        missing.append("control_secret")
+    if unknown:
+        missing.append("unsupported configuration")
+    if missing:
+        raise RuntimeError("EVALUATION_SERVICE_NOT_READY: " + ", ".join(missing))
+    factories = EvaluationFactories(ledger=ledger, embedding=embedding, llm=llm)
+    factories.record_results = True
+    try:
+        factories.preflight()
+    except (KeyError, TypeError, ValueError) as error:
+        raise RuntimeError("EVALUATION_SERVICE_NOT_READY: invalid guard configuration") from error
+    from knowflow_ai.app import create_app
+    app = create_app(settings, worker_factory=factories.index_worker,
+                     answer_service_factory=factories.answer_service)
+    app.state.evaluation_factories = factories
+    import hmac
+    from fastapi import HTTPException, Request
+
+    @app.post("/internal/evaluation/results/{request_id}")
+    async def take_result(request: Request, request_id: str):
+        if (request.client is None or request.client.host not in ("127.0.0.1", "::1")
+                or not hmac.compare_digest(request.headers.get("X-Evaluation-Secret", "").encode("utf-8"),
+                                           control_secret.encode("utf-8"))):
+            raise HTTPException(status_code=403, detail="EVALUATION_ACCESS_DENIED")
+        result = factories.results.pop(request_id, None)
+        if result is None:
+            raise HTTPException(status_code=404, detail="EVALUATION_RESULT_NOT_AVAILABLE")
+        return result
+    return app
 
 
 if __name__ == "__main__":

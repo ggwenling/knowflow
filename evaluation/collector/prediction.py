@@ -141,9 +141,9 @@ def error_prediction(*, question_id, runtime_question_id, trace, mappings,
 async def bind_response(*, trace_store, request_id, question_id, runtime_question_id,
                         mappings, response, latency_ms):
     """Consume the request's single-use trace and build its response row."""
-    trace = await trace_store.take(request_id)
     if not isinstance(response, dict) or response.get("request_id") != request_id:
         raise ValueError("ANSWER_TRACE_REQUEST_MISMATCH")
+    trace = await trace_store.take(request_id)
     return answer_prediction(question_id=question_id, runtime_question_id=runtime_question_id,
                              trace=trace, mappings=mappings, response=response,
                              latency_ms=latency_ms)

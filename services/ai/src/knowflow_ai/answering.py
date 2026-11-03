@@ -164,6 +164,8 @@ class DeepSeekAdapter:
     async def generate(self, question: str, evidence: list[dict], *, request_id: str) -> dict:
         self.last_usage = None
         payload = self._payload(question, evidence)
+        from .provider_budget import reserve_provider_call
+        await reserve_provider_call("deepseek", self.settings.model, payload)
         try:
             async with self._client.stream(
                     "POST", self.settings.base_url.rstrip("/") + "/chat/completions",

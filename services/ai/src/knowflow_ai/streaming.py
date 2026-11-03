@@ -195,6 +195,8 @@ async def provider_content(adapter, question, evidence, *, request_id):
     payload = adapter._payload(question, evidence)
     payload["stream"] = True
     payload["messages"][0]["content"] += "先输出 has_answer，再输出 answer，最后输出 source_ids。"
+    from .provider_budget import reserve_provider_call
+    await reserve_provider_call("deepseek", adapter.settings.model, payload)
     finished = done = False
     total_bytes = 0
     pending = bytearray()

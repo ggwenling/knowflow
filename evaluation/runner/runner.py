@@ -47,7 +47,8 @@ def _load_dataset(dataset_root):
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
     validator.validate(root)
-    if manifest.get("synthetic") is not True or not isinstance(questions, list):
+    private = manifest.get("private_pack_version") == 1 and manifest.get("privacy") == "local_only"
+    if (not private and manifest.get("synthetic") is not True) or not isinstance(questions, list):
         raise ValueError("UNSUPPORTED_DATASET")
     documents = {}
     sources = {}

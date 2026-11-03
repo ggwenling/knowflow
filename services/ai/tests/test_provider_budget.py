@@ -1,0 +1,96 @@
+import json
+from datetime import datetime, timedelta, timezone
+
+import httpx
+import pytest
+
+from knowflow_ai.adapters import ProcessingError
+from knowflow_ai.answering import DeepSeekAdapter, LlmSettings
+from knowflow_ai.embedding import SiliconFlowEmbeddingAdapter, EmbeddingSettings
+from knowflow_ai.budget import BudgetLedger
+from pathlib import Path
+import os
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["embed", "generate", "stream"])
+async def test_direct_provider_calls_require_budget_before_http(monkeypatch, operation):
+    for key in ("KNOWFLOW_BUDGET_LEDGER_PATH", "KNOWFLOW_BUDGET_PRICE_FILE", "KNOWFLOW_BUDGET_POLICY_FILE"):
+        monkeypatch.delenv(key, raising=False)
+    calls = []
+    async def transport(request):
+        calls.append(request)
+        return httpx.Response(500)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        embedding = SiliconFlowEmbeddingAdapter(EmbeddingSettings(api_key="fake-key-" * 8), client)
+        llm = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+        with pytest.raises(ProcessingError, match="AI_PROCESSING_FAILED") as error:
+            if operation == "embed":
+                await embedding.embed(["synthetic"], request_id="probe")
+            elif operation == "generate":
+                await llm.generate("synthetic", [], request_id="probe")
+            else:
+                async for _ in llm.stream_content("synthetic", [], request_id="probe"):
+                    pass
+        assert error.value.retryable is False
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_raw_adapter_failed_attempts_are_reserved_individually(monkeypatch, tmp_path):
+    now = datetime.now(timezone.utc)
+    model = "deepseek-flash"
+    quote = {"provider": "deepseek", "model": model, "input_cny_per_million": "1",
+             "output_cny_per_million": "2", "source_url": "https://example.test/prices",
+             "verified_by": "synthetic-test", "verified_at": (now - timedelta(hours=1)).isoformat(),
+             "valid_until": (now + timedelta(hours=1)).isoformat()}
+    policy = {"provider": "deepseek", "bound_kind": "provider_context_limit",
+              "verified_by": "synthetic-test", "source_url": "https://example.test/policy",
+              "verified_at": quote["verified_at"], "valid_until": quote["valid_until"],
+              "input_tokens_upper": 10000, "output_tokens_upper": 1024, "max_payload_bytes": 10000}
+    for name, value in (("PRICE_FILE", {model: quote}), ("POLICY_FILE", {model: policy})):
+        path = tmp_path / (name + ".json")
+        path.write_text(json.dumps(value), encoding="utf-8")
+        monkeypatch.setenv("KNOWFLOW_BUDGET_" + name, str(path))
+    ledger_path = tmp_path / "budget.sqlite3"
+    monkeypatch.setenv("KNOWFLOW_BUDGET_LEDGER_PATH", str(ledger_path))
+    calls = []
+    async def transport(request):
+        calls.append(request)
+        return httpx.Response(503)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        adapter = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+        for _ in range(2):
+            with pytest.raises(ProcessingError):
+                await adapter.generate("synthetic", [], request_id="same-product-request")
+    assert len(calls) == 2
+    assert BudgetLedger(ledger_path).summary()["paid_reservations"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("spent,input_upper,reason", [
+    (8_000_000, 10_000, "BUDGET_SOFT_STOP"),
+    (7_000_000, 4_000_000, "BUDGET_EXCEEDED"),
+])
+async def test_provider_thresholds_stop_before_http(monkeypatch, caplog, spent, input_upper, reason):
+    model = "deepseek-flash"
+    policy_path = Path(os.environ["KNOWFLOW_BUDGET_POLICY_FILE"])
+    policies = json.loads(policy_path.read_text())
+    policies[model]["input_tokens_upper"] = input_upper
+    policy_path.write_text(json.dumps(policies))
+    quote = json.loads(Path(os.environ["KNOWFLOW_BUDGET_PRICE_FILE"]).read_text())[model]
+    ledger = BudgetLedger(os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"])
+    ledger.reserve("initial", provider="deepseek", model=model, input_tokens_upper=spent,
+                   output_tokens_upper=0, quote=quote)
+    calls = []
+    async def transport(request):
+        calls.append(request)
+        return httpx.Response(500)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        adapter = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+        with pytest.raises(ProcessingError) as error:
+            await adapter.generate("synthetic", [], request_id="threshold")
+    assert error.value.retryable is False
+    assert reason in caplog.text
+    assert calls == []
+    assert ledger.summary()["paid_reservations"] == 1

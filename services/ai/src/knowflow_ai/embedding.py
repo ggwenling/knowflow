@@ -118,6 +118,8 @@ class SiliconFlowEmbeddingAdapter:
             raise ProcessingError("INVALID_EMBEDDING_INPUT", 400, retryable=False)
 
         payload = {"model": self.settings.model, "input": texts, "encoding_format": "float"}
+        from .provider_budget import reserve_provider_call
+        await reserve_provider_call("siliconflow", self.settings.model, payload)
         try:
             async with self._client.stream(
                     "POST", self.settings.base_url.rstrip("/") + "/embeddings",
