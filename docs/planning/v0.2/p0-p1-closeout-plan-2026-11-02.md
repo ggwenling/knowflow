@@ -1,8 +1,13 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。当前代码候选为 `local@802fe48e7d4c689c224c72273a937ac1c8472d73`，执行及审阅见下方最新检查点。较早代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。较早候选 `7967883` 当时已推送并与 `origin/local` 同步；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。先前约定 Luna 实现、Sol 独立审阅；本次 Luna 服务不可用后由根代理实施，Sol 独立审阅。M/项目负责人签收及真实模型质量验收仍待完成。
+状态：IN_PROGRESS。当前代码候选为 `local@a30394a9042383fafaab9e6ca6c71d64f7b5a156`，执行及审阅见下方最新检查点。较早代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。较早候选 `7967883` 当时已推送并与 `origin/local` 同步；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。先前约定 Luna 实现、Sol 独立审阅；本次 Luna 服务不可用后由根代理实施，Sol 独立审阅。M/项目负责人签收及真实模型质量验收仍待完成。
 
-## 2026-11-03 SSE 消费补验
+## 2026-11-03 SSE 工程收尾
+
+- 最新代码候选 `local@a30394a9042383fafaab9e6ca6c71d64f7b5a156` 已获 Sol 精确 SHA 工程审查 APPROVED 并推送。完成 HTTP/SSE/内部请求 ID 关联、Web 状态机/终态关闭、has_answer 消费及失败清引用；真实 deadline、拒答及幂等冲突补验通过。
+- Java84（1skip）、Windows Python341、Web64/typecheck/相关lint、Schema85/OpenAPI4；最终 Docker 浏览器1/1（场景43秒），六类共享Schema捕获及主动停止/历史验证通过，隔离资源清零。首轮抓包失败及最终重跑证据见 `docs/reviews/2026-11-03-sse-consumption.md`。有限SSE工程项完成，正式人工签收独立；候选远端CI在记录时尚未结束。
+
+## 前一轮 SSE 消费补验（历史）
 
 - 当前代码候选 `local@802fe48e7d4c689c224c72273a937ac1c8472d73` 已经 Sol 精确 SHA 审阅 APPROVED 并推送；`main` 未合并。此前文档候选 `65774c4` 也获 Sol 批准，PR CI run #18 三个 job 全绿。代码候选 [PR CI #20](https://github.com/ggwenling/knowflow/actions/runs/41596593798) 三个 job 全绿：Java 84（1 skip）、Linux Python 335 passed（3 skipped）、Web/Docker E2E 1/1（14.3秒）；最终四类 SSE 捕获共享 Schema/顺序及主动停止历史检查通过。
 - 修复上游 cancelled 被前端误报为 FAILED；补充真实全栈 synthetic error/cancelled 与主动停止的 UI、历史持久化及不自动重发检查。Python 338 项、Web 46 项、typecheck/相关 lint、Schema 85 项和 OpenAPI 4 项通过。完整验证边界及本地 Docker 网络失败记录见 `docs/reviews/2026-11-03-sse-consumption.md`；Java/Python/M 的正式完整消费签收仍未完成。
@@ -25,7 +30,8 @@
 - [x] 本地实际构建 Docker Web/API/AI/migrate 镜像并通过 Playwright Chromium 全栈 E2E 1/1；Web、Java、Python、Schema、OpenAPI 检查结果见上方当前检查点。
 - [x] 受控改动和证据已提交并推送 `local`；push run #15 的 Web E2E、Java、Python/契约三个 job 全绿，远端 `local` 与推送候选同步。
 - [x] Sol 在候选 `7967883` 对代码及契约给出 APPROVED，无剩余代码 blocker。
-- [ ] 在最新目标 SHA 上完成 Java/Python 消费和 M/项目负责人前端签收；覆盖未测的错误/取消 SSE 路径及完整消费语义，并由 Q 记录最终结论。PR #3 合并到 main 前仍须项目负责人签收。
+- [x] 完成本轮 SSE 有限工程收尾：正常/拒答/错误/取消/真实 deadline/主动停止与历史、ID关联和Web生命周期回归；精确代码及证据见最新检查点。
+- [ ] 在最新目标 SHA 上完成 Java/Python 消费和 M/项目负责人前端签收，并由 Q 记录正式总体验收结论。PR #3 合并到 main 前仍须项目负责人签收。
 
 ## P1
 

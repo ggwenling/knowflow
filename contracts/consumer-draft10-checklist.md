@@ -2,7 +2,13 @@
 
 状态：IN_REVIEW；本文是待签收清单，不代表契约已冻结。当前共享 Schema SHA-256：`20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。验收时填写目标提交、验证结果及执行者；修复改变目标后重新复核受影响项目。
 
-## 2026-11-03 SSE 补验（尚未签收）
+## 2026-11-03 SSE 工程收尾（人工签收独立）
+
+- 最终代码 `a30394a9042383fafaab9e6ca6c71d64f7b5a156` 经 Sol 精确 SHA 工程审查 APPROVED；HTTP/SSE/内部请求 ID 关联、Web 生命周期和终态消费、拒答元数据及失败引用清理已修复。
+- Java84（1 skip）、Windows Python341、Web64/typecheck/相关lint、Schema85/OpenAPI4通过；最终 Docker 全链路1/1（场景43秒），TXT/PDF、error/cancelled、真实28秒deadline及拒答共六组捕获通过；主动停止、历史及幂等冲突也已验证。真实provider调用0，隔离资源清零。详细证据及抓包边界见 `docs/reviews/2026-11-03-sse-consumption.md`。
+- 本轮有限 SSE 工程项已完成；正式三端消费及 M/负责人签收继续保留未勾选，不把人工签收当作继续工程工作的阻断。远端候选 CI 在本记录时仍运行。
+
+## 前一轮 SSE 补验（历史，尚未签收）
 
 - 代码目标 `802fe48e7d4c689c224c72273a937ac1c8472d73`；Sol 精确 SHA 复核 APPROVED。补齐部分输出后的错误、上游取消及用户主动停止，修复取消被显示为失败；详见 `docs/reviews/2026-11-03-sse-consumption.md`。
 - 目标代码本地 Python 338 项、Web 46 项、typecheck/相关 lint、Schema 85 项和 OpenAPI 4 项通过。本地中间工作树全栈 E2E 1/1；最终两项测试收紧定向 15 项通过，目标 SHA 本地重跑因镜像仓库网络失败未执行测试。最终目标 [PR CI #20](https://github.com/ggwenling/knowflow/actions/runs/41596593798) 三个 job 全绿：Java 84（1 skip）、Linux Python 335 passed（3 skipped）、Web/Docker E2E 1/1（14.3秒），正常 TXT/PDF、error/cancelled 共享 Schema 与顺序，以及历史/主动停止断言通过。
