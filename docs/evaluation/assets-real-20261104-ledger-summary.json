@@ -1,0 +1,16 @@
+{
+  "limit_microyuan": 10000000,
+  "reserved_microyuan": 73740,
+  "remaining_microyuan": 9926260,
+  "paid_reservations": 60,
+  "zero_price_reservations": 80,
+  "reserved_cny": 0.07374,
+  "price_file": "PRICE_FILE.offpeak.draft.json",
+  "price_status": "draft-not-owner-signed",
+  "policy_file": "POLICY_FILE.draft.json",
+  "policy_status": "draft-not-owner-signed",
+  "models": {
+    "embedding": "BAAI/bge-m3",
+    "llm": "deepseek-flash"
+  }
+}
