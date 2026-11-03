@@ -3,7 +3,7 @@
   "info": {
     "title": "KnowFlow draft.10 candidate API",
     "version": "0.2.0-draft.10",
-    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。公开 SSE 事件按事件类型省略未使用字段；具体 wire 帧由浏览器 E2E 对共享 schema 校验。部分公开响应的其余 null 字段兼容性仍待运行验证。 不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
+    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。公开 SSE 事件按事件类型省略未使用字段；具体 wire 帧由浏览器 E2E 对共享 schema 校验。DocumentApiIntegrationTest 以 MVC wire 响应验证了这些 null 规则：Document/Task 可选字段省略，问答历史 nullable 字段和过期来源字段为 JSON null；其他公开响应及 SSE wire/消费语义仍待复核。不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
   },
   "security": [
     {

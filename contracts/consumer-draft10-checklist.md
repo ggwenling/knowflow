@@ -6,6 +6,7 @@
 
 - 验证代码基线：`local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；随后 `9c9b4a0` 增加备份证据，未改动代码。Schema 指纹如上。Web typecheck/lint/43 项单测通过，Docker production Web 镜像与全栈 Chromium E2E 1/1 通过；Java Maven/Testcontainers 83 项（1 skip），Python 324 项，Schema 85 项、OpenAPI 4 项通过。
 - 浏览器 E2E 覆盖注册、上传至 READY、draft.10 SSE 问答、来源查看、owner 隔离、删除、PDF 和移动视口；这属于本地执行证据，不等于 M/项目负责人已签收。
+- Java Testcontainers 新增 3 项实际 MVC wire 断言：Document 的空活动索引 ID 与 QUEUED Task 的空 failure code 确实不输出该键；processing 问答历史及过期来源的 nullable 字段显式输出 JSON `null`。OpenAPI 单测 4 项、Schema 85 structural cases 均通过。覆盖范围仅限这些已命名字段与端点。
 - 这些检查未替代 Q 对当前提交的独立代码/契约审阅，也未逐项证明下方所有授权、租约、超时和数据保留断言。因此所有 Q/M 复核框继续保持未勾选，直至审核者在最终目标 SHA 上记录结论、阻断项和日期。
 - 远端 CI 尚待推送本轮提交后核实。版本化 OpenAPI 候选的测试通过不等于 Q/M 已冻结契约。
 

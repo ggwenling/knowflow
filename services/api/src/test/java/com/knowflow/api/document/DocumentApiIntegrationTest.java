@@ -277,6 +277,7 @@ class DocumentApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
                 .andExpect(jsonPath("$.format").value("txt"))
+                .andExpect(jsonPath("$.active_index_version_id").doesNotHaveJsonPath())
                 .andExpect(jsonPath("$.byte_size").value(text.length))
                 .andExpect(jsonPath("$.latest_task_id").value(taskId))
                 .andExpect(jsonPath("$.latest_task_status").value("QUEUED"))
@@ -287,6 +288,7 @@ class DocumentApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andExpect(jsonPath("$.attempt_count").value(0))
+                .andExpect(jsonPath("$.failure_code").doesNotHaveJsonPath())
                 .andExpect(jsonPath("$.lease_id").doesNotExist());
         mockMvc.perform(get("/api/v1/knowledge-bases/{knowledgeBaseId}/documents",
                         knowledgeBaseId).header("Authorization", "Bearer " + token))
@@ -2009,11 +2011,16 @@ class DocumentApiIntegrationTest {
         mockMvc.perform(get("/api/v1/documents/{id}/contents/{version}/file", document,
                 first.lease().contentVersionId()).header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/v1/questions/{id}", questionId)
+        JsonNode expiredHistory = objectMapper.readTree(mockMvc.perform(
+                get("/api/v1/questions/{id}", questionId)
                 .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sources[0].state").value("VERSION_EXPIRED"))
-                .andExpect(jsonPath("$.sources[0].quote").value(org.hamcrest.Matchers.nullValue()));
+                .andReturn().getResponse().getContentAsByteArray());
+        assertThat(expiredHistory.path("sources").get(0).has("locator")).isTrue();
+        assertThat(expiredHistory.path("sources").get(0).get("locator").isNull()).isTrue();
+        assertThat(expiredHistory.path("sources").get(0).has("quote")).isTrue();
+        assertThat(expiredHistory.path("sources").get(0).get("quote").isNull()).isTrue();
         String otherToken = register("history-other@example.test").path("access_token").asText();
         mockMvc.perform(get("/api/v1/questions/{id}", questionId)
                 .header("Authorization", "Bearer " + otherToken)).andExpect(status().isNotFound());
@@ -2027,6 +2034,47 @@ class DocumentApiIntegrationTest {
                 Integer.class, first.lease().indexVersionId())).isZero();
         assertThat(jdbc.queryForObject("SELECT cleaned_at IS NULL FROM knowflow.index_versions WHERE id = ?",
                 Boolean.class, second.lease().indexVersionId())).isTrue();
+    }
+
+    @Test
+    void processingQuestionHistoryIncludesNullableFieldsAsJsonNull() throws Exception {
+        JsonNode owner = register("processing-history@example.test");
+        UUID userId = UUID.fromString(owner.path("user_id").asText());
+        UUID knowledgeBaseId = UUID.fromString(createKnowledgeBase(
+                owner.path("access_token").asText(), "Processing history"));
+        UUID questionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO knowflow.questions
+                    (id, owner_user_id, knowledge_base_id, request_id, snapshot_id,
+                     question_text, status, deadline_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'PROCESSING', CURRENT_TIMESTAMP + INTERVAL '30 seconds')
+                """, questionId, userId, knowledgeBaseId,
+                "processing-history-" + questionId, UUID.randomUUID(), "Pending question");
+
+        String token = owner.path("access_token").asText();
+        JsonNode list = objectMapper.readTree(mockMvc.perform(
+                get("/api/v1/questions").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray());
+        JsonNode item = list.path("items").get(0);
+        assertThat(item.path("question_id").asText()).isEqualTo(questionId.toString());
+        assertJsonNull(item, "finished_at");
+
+        JsonNode detail = objectMapper.readTree(mockMvc.perform(
+                get("/api/v1/questions/{id}", questionId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray());
+        for (String field : List.of("finished_at", "answer", "has_answer", "failure_code",
+                "embedding_model_profile_id", "llm_model_profile_id")) {
+            assertJsonNull(detail, field);
+        }
+        assertThat(detail.path("sources").isEmpty()).isTrue();
+    }
+
+    private static void assertJsonNull(JsonNode object, String field) {
+        assertThat(object.has(field)).isTrue();
+        assertThat(object.get(field).isNull()).isTrue();
     }
 
     @Test
