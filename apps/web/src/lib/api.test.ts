@@ -39,4 +39,24 @@ describe("streamQuestion", () => {
     await expect(streamQuestion(responseFromChunks([new TextEncoder().encode(wire)]), vi.fn(), vi.fn()))
       .rejects.toThrow("顺序异常");
   });
+
+  it.each(["error", "cancelled"])("rejects %s after a partial answer", async (terminal) => {
+    const events = [
+      ["started", { sequence: 1 }],
+      ["delta", { sequence: 2, delta: "未完成的回答" }],
+      [terminal, { sequence: 3, ...(terminal === "error" ? { message: "AI_PROCESSING_FAILED" } : {}) }],
+    ];
+    const wire = events.map(([name, data]) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`).join("");
+    const delta = vi.fn();
+    const sources = vi.fn();
+
+    await expect(streamQuestion(responseFromChunks([new TextEncoder().encode(wire)]), delta, sources))
+      .rejects.toThrow(terminal === "error" ? "AI_PROCESSING_FAILED" : "问答未能完成");
+    if (terminal === "cancelled") {
+      await expect(streamQuestion(responseFromChunks([new TextEncoder().encode(wire)]), vi.fn(), vi.fn()))
+        .rejects.toHaveProperty("name", "AbortError");
+    }
+    expect(delta).toHaveBeenCalledExactlyOnceWith("未完成的回答");
+    expect(sources).not.toHaveBeenCalled();
+  });
 });

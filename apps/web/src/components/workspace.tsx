@@ -297,7 +297,8 @@ export default function Workspace() {
     } catch (error) {
       if (!isCurrent()) return;
       const reason = controller.signal.aborted ? "用户停止生成" : messageOf(error);
-      setAnswer((old) => isCurrent() && old ? { ...old, status: controller.signal.aborted ? "CANCELLED" : "FAILED", failure_code: reason } : old);
+      const cancelled = controller.signal.aborted || error instanceof DOMException && error.name === "AbortError";
+      setAnswer((old) => isCurrent() && old ? { ...old, status: cancelled ? "CANCELLED" : "FAILED", failure_code: reason } : old);
       if (!controller.signal.aborted) setNotice(messageOf(error));
       await refresh(selectedBase).catch(() => undefined);
     } finally { if (isCurrent()) { abortRef.current = null; setBusy(false); } }

@@ -244,6 +244,16 @@ describe("knowledge-base refresh isolation", () => {
 });
 
 describe("question view isolation", () => {
+  it("shows an upstream cancellation as cancelled and refreshes history", async () => {
+    vi.mocked(streamQuestion).mockRejectedValue(new DOMException("问答未能完成", "AbortError"));
+    await openWorkspace();
+    fireEvent.change(screen.getByRole("textbox", { name: "" }), { target: { value: "取消的问题" } });
+    fireEvent.click(screen.getByRole("button", { name: /^提问/ }));
+    expect(await screen.findByText(/此问答状态：已取消/)).toBeVisible();
+    expect(screen.queryByText(/此问答状态：处理失败/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "停止生成" })).not.toBeInTheDocument());
+  });
+
   it.each(["completed", "error"])("ignores late deltas, sources and %s after opening history", async (terminal) => {
     let onDelta!: (value: string) => void;
     let onSources!: (value: Source[]) => void;

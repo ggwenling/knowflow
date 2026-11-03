@@ -91,7 +91,10 @@ export async function streamQuestion(
     sequence = payload.sequence;
     if (event === "delta" && payload.delta) onDelta(payload.delta);
     if (event === "sources" && payload.sources) onSources(payload.sources);
-    if (event === "error" || event === "cancelled") {
+    if (event === "cancelled") {
+      throw new DOMException(payload.message ?? "问答未能完成", "AbortError");
+    }
+    if (event === "error") {
       throw new Error(payload.message ?? payload.code ?? "问答未能完成");
     }
     if (event === "completed") completed = true;

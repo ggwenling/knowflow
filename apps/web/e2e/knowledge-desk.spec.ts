@@ -17,6 +17,31 @@ function parseSseEvents(body: string) {
   });
 }
 
+function expectStream(events: ReturnType<typeof parseSseEvents>, terminal: string) {
+  expect(events[0].name).toBe("started");
+  expect(events.some(({ name }) => name === "delta")).toBeTruthy();
+  expect(events.at(-1)?.name).toBe(terminal);
+  expect(events.filter(({ name }) => ["completed", "error", "cancelled"].includes(name ?? ""))).toHaveLength(1);
+  events.forEach(({ name, data }, index) => {
+    expect(data).toMatchObject({ contract_version: "0.2.0-draft.10",
+      request_id: events[0].data.request_id, sequence: index + 1, event: name });
+  });
+}
+
+async function expectUnfinishedHistory(page: Page, question: string, status: "FAILED" | "CANCELLED") {
+  const history = async () => page.evaluate(async (text) => {
+    const list = await (await fetch("/api/v1/questions?limit=100")).json();
+    const item = list.items.find((row: { question: string }) => row.question === text);
+    return item ? (await fetch(`/api/v1/questions/${item.question_id}`)).json() : null;
+  }, question);
+  await expect.poll(async () => (await history())?.status).toBe(status);
+  const detail = await history();
+  expect(detail).toMatchObject({ answer: null, has_answer: null, sources: [],
+    failure_code: status === "FAILED" ? "AI_PROCESSING_FAILED" : null });
+  expect(detail.finished_at).toBeTruthy();
+  return detail;
+}
+
 test.afterEach(async () => {
   if (firstPage) {
     for (const id of [firstKnowledgeBase, secondKnowledgeBase]) {
@@ -99,6 +124,43 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await expect(textDialog).toHaveCount(0);
   await expect(citationButton).toBeFocused();
 
+  const failureCaptures: Record<string, ReturnType<typeof parseSseEvents>> = {};
+  for (const [mode, status, label] of [["error", "FAILED", "处理失败"], ["cancelled", "CANCELLED", "已取消"]] as const) {
+    const question = `[e2e:${mode}] 流中终止验收`;
+    const response = page.waitForResponse((item) => item.url().includes("/questions/stream"));
+    await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(question);
+    await page.getByRole("button", { name: "提问" }).click();
+    const wire = await response;
+    const frames = parseSseEvents(await wire.text());
+    expectStream(frames, mode);
+    expect(frames.some(({ name }) => name === "sources")).toBeFalsy();
+    failureCaptures[mode] = frames;
+    await expect(page.getByText(`此问答状态：${label}。可在历史记录中查看。`)).toBeVisible();
+    await expectUnfinishedHistory(page, question, status);
+    await expect(page.getByRole("button", { name: new RegExp(question.replace(/[\[\]]/g, "\\$&")) })).toContainText(label);
+  }
+
+  const slowQuestion = "[e2e:slow] 主动停止验收";
+  let slowRequests = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/questions/stream") && request.postDataJSON()?.question === slowQuestion) slowRequests++;
+  });
+  await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(slowQuestion);
+  await page.getByRole("button", { name: "提问" }).click();
+  await expect(page.getByText("合成中断片段", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "停止生成" }).click();
+  await expect(page.getByText("此问答状态：已取消。可在历史记录中查看。")).toBeVisible();
+  const stopped = await expectUnfinishedHistory(page, slowQuestion, "CANCELLED");
+  // The synthetic model would finish in four seconds if the abort were lost.
+  await expect.poll(async () => {
+    const detail = await page.evaluate(async (id) => (await fetch(`/api/v1/questions/${id}`)).json(), stopped.question_id);
+    expect(detail).toMatchObject({ status: "CANCELLED", answer: null, has_answer: null, sources: [] });
+    return Date.now() - Date.parse(stopped.finished_at) >= 4500;
+  }, { timeout: 10_000 }).toBe(true);
+  expect(slowRequests).toBe(1);
+  await page.getByRole("button", { name: /主动停止验收/ }).click();
+  await expect(page.getByText("此问答状态：已取消。可在历史记录中查看。")).toBeVisible();
+
   const secondContext = await browser.newContext();
   const secondPage = await secondContext.newPage();
   const secondEmail = `other-${randomUUID()}@example.test`;
@@ -144,5 +206,5 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   expect(uploaded.document_id).toBe(source.document_id);
   const capturePath = process.env.KNOWFLOW_E2E_STREAM_CAPTURE;
   if (!capturePath) throw new Error("KNOWFLOW_E2E_STREAM_CAPTURE is required");
-  await writeFile(capturePath, JSON.stringify({ text: streamEvents, pdf: pdfEvents }, null, 2), "utf8");
+  await writeFile(capturePath, JSON.stringify({ text: streamEvents, pdf: pdfEvents, ...failureCaptures }, null, 2), "utf8");
 });

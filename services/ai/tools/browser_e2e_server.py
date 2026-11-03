@@ -19,6 +19,21 @@ class BrowserE2ELlm:
         return self.answer(question, evidence)
 
     async def stream_content(self, question, evidence, *, request_id):
+        if question.startswith(("[e2e:error]", "[e2e:cancelled]", "[e2e:slow]")):
+            # Only this test entrypoint installs the synthetic adapter.
+            yield '{"has_answer":true,"answer":"合成中断片段'
+            await asyncio.sleep(0.1)
+            if question.startswith("[e2e:error]"):
+                from knowflow_ai.adapters import ProcessingError
+                raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+            if question.startswith("[e2e:cancelled]"):
+                raise asyncio.CancelledError
+            for _ in range(40):
+                yield "。"
+                await asyncio.sleep(0.1)
+            source_id = evidence[0]["source_id"]
+            yield f' [{source_id}]","source_ids":' + json.dumps([source_id]) + "}"
+            return
         payload = json.dumps(self.answer(question, evidence), ensure_ascii=False,
                              separators=(",", ":"))
         for position in range(0, len(payload), 8):

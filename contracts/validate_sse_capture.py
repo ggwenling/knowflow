@@ -15,12 +15,13 @@ def validate(path):
     target = {**schema, "$ref": "#/$defs/AnswerStreamEvent"}
     validator = Draft202012Validator(target, format_checker=FormatChecker())
     captures = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(captures, dict) or set(captures) != {"text", "pdf"}:
+    if not isinstance(captures, dict) or set(captures) != {"text", "pdf", "error", "cancelled"}:
         raise ValueError("INVALID_SSE_CAPTURE")
     counts = {}
     for kind, frames in captures.items():
         if not isinstance(frames, list) or not frames:
             raise ValueError("MISSING_SSE_FRAMES")
+        request_id = None
         for sequence, frame in enumerate(frames, 1):
             if (not isinstance(frame, dict) or set(frame) != {"name", "data"}
                     or not isinstance(frame["name"], str)
@@ -33,6 +34,19 @@ def validate(path):
                 error = errors[0]
                 location = ".".join(str(part) for part in error.absolute_path)
                 raise ValueError(f"SSE_SCHEMA_MISMATCH_{kind}_{sequence}_{location}")
+            if sequence == 1:
+                request_id = frame["data"]["request_id"]
+            if frame["data"]["request_id"] != request_id:
+                raise ValueError(f"SSE_REQUEST_MISMATCH_{kind}_{sequence}")
+        names = [frame["name"] for frame in frames]
+        terminal = kind if kind in {"error", "cancelled"} else "completed"
+        if (names[0] != "started" or names.count("started") != 1 or "delta" not in names
+                or names[-1] != terminal
+                or sum(name in {"completed", "error", "cancelled"} for name in names) != 1
+                or (terminal == "completed" and (names[-2] != "sources"
+                    or any(name != "delta" for name in names[1:-2])))
+                or (terminal != "completed" and any(name != "delta" for name in names[1:-1]))):
+            raise ValueError(f"SSE_LIFECYCLE_MISMATCH_{kind}")
         counts[kind] = len(frames)
     return counts
 
@@ -42,5 +56,5 @@ if __name__ == "__main__":
         result = validate(sys.argv[1])
     except (IndexError, OSError, ValueError, json.JSONDecodeError) as error:
         raise SystemExit(f"FAIL: {error}") from None
-    print("PASS: shared AnswerStreamEvent schema; "
-          f"TXT={result['text']} frames, PDF={result['pdf']} frames")
+    print("PASS: shared AnswerStreamEvent schema and lifecycle; "
+          + ", ".join(f"{kind}={count} frames" for kind, count in result.items()))
