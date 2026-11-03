@@ -6,6 +6,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import socket
@@ -823,6 +824,156 @@ def _restore_isolated_service(env_path: Path, service: str) -> None:
     raise RuntimeError("ISOLATED_SERVICE_RESTART_TIMEOUT")
 
 
+def _wait_minio_ready(timeout: float = 90) -> dict:
+    deadline = time.monotonic() + timeout
+    attempts = 0
+    status = None
+    while time.monotonic() < deadline:
+        attempts += 1
+        try:
+            response = httpx.get("http://127.0.0.1:59000/minio/health/ready",
+                                 timeout=2, trust_env=False)
+            status = response.status_code
+            if status == 200:
+                return {"passed": True, "attempts": attempts, "http_status": status}
+        except httpx.HTTPError:
+            status = None
+        time.sleep(0.5)
+    return {"passed": False, "attempts": attempts, "http_status": status}
+
+
+def _safe_storage_failure_details(log, offset) -> dict:
+    details = {"http_status": None, "message_kind": None, "cause_class": None}
+    if log is None or offset is None:
+        return details
+    try:
+        log.flush()
+        end = log.seek(0, os.SEEK_END)
+        log.seek(offset)
+        data = log.read(end - offset)
+        log.seek(end)
+    except (OSError, ValueError):
+        return details
+    if isinstance(data, str):
+        data = data.encode("utf-8", errors="replace")
+    matches = list(re.finditer(
+        rb"Source upload failed: (?:Object storage returned HTTP (?P<status>[1-9][0-9]{2})|"
+        rb"(?P<failed>Object storage request failed)|"
+        rb"(?P<interrupted>Object storage request was interrupted)) "
+        rb"\((?P<cause>[A-Za-z_$][A-Za-z0-9_$]{0,79}|none)\)", data))
+    if matches:
+        match = matches[-1]
+        message_kind = ("HTTP_STATUS" if match.group("status") else
+                        "REQUEST_FAILED" if match.group("failed") else
+                        "REQUEST_INTERRUPTED")
+        details = {"http_status": int(match.group("status"))
+                   if match.group("status") else None,
+                   "message_kind": message_kind,
+                   "cause_class": match.group("cause").decode("ascii")}
+    return details
+
+
+def _minio_write_canary(harness: RecoveryHarness, readiness: dict) -> dict:
+    result = {
+        "passed": False,
+        "readiness": readiness,
+        "failure_stage": None if readiness["passed"] else "readiness",
+        "upload": {"attempted": False, "accepted": False, "http_status": None,
+                   "error_code": None,
+                   "storage_failure": {"http_status": None, "message_kind": None,
+                                       "cause_class": None}},
+        "readback": {"attempted": False, "http_status": None, "matches": False},
+        "cleanup": {"attempted": False, "http_status": None,
+                    "confirmed": False, "queues_drained": False},
+    }
+    if not readiness["passed"]:
+        return result
+
+    knowledge_base_id = None
+    log_offset = None
+    try:
+        knowledge_base_id = harness.create_knowledge_base("minio-write-canary")
+        filename = "minio-write-canary.txt"
+        contents = b"Synthetic MinIO recovery write/read/delete canary.\n"
+        result["upload"]["attempted"] = True
+        try:
+            harness.log.flush()
+            log_offset = harness.log.seek(0, os.SEEK_END)
+        except (AttributeError, OSError, ValueError):
+            log_offset = None
+        document_id, _task_id = harness.upload_document(
+            knowledge_base_id, filename, contents.decode("utf-8"))
+        result["upload"].update(accepted=True, http_status=202)
+
+        document = _document_row(harness.database_url, document_id)
+        path = (f"/api/v1/documents/{document_id}/contents/"
+                f"{document['content_version_id']}/file")
+        result["readback"]["attempted"] = True
+        with harness.client(timeout=10) as client:
+            response = client.get(path, headers={"Authorization": f"Bearer {harness.token}"})
+        result["readback"].update(http_status=response.status_code,
+                                  matches=response.status_code == 200 and response.content == contents)
+        if not result["readback"]["matches"]:
+            result["failure_stage"] = "readback"
+    except RuntimeError as error:
+        result["failure_stage"] = result["failure_stage"] or (
+            "upload" if result["upload"]["attempted"] and not result["upload"]["accepted"]
+            else "readback" if result["upload"]["accepted"] else "setup")
+        match = re.fullmatch(r"UPLOAD_FAILED_(\d{3})_([A-Z][A-Z0-9_]{0,63})", str(error))
+        if match:
+            result["upload"].update(http_status=int(match.group(1)), error_code=match.group(2))
+            result["upload"]["storage_failure"] = _safe_storage_failure_details(
+                getattr(harness, "log", None), log_offset)
+    except httpx.HTTPError:
+        if result["upload"]["attempted"] and not result["upload"]["accepted"]:
+            result["failure_stage"] = "upload"
+        else:
+            result["failure_stage"] = "readback"
+            result["readback"]["http_status"] = None
+    except Exception:
+        result["failure_stage"] = result["failure_stage"] or (
+            "upload" if result["upload"]["attempted"] and not result["upload"]["accepted"]
+            else "readback" if result["upload"]["accepted"] else "setup")
+    finally:
+        if knowledge_base_id is not None:
+            result["cleanup"]["attempted"] = True
+            try:
+                with harness.client(timeout=10) as client:
+                    response = client.delete(
+                        f"/api/v1/knowledge-bases/{knowledge_base_id}",
+                        headers={"Authorization": f"Bearer {harness.token}"})
+                result["cleanup"]["http_status"] = response.status_code
+                deleted = response.status_code in (204, 404)
+                if deleted:
+                    cleanup = _wait_cleanup(harness.database_url)
+                    result["cleanup"]["queues_drained"] = cleanup == {
+                        "unfinished_tasks": 0, "cleanup_queue_rows": 0}
+                    if result["cleanup"]["queues_drained"]:
+                        result["cleanup"]["confirmed"] = True
+                        if knowledge_base_id in harness.knowledge_bases:
+                            harness.knowledge_bases.remove(knowledge_base_id)
+                if not result["cleanup"]["confirmed"]:
+                    result["failure_stage"] = result["failure_stage"] or "cleanup"
+            except Exception:
+                result["failure_stage"] = result["failure_stage"] or "cleanup"
+
+    result["passed"] = (
+        result["readiness"]["passed"]
+        and result["upload"]["accepted"]
+        and result["readback"]["matches"]
+        and result["cleanup"]["confirmed"]
+    )
+    return result
+
+
+def _outage_failure_code(service: str, canary_passed, cleanup_drained: bool):
+    if canary_passed is False:
+        return "MINIO_RECOVERY_WRITE_CANARY_FAILED"
+    if not cleanup_drained:
+        return f"{service.upper()}_RECOVERY_CLEANUP_FAILED"
+    return None
+
+
 def _scenario_service_outage(harness: RecoveryHarness, service: str) -> dict:
     if _ISOLATED_COMPOSE is None or service not in {"postgres", "minio"}:
         raise RuntimeError("OUTAGE_REQUIRES_OWN_ISOLATED_COMPOSE")
@@ -864,6 +1015,16 @@ def _scenario_service_outage(harness: RecoveryHarness, service: str) -> dict:
     finally:
         _restore_isolated_service(env_path, service)
 
+    readiness = None
+    if service == "minio":
+        readiness = _wait_minio_ready()
+        if not readiness["passed"]:
+            canary = _minio_write_canary(harness, readiness)
+            return {"passed": False, "service": service,
+                    "request_failed_during_outage": True, "request_recovered": False,
+                    "failure_code": "MINIO_READY_TIMEOUT",
+                    "storage_canary": canary}
+
     deadline = time.monotonic() + 60
     recovered = False
     while time.monotonic() < deadline:
@@ -890,11 +1051,19 @@ def _scenario_service_outage(harness: RecoveryHarness, service: str) -> dict:
     if not sources or sources[0].get("index_version_id") != original:
         raise RuntimeError("PREVIOUS_ACTIVE_INDEX_NOT_QUERYABLE")
     cleanup = _wait_cleanup(harness.database_url)
-    return {"passed": True, "service": service, "baseline_request_succeeded": True,
+    canary = _minio_write_canary(harness, readiness) if service == "minio" else None
+    cleanup_drained = cleanup == {"unfinished_tasks": 0, "cleanup_queue_rows": 0}
+    failure_code = _outage_failure_code(
+        service, canary["passed"] if canary is not None else None, cleanup_drained)
+    passed = failure_code is None
+    return {"passed": passed,
+            **({"failure_code": failure_code} if failure_code is not None else {}),
+            "service": service, "baseline_request_succeeded": True,
             "request_failed_during_outage": True, "request_recovered": True,
             "source_bytes_preserved": True if service == "minio" else None,
             "previous_active_index_preserved": True, "previous_active_index_queryable": True,
-            "cleanup_queues_drained": cleanup == {"unfinished_tasks": 0, "cleanup_queue_rows": 0}}
+            "cleanup_queues_drained": cleanup_drained,
+            **({"storage_canary": canary} if canary is not None else {})}
 
 
 def _scenario_postgres_outage_during_index_write(harness: RecoveryHarness) -> dict:
@@ -1058,6 +1227,9 @@ def run(args):
             scenarios["postgres_index_write_outage"] = _scenario_postgres_outage_during_index_write(harness)
             scenarios["postgres_outage"] = _scenario_service_outage(harness, "postgres")
             scenarios["minio_outage"] = _scenario_service_outage(harness, "minio")
+            if not scenarios["minio_outage"]["passed"]:
+                raise RuntimeError(scenarios["minio_outage"].get(
+                    "failure_code", "MINIO_RECOVERY_ACCEPTANCE_FAILED"))
             scenarios["second_embedding_batch_failure"] = (
                 _scenario_second_embedding_batch_failure(harness))
         else:

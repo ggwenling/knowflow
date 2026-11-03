@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+from types import SimpleNamespace
 
 import pytest
 from knowflow_ai.adapters import ProcessingError
@@ -83,6 +85,136 @@ def test_cleanup_stops_only_services_started_by_this_run(monkeypatch, tmp_path):
     recovery._stop_compose_services(tmp_path / ".env", set())
 
     assert calls == [["stop", "minio"]]
+
+
+def test_outage_cleanup_failure_code_matches_service_and_canary_failure():
+    assert recovery._outage_failure_code("postgres", None, False) == \
+        "POSTGRES_RECOVERY_CLEANUP_FAILED"
+    assert recovery._outage_failure_code("minio", True, False) == \
+        "MINIO_RECOVERY_CLEANUP_FAILED"
+    assert recovery._outage_failure_code("minio", False, False) == \
+        "MINIO_RECOVERY_WRITE_CANARY_FAILED"
+
+
+def test_minio_ready_waits_for_ready_response(monkeypatch):
+    statuses = iter([503, 200])
+    monkeypatch.setattr(recovery.httpx, "get", lambda *_args, **_kwargs:
+                        SimpleNamespace(status_code=next(statuses)))
+    monkeypatch.setattr(recovery.time, "monotonic", lambda: 0)
+    monkeypatch.setattr(recovery.time, "sleep", lambda _seconds: None)
+
+    assert recovery._wait_minio_ready() == {
+        "passed": True, "attempts": 2, "http_status": 200}
+
+
+def test_minio_write_canary_upload_readback_and_cleanup(monkeypatch):
+    contents = b"Synthetic MinIO recovery write/read/delete canary.\n"
+
+    class Client:
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def get(self, *_args, **_kwargs):
+            return SimpleNamespace(status_code=200, content=contents)
+        def delete(self, *_args, **_kwargs):
+            return SimpleNamespace(status_code=204)
+
+    class Harness:
+        def __init__(self):
+            self.database_url = "synthetic-db"
+            self.token = "synthetic-token"
+            self.knowledge_bases = []
+            self.log = tempfile.TemporaryFile()
+        def create_knowledge_base(self, _label):
+            self.knowledge_bases.append("canary-kb")
+            return "canary-kb"
+        def upload_document(self, _kb, filename, text):
+            assert filename == "minio-write-canary.txt"
+            assert text.encode("utf-8") == contents
+            return "canary-document", "canary-task"
+        def client(self, **_kwargs): return Client()
+
+    harness = Harness()
+    monkeypatch.setattr(recovery, "_document_row", lambda *_args: {
+        "content_version_id": "canary-content"})
+    monkeypatch.setattr(recovery, "_wait_cleanup", lambda *_args: {
+        "unfinished_tasks": 0, "cleanup_queue_rows": 0})
+
+    result = recovery._minio_write_canary(
+        harness, {"passed": True, "attempts": 1, "http_status": 200})
+
+    assert result["passed"] is True
+    assert result["upload"]["accepted"] is True
+    assert result["readback"] == {"attempted": True, "http_status": 200, "matches": True}
+    assert result["cleanup"]["confirmed"] is True
+    assert harness.knowledge_bases == []
+    harness.log.close()
+
+
+def test_minio_write_canary_skips_writes_when_ready_gate_fails():
+    class Harness:
+        def create_knowledge_base(self, *_args):
+            pytest.fail("canary must not write before MinIO is ready")
+
+    result = recovery._minio_write_canary(
+        Harness(), {"passed": False, "attempts": 3, "http_status": 503})
+
+    assert result["passed"] is False
+    assert result["failure_stage"] == "readiness"
+    assert result["upload"]["attempted"] is False
+    assert result["readback"]["attempted"] is False
+    assert result["cleanup"]["attempted"] is False
+
+
+def test_minio_write_canary_failure_is_structured_and_redacts_logs(monkeypatch):
+    class Client:
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def delete(self, *_args, **_kwargs):
+            return SimpleNamespace(status_code=204)
+
+    class Harness:
+        def __init__(self):
+            self.database_url = "synthetic-db"
+            self.token = "synthetic-token"
+            self.knowledge_bases = []
+            self.log = tempfile.TemporaryFile()
+        def create_knowledge_base(self, _label):
+            self.knowledge_bases.append("canary-kb")
+            return "canary-kb"
+        def upload_document(self, *_args):
+            self.log.write(b"irrelevant password=never-report-this\n")
+            self.log.write(b"Source upload failed: Object storage returned HTTP 503 (none)\n")
+            self.log.flush()
+            raise RuntimeError("UPLOAD_FAILED_503_STORAGE_UNAVAILABLE")
+        def client(self, **_kwargs): return Client()
+
+    harness = Harness()
+    monkeypatch.setattr(recovery, "_wait_cleanup", lambda *_args: {
+        "unfinished_tasks": 0, "cleanup_queue_rows": 0})
+
+    result = recovery._minio_write_canary(
+        harness, {"passed": True, "attempts": 1, "http_status": 200})
+
+    assert result["passed"] is False
+    assert result["failure_stage"] == "upload"
+    assert result["upload"]["http_status"] == 503
+    assert result["upload"]["error_code"] == "STORAGE_UNAVAILABLE"
+    assert result["upload"]["storage_failure"] == {
+        "http_status": 503, "message_kind": "HTTP_STATUS", "cause_class": "none"}
+    assert result["cleanup"]["confirmed"] is True
+    assert "never-report-this" not in json.dumps(result)
+    harness.log.close()
+
+
+def test_safe_storage_failure_details_captures_request_failure_without_message(monkeypatch):
+    with tempfile.TemporaryFile() as log:
+        log.write(b"Source upload failed: Object storage request failed (ConnectException)\n")
+        log.flush()
+
+        details = recovery._safe_storage_failure_details(log, 0)
+
+    assert details == {"http_status": None, "message_kind": "REQUEST_FAILED",
+                       "cause_class": "ConnectException"}
 
 
 @pytest.mark.asyncio
