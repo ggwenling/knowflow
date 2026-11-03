@@ -120,6 +120,8 @@ class BudgetLedger:
                 raise ValueError("BUDGET_SOFT_STOP")
             if spent + amount > self.limit:
                 raise ValueError("BUDGET_EXCEEDED")
+            if spent + amount > SOFT_STOP_MICROYUAN:
+                raise ValueError("BUDGET_SOFT_STOP")
             if zero_price:
                 db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
                            (request_id, input_tokens_upper, output_tokens_upper,

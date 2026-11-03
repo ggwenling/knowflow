@@ -70,6 +70,7 @@ async def test_raw_adapter_failed_attempts_are_reserved_individually(monkeypatch
 @pytest.mark.asyncio
 @pytest.mark.parametrize("spent,input_upper,reason", [
     (8_000_000, 10_000, "BUDGET_SOFT_STOP"),
+    (7_000_000, 2_000_000, "BUDGET_SOFT_STOP"),
     (7_000_000, 4_000_000, "BUDGET_EXCEEDED"),
 ])
 async def test_provider_thresholds_stop_before_http(monkeypatch, caplog, spent, input_upper, reason):

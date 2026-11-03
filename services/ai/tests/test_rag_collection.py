@@ -421,8 +421,8 @@ async def test_guard_freezes_evidence_before_estimation_and_reservation(tmp_path
 
 def test_budget_is_durable_and_duplicate_retries_cannot_reuse_reservation(tmp_path):
     path = tmp_path / "budget.sqlite3"
-    result = reserve(budget.BudgetLedger(path), "request-1", tokens=9_000_000)
-    assert result["remaining_microyuan"] == 1_000_000
+    result = reserve(budget.BudgetLedger(path), "request-1", tokens=8_000_000)
+    assert result["remaining_microyuan"] == 2_000_000
     reopened = budget.BudgetLedger(path)
     with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
         reserve(reopened, "request-1", tokens=1)
