@@ -81,16 +81,22 @@ public class QuestionService {
     Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
                                          PublicQuestion input, QuestionCancellation cancellation,
                                          String idempotencyKey, long requestStartedAt) {
+        return stream(user, knowledgeBaseId, input, cancellation, idempotencyKey,
+                requestStartedAt, UUID.randomUUID().toString());
+    }
+
+    Flux<PublicAnswerStreamEvent> stream(AuthenticatedUser user, UUID knowledgeBaseId,
+                                         PublicQuestion input, QuestionCancellation cancellation,
+                                         String idempotencyKey, long requestStartedAt,
+                                         String requestId) {
         return Flux.defer(() -> {
             if (!questionPermits.tryAcquire()) {
-                String requestId = UUID.randomUUID().toString();
                 return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
                         requestId, 1, "error", null, null, null, "AI_PROCESSING_FAILED",
                         "The AI service could not complete the request.", true));
             }
             try {
                 String question = validateQuestion(input);
-                String requestId = UUID.randomUUID().toString();
                 QuestionSnapshot snapshot;
                 try {
                     snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,

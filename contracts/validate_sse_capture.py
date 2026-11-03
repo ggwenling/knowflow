@@ -15,7 +15,7 @@ def validate(path):
     target = {**schema, "$ref": "#/$defs/AnswerStreamEvent"}
     validator = Draft202012Validator(target, format_checker=FormatChecker())
     captures = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(captures, dict) or set(captures) != {"text", "pdf", "error", "cancelled"}:
+    if not isinstance(captures, dict) or set(captures) != {"text", "pdf", "error", "cancelled", "timeout", "refusal"}:
         raise ValueError("INVALID_SSE_CAPTURE")
     counts = {}
     for kind, frames in captures.items():
@@ -39,7 +39,7 @@ def validate(path):
             if frame["data"]["request_id"] != request_id:
                 raise ValueError(f"SSE_REQUEST_MISMATCH_{kind}_{sequence}")
         names = [frame["name"] for frame in frames]
-        terminal = kind if kind in {"error", "cancelled"} else "completed"
+        terminal = "error" if kind == "timeout" else kind if kind in {"error", "cancelled"} else "completed"
         if (names[0] != "started" or names.count("started") != 1 or "delta" not in names
                 or names[-1] != terminal
                 or sum(name in {"completed", "error", "cancelled"} for name in names) != 1
@@ -47,6 +47,10 @@ def validate(path):
                     or any(name != "delta" for name in names[1:-2])))
                 or (terminal != "completed" and any(name != "delta" for name in names[1:-1]))):
             raise ValueError(f"SSE_LIFECYCLE_MISMATCH_{kind}")
+        if kind == "timeout" and frames[-1]["data"]["code"] != "PROCESSING_TIMEOUT":
+            raise ValueError("SSE_TIMEOUT_CODE_MISMATCH")
+        if kind == "refusal" and (frames[-2]["data"]["has_answer"] or frames[-2]["data"]["sources"]):
+            raise ValueError("SSE_REFUSAL_MISMATCH")
         counts[kind] = len(frames)
     return counts
 

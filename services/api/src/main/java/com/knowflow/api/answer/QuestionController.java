@@ -157,7 +157,7 @@ public class QuestionController {
             executor.execute(() -> {
                 try {
                     Disposable current = questions.stream(user, knowledgeBaseId, question,
-                                    cancellation, idempotencyKey, requestStartedAt)
+                                    cancellation, idempotencyKey, requestStartedAt, fallbackRequestId)
                             .subscribe(event -> send(emitter, event, cancellation, lifecycle),
                                     failure -> {
                                         lifecycle.failed(failure);

@@ -7,6 +7,12 @@ let firstPage: Page | undefined;
 let firstKnowledgeBase = "";
 let secondKnowledgeBase = "";
 
+async function capturedStream(page: Page, question: string) {
+  return page.evaluate((text) => (window as unknown as {
+    sseCaptures: Record<string, Promise<string>>;
+  }).sseCaptures[text], question);
+}
+
 function parseSseEvents(body: string) {
   return body.split(/\r?\n\r?\n/).filter((frame) => frame.includes("data:")).map((frame) => {
     const lines = frame.split(/\r?\n/);
@@ -28,7 +34,7 @@ function expectStream(events: ReturnType<typeof parseSseEvents>, terminal: strin
   });
 }
 
-async function expectUnfinishedHistory(page: Page, question: string, status: "FAILED" | "CANCELLED") {
+async function expectUnfinishedHistory(page: Page, question: string, status: "FAILED" | "CANCELLED", failureCode = "AI_PROCESSING_FAILED") {
   const history = async () => page.evaluate(async (text) => {
     const list = await (await fetch("/api/v1/questions?limit=100")).json();
     const item = list.items.find((row: { question: string }) => row.question === text);
@@ -37,7 +43,7 @@ async function expectUnfinishedHistory(page: Page, question: string, status: "FA
   await expect.poll(async () => (await history())?.status).toBe(status);
   const detail = await history();
   expect(detail).toMatchObject({ answer: null, has_answer: null, sources: [],
-    failure_code: status === "FAILED" ? "AI_PROCESSING_FAILED" : null });
+    failure_code: status === "FAILED" ? failureCode : null });
   expect(detail.finished_at).toBeTruthy();
   return detail;
 }
@@ -56,6 +62,21 @@ test.afterEach(async () => {
 
 test("register, index, stream, verify source, enforce ownership, delete and preview PDF", async ({ page, browser }) => {
   firstPage = page;
+  // Keep a wire copy when the real consumer cancels its reader at a terminal.
+  // The active-stop scenario must retain the unmodified cancellation path.
+  await page.addInitScript(() => {
+    const captures: Record<string, Promise<string>> = {};
+    (window as unknown as { sseCaptures: typeof captures }).sseCaptures = captures;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init);
+      if (String(input).endsWith("/questions/stream") && typeof init?.body === "string") {
+        const question = JSON.parse(init.body).question as string;
+        if (!question.startsWith("[e2e:slow]")) captures[question] = response.clone().text();
+      }
+      return response;
+    };
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   const email = `web-${randomUUID()}@example.test`;
   const password = "KnowFlow-e2e-only-2026!";
@@ -98,7 +119,9 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const streamResponse = page.waitForResponse((response) => response.url().includes("/questions/stream"));
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("什么时候允许使用这份资料进行问答？");
   await page.getByRole("button", { name: "提问" }).click();
-  const streamEvents = parseSseEvents(await (await streamResponse).text());
+  const firstStream = await streamResponse;
+  const streamEvents = parseSseEvents(await capturedStream(page, "什么时候允许使用这份资料进行问答？"));
+  expect(firstStream.headers()["x-request-id"]).toBe(streamEvents[0].data.request_id);
   expect(streamEvents[0].name).toBe("started");
   expect(streamEvents.some(({ name }) => name === "delta")).toBeTruthy();
   expect(streamEvents.at(-1)?.name).toBe("completed");
@@ -125,20 +148,54 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await expect(citationButton).toBeFocused();
 
   const failureCaptures: Record<string, ReturnType<typeof parseSseEvents>> = {};
-  for (const [mode, status, label] of [["error", "FAILED", "处理失败"], ["cancelled", "CANCELLED", "已取消"]] as const) {
+  for (const [mode, status, label] of [["error", "FAILED", "处理失败"], ["cancelled", "CANCELLED", "已取消"], ["timeout", "FAILED", "处理失败"]] as const) {
     const question = `[e2e:${mode}] 流中终止验收`;
     const response = page.waitForResponse((item) => item.url().includes("/questions/stream"));
     await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(question);
     await page.getByRole("button", { name: "提问" }).click();
     const wire = await response;
-    const frames = parseSseEvents(await wire.text());
-    expectStream(frames, mode);
+    const frames = parseSseEvents(await capturedStream(page, question));
+    expectStream(frames, mode === "timeout" ? "error" : mode);
+    expect(wire.headers()["x-request-id"]).toBe(frames[0].data.request_id);
+    if (mode === "timeout") expect(frames.at(-1)?.data).toMatchObject({ code: "PROCESSING_TIMEOUT", retryable: true });
     expect(frames.some(({ name }) => name === "sources")).toBeFalsy();
     failureCaptures[mode] = frames;
     await expect(page.getByText(`此问答状态：${label}。可在历史记录中查看。`)).toBeVisible();
-    await expectUnfinishedHistory(page, question, status);
+    await expectUnfinishedHistory(page, question, status, mode === "timeout" ? "PROCESSING_TIMEOUT" : "AI_PROCESSING_FAILED");
     await expect(page.getByRole("button", { name: new RegExp(question.replace(/[\[\]]/g, "\\$&")) })).toContainText(label);
   }
+
+  const refusalQuestion = "[e2e:refusal] 证据不足验收";
+  const refusalResponse = page.waitForResponse((item) => item.url().includes("/questions/stream"));
+  await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(refusalQuestion);
+  await page.getByRole("button", { name: "提问" }).click();
+  const refusalWire = await refusalResponse;
+  const refusalFrames = parseSseEvents(await capturedStream(page, refusalQuestion));
+  expectStream(refusalFrames, "completed");
+  expect(refusalWire.headers()["x-request-id"]).toBe(refusalFrames[0].data.request_id);
+  expect(refusalFrames.find(({ name }) => name === "sources")?.data).toMatchObject({ has_answer: false, sources: [] });
+  failureCaptures.refusal = refusalFrames;
+  await expect(page.getByText("没有足够的资料证据回答这个问题。", { exact: true })).toBeVisible();
+  await expect(page.getByText("合成拒答草稿不得显示")).toHaveCount(0);
+  await expect.poll(async () => page.evaluate(async (question) => {
+    const list = await (await fetch("/api/v1/questions?limit=100")).json();
+    const item = list.items.find((row: { question: string }) => row.question === question);
+    return item ? (await fetch(`/api/v1/questions/${item.question_id}`)).json() : null;
+  }, refusalQuestion)).toMatchObject({ status: "SUCCEEDED", has_answer: false, sources: [],
+    answer: "没有足够的资料证据回答这个问题。", failure_code: null });
+
+  const conflictId = `browser-conflict-${randomUUID()}`;
+  const conflict = await page.evaluate(async ({ base, key, requestId }) => {
+    const response = await fetch(`/api/v1/knowledge-bases/${base}/questions/stream`, {
+      method: "POST", headers: { "content-type": "application/json", "idempotency-key": key, "x-request-id": requestId },
+      body: JSON.stringify({ question: "重复付费请求不得重发" }),
+    });
+    return { requestId: response.headers.get("x-request-id"), body: await response.text() };
+  }, { base: firstKnowledgeBase, key: firstStream.request().headers()["idempotency-key"], requestId: conflictId });
+  const conflictFrames = parseSseEvents(conflict.body);
+  expect(conflict.requestId).toBe(conflictId);
+  expect(conflictFrames).toHaveLength(1);
+  expect(conflictFrames[0]).toMatchObject({ name: "error", data: { sequence: 1, request_id: conflictId, code: "QUESTION_REQUEST_CONFLICT" } });
 
   const slowQuestion = "[e2e:slow] 主动停止验收";
   let slowRequests = 0;
@@ -194,9 +251,11 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const pdfStream = page.waitForResponse((response) => response.url().includes("/questions/stream"));
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("请根据 PDF 原文给出引用依据。");
   await page.getByRole("button", { name: "提问" }).click();
-  const pdfBody = await (await pdfStream).text();
+  const pdfWire = await pdfStream;
+  const pdfBody = await capturedStream(page, "请根据 PDF 原文给出引用依据。");
   expect(pdfBody).toMatch(/event:[ \t]*completed/);
   const pdfEvents = parseSseEvents(pdfBody);
+  expect(pdfWire.headers()["x-request-id"]).toBe(pdfEvents[0].data.request_id);
   const pdfSource = (pdfEvents.find(({ name }) => name === "sources")!.data.sources[0]) as { document_id: string; content_version_id: string; locator: { page: number } };
   expect(pdfSource.document_id).toBeTruthy();
   expect(pdfSource.content_version_id).toBeTruthy();

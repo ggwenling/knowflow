@@ -43,10 +43,12 @@ class QuestionAdmissionTest {
         int acquired = permits.drainPermits();
 
         PublicAnswerStreamEvent event = service.stream(user(), UUID.randomUUID(),
-                new PublicQuestion("question"), new QuestionCancellation())
+                new PublicQuestion("question"), new QuestionCancellation(), null,
+                System.nanoTime(), "admission-request")
                 .blockFirst();
 
         assertEquals("error", event.event());
+        assertEquals("admission-request", event.requestId());
         assertEquals("AI_PROCESSING_FAILED", event.code());
         assertEquals(true, event.retryable());
         verifyNoInteractions(jdbc, client);

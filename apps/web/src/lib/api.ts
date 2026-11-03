@@ -58,7 +58,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export async function streamQuestion(
   response: Response,
   onDelta: (value: string) => void,
-  onSources: (value: Source[]) => void,
+  onSources: (value: Source[], hasAnswer: boolean) => void,
 ) {
   if (!response.ok || !response.body) {
     const error = await response.json().catch(() => null) as { code?: string; message?: string } | null;
@@ -70,6 +70,9 @@ export async function streamQuestion(
   let buffered = "";
   let sequence = 0;
   let completed = false;
+  let started = false;
+  let sourcesReceived = false;
+  let requestId = response.headers.get("x-request-id");
   const consume = (frame: string) => {
     let event = "message";
     const data: string[] = [];
@@ -80,7 +83,11 @@ export async function streamQuestion(
     if (!data.length) return;
     const payload = JSON.parse(data.join("\n")) as {
       sequence: number;
+      contract_version: string;
+      request_id: string;
+      event: string;
       delta?: string;
+      has_answer?: boolean;
       sources?: Source[];
       code?: string;
       message?: string;
@@ -89,8 +96,28 @@ export async function streamQuestion(
       throw new Error("问答事件顺序异常，请查看历史记录。");
     }
     sequence = payload.sequence;
+    if (typeof payload.request_id !== "string" || !payload.request_id
+        || requestId !== null && payload.request_id !== requestId) {
+      throw new Error("问答请求标识异常，请查看历史记录。");
+    }
+    requestId = payload.request_id;
+    if (completed || payload.contract_version !== "0.2.0-draft.10" || payload.event !== event
+        || !["started", "delta", "sources", "completed", "error", "cancelled"].includes(event)
+        || event === "started" && started
+        || !started && event !== "started" && event !== "error"
+        || event === "delta" && (sourcesReceived || typeof payload.delta !== "string" || !payload.delta)
+        || event === "sources" && (sourcesReceived || !Array.isArray(payload.sources)
+          || typeof payload.has_answer !== "boolean" || payload.sources.length > 5
+          || payload.has_answer !== (payload.sources.length > 0))
+        || event === "completed" && !sourcesReceived) {
+      throw new Error("问答事件状态异常，请查看历史记录。");
+    }
+    if (event === "started") started = true;
     if (event === "delta" && payload.delta) onDelta(payload.delta);
-    if (event === "sources" && payload.sources) onSources(payload.sources);
+    if (event === "sources") {
+      sourcesReceived = true;
+      onSources(payload.sources!, payload.has_answer!);
+    }
     if (event === "cancelled") {
       throw new DOMException(payload.message ?? "问答未能完成", "AbortError");
     }
@@ -109,10 +136,11 @@ export async function streamQuestion(
       for (const frame of frames) consume(frame);
       if (done && buffered.trim()) consume(buffered);
       if (done) buffered = "";
-      if (done) break;
+      if (done || completed) break;
     }
     if (!completed) throw new Error("连接已中断，答案可能未完成。请查看历史记录，不会自动重发。");
   } finally {
+    void reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }

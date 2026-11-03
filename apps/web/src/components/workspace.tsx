@@ -290,7 +290,7 @@ export default function Workspace() {
       if (!isCurrent()) return;
       setAnswer(detail);
       await streamQuestion(response, (delta) => setAnswer((old) => isCurrent() && old ? { ...old, answer: (old.answer ?? "") + delta } : old),
-        (sources) => setAnswer((old) => isCurrent() && old ? { ...old, sources } : old));
+        (sources, hasAnswer) => setAnswer((old) => isCurrent() && old ? { ...old, sources, has_answer: hasAnswer } : old));
       if (!isCurrent()) return;
       setAnswer((old) => isCurrent() && old ? { ...old, status: "SUCCEEDED", finished_at: new Date().toISOString() } : old);
       await refresh(selectedBase).catch((error) => setNotice(messageOf(error)));
@@ -298,7 +298,7 @@ export default function Workspace() {
       if (!isCurrent()) return;
       const reason = controller.signal.aborted ? "用户停止生成" : messageOf(error);
       const cancelled = controller.signal.aborted || error instanceof DOMException && error.name === "AbortError";
-      setAnswer((old) => isCurrent() && old ? { ...old, status: cancelled ? "CANCELLED" : "FAILED", failure_code: reason } : old);
+      setAnswer((old) => isCurrent() && old ? { ...old, status: cancelled ? "CANCELLED" : "FAILED", failure_code: reason, has_answer: null, sources: [] } : old);
       if (!controller.signal.aborted) setNotice(messageOf(error));
       await refresh(selectedBase).catch(() => undefined);
     } finally { if (isCurrent()) { abortRef.current = null; setBusy(false); } }

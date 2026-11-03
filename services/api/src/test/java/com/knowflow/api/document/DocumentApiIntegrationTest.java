@@ -574,6 +574,7 @@ class DocumentApiIntegrationTest {
         var initial = mockMvc.perform(post(
                         "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
                         .header("Authorization", "Bearer " + token)
+                        .header("X-Request-ID", "stream-client-request")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.TEXT_EVENT_STREAM)
                         .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
@@ -603,6 +604,9 @@ class DocumentApiIntegrationTest {
         String body = streamed.getResponse().getContentAsString();
         assertThat(body).contains("event:started", "event:delta", "event:sources", "event:completed")
                 .doesNotContain("stream-source");
+        assertThat(AI_RECEIVED_REQUEST_ID.get())
+                .isEqualTo(streamed.getResponse().getHeader("X-Request-ID"))
+                .isEqualTo("stream-client-request");
         assertSseContractFrames(body);
         assertThat(jdbc.queryForObject("SELECT status FROM knowflow.questions WHERE request_id = ?",
                 String.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo("SUCCEEDED");
@@ -662,6 +666,7 @@ class DocumentApiIntegrationTest {
             }
             String requestId = AI_RECEIVED_REQUEST_ID.get();
             String body = streamed.getResponse().getContentAsString();
+            assertThat(requestId).isEqualTo(streamed.getResponse().getHeader("X-Request-ID"));
             assertThat(body).contains("event:sources",
                     "event:" + ("cancelled".equals(terminal) ? "cancelled" : "error"))
                     .doesNotContain("event:completed");
@@ -764,6 +769,12 @@ class DocumentApiIntegrationTest {
             assertThat(failed.get("answer_text")).isNull();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM knowflow.question_sources WHERE question_id = ?",
                     Integer.class, questionId)).isZero();
+            awaitSseEvent(initial, "event:error");
+            var streamed = mockMvc.perform(asyncDispatch(initial)).andReturn();
+            String body = streamed.getResponse().getContentAsString();
+            assertSseContractFrames(body);
+            assertThat(body).contains("PROCESSING_TIMEOUT").doesNotContain("event:completed");
+            assertThat(body.split("event:error", -1)).hasSize(2);
         } finally {
             terminalGate.countDown();
             questionProperties.setTotalBudgetSeconds(originalBudget);

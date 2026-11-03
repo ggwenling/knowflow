@@ -15,12 +15,13 @@ _spec.loader.exec_module(_module)
 
 def captures():
     result = {}
-    for kind in ("text", "pdf", "error", "cancelled"):
+    for kind in ("text", "pdf", "error", "cancelled", "timeout", "refusal"):
         events = [("started", {}), ("delta", {"delta": "partial"})]
-        if kind in {"text", "pdf"}:
+        if kind in {"text", "pdf", "refusal"}:
             events += [("sources", {"has_answer": False, "sources": []}), ("completed", {})]
-        elif kind == "error":
-            events += [("error", {"code": "AI_PROCESSING_FAILED", "message": "AI_PROCESSING_FAILED", "retryable": False})]
+        elif kind in {"error", "timeout"}:
+            code = "PROCESSING_TIMEOUT" if kind == "timeout" else "AI_PROCESSING_FAILED"
+            events += [("error", {"code": code, "message": code, "retryable": kind == "timeout"})]
         else:
             events += [("cancelled", {})]
         result[kind] = [{"name": name, "data": {
@@ -37,14 +38,18 @@ def validate(tmp_path, value):
 
 
 def test_complete_and_failed_captures_pass(tmp_path):
-    assert validate(tmp_path, captures()) == {"text": 4, "pdf": 4, "error": 3, "cancelled": 3}
+    assert validate(tmp_path, captures()) == {"text": 4, "pdf": 4, "error": 3, "cancelled": 3, "timeout": 3, "refusal": 4}
 
 
-@pytest.mark.parametrize("case", ["missing_path", "mixed_request", "sequence", "schema", "after_terminal", "wrong_terminal", "missing_delta", "missing_sources", "sources_before_delta"])
+@pytest.mark.parametrize("case", ["missing_path", "mixed_request", "sequence", "schema", "after_terminal", "wrong_terminal", "missing_delta", "missing_sources", "sources_before_delta", "timeout_code", "refusal_flag"])
 def test_invalid_capture_is_rejected(tmp_path, case):
     value = deepcopy(captures())
     if case == "missing_path":
         del value["cancelled"]
+    elif case == "timeout_code":
+        value["timeout"][-1]["data"]["code"] = "AI_PROCESSING_FAILED"
+    elif case == "refusal_flag":
+        value["refusal"][-2]["data"]["has_answer"] = True
     elif case == "mixed_request":
         value["error"][1]["data"]["request_id"] = "other-request"
     elif case == "sequence":

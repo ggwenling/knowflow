@@ -56,7 +56,8 @@ def test_synthetic_slow_stream_can_be_closed_after_first_delta():
     asyncio.run(collect())
 
 
-def test_synthetic_slow_stream_would_complete_with_valid_citations(monkeypatch):
+@pytest.mark.parametrize("mode", ["slow", "timeout"])
+def test_synthetic_slow_stream_would_complete_with_valid_citations(monkeypatch, mode):
     from knowflow_ai.answering import AnswerService
     from knowflow_ai.streaming import IncrementalAnswerParser
     from test_answering import FakeRetriever, _contract, _evidence, _request
@@ -71,7 +72,7 @@ def test_synthetic_slow_stream_would_complete_with_valid_citations(monkeypatch):
     async def collect():
         parser = IncrementalAnswerParser()
         async for fragment in BrowserE2ELlm().stream_content(
-                "[e2e:slow]", evidence, request_id=request["request_id"]):
+                f"[e2e:{mode}]", evidence, request_id=request["request_id"]):
             parser.feed(fragment)
         return service._response_from_generated(request, evidence, parser.finish())
 

@@ -11,6 +11,8 @@ class BrowserE2ELlm:
 
     @staticmethod
     def answer(question, evidence):
+        if question.startswith("[e2e:refusal]"):
+            return {"answer": "合成拒答草稿不得显示", "has_answer": False, "source_ids": []}
         source_id = evidence[0]["source_id"]
         return {"answer": f"本地合成验证：{question} [{source_id}]",
                 "has_answer": True, "source_ids": [source_id]}
@@ -19,7 +21,7 @@ class BrowserE2ELlm:
         return self.answer(question, evidence)
 
     async def stream_content(self, question, evidence, *, request_id):
-        if question.startswith(("[e2e:error]", "[e2e:cancelled]", "[e2e:slow]")):
+        if question.startswith(("[e2e:error]", "[e2e:cancelled]", "[e2e:slow]", "[e2e:timeout]")):
             # Only this test entrypoint installs the synthetic adapter.
             yield '{"has_answer":true,"answer":"合成中断片段'
             await asyncio.sleep(0.1)
@@ -28,6 +30,9 @@ class BrowserE2ELlm:
                 raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
             if question.startswith("[e2e:cancelled]"):
                 raise asyncio.CancelledError
+            if question.startswith("[e2e:timeout]"):
+                # Let the real request deadline expire while awaiting model data.
+                await asyncio.sleep(60)
             for _ in range(40):
                 yield "。"
                 await asyncio.sleep(0.1)

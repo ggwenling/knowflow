@@ -244,6 +244,20 @@ describe("knowledge-base refresh isolation", () => {
 });
 
 describe("question view isolation", () => {
+  it.each(["error", "cancelled"])("clears provisional sources after %s", async (terminal) => {
+    vi.mocked(streamQuestion).mockImplementation(async (_response, delta, sources) => {
+      delta("未完成回答");
+      sources([source], true);
+      throw terminal === "error" ? new Error("AI_PROCESSING_FAILED") : new DOMException("取消", "AbortError");
+    });
+    await openWorkspace();
+    fireEvent.change(screen.getByRole("textbox", { name: "" }), { target: { value: "未完成问题" } });
+    fireEvent.click(screen.getByRole("button", { name: /^提问/ }));
+    await screen.findByText(terminal === "error" ? /此问答状态：处理失败/ : /此问答状态：已取消/);
+    expect(screen.queryByText("历史引用")).not.toBeInTheDocument();
+    expect(screen.getByText("未完成回答")).toBeVisible();
+  });
+
   it("shows an upstream cancellation as cancelled and refreshes history", async () => {
     vi.mocked(streamQuestion).mockRejectedValue(new DOMException("问答未能完成", "AbortError"));
     await openWorkspace();
@@ -256,7 +270,7 @@ describe("question view isolation", () => {
 
   it.each(["completed", "error"])("ignores late deltas, sources and %s after opening history", async (terminal) => {
     let onDelta!: (value: string) => void;
-    let onSources!: (value: Source[]) => void;
+    let onSources!: (value: Source[], hasAnswer: boolean) => void;
     let finish!: () => void;
     let fail!: (error: Error) => void;
     vi.mocked(streamQuestion).mockImplementation((_response, delta, sources) => {
@@ -273,7 +287,7 @@ describe("question view isolation", () => {
     expect((streamCall[1] as RequestInit).signal?.aborted).toBe(true);
     await act(async () => {
       onDelta("新回答的迟到片段");
-      onSources([{ ...source, quote: "新来源" }]);
+      onSources([{ ...source, quote: "新来源" }], true);
       if (terminal === "completed") finish(); else fail(new Error("旧请求失败"));
     });
     expect(screen.getByText("历史回答")).toBeVisible();
