@@ -45,6 +45,49 @@ def _not_ready(*keys):
     raise RuntimeError("EVALUATION_SERVICE_NOT_READY: " + ", ".join(names)) from None
 
 
+def _assert_shared_ledger_ready(path):
+    """Fail closed unless the shared ledger schema can accept a rolled-back reserve."""
+    import sqlite3
+    required = {
+        "budget": {"id", "limit_microyuan"},
+        "reservations": {
+            "request_id", "microyuan", "input_tokens_upper",
+            "output_tokens_upper", "price_quote",
+        },
+        "zero_price_reservations": {
+            "request_id", "input_tokens_upper", "output_tokens_upper", "price_quote",
+        },
+    }
+    try:
+        with sqlite3.connect(path, timeout=30, isolation_level=None) as db:
+            for table, columns in required.items():
+                info = {row[1] for row in db.execute(f"PRAGMA table_info({table})")}
+                if not columns <= info:
+                    raise ValueError
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                db.execute(
+                    "INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
+                    ("__evaluation_ledger_probe__", 1, 1, 0, "{}"),
+                )
+                db.execute(
+                    "INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
+                    ("__evaluation_ledger_probe_zero__", 1, 0, "{}"),
+                )
+                db.execute(
+                    "DELETE FROM reservations WHERE request_id = ?",
+                    ("__evaluation_ledger_probe__",),
+                )
+                db.execute(
+                    "DELETE FROM zero_price_reservations WHERE request_id = ?",
+                    ("__evaluation_ledger_probe_zero__",),
+                )
+            finally:
+                db.execute("ROLLBACK")
+    except Exception:
+        _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+
+
 def _unique_object(pairs):
     value = {}
     for key, item in pairs:
@@ -241,6 +284,7 @@ def create_real_app():
             or snapshot["reserved_microyuan"] < 0
             or snapshot["reserved_microyuan"] >= SOFT_STOP_MICROYUAN):
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+    _assert_shared_ledger_ready(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
     try:
         app = wiring.create_evaluation_app(
             service_settings,

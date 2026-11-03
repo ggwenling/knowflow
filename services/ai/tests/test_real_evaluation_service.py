@@ -185,6 +185,36 @@ def test_corrupt_shared_ledger_fails_closed(monkeypatch, tmp_path):
     assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
 
 
+def test_ledger_missing_request_id_column_fails_closed(monkeypatch, tmp_path):
+    configure_real_service(monkeypatch, tmp_path)
+    ledger_path = tmp_path / "ledger.sqlite3"
+    with sqlite3.connect(ledger_path) as db:
+        db.execute("CREATE TABLE reservations (microyuan INTEGER NOT NULL)")
+        db.commit()
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
+
+
+def test_ledger_insert_trigger_failure_fails_closed(monkeypatch, tmp_path):
+    configure_real_service(monkeypatch, tmp_path)
+    # Build a normal ledger first, then attach a rejecting trigger.
+    from knowflow_ai.budget import BudgetLedger
+    BudgetLedger(tmp_path / "ledger.sqlite3")
+    with sqlite3.connect(tmp_path / "ledger.sqlite3") as db:
+        db.execute(
+            "CREATE TRIGGER reject_reservations BEFORE INSERT ON reservations "
+            "BEGIN SELECT RAISE(ABORT, 'blocked'); END")
+        db.commit()
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
+
+
 def test_soft_stopped_shared_ledger_fails_closed(monkeypatch, tmp_path):
     prices, _policies, _price_file, _policy_file = configure_real_service(monkeypatch, tmp_path)
     from knowflow_ai.budget import BudgetLedger, SOFT_STOP_MICROYUAN
@@ -239,18 +269,26 @@ def test_real_app_uses_product_adapters_with_mock_transport(monkeypatch, tmp_pat
         assert embedding_adapter.settings.dimensions == 1024
         assert llm_adapter.settings.model == "deepseek-flash"
 
-        async def exercise_guards():
-            with pytest.raises(Exception):
-                await embedding_guard.embed(["hello"], request_id="emb-test-1")
-            with pytest.raises(Exception):
-                await llm_guard.generate(
-                    "q", [{"source_id": "s1", "text": "t"}], request_id="llm-test-1")
+        from knowflow_ai.adapters import ProcessingError
 
-        before = factories._ledger.summary()["paid_reservations"]
+        async def exercise_guards():
+            with pytest.raises(ProcessingError) as emb_error:
+                await embedding_guard.embed(["hello"], request_id="emb-test-1")
+            assert emb_error.value.code == "MODEL_FAILURE"
+            mid = factories._ledger.summary()
+            assert mid["paid_reservations"] == 1
+            assert any("/embeddings" in url for url in requests_seen)
+            with pytest.raises(ProcessingError) as llm_error:
+                await llm_guard.generate(
+                    "q", [{"source_id": "s1", "text_content": "t"}],
+                    request_id="llm-test-1")
+            assert llm_error.value.code == "MODEL_FAILURE"
+            assert factories._ledger.summary()["paid_reservations"] == 2
+            assert any("/chat/completions" in url for url in requests_seen)
+
+        assert factories._ledger.summary()["paid_reservations"] == 0
         asyncio.run(exercise_guards())
-        after = factories._ledger.summary()["paid_reservations"]
-        assert after > before
-        assert requests_seen
+        assert len(requests_seen) == 2
     finally:
         async def close_adapters():
             await embedding_adapter.aclose()
