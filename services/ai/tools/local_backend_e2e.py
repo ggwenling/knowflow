@@ -249,7 +249,14 @@ def upload(client: httpx.Client, token: str, knowledge_base_id: str,
         files={"file": (filename, text.encode("utf-8"), "text/plain")},
     )
     if response.status_code != 202:
-        raise RuntimeError(f"UPLOAD_FAILED_{response.status_code}")
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        code = payload.get("code") if isinstance(payload, dict) else None
+        if not isinstance(code, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", code):
+            code = "UNKNOWN"
+        raise RuntimeError(f"UPLOAD_FAILED_{response.status_code}_{code}")
     return response.json()
 
 
