@@ -100,3 +100,10 @@ def test_resource_coverage_requires_all_services():
     assert perf.has_resource_coverage(resources)
     resources["ai"]["samples"] = 0
     assert not perf.has_resource_coverage(resources)
+
+
+def test_compose_admission_limit_covers_requested_concurrency(tmp_path):
+    _env, override = perf.compose_files(tmp_path, 8080, admission_limit=8)
+    config = override.read_text(encoding="utf-8")
+    assert config.count('KNOWFLOW_QUESTION_MAX_CONCURRENT: "8"') == 2
+    assert config.index("  api:") < config.index("  ai:")

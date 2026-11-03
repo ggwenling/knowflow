@@ -56,7 +56,7 @@ def clean_build_revision():
                           text=True, check=True).stdout.strip()
 
 
-def compose_files(directory, port):
+def compose_files(directory, port, admission_limit):
     env = directory / "perf.env"
     names = ("POSTGRES_PASSWORD", "MIGRATOR_PASSWORD", "APP_PASSWORD", "AI_PASSWORD")
     values = {"KNOWFLOW_DEV_" + name: secrets.token_hex(32) for name in names}
@@ -68,7 +68,7 @@ def compose_files(directory, port):
     env.write_text("\n".join(f"{key}={value}" for key, value in values.items()) + "\n", encoding="utf-8")
     override = directory / "override.yml"
     command = ["python", "-c", "import logging,runpy,sys; logging.basicConfig(level=logging.INFO); logging.getLogger('knowflow_ai.answering').setLevel(logging.INFO); sys.path.insert(0, '/workspace/services/ai/tools'); sys.argv=['browser_e2e_server.py','--host','0.0.0.0']; runpy.run_path('/workspace/services/ai/tools/browser_e2e_server.py',run_name='__main__')"]
-    override.write_text(f'services:\n  api:\n    ports:\n      - "127.0.0.1:{port}:8080"\n    networks: [knowflow, web-edge]\n  ai:\n    command: {json.dumps(command)}\n', encoding="utf-8")
+    override.write_text(f'services:\n  api:\n    ports:\n      - "127.0.0.1:{port}:8080"\n    networks: [knowflow, web-edge]\n    environment:\n      KNOWFLOW_QUESTION_MAX_CONCURRENT: "{admission_limit}"\n  ai:\n    command: {json.dumps(command)}\n    environment:\n      KNOWFLOW_QUESTION_MAX_CONCURRENT: "{admission_limit}"\n', encoding="utf-8")
     return env, override
 
 
@@ -263,6 +263,8 @@ def run(args):
                               "docker_cpus": int(docker_info[0]), "docker_memory_bytes": int(docker_info[1]),
                               "docker_version": docker_info[2],
                               "other_running_container_count": len(other_running),
+                              "question_admission_limit": max(args.concurrency),
+                              "question_admission_services": ["api", "ai"],
                               "mode": "synthetic adapters, local Docker, no external model calls",
                               "retrieval": "AI service stage log; excludes question embedding",
                               "first_delta": "client elapsed time until first SSE delta",
@@ -271,7 +273,7 @@ def run(args):
                                 for p in (Path(__file__), COMPOSE, ROOT / "services/ai/tools/browser_e2e_server.py")},
               "cases": [], "status": "incomplete"}
     with tempfile.TemporaryDirectory(prefix="knowflow-perf-") as temp:
-        env, override = compose_files(Path(temp), port)
+        env, override = compose_files(Path(temp), port, max(args.concurrency))
         base = ["compose", "--project-name", project, "-f", str(COMPOSE), "-f", str(override), "--env-file", str(env)]
         started = False
         stop = threading.Event()

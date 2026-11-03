@@ -1,0 +1,827 @@
+{
+  "run_at": "2026-11-03T04:07:49.926996+00:00",
+  "project": "knowflow-perf-fc06ccb5e671",
+  "source_revision": "38252b34023d128b3c40138f8cb4c801f255455b",
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 20,
+    "docker_cpus": 20,
+    "docker_memory_bytes": 8215240704,
+    "docker_version": "29.8.2",
+    "other_running_container_count": 4,
+    "question_admission_limit": 8,
+    "question_admission_services": [
+      "api",
+      "ai"
+    ],
+    "mode": "synthetic adapters, local Docker, no external model calls",
+    "retrieval": "AI service stage log; excludes question embedding",
+    "first_delta": "client elapsed time until first SSE delta",
+    "resources": "docker stats samples; observed maxima, not continuous peaks"
+  },
+  "source_sha256": {
+    "evaluation\\performance\\run.py": "c25f7edc1c3ae7480f47666feffcbc23b3442644d2a7e1a0819bfd49919a9ee5",
+    "infra\\compose.yml": "77606246dd822b80c4664457e8cb508f597cfcdf6bc01775a4aaacfc44d6b9bb",
+    "services\\ai\\tools\\browser_e2e_server.py": "b1ffbb53d7e78519e95c1e67fb31433166078d219a531ba30083fd73c6cd5a8b"
+  },
+  "cases": [
+    {
+      "document_count": 10,
+      "index_elapsed_ms": 3334.23,
+      "loads": [
+        {
+          "concurrency": 1,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 547.74,
+            "p95_ms": 616.36
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 744.34,
+            "p95_ms": 821.91
+          },
+          "requests": [
+            {
+              "request_id": "8c661a8c481a465c9a94351db9b24d42",
+              "outcome": "success",
+              "retrieval_request_id": "1d275327-c45a-49f2-994a-c60a71f10a81",
+              "first_delta_ms": 611.96,
+              "total_ms": 819.77,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "72766b7673f345579ed0ad49c24206ba",
+              "outcome": "success",
+              "retrieval_request_id": "55c889cf-ec84-430c-a391-98dd0a7959b5",
+              "first_delta_ms": 494.54,
+              "total_ms": 693.97,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "dc2eb693c9f9471ca94b5f9880da0810",
+              "outcome": "success",
+              "retrieval_request_id": "9e7337a8-9a2f-4d66-9b39-d86a9db69e4d",
+              "first_delta_ms": 537.04,
+              "total_ms": 743.92,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "f158467224224b2d87cf79afe10eb6db",
+              "outcome": "success",
+              "retrieval_request_id": "51f674a2-bb0b-4055-a270-39279a6bbb10",
+              "first_delta_ms": 616.36,
+              "total_ms": 821.91,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "fc8b060e96254d5eabe5a97b642f199f",
+              "outcome": "success",
+              "retrieval_request_id": "685842f3-5c39-4afe-87eb-43c5b88c47f8",
+              "first_delta_ms": 564.28,
+              "total_ms": 772.59,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "472014d75f284481ae75494a542c82a0",
+              "outcome": "success",
+              "retrieval_request_id": "6f53dd83-787d-48bb-b7ab-7882939e65f2",
+              "first_delta_ms": 547.74,
+              "total_ms": 744.34,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "6c6eb648e50f45dd822316d1fdf38288",
+              "outcome": "success",
+              "retrieval_request_id": "a6a0be42-bd21-40bc-8ea9-d9b2ebcc4a64",
+              "first_delta_ms": 515.5,
+              "total_ms": 717.59,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "d85f65823e0d484d9d420c7f00e06c81",
+              "outcome": "success",
+              "retrieval_request_id": "3086ddb7-ca0d-45fb-968b-63a93092313a",
+              "first_delta_ms": 586.54,
+              "total_ms": 783.36,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 10,
+            "p95_ms": 15
+          }
+        },
+        {
+          "concurrency": 4,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 776.21,
+            "p95_ms": 818.1
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 980.68,
+            "p95_ms": 1017.67
+          },
+          "requests": [
+            {
+              "request_id": "fa10bf31d90a4589b97084bfbe0c6d83",
+              "outcome": "success",
+              "retrieval_request_id": "6f853ebf-ff7f-40f7-b51b-dd275cb7ffd3",
+              "first_delta_ms": 767.29,
+              "total_ms": 979.03,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "9862166eacdd470b95394e764d9252e9",
+              "outcome": "success",
+              "retrieval_request_id": "dc0e2f38-6d0b-4728-86fd-30ae628bc5c7",
+              "first_delta_ms": 756.22,
+              "total_ms": 957.57,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "94fa2d6c260e437ba7c6a60844163f81",
+              "outcome": "success",
+              "retrieval_request_id": "0ab056bd-23ee-40c6-beb2-81dbbf7ae7d7",
+              "first_delta_ms": 787.84,
+              "total_ms": 1002.62,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "c7e43de665fe4838a8f3c5e5da13b10f",
+              "outcome": "success",
+              "retrieval_request_id": "bc9ba29f-5488-499b-935d-e2330b4cd405",
+              "first_delta_ms": 776.21,
+              "total_ms": 987.06,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "6a671e1568a545fbb705bf41e6054e18",
+              "outcome": "success",
+              "retrieval_request_id": "08e2dc26-016b-494e-8e43-f7b48bc7c246",
+              "first_delta_ms": 765.82,
+              "total_ms": 969.78,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "ed6121e80bfa4f2f85f44164b7f9ed87",
+              "outcome": "success",
+              "retrieval_request_id": "ca0a392c-2f1e-4140-baac-813549e25b39",
+              "first_delta_ms": 777.55,
+              "total_ms": 980.68,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "f41db241f1804441b0a3fad3c94212fd",
+              "outcome": "success",
+              "retrieval_request_id": "1ba678ac-1a26-4862-969d-c73c4a1bdaf9",
+              "first_delta_ms": 789.61,
+              "total_ms": 993.51,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "217b8b2cdf6f4674a9cb1d59e5964fdd",
+              "outcome": "success",
+              "retrieval_request_id": "35bb0e75-7a58-49b1-946a-887809d01597",
+              "first_delta_ms": 818.1,
+              "total_ms": 1017.67,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 14,
+            "p95_ms": 19
+          }
+        },
+        {
+          "concurrency": 8,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 1018.25,
+            "p95_ms": 1027.07
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 1275.68,
+            "p95_ms": 1304.49
+          },
+          "requests": [
+            {
+              "request_id": "74656a271157402b9babb7df0e869618",
+              "outcome": "success",
+              "retrieval_request_id": "2a937db3-deaa-416b-9bc2-933a0631af2a",
+              "first_delta_ms": 1010.72,
+              "total_ms": 1226.96,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "10037d541d7d40ab9fccf079fe9c7e9e",
+              "outcome": "success",
+              "retrieval_request_id": "60768b8b-4b3f-4103-968b-bee299198ca8",
+              "first_delta_ms": 1018.25,
+              "total_ms": 1275.68,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "fa2583fe135b4946b387d26de4d607ec",
+              "outcome": "success",
+              "retrieval_request_id": "1bbc24c4-4b80-4173-97f7-8e39c893ff6c",
+              "first_delta_ms": 1027.07,
+              "total_ms": 1304.49,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "0287135de083444285970bfa3009c74d",
+              "outcome": "success",
+              "retrieval_request_id": "db8f1036-f8e8-42d9-8f51-259f185b332b",
+              "first_delta_ms": 1013.84,
+              "total_ms": 1269.06,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "2f5fbf19584c46b2be22210977cf85c7",
+              "outcome": "success",
+              "retrieval_request_id": "7a74045e-7432-44a5-b3e1-b6a9e1288fba",
+              "first_delta_ms": 1018.64,
+              "total_ms": 1284.17,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "98e17e9b24e64fbab9a815c26c18023f",
+              "outcome": "success",
+              "retrieval_request_id": "a84e6b16-95eb-4382-a4cd-89cac73def44",
+              "first_delta_ms": 1025.62,
+              "total_ms": 1296.68,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "86e5688947454c32953a8a99a5ec5878",
+              "outcome": "success",
+              "retrieval_request_id": "05c1a068-936c-4f8d-ad22-93f2c443ef58",
+              "first_delta_ms": 1020.7,
+              "total_ms": 1290.64,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "cfe277a673f54b0494840775ec1427b7",
+              "outcome": "success",
+              "retrieval_request_id": "cb352981-ad3e-4780-b302-6e789d4100f6",
+              "first_delta_ms": 1008.77,
+              "total_ms": 1244.74,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 27,
+            "p95_ms": 45
+          }
+        }
+      ]
+    },
+    {
+      "document_count": 100,
+      "index_elapsed_ms": 43348.86,
+      "loads": [
+        {
+          "concurrency": 1,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 622.85,
+            "p95_ms": 700.12
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 865.3,
+            "p95_ms": 963.52
+          },
+          "requests": [
+            {
+              "request_id": "4c373a5ecb48415d97cfe98d11cb54ba",
+              "outcome": "success",
+              "retrieval_request_id": "35038bb8-c502-42fc-9e48-c26417a46774",
+              "first_delta_ms": 575.71,
+              "total_ms": 843.5,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "c5f183cba5f3485d957ac6fca81ff859",
+              "outcome": "success",
+              "retrieval_request_id": "83eafdf1-f92e-4166-8281-f3c60a719b0e",
+              "first_delta_ms": 700.12,
+              "total_ms": 963.52,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "5cc95e7150804018b6dac99036e4ce01",
+              "outcome": "success",
+              "retrieval_request_id": "6f660b2d-df10-434e-88ef-01eaaeae4068",
+              "first_delta_ms": 655.56,
+              "total_ms": 888.96,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "67d296cd24dd471a8075c8e86a06d35f",
+              "outcome": "success",
+              "retrieval_request_id": "d5043548-3b94-454a-8e77-2846eca999e4",
+              "first_delta_ms": 598.25,
+              "total_ms": 845.05,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "ec36456645d841f9a66e2749d03c28cf",
+              "outcome": "success",
+              "retrieval_request_id": "eca706a7-f0e1-4198-8080-74f7d946655e",
+              "first_delta_ms": 624.0,
+              "total_ms": 874.81,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "c41667113e5248a7a50057bc50a275bf",
+              "outcome": "success",
+              "retrieval_request_id": "ba8587d6-21bc-46ee-8ac1-5d5dc717578c",
+              "first_delta_ms": 622.85,
+              "total_ms": 865.3,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "170db9f55e6c4d6c90ed44432707f52d",
+              "outcome": "success",
+              "retrieval_request_id": "22df356d-5a7b-424d-97de-f6e0a4c40a1c",
+              "first_delta_ms": 558.4,
+              "total_ms": 857.33,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "6123770518b144e298b6b4b76a303f23",
+              "outcome": "success",
+              "retrieval_request_id": "ddc08a2e-94e5-4a9d-801f-6654705fc8dd",
+              "first_delta_ms": 648.57,
+              "total_ms": 954.52,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 13,
+            "p95_ms": 16
+          }
+        },
+        {
+          "concurrency": 4,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 913.87,
+            "p95_ms": 1007.06
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 1295.51,
+            "p95_ms": 1477.47
+          },
+          "requests": [
+            {
+              "request_id": "05b4b562cbb14431a96dc7643f271927",
+              "outcome": "success",
+              "retrieval_request_id": "adbffef8-0c9c-4a07-9588-eabb03d8c1eb",
+              "first_delta_ms": 1002.82,
+              "total_ms": 1444.54,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "139353d941a744d79aa3cd876a19de09",
+              "outcome": "success",
+              "retrieval_request_id": "75292c86-b340-481a-b0e3-2dc111e906a7",
+              "first_delta_ms": 1007.06,
+              "total_ms": 1477.47,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "c67669f1a9a64680aca89ee09145f4d5",
+              "outcome": "success",
+              "retrieval_request_id": "a6fd84ed-344d-4985-bdef-b64be73368fe",
+              "first_delta_ms": 988.88,
+              "total_ms": 1385.53,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "258030b4ce1e410d9e39a39d0834fab1",
+              "outcome": "success",
+              "retrieval_request_id": "86aa8053-543f-44f1-a4f5-34208ee48fa8",
+              "first_delta_ms": 998.88,
+              "total_ms": 1414.46,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "8357985ecabb441e8c7676324ee880b2",
+              "outcome": "success",
+              "retrieval_request_id": "a66c8f61-5ca7-4e27-85ad-c6bdef2a45c1",
+              "first_delta_ms": 911.8,
+              "total_ms": 1293.72,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "340e49f4a63743afa09b2ab19add437b",
+              "outcome": "success",
+              "retrieval_request_id": "e700f430-d62c-400d-a8f0-afc563f9a9b2",
+              "first_delta_ms": 913.87,
+              "total_ms": 1295.51,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "40c372a41ab34770a9ec3322076fd5ff",
+              "outcome": "success",
+              "retrieval_request_id": "57ef1052-1e4d-4cbe-99f3-e897af6214e6",
+              "first_delta_ms": 885.35,
+              "total_ms": 1293.08,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "1b56e18a76ae4a9b96a20d11f2e20641",
+              "outcome": "success",
+              "retrieval_request_id": "97078d43-e9dd-450b-a911-a50712d93fad",
+              "first_delta_ms": 887.4,
+              "total_ms": 1287.71,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 22,
+            "p95_ms": 94
+          }
+        },
+        {
+          "concurrency": 8,
+          "requested": 8,
+          "succeeded": 8,
+          "failed": 0,
+          "retryable_ai_failures": 0,
+          "outcomes": {
+            "success": 8
+          },
+          "first_delta": {
+            "sample_count": 8,
+            "p50_ms": 1287.26,
+            "p95_ms": 1291.44
+          },
+          "complete": {
+            "sample_count": 8,
+            "p50_ms": 1816.15,
+            "p95_ms": 1963.32
+          },
+          "requests": [
+            {
+              "request_id": "8f0ab128b23648f283648d21b129ea7b",
+              "outcome": "success",
+              "retrieval_request_id": "59a5c367-1fa8-41d7-8dcd-f9389805544a",
+              "first_delta_ms": 1288.64,
+              "total_ms": 1851.93,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "c4d183495756459b9b1e97b38a426044",
+              "outcome": "success",
+              "retrieval_request_id": "188ca991-8ac8-4b2b-b737-e543ccedb6a2",
+              "first_delta_ms": 1280.5,
+              "total_ms": 1784.03,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "d34ba4610dc047b4843ddf2a0e1330ad",
+              "outcome": "success",
+              "retrieval_request_id": "77c9a0c7-1402-4110-b05c-e06a458bf75f",
+              "first_delta_ms": 1291.44,
+              "total_ms": 1879.27,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "eeda6bbecb7e4e3ab90b488a982e0bb3",
+              "outcome": "success",
+              "retrieval_request_id": "36a9ace0-4c68-424d-a22d-11254a1387d6",
+              "first_delta_ms": 1287.26,
+              "total_ms": 1816.15,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "668deb7f71394791ab2880082465d622",
+              "outcome": "success",
+              "retrieval_request_id": "97752325-c85a-47c5-8dd9-fe4959826811",
+              "first_delta_ms": 1290.54,
+              "total_ms": 1905.83,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "aea09f504f4a4b87986c52cfeb337575",
+              "outcome": "success",
+              "retrieval_request_id": "c4444060-8be7-49fa-b2dc-b278006d81e0",
+              "first_delta_ms": 1272.31,
+              "total_ms": 1754.15,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "f164bd3f9dba424fac68d5f1d99cfc59",
+              "outcome": "success",
+              "retrieval_request_id": "76437aed-16dd-4075-b943-846a387159cf",
+              "first_delta_ms": 1269.39,
+              "total_ms": 1725.37,
+              "error_code": null,
+              "retryable": null
+            },
+            {
+              "request_id": "a9b695ff6a3f4497a7142d9b5577944e",
+              "outcome": "success",
+              "retrieval_request_id": "de0b8ceb-529f-4217-a9d7-67317dc91827",
+              "first_delta_ms": 1291.3,
+              "total_ms": 1963.32,
+              "error_code": null,
+              "retryable": null
+            }
+          ],
+          "retrieval": {
+            "sample_count": 8,
+            "p50_ms": 72,
+            "p95_ms": 202
+          }
+        }
+      ]
+    }
+  ],
+  "status": "completed",
+  "images": {
+    "api": "sha256:f724cb7f56431d5344100da27949803e96000eb908c6da6fe3913f86596c4533",
+    "ai": "sha256:ddabe320591f3e38504c37a640f6f2e43b2048b72de835ff76d49ad0d7a4ab09",
+    "postgres": "sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337",
+    "minio": "sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01"
+  },
+  "resources": {
+    "ai": {
+      "samples": 16,
+      "peak_cpu_percent": 78.2,
+      "peak_memory_bytes": 92211773
+    },
+    "api": {
+      "samples": 16,
+      "peak_cpu_percent": 126.88,
+      "peak_memory_bytes": 546622669
+    },
+    "minio": {
+      "samples": 16,
+      "peak_cpu_percent": 3.17,
+      "peak_memory_bytes": 252392243
+    },
+    "postgres": {
+      "samples": 16,
+      "peak_cpu_percent": 35.95,
+      "peak_memory_bytes": 103809024
+    }
+  },
+  "cleanup_exit_code": 0,
+  "server_diagnostics": {
+    "status": "completed",
+    "runner_revision": "38252b34023d128b3c40138f8cb4c801f255455b",
+    "server_image_revision": "fbe7038c47ed02b2a7837ec033afee0f9224200a",
+    "current_server_build_inputs_match_image_revision": true,
+    "synthetic_question_admission_limit": 8,
+    "configured_services": [
+      "api",
+      "ai"
+    ],
+    "server_images_from_backup_restore_project": "knowflow-restore-67054ae1d5364000",
+    "cleanup_exit_code": 0,
+    "cases": [
+      {
+        "documents": 10,
+        "loads": [
+          {
+            "concurrency": 1,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 10,
+              "p95_ms": 15
+            }
+          },
+          {
+            "concurrency": 4,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 14,
+              "p95_ms": 19
+            }
+          },
+          {
+            "concurrency": 8,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 27,
+              "p95_ms": 45
+            }
+          }
+        ]
+      },
+      {
+        "documents": 100,
+        "loads": [
+          {
+            "concurrency": 1,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 13,
+              "p95_ms": 16
+            }
+          },
+          {
+            "concurrency": 4,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 22,
+              "p95_ms": 94
+            }
+          },
+          {
+            "concurrency": 8,
+            "requested": 8,
+            "succeeded": 8,
+            "failed": 0,
+            "outcomes": {
+              "success": 8
+            },
+            "retryable_ai_failures": 0,
+            "retrieval_samples": {
+              "sample_count": 8,
+              "p50_ms": 72,
+              "p95_ms": 202
+            }
+          }
+        ]
+      }
+    ],
+    "ai_stage_log_counts": {
+      "source_read": 110,
+      "parse": 110,
+      "index_embedding": 110,
+      "index_write": 110,
+      "embedding": 48,
+      "retrieval": 48,
+      "evidence_validation": 48,
+      "generation": 48
+    },
+    "ai_stage_outcomes": {
+      "success": 632
+    },
+    "api_log_lines": 186,
+    "scope": "synthetic adapter load evidence at cap 8 in both Java API and AI service; default cap 4 still rejects excess concurrent requests",
+    "image_digests": {
+      "api": "sha256:f724cb7f56431d5344100da27949803e96000eb908c6da6fe3913f86596c4533",
+      "ai": "sha256:ddabe320591f3e38504c37a640f6f2e43b2048b72de835ff76d49ad0d7a4ab09",
+      "migrate": "sha256:3a85ae1ec649a64b516df0d2fa2adaf164a573ea506c8824968ee466256eed93",
+      "postgres": "sha256:33198da2828a14c30348d2ccb4750833d5ed9a44c88d840a0e523d7417120337",
+      "minio": "sha256:50cec18ac4184af4671a78aedd5554942c8ae105d51a465fa82037949046da01"
+    },
+    "api_ai_image_ids_match_fbe_build": true,
+    "admission_values": {
+      "api": 8,
+      "ai": 8
+    },
+    "cleanup_verified": {
+      "containers": 0,
+      "volumes": 0,
+      "networks": 0,
+      "temporary_image_tags": 0
+    },
+    "resource_sample_counts": {
+      "api": 16,
+      "ai": 16,
+      "postgres": 16,
+      "minio": 16
+    }
+  },
+  "diagnostic_note": "API/AI/migrate images were built at fbe7038, and all Compose build inputs used by them match fbe7038 at current HEAD. Pinned Postgres/MinIO images match the restore drill digests. A fresh Compose project and volumes were used. Runner override configured both Java API and AI admission caps to 8; production defaults were not changed.",
+  "verification": {
+    "all_requests_succeeded": true,
+    "all_resources_sampled": true,
+    "all_containers_volumes_networks_and_temporary_tags_removed": true,
+    "both_admission_values_equal_reported_limit": true,
+    "source_build_inputs_match_image_revision": true
+  }
+}
