@@ -1,0 +1,155 @@
+{
+  "status": "incomplete",
+  "started_at": "2026-11-03T04:39:36.429793+00:00",
+  "projects": [
+    "knowflow-restore-a748a3764f994d24",
+    "knowflow-restore-435178f544ed4b05"
+  ],
+  "checks": {},
+  "provider_calls": 0,
+  "source_revision": "38252b34023d128b3c40138f8cb4c801f255455b",
+  "drill_sha256": "85c8ed2f6f7e8c50544690823ce5386f540c6a7177deb435b1f7a7eecffa228a",
+  "command": "uv run --project services/ai --frozen python infra/backup_restore_e2e.py --output infra/evidence/backup-restore-20261103-attempt3.json",
+  "machine": {
+    "os": "Windows",
+    "release": "11",
+    "architecture": "AMD64",
+    "docker_server": "29.8.2",
+    "compose": "5.6.0"
+  },
+  "images": {},
+  "migration_versions": {},
+  "stage": "prepare_source_data",
+  "failure": "RuntimeError:QUESTION_HISTORY_SOURCE_UNAVAILABLE",
+  "cleanup": {
+    "knowflow-restore-a748a3764f994d24": {
+      "down_exit_code": 0,
+      "remaining_resources": {
+        "containers": 0,
+        "networks": 0,
+        "volumes": 0
+      },
+      "verified_empty": true
+    }
+  },
+  "cleanup_verified": true,
+  "commands": [
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-435178f544ed4b05"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-435178f544ed4b05"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-435178f544ed4b05"
+    ],
+    [
+      "docker",
+      "version",
+      "--format",
+      "{{.Server.Version}}"
+    ],
+    [
+      "docker",
+      "compose",
+      "version",
+      "--short"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-a748a3764f994d24",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-ejva5y4z\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-ejva5y4z\\.env",
+      "up",
+      "--build",
+      "--quiet-build",
+      "--wait",
+      "--wait-timeout",
+      "240",
+      "api"
+    ],
+    [
+      "docker",
+      "compose",
+      "--project-name",
+      "knowflow-restore-a748a3764f994d24",
+      "-f",
+      "D:\\konwflow\\infra\\compose.yml",
+      "-f",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-ejva5y4z\\override-0.yml",
+      "--env-file",
+      "C:\\Users\\31180\\AppData\\Local\\Temp\\knowflow-restore-ejva5y4z\\.env",
+      "down",
+      "--volumes",
+      "--remove-orphans"
+    ],
+    [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ],
+    [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ],
+    [
+      "docker",
+      "volume",
+      "ls",
+      "-q",
+      "--filter",
+      "label=com.docker.compose.project=knowflow-restore-a748a3764f994d24"
+    ]
+  ],
+  "docker_errors": [],
+  "finished_at": "2026-11-03T04:40:04.263370+00:00"
+}
