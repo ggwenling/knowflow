@@ -10,7 +10,7 @@
 - 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
 - Java `DocumentApiIntegrationTest` 增加 3 项 MVC wire 回归：可选空 `active_index_version_id` / `failure_code` 不输出，processing 历史和过期来源的 required nullable 字段显式为 JSON `null`。3 个 Testcontainers 方法、OpenAPI 4 项、Schema 85 structural cases 通过。此验证仅覆盖列出的字段与端点，不代表全部公开 JSON 响应或 SSE 消费验收。
 - 项目负责人此前确认尚未准备 20 题私有盲测；不生成、不查看或评分私有题。60 题开发/公开验证集人工审核者为 `human-reviewer`，不能代替新增私有盲测。
-- Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时完整证据及 M 签收未齐，未指出新增契约代码缺陷。Sol 对 `00147f6` 的正式 Q/M 结论仍为 CHANGES_REQUESTED：代码无剩余 blocker；独立确认 Java/Python 和 M 的消费签收、远端 CI、公开 SSE wire/消费复核尚缺。该次审阅指出的 OpenAPI null 兼容问题已由本节所列定向运行时测试覆盖；本轮代码/契约变更仍须由 Sol 在新最终 SHA 复核。M 签收仍待项目负责人。
+- Sol 对 `local@38252b3` 的先前审阅为 CHANGES_REQUESTED，原因是当时完整证据及 M 签收未齐，未指出新增契约代码缺陷。Sol 对 `00147f6` 的正式 Q/M 结论仍为 CHANGES_REQUESTED：代码无剩余 blocker；Java/Python 和 M 的消费签收、远端 CI、错误/取消 SSE 路径及完整消费语义尚缺。该次审阅指出的 OpenAPI null 兼容问题已由本节所列定向运行时测试覆盖；本轮代码/契约变更仍须由 Sol 在新最终 SHA 复核。M 签收仍待项目负责人。
 
 ## P0
 
