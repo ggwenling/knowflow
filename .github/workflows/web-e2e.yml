@@ -3,7 +3,7 @@ name: Web engineering E2E
 on:
   pull_request:
   push:
-    branches: [main, local]
+    branches: [main, local, grok]
 
 jobs:
   evaluation-e2e:
