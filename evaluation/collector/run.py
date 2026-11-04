@@ -37,7 +37,8 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger):
+async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger,
+                          limit=None):
     if (not isinstance(run_metadata, dict)
             or set(run_metadata) != {"code_sha", "schema_sha256", "config_sha256", "prompt_sha256", "model"}
             or not isinstance(run_metadata["model"], str) or not run_metadata["model"].strip()
@@ -50,6 +51,10 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
     if manifest.get("privacy") == "local_only" and not output.resolve().is_relative_to(ROOT / ".blindtest/out"):
         raise ValueError("PRIVATE_OUTPUT_OUTSIDE_IGNORED_DIRECTORY")
     selected = [question for question in questions if question["split"] == split]
+    if limit is not None:
+        if type(limit) is not int or limit < 1:
+            raise ValueError("INVALID_COLLECTION_LIMIT")
+        selected = selected[:limit]
     if not selected or output.exists():
         raise ValueError("INVALID_COLLECTION_OUTPUT_OR_SPLIT")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -157,7 +162,8 @@ async def main_async(args):
                 "X-Evaluation-Secret": os.environ["KNOWFLOW_EVALUATION_CONTROL_SECRET"]}) as ai:
             await collect_dataset(java=java, ai=ai, dataset=args.dataset, split=args.split, output=args.output,
                                   run_metadata=json.loads(args.run_metadata.read_text(encoding="utf-8")), fetch_row=fetch,
-                                  ledger=BudgetLedger(os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"]))
+                                  ledger=BudgetLedger(os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"]),
+                                  limit=args.limit)
 
 
 def main():
@@ -168,6 +174,7 @@ def main():
     parser.add_argument("--split", choices=("development", "holdout"), default="development")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--run-metadata", required=True, type=Path)
+    parser.add_argument("--limit", type=int, help="Collect only the first N selected questions")
     args = parser.parse_args()
     try:
         asyncio.run(main_async(args))
