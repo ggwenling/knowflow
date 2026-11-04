@@ -51,3 +51,9 @@
 - 采集命令：`services/ai/.venv/Scripts/python.exe services/ai/tools/audit_licenses.py --base-sha be958d4848285ebcc32a299079ed6dc94d149b08 --build-metadata <本机缓存的 uv_build-0.12.23.dist-info> --export-dir services/ai/docs/evidence/license-texts`。只读本地安装／缓存元数据，不下载或调用模型。
 - `knowflow-ai==0.1.0` 的项目自身许可证仍无文本或声明，**未完成**；不能由 Terra 擅自选定授权条款，需权利人决定。
 - **仍未完成**：实际 Linux 镜像中 native 捆绑依赖的许可证据、Maven/npm 全传递工件的许可证原文及内容身份验证、基础镜像／系统包 SBOM、完整产品 NOTICE／对应源码获取和替换方式等发行证据、负责人及独立审核者签收。既有三栈清单只能作为后续核对输入，不能据此自动判定发行合规。
+
+## 2026-11-04 NOTICE 初稿
+
+- 已在仓库根新增 `NOTICE`，基于 `docs/reviews/2026-11-03-dependency-inventory.json` 与 `docs/reviews/2026-11-03-license-log-redaction-audit.md` 汇总 Python / Node 运行时弱 copyleft 及 Java EPL 组，并注明需署名组件与许可证原文位置。
+- 本初稿**不是法律意见**；`knowflow-ai` 自身许可证仍待权利人声明；Maven/npm 全量 SBOM、镜像层及 Linux native 捆绑依赖证据仍未完成。
+- **仍待独立审阅与负责人发行签收**；本注记不把 NOTICE 初稿表述为已完成全量许可证清理或发行批准。

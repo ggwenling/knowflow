@@ -1,0 +1,44 @@
+# NOTICE — 第三方弱 copyleft 与需署名组件摘要（初版）
+
+本文件汇总 KnowFlow 仓库发行物中已知的第三方弱 copyleft 及需署名组件，供分发时保留声明与履行相应义务。依据 `docs/reviews/2026-11-03-dependency-inventory.json` 与 `docs/reviews/2026-11-03-license-log-redaction-audit.md` 的只读清单整理；**不是法律意见，也不构成发行合规批准**。
+
+## Python 运行时
+
+| 组件 | 版本 | SPDX 许可证 | 说明 |
+|---|---|---|---|
+| `psycopg` / `psycopg-binary` | 3.3.6 | `LGPL-3.0-only` | 作为独立包使用；分发时保留版权与许可证声明，并说明库可被替换及对应源码的获取方式。 |
+| `certifi` | 2026.10.23 | `MPL-2.0` | 文件级 copyleft；未修改时保留许可证与来源声明。 |
+
+## Node / Web
+
+| 组件 | 版本 | SPDX 许可证 | 说明 |
+|---|---|---|---|
+| `@img/sharp-libvips-*`（含各平台 binary 变体） | 1.3.4 | `LGPL-3.0-or-later` | 以独立动态库方式加载；保留声明并说明可替换方式与源码获取方式。 |
+| `axe-core` | 4.14.0 | `MPL-2.0` | 开发／构建期依赖；如分发修改后的源文件，需按 MPL-2.0 提供该文件源码。 |
+| `lightningcss` / `lightningcss-*`（含各平台 binary 变体） | 1.33.0 | `MPL-2.0` | 开发／构建期依赖；义务同上。 |
+| `caniuse-lite` | 1.0.30001820 | `CC-BY-4.0` | 需署名（数据来源）；随发行物保留本 NOTICE 作为署名入口，具体署名文本以发行清单为准。 |
+
+## Java / API
+
+| 组件 | 版本 | SPDX 许可证 | 说明 |
+|---|---|---|---|
+| `ch.qos.logback:logback-classic` / `logback-core` | 1.5.34 | `EPL-2.0` 或 `LGPL-2.1-only`（双许可） | 本仓库按 `EPL-2.0` 使用；保留声明，无源码开放义务。 |
+| `jakarta.annotation:jakarta.annotation-api` | 2.1.1 | `EPL-2.0` 或 `GPL-2.0-only WITH Classpath-exception-2.0`（双许可） | 按 `EPL-2.0` 使用；保留声明。 |
+| `org.junit.jupiter:*` / `org.junit.platform:*` | 5.12.2 / 1.12.2 | `EPL-2.0` | 仅测试作用域，不随运行时镜像分发。 |
+| `junit:junit` | 4.13.2 | `EPL-1.0` | 仅测试作用域。 |
+| `jakarta.activation:jakarta.activation-api` / `jakarta.xml.bind:jakarta.xml.bind-api` | 2.1.4 / 4.0.5 | `EDL-1.0`（BSD-3-Clause 类） | 保留版权与免责声明。 |
+
+清单未发现必须按 GPL / AGPL / SSPL 强 copyleft 条款履行的运行时组件（`jakarta.annotation-api` 虽带 GPL2 w/ CPE 选项，本仓库按 `EPL-2.0` 使用）。Java 的 EPL 组按 inventory summary 归纳；更完整的传递依赖与作用域以清单为准。
+
+## 许可证原文与获取方式
+
+- 完整许可证原文见各上游软件包内附带的 `LICENSE` / `NOTICE` / `COPYING` 文件。
+- 本仓库已留存的部分 Python 上游许可证原文位于 `services/ai/docs/evidence/license-texts/`。
+- 本文件只引用 SPDX 标识与上游位置，**不粘贴 GPL/LGPL 等许可证全文**。
+
+## 范围与未完成事项
+
+- 本文件**不是法律意见**；具体发行场景下的通知、源码提供与再分发义务应由权利人结合实际情况确认。
+- `knowflow-ai` 项目自身的许可证仍待权利人声明（inventory 中记为 `UNKNOWN`），本文件不为项目选择或主张任何许可证。
+- Maven / npm 的全量 SBOM、完整传递依赖许可证原文、容器镜像层与 Linux native 捆绑依赖的证据**尚未完成**；本 NOTICE 首版先覆盖 Python / Node 运行时弱 copyleft，并纳入 Java EPL 组概要。
+- 本初版仍待独立审阅及负责人发行签收。

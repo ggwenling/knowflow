@@ -6,11 +6,13 @@
 
 | 任务 | 计划负责人 | 实际执行者 / 交接 | 状态 | Base SHA | Target SHA |
 |---|---|---|---|---|---|
-| KF2-002 | M | Codex 本会话承接 M 的场景/试用文档所有权 | IN_REVIEW | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | bab4d97348b84ef025c6539fb7fd020bb9a660b0 |
-| KF2-003 | B | Codex 本会话，负责模型/隐私/运行基线 | IN_REVIEW | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | bab4d97348b84ef025c6539fb7fd020bb9a660b0 |
-| KF2-005 | M | Codex 本会话承接 M 的仓库组织/协作文档所有权 | IN_REVIEW | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | 6e260de9e99b2e7a089edaad10cd451a6e9eb938 |
+| KF2-002 | M | Codex 本会话承接 M 的场景/试用文档所有权 | SUPERSEDED | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | bab4d97348b84ef025c6539fb7fd020bb9a660b0 |
+| KF2-003 | B | Codex 本会话，负责模型/隐私/运行基线 | SUPERSEDED | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | bab4d97348b84ef025c6539fb7fd020bb9a660b0 |
+| KF2-005 | M | Codex 本会话承接 M 的仓库组织/协作文档所有权 | SUPERSEDED | 5a3d84413f69437b23f2a38fcae032a4ddf8d326 | 6e260de9e99b2e7a089edaad10cd451a6e9eb938 |
 
-全部在 python 分支。Q 尚未审阅，作者未替 Q 填写结论；推送后以审阅包指向的精确 SHA 复核。任务只有在 Q 批准及对应集成验证完成后才转 DONE。
+全部在 python 分支。三条早期文档任务的开放审阅已由后续收尾交付替代，状态仅为 **SUPERSEDED**，**不是 DONE**；原 Q 结论栏仍为空，不伪造 Q APPROVED。
+
+**终态说明（2026-11-04）**：后续 P0 工程收尾、Sol 对 `cd68d7f` 的工程 APPROVED（[2026-11-03-sol-cd68d7f.md](../reviews/2026-11-03-sol-cd68d7f.md)）以及 `grok` 上真实公开集评测/文档体系（[2026-11-04-rag-real-public-seed-v2.md](../evaluation/2026-11-04-rag-real-public-seed-v2.md)），已覆盖并取代这三条早期文档任务的开放审阅。原审阅包 [KF2-002-003-005-review.md](../reviews/KF2-002-003-005-review.md) 的“Q 独立结论”仍未由 Q 填写，故走替代关闭而非 DONE；不据此宣称整体产品验收通过。
 
 ## KF2-002 — 项目规范与接口查询
 
@@ -50,6 +52,8 @@
 | Target SHA | 未提交；代码仍在共享工作区 |
 | 边界 | 保留工作区原有未提交改动；未切分支、提交、推送或合并 |
 
+> 后续说明（2026-11-04）：该 M 主线 Web/基础设施工作后续已合入 `local`/`grok` 工程线并由 CI 验证；本日志不追溯改写旧 Target，仅标记该历史 IN_REVIEW 已被替代。
+
 交付包括 Next.js 文档核验工作台、同源 Java API 代理、Docker Compose 全栈环境、合成模型浏览器 E2E 和 Web CI 工作流。工作台覆盖注册/登录、知识库、上传与索引状态、更新/重建/删除、流式问答、来源原文、历史、取消，以及文本/PDF 页码预览。代理将 Bearer 凭证留在 HttpOnly Cookie 与服务端；写操作校验浏览器来源，并限制请求大小和上游等待时间。Compose 使用独立项目卷、内外分离网络和显式合成 AI 适配器；E2E 使用随机本地凭证与独立 Compose 项目，结束后清理该项目的容器、网络和数据卷。
 
 ### 验证
@@ -66,6 +70,6 @@
 
 ### 尚未关闭
 
-- 等待独立 Q 对精确代码提交审阅，并由 M/项目负责人完成正式验收；本记录不将相关 KF2 任务标记 DONE。
+- 独立 Q 对精确代码提交的审阅仍未由 Q 填写；相关 KF2 文档任务已标记 **SUPERSEDED**（非 DONE），不将相关任务表述为已完成整体验收。
 - 真实 provider 评测、质量/隐私/费用核验、真实用户试用和生产部署仍需按各自依赖推进；本轮没有调用真实模型或外部参与者。
 - 独立前端契约 Mock 是否仍属 KF2-008 的必需验收，应在 Q 复核时确认；当前 E2E 使用真实本地 API 与合成 AI 适配器。

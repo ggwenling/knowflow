@@ -1,6 +1,13 @@
 # P0 工程收尾与 P1 RAG 验收
 
-状态：IN_PROGRESS。当前代码候选为 `local@cd68d7f88d92ee2dd16740b0cf4c7ecc1676cbac`；Sol 独立工程审阅为 **APPROVED**，依据 [2026-11-03-sol-cd68d7f.md](../../reviews/2026-11-03-sol-cd68d7f.md)。执行、证据范围及待负责人事项见下方最新检查点。较早代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。较早候选 `7967883` 当时已推送并与 `origin/local` 同步；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。先前约定 Luna 实现、Sol 独立审阅；本次 Luna 服务不可用后由根代理实施，Sol 独立审阅。M/项目负责人签收及真实模型质量验收仍待完成。
+状态：IN_PROGRESS。工程候选为 `cd68d7f88d92ee2dd16740b0cf4c7ecc1676cbac`（历史基线位于 `local`；当前开发分支为 `grok`）；Sol 独立工程审阅为 **APPROVED**，依据 [2026-11-03-sol-cd68d7f.md](../../reviews/2026-11-03-sol-cd68d7f.md)。执行、证据范围及待负责人事项见下方最新检查点。较早代码全量验证基线为 `local@bb25dc194fc1aeb3b0c21b7f57d364988308c8ea`；性能证据另绑定 `local@9c9b4a08bbabc4efebd906e7cbd93dc83bb7a6c7`。较早候选 `7967883` 当时已推送并与 `origin/local` 同步；`origin/main@b7e83c8cf475195ac54b7b58a96ba275e44b8625` 未改变。draft.10 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。先前约定 Luna 实现、Sol 独立审阅；本次 Luna 服务不可用后由根代理实施，Sol 独立审阅。M/项目负责人签收及真实模型质量验收仍待完成。
+
+## 2026-11-04 真实公开集评测（grok 分支）
+
+- 分支 `grok`；采集时代码 SHA `d5e1eb7f3a0094481a26cb6465ed57537099ee03`。报告：[2026-11-04-rag-real-public-seed-v2.md](../../evaluation/2026-11-04-rag-real-public-seed-v2.md)；聚合 assets：`docs/evaluation/assets-real-20261104-*.json`。当前文档同步时 HEAD 以协调者提交后为准；此前 `de830a8` 的 Web engineering E2E run `41682519659` 为 success。
+- 数据集：`qingzhu-seed-v2-reviewed` / `evaluation/data/seed-v2-reviewed`，公开合成集，**非盲测**。development 40 题与 holdout 20 题质量门**全部 passed**：Recall@5 = 1.0；MRR@10 development 0.9785 / holdout 1.0；support、citation、refusal 门均通过，误拒 0。数字以报告表格为准，不另行推算。
+- 花费：BudgetLedger 预留 **0.07374 CNY**（73740 microyuan）；paid 60 / zero-price 80；soft 8 / hard 10 未触发。PRICE/POLICY 仍为草稿，`verified_by=draft-not-owner-signed`，**待负责人签核**。
+- 明确：公开集满分**不**等于真实水平或正式总体验收；盲测由负责人在 Windows 本机执行，本轮未触碰盲测数据。真实评测启动器修复 `ee359a0` 经 Sol High 复审 APPROVED（[2026-11-04-sol-ee359a0.md](../../reviews/2026-11-04-sol-ee359a0.md)）；盲测 runbook F1–F4 由 Sol 复审 Target `b8a8a60` APPROVED（审阅文件提交于 `de830a8`，[2026-11-04-sol-b8a8a60.md](../../reviews/2026-11-04-sol-b8a8a60.md)），本节不展开 runbook 内容。
 
 ## 2026-11-03 独立工程审阅与候选校准
 
@@ -25,7 +32,7 @@
 - 本机验证通过（目标代码 `bb25dc1`）：Web typecheck、lint、43 项单测、Docker production Web 镜像构建、Docker 全栈 Chromium E2E 1/1；Java Maven/Testcontainers 83 项（1 项跳过）；AI 324 项；Schema 85 项、OpenAPI 4 项、批次摘要 5 项、离线模型 smoke 16 项。E2E 构建 Web/API/AI/migrate 镜像并检查正常 TXT/PDF 问答的 draft.10 SSE 帧、注册、上传/READY、owner 隔离、删除及 PDF；浏览器通过来源查看键盘操作和移动视口检查。错误/取消 SSE 路径及完整消费语义仍待验收。临时 Compose 容器、网络和卷清理后均为 0。Docker 代理已恢复；远端 CI 尚待推送后确认。
 - 合成负载报告 `evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` 绑定 `9c9b4a0`：10/100 文档 × 并发 1/4/8 × 每组 8 个请求，48/48 成功；合成环境 Java API 与 AI 准入上限均为 8。100 文档下首个 SSE delta p95 为 360/485/532 ms，完整回答 p95 为 625/844/1094 ms（并发 1/4/8）。报告有容器资源采样并确认清理。仅证明该 Windows Docker 合成适配器负载，不代表真实 provider 延迟、成本或生产容量。
 - 故障恢复报告 `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json` 绑定 `bb25dc1`：PostgreSQL 读/索引写中断、MinIO 中断后 ready 与真实 PUT/GET/DELETE canary、第二批 Embedding 失败四项通过；临时数据库和服务端口清理，provider 调用 0。隔离备份恢复报告 `infra/evidence/backup-restore-20261103-final-bb25dc1.json` 同样绑定 `bb25dc1`，数据库/MinIO 恢复、字节一致、历史来源、owner 隔离、恢复后查询及两套 Compose 清理通过，迁移版本 8→8。均未测试生产升级回滚或真实用户环境。
-- 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。尚未接通真实评测驱动；真实 provider 调用保持 0。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
+- 当前 collector 已把 request-id 单次检索 trace 与 AnswerService 响应/错误组装为 runner-v2 行，逐次重映射引用标记，并支持经审核来源元数据的 SiliconFlow `BAAI/bge-m3` 零价 embedding 账本记录；`services/ai/tests/test_rag_collection.py` 当前定向测试 25 项通过。（截至 2026-11-03）尚未接通真实评测驱动；真实 provider 调用保持 0；该状态已于 2026-11-04 被 `grok` 上公开合成集真实采集取代，见上节。Sol 的预算审阅不批准启用真实评测：现有输入 token 计数不能证明 ¥10 硬上限；须有供应商级支出上限或由负责人明确批准可接受的软预算策略。
 - Java `DocumentApiIntegrationTest` 增加 3 项 MVC wire 回归：可选空 `active_index_version_id` / `failure_code` 不输出，processing 历史和过期来源的 required nullable 字段显式为 JSON `null`。3 个 Testcontainers 方法、OpenAPI 4 项、Schema 85 structural cases 通过。此验证仅覆盖列出的字段与端点，不代表全部公开 JSON 响应或 SSE 消费验收。
 - 远端 push workflow [#15](https://github.com/ggwenling/knowflow/actions/runs/41590144065) 在候选 `7967883` 上 4m48s 完成，`python-contract`、Java、Web/Docker E2E 三个 job 均成功。现有 PR [#3](https://github.com/ggwenling/knowflow/pull/3) 的 pull_request workflow [#16](https://github.com/ggwenling/knowflow/actions/runs/41590148290) 在本次记录时仍运行中（python-contract 与 Java 已成功，Web job 未结束）。`main` 尚未更新。
 - Sol High 对候选 `79678830b14047aabc41e3cd5f607f564728fb6a` 的代码/契约复核为 APPROVED，无代码阻断；正式 Q/M 仍 CHANGES_REQUESTED，Java/Python 与 M 的消费清单未签、错误/取消 SSE 路径及完整消费语义待完成。
@@ -44,9 +51,12 @@
 
 - [x] 用户确认逐题审核现有 60 题，审核者 `human-reviewer`；保留公开 40/20 开发/验证划分，不声称双人人工一致性。
 - [ ] **待负责人**：用户私下保管新增 20 道盲测题（15 道可回答、5 道不可回答），使用新合成资料和事实组；冻结候选后独立运行。
-- [ ] **待负责人**：接通 Java 授权写入/索引/问答与真实 provider 的完整预测采集，保存前 10 名检索记录，完成人工答案支持和逐引用审核、错误/拒答区分及正式质量门；先通过经 Sol 复核的支出上限门禁。私有答案和盲测题不提交仓库。
-- [ ] **待负责人**：真实质量门核验，门槛为 Recall@5 ≥ 0.85、MRR@10 ≥ 0.75、答案支持率 ≥ 0.90、引用准确率 ≥ 0.95、不可回答题拒答率 ≥ 0.90、可回答题误拒答率 ≤ 0.10、人工审核覆盖率 100%。记录分子、分母和分类结果。
-- [ ] **待负责人**：真实模型调用总预算人民币 10 元，覆盖索引、问答、重试和在途请求；需有可核验的供应商侧硬支出上限及超额拒绝证据，或经负责人批准的软预算政策，并由 Sol 复核。仅本地 token 估算不构成硬上限；未解锁前保持零 provider 调用。
+- [x] 公开集真实采集与质量门（合成）：`qingzhu-seed-v2-reviewed` 的 development+holdout 已在 `grok` 上完成真实采集并通过质量门，见 [2026-11-04 报告](../../evaluation/2026-11-04-rag-real-public-seed-v2.md)；仅代表公开合成集，不等于私有盲测或正式总体验收。
+- [ ] **待负责人**：接通 Java 授权写入/索引/问答与真实 provider 的完整预测采集，保存前 10 名检索记录，完成人工答案支持和逐引用审核、错误/拒答区分及正式质量门；私有盲测 / 正式总体验收 / 价格政策签核仍待负责人。私有答案和盲测题不提交仓库。
+- [x] 公开合成集质量门核验（合成）：development 40 / holdout 20 的门槛全部 passed，数字见上述 2026-11-04 报告；不代替盲测或负责人签收。
+- [ ] **待负责人**：私有盲测与正式总体验收的真实质量门核验，门槛为 Recall@5 ≥ 0.85、MRR@10 ≥ 0.75、答案支持率 ≥ 0.90、引用准确率 ≥ 0.95、不可回答题拒答率 ≥ 0.90、可回答题误拒答率 ≤ 0.10、人工审核覆盖率 100%。记录分子、分母和分类结果。
+- [x] 本轮公开合成集已发生真实调用，BudgetLedger 预留约 **0.074 CNY**（0.07374，73740 microyuan）；soft 8 / hard 10 未触发，按草稿 PRICE/POLICY 保守预留。
+- [ ] **待负责人**：真实模型调用总预算人民币 10 元，覆盖索引、问答、重试和在途请求；需有可核验的供应商侧硬支出上限及超额拒绝证据，或经负责人批准的软预算政策，并由 Sol 复核。仅本地 token 估算不构成硬上限。**软预算政策与 PRICE/POLICY 正式签核仍待负责人；不得声称 hard cap 已签收。**
 - [x] 在 `bb25dc1` 隔离恢复 E2E 中验证 PostgreSQL 读/写中断、MinIO ready+写入 canary 和第二批 Embedding 失败；恢复报告见当前检查点。
 - [x] 在 `9c9b4a0` 完成 10/100 文档、并发 1/4/8 的合成负载测量。
 - [ ] **待负责人**：测量真实 provider 的延迟与成本；先解决预算门禁。

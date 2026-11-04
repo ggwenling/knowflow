@@ -1,22 +1,29 @@
 ---
 schema_version: 1
-handoff_id: 20261103-122516
-updated_at: 2026-11-03T12:25:16Z
-from: codex
+handoff_id: 20261104-025910
+updated_at: 2026-11-04T02:59:10Z
+from: know-bot-codebuddy
 to: codex
 status: ready
 source_machine: WENLING
 target_machine: same
-branch: local
-commit: 3adc864d68a5e1a7635643c6b8646e007b5d0b52
+branch: grok
+commit: de830a80e49eb1840f5a20ec7c1b72ac7fdbe668
 ---
 
 # AI project handoff
 
 ## Outcome
-继续在 `local` 完成 P0 契约与工程签收、P1 真实 RAG 和独立盲测，以及 P2 部署恢复与真实用户试用；保持已完成证据可追溯，按实际结果更新状态。
+继续在 `grok` 完成 P0 契约与工程签收、P1 真实 RAG 与私有盲测，以及 P2 部署恢复与真实用户试用；公开合成集真实采集已完成，保持已完成证据可追溯，按实际结果更新状态。
 
 ## Current state
+- 开发分支现为 `grok`（勿在 `local`/`main` 开发）；本轮文档同步前 HEAD 为 `de830a8`，协调者提交后以实际 SHA 为准。
+- 真实公开集评测已完成：`qingzhu-seed-v2-reviewed`（公开合成，**非盲测**）development 40 + holdout 20 质量门全部 passed；报告 `docs/evaluation/2026-11-04-rag-real-public-seed-v2.md`，采集代码 SHA `d5e1eb7f3a0094481a26cb6465ed57537099ee03`；BudgetLedger 预留 **0.07374 CNY**（73740 microyuan），paid 60 / zero-price 80，soft 8 / hard 10 未触发。PRICE/POLICY 仍为草稿（`verified_by=draft-not-owner-signed`），待负责人签核。
+- 工程候选仍可引用 `cd68d7f88d92ee2dd16740b0cf4c7ecc1676cbac` 的 Sol APPROVED（`docs/reviews/2026-11-03-sol-cd68d7f.md`）；grok 上评测启动器 `ee359a0` 另有 Sol 复审（`docs/reviews/2026-11-04-sol-ee359a0.md`），盲测 runbook F1–F4 的 Sol 复审（Target `b8a8a60`，审阅文件提交于 `de830a8`，`docs/reviews/2026-11-04-sol-b8a8a60.md`），均不重新绑定工程候选。
+- 待负责人：M 浏览器人工签收、PRICE/POLICY 签核、PR #3 合并、密钥轮换、私有盲测（Windows 本机）、生产部署／试用。
+- 本轮协调者时限：仅 CodeBuddy；不跑 Codex。公开合成集满分不等于真实水平或正式总体验收；本轮未触碰盲测数据。
+
+### 2026-11-03 接收快照（历史，已被上方状态取代）
 - Terra High 接收本轮仅文档同步；接收基线 `3adc864d68a5e1a7635643c6b8646e007b5d0b52`，经 TLS 校验 fetch 确认 `local` 与 `origin/local` 一致。frontmatter commit 是本轮接收基线，不是本文件所在最终文档提交的自引用 SHA。
 - **Sol APPROVED cd68d7f**：工程 Target `cd68d7f88d92ee2dd16740b0cf4c7ecc1676cbac`，Base `b7e83c8cf475195ac54b7b58a96ba275e44b8625`；依据 [独立审阅文件](../docs/reviews/2026-11-03-sol-cd68d7f.md)（路径 `docs/reviews/2026-11-03-sol-cd68d7f.md`）。该审阅关闭原 R1/R2 和 #14 日志 L1，不再将该工程目标称为待独立审阅；此前缺少对应文件的其他旧 SHA 不追溯批准。
 - 本轮仅将计划工程候选更新为 `cd68d7f`，把消费清单已有证据的限定工程项登记为 APPROVED，并同步本交接。`3adc864` 是审阅文件提交，本轮新提交也是文档同步；不声称 Sol 已批准这些后续文档提交，不由 Terra 自签。
@@ -99,19 +106,21 @@ commit: 3adc864d68a5e1a7635643c6b8646e007b5d0b52
 - [x] 工程目标 `cd68d7f` 已提交／推送，Sol 报告核对该 Target 的 PR CI run `41630396504` 三个 job success；本轮后续文档提交的 CI 另行核对，不混用 Target。
 - [x] 计划候选和消费清单按独立工程审阅同步；没有覆盖证据的完整签收项继续保留未勾选。
 - [ ] **待负责人**：Java/Python 与 M 浏览器正式消费签收及整体负责人验收；工程 APPROVED 不代替人工签收，本轮禁止合并 PR #3。
-- [ ] 提交前快照：本轮三份文档尚待 commit／普通 push；最终交付核对新完整 SHA，不强推。
+- [ ] 本轮文档变更（收尾计划、交接、执行日志、根 `NOTICE`、消费清单注释）未 commit／push，由协调者提交；最终 SHA 以提交后为准。
 - [ ] **待负责人**：完整真实 RAG 采集覆盖索引、授权、top-10 检索、回答和逐引用人工审核；经预算门禁与 Sol 复审后运行，报告 Recall@5、MRR@10、支持率、引用准确率、拒答与误拒答率及分母，按计划质量门判定。
 - [ ] **待负责人**：人工管理员在仓库外准备独立 20 题私有盲测与资料，冻结候选后在不提前泄露答案的前提下执行并留存可核验评分。
 - [ ] **待负责人**：完成 Linux 解析资源/许可、真实 provider 延迟成本、生产部署和升级失败回滚、备份恢复目标环境验收，以及至少两周真实用户试用；没有证据的项目保持未完成。
 
 ## Start here
-1. `cd D:\konwflow`；核对实际 HEAD/工作树/远端。代码候选与独立批准固定为 `cd68d7f`，后续文档 SHA 单独记录；不要输出环境配置值。
+1. `cd /workspace/knowflow`（Windows 本机为仓库根）；核对实际 HEAD/工作树/远端。开发分支固定为 `grok`（勿在 `local`/`main` 开发）；工程候选与独立批准可引用 `cd68d7f`，后续文档 SHA 单独记录；不要输出环境配置值。
 2. 读取 `docs/reviews/2026-11-03-sol-cd68d7f.md`，按其未覆盖范围和消费清单继续安排负责人待办。不得将历史口头批准或当前文档同步当作新独立批准。
 3. 按消费清单完成其余Java/Python/M的完整签收，负责人明确签收前不合并PR #3；不能把代码审阅或自动化验证冒充人工签收。
-4. 真实RAG采集驱动仍可继续设计/实现，但真实provider启用须先有可核验硬预算证据或明确获批软预算政策，再由Sol复核；当前入口继续fail-closed。新增私有20题与生产环境由用户准备，本轮确认仍无更新。
+4. 公开合成集真实采集已在 `grok` 完成（见 2026-11-04 报告）；私有盲测仍由负责人在 Windows 本机执行，PRICE/POLICY 与软预算政策仍待签核。不得读取或提交盲测题面、答案或预测全文。
 
 ## Files and commands
 - `docs/reviews/2026-11-03-sol-cd68d7f.md` — 独立 Sol 工程审阅，Target `cd68d7f`，Verdict APPROVED；未覆盖事项仍待负责人。
+- `docs/evaluation/2026-11-04-rag-real-public-seed-v2.md`（assets `docs/evaluation/assets-real-20261104-*.json`）— 公开合成集 development+holdout 真实采集、质量门与预算账本摘要；非盲测。
+- `NOTICE` — 第三方弱 copyleft／需署名组件初版摘要；非法律意见，项目自身许可证仍待权利人声明。
 - `docs/planning/v0.2/p0-p1-closeout-plan-2026-11-02.md` — P0/P1/P2 计划、阈值与证据；`65774c4` 中 PR run #16 的“运行中”是历史快照，实际已成功。
 - `contracts/consumer-draft10-checklist.md`、`contracts/openapi-draft10.json`、`contracts/schemas/protocol.schema.json` — 三端验收与候选契约；共享 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。
 - `docs/evaluation/real-collection-design.md`、`docs/evaluation/blind-holdout-protocol.md` — 采集、预算和盲测边界；`evaluation/collector/` 为尚未贯通的原型。
@@ -119,13 +128,14 @@ commit: 3adc864d68a5e1a7635643c6b8646e007b5d0b52
 - 全栈 E2E：`node scripts/e2e-web.mjs`；Java：在 `services/api` 运行 `.\mvnw.cmd -B test`；AI：`uv run --project services/ai --frozen pytest services/ai/tests -q`；契约：`uv run --project services/ai --frozen python contracts/validate.py` 与 `python -m unittest contracts.test_openapi_draft10 -v`。按需运行，避免重复无关测试。
 
 ## Decisions and guardrails
-- 始终使用 `local`；本轮文档编辑者 Terra High，仅转录独立 Sol 对 `cd68d7f` 的 APPROVED，不自签。只允许候选 SHA 和证据状态的文档同步；禁止改代码、合并 main、强推、删除分支、部署、调用付费模型/API 或修改盲测。仅授权普通 commit / push 到 origin/local。
+- 开发分支使用 `grok`（勿在 `local`/`main` 开发）；本轮文档编辑者 know-bot-codebuddy，仅转录独立审阅结论，不自签。只允许候选 SHA 和证据状态的文档同步；禁止改代码、合并 main、强推、删除分支、部署、调用付费模型/API 或修改盲测。按本轮协调者要求不 commit／push，由协调者提交。
 - 独立私有盲测须人工保管，公开 60 题不可充作盲测。真实 provider 调用、索引和重试必须纳入批准预算及经过复核的门禁；不能以调用后统计冒充硬限额。
 - 不查看 `data/raw/` 或密钥文件；不输出凭据、原始私有题或答案。故障/性能和备份通过仅限所记录的隔离合成环境。
 
 ## Working tree
+- 2026-11-04 本轮仅文档变更：`docs/planning/v0.2/p0-p1-closeout-plan-2026-11-02.md`、`.context/ai-handoff.md`、`docs/tasks/execution-log.md`、根 `NOTICE`、`contracts/consumer-draft10-checklist.md`（及 `docs/reviews/issue-14-license-audit-25c8dc3.md` 末尾注记）；未 commit／push。
 - 接收基线的已跟踪文件无未提交差异；handoff、`next-env.d.ts` 和两个误入目录此前均已跟踪，不能再称为未跟踪文件。
-- 本轮修改归属 Terra High：本交接、`docs/planning/v0.2/p0-p1-closeout-plan-2026-11-02.md`、`contracts/consumer-draft10-checklist.md`；仅三份 Markdown，按用户明确授权提交并推送。最终文件清单以新提交的 `git show --name-status` 为准。
+- 上一轮修改归属 Terra High：本交接、`docs/planning/v0.2/p0-p1-closeout-plan-2026-11-02.md`、`contracts/consumer-draft10-checklist.md`；仅三份 Markdown，当时按用户明确授权提交并推送。最终文件清单以新提交的 `git show --name-status` 为准。
 - `grok bot/`、`.workbuddy/` 按授权 `git rm -r`，并加入根 `.gitignore`；不再作为执行入口。
 - `.tmp-annotation/` 的两份已跟踪文件归属／删除必要性未确认，保留原状；`.gitignore` 不变。`apps/web/next-env.d.ts`、业务代码、独立审阅文件、正式人工签收和盲测资料不改。
 - `.env.example` 只允许空值／示例占位符。实际 `.env` 不读取、不暂存、不输出；供应商撤销／轮换未核实。
@@ -138,6 +148,7 @@ commit: 3adc864d68a5e1a7635643c6b8646e007b5d0b52
 - 生产目标环境、备份/升级回滚策略及真实用户试用负责人和时间尚未确定。
 
 ## Handoff log
+- `2026-11-04T02:59:10Z` — `know-bot-codebuddy` set status to `ready`：`grok@de830a8` 上同步公开合成集真实评测（development+holdout 质量门 passed、预留 0.07374 CNY、PRICE/POLICY 仍为草稿待签核）、收口 KF2-002/003/005 为 SUPERSEDED、新增根 `NOTICE` 初稿；本轮仅文档，未 commit／push，不代签负责人，未触碰盲测。
 - `2026-11-03T12:25:16Z` — `codex` / Terra High 接收 `local@3adc864` 的仅文档任务；核对独立文件后登记 **Sol APPROVED cd68d7f**，候选校准到该工程 Target，完整消费／真实评测／预算／盲测／M 人工／部署均待负责人。`.tmp-annotation/` 删除用途不确定，保留；本轮普通提交／推送，不自签。
 - `2026-11-03T11:33:01Z` — `codex` / Terra High accepted 并设为 in_progress：核对 be958d4 与 origin/local 一致，接收用户授权的目录清理、交接修正与 #14 修复；待独立审阅，不改计划候选，不自签。
 
