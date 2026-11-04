@@ -1,0 +1,1 @@
+{"deepseek-flash": {"provider": "deepseek", "bound_kind": "provider_context_limit", "verified_by": "synthetic-test", "source_url": "https://example.test/policy", "verified_at": "2026-11-03T12:52:32.553943+00:00", "valid_until": "2026-11-03T14:52:32.553943+00:00", "input_tokens_upper": 10000, "output_tokens_upper": 1024, "max_payload_bytes": 10000}}

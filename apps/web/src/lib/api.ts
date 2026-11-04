@@ -1,5 +1,5 @@
 export type User = { user_id: string; email: string };
-export type KnowledgeBase = { id: string; name: string; status: string };
+export type KnowledgeBase = { id: string; name: string; status: string; updated_at?: string };
 export type Document = {
   id: string;
   original_name: string;

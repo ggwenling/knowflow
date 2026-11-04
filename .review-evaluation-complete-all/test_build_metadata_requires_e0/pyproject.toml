@@ -1,0 +1,5 @@
+[project]
+dependencies = []
+[build-system]
+requires = ["expected-builder==1.0"]
+build-backend = "expected_builder"

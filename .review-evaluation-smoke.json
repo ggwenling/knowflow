@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "real_provider_calls": 0,
+  "project": "knowflow-eval-879065babf7c",
+  "predictions": 12,
+  "scorer_samples": 12,
+  "fake_budget": {
+    "limit_microyuan": 10000000,
+    "reserved_microyuan": 364576,
+    "remaining_microyuan": 9635424,
+    "paid_reservations": 34,
+    "zero_price_reservations": 0
+  },
+  "cleanup_exit_code": 0
+}

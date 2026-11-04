@@ -1,0 +1,44 @@
+{
+  "dataset_id": "private-63faa9edcd9f98e969f36e6632b09ff451771c37c4b4fa086159d81935dd7279",
+  "private_pack_version": 1,
+  "privacy": "local_only",
+  "synthetic": false,
+  "documents": [
+    {
+      "id": "doc-0bdd108df89efc080b38e34a802d21fed637990cc074d948afd3626f50fef9ef",
+      "content_version_id": "content-439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "path": "documents/doc-0bdd108df89efc080b38e34a802d21fed637990cc074d948afd3626f50fef9ef.txt",
+      "sha256": "439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "bytes": 29,
+      "characters": 12,
+      "license": "UNSPECIFIED"
+    },
+    {
+      "id": "doc-b26b7b0c4b29c090c4d37ece8c98f70fd07a44c8459ab4aded37c5594d254c4c",
+      "content_version_id": "content-439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "path": "documents/doc-b26b7b0c4b29c090c4d37ece8c98f70fd07a44c8459ab4aded37c5594d254c4c.txt",
+      "sha256": "439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "bytes": 29,
+      "characters": 12,
+      "license": "UNSPECIFIED"
+    },
+    {
+      "id": "doc-b67db279470768b51a0175130c878ac36562cb7694b4c38faea4e4a45a8b5fcf",
+      "content_version_id": "content-439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "path": "documents/doc-b67db279470768b51a0175130c878ac36562cb7694b4c38faea4e4a45a8b5fcf.txt",
+      "sha256": "439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "bytes": 29,
+      "characters": 12,
+      "license": "UNSPECIFIED"
+    },
+    {
+      "id": "doc-742b51fafdbbc8b99c10b58943f9bf9cc52789776aca3738f92bdd5d616cb0bd",
+      "content_version_id": "content-439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "path": "documents/doc-742b51fafdbbc8b99c10b58943f9bf9cc52789776aca3738f92bdd5d616cb0bd.txt",
+      "sha256": "439628dcda43497bbb0a9aa2bfc47f0950a753cdb373a9884637efe1cb40f7e0",
+      "bytes": 29,
+      "characters": 12,
+      "license": "UNSPECIFIED"
+    }
+  ]
+}

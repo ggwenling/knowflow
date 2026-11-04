@@ -1,0 +1,182 @@
+{
+  "complete": true,
+  "failures": [],
+  "budget_steps": [
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "index",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    },
+    {
+      "stage": "question",
+      "limit_microyuan": 10000000,
+      "reserved_microyuan": 0,
+      "remaining_microyuan": 10000000,
+      "paid_reservations": 0,
+      "zero_price_reservations": 0
+    }
+  ]
+}
