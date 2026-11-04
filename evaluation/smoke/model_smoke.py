@@ -48,10 +48,7 @@ def read_config(env):
             raise SmokeFailure("INVALID_MODEL_IDENTIFIER")
         if role == "EMBEDDING" and model.rsplit("/", 1)[-1].lower().startswith("bge-reranker"):
             raise SmokeFailure("RERANKER_IS_NOT_EMBEDDING")
-        # Separate endpoints require explicit credential selectors. Never forward a
-        # shared provider key to a newly configured provider by silent fallback.
-        separate_url = env.get(prefix + "_BASE_URL", "").strip()
-        base_url = separate_url or env.get("KNOWFLOW_MODEL_BASE_URL", "").strip()
+        base_url = env.get(prefix + "_BASE_URL", "").strip()
         if not base_url:
             missing.append(prefix + "_BASE_URL")
         else:
@@ -61,11 +58,15 @@ def read_config(env):
             except ValueError:
                 raise SmokeFailure("INVALID_HTTPS_BASE_URL") from None
             if (url.scheme != "https" or not url.hostname or url.username is not None
-                    or url.password is not None or url.query or url.fragment):
+                    or url.password is not None or url.query or url.fragment
+                    or url.port not in (None, 443)):
                 raise SmokeFailure("INVALID_HTTPS_BASE_URL")
+            expected_host, expected_path = (
+                ("api.siliconflow.cn", "/v1") if role == "EMBEDDING"
+                else ("api.deepseek.com", ""))
+            if url.hostname != expected_host or url.path.rstrip("/") != expected_path:
+                raise SmokeFailure("PROVIDER_ENDPOINT_MISMATCH")
         key_name = env.get(prefix + "_KEY_ENV")
-        if key_name is None and not separate_url:
-            key_name = env.get("KNOWFLOW_MODEL_KEY_ENV", "OPENAI_API_KEY")
         if key_name is None:
             missing.append(prefix + "_KEY_ENV")
         elif not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key_name):

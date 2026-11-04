@@ -7,6 +7,7 @@ import json
 import os
 import re
 from pathlib import Path
+import subprocess
 import time
 from urllib.parse import urlsplit
 
@@ -37,6 +38,35 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def private_output_is_ignored(dataset, output):
+    dataset_path = Path(dataset).absolute()
+    if dataset_path.is_symlink() or dataset_path.resolve() != dataset_path:
+        return False
+    dataset = dataset_path.resolve()
+    private_root = dataset.parent.parent
+    private_output = private_root / "out"
+    if (dataset.name != "runner" or dataset.parent.name != "out" or private_root.name != ".blindtest"
+            or any(path.is_symlink() or path.resolve() != path for path in
+                   (private_root, private_output, dataset))):
+        return False
+    target_path = Path(output).absolute()
+    if target_path.is_symlink() or target_path.resolve() != target_path:
+        return False
+    target = target_path.resolve()
+    if not target.is_relative_to(private_output):
+        return False
+    repository = private_root.parent
+    try:
+        root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repository,
+                              capture_output=True, text=True, check=False)
+        if root.returncode or Path(root.stdout.strip()).resolve() != repository.resolve():
+            return False
+        return all(subprocess.run(["git", "check-ignore", "--quiet", str(path)], cwd=repository,
+                                  check=False).returncode == 0 for path in (dataset, target))
+    except OSError:
+        return False
+
+
 async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger):
     if (not isinstance(run_metadata, dict)
             or set(run_metadata) != {"code_sha", "schema_sha256", "config_sha256", "prompt_sha256", "model"}
@@ -47,7 +77,7 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                                        ("config_sha256", 64), ("prompt_sha256", 64)))):
         raise ValueError("INVALID_RUN_METADATA")
     manifest, questions, _documents, _sources, fingerprint = scorer._load_dataset(dataset)
-    if manifest.get("privacy") == "local_only" and not output.resolve().is_relative_to(ROOT / ".blindtest/out"):
+    if manifest.get("privacy") == "local_only" and not private_output_is_ignored(dataset, output):
         raise ValueError("PRIVATE_OUTPUT_OUTSIDE_IGNORED_DIRECTORY")
     selected = [question for question in questions if question["split"] == split]
     if not selected or output.exists():
@@ -114,14 +144,17 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                     question=question["question"], question_id=question["id"],
                     mappings=mappings, lookup_question=lookup)
             except (ValueError, httpx.HTTPError):
-                status["failures"].append({"question_id": question["id"], "code": "COLLECTION_INCOMPLETE"})
                 row = {"question_id": question["id"], "outcome": "error", "answer": "",
                        "answer_sha256": sha256(b"").hexdigest(), "retrieved_evidence": [], "citations": [],
                        "latency_ms": 0, "error_code": "COLLECTION_INCOMPLETE"}
+            if row.get("outcome") == "error":
+                status["failures"].append({"question_id": question["id"], "code": "COLLECTION_INCOMPLETE"})
             payload["predictions"].append(row)
             status["budget_steps"].append({"stage": "question", **ledger.summary()})
             write_json(output, payload)
             write_json(output.with_suffix(".status.json"), status)
+            if row.get("outcome") == "error":
+                raise ValueError("COLLECTION_INCOMPLETE")
             if (question_index + 1 < len(selected)
                     and ledger.summary()["reserved_microyuan"] >= 8_000_000):
                 raise ValueError("BUDGET_SOFT_STOP")

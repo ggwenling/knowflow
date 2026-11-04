@@ -94,18 +94,32 @@ def convert(pack, source_root):
 def main():
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, default=root)
+    parser.add_argument("--pack-root", type=Path, default=root / ".blindtest",
+                        help="private .blindtest directory in a Git repository")
+    parser.add_argument("--source-root", type=Path)
     args = parser.parse_args()
-    pack = root / ".blindtest"
-    if pack.is_symlink():
+    pack_path = args.pack_root.absolute()
+    if pack_path.is_symlink() or pack_path.resolve() != pack_path:
         print("UNSAFE_PRIVATE_PACK_PATH")
         return 1
-    ignored = subprocess.run(["git", "check-ignore", "--quiet", str(pack / "out" / "runner")], cwd=root)
-    if ignored.returncode:
+    pack = pack_path.resolve()
+    try:
+        repository = Path(subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], cwd=pack.parent,
+            text=True, stderr=subprocess.DEVNULL).strip()).resolve()
+    except (OSError, subprocess.CalledProcessError):
+        print("UNSAFE_PRIVATE_PACK_PATH")
+        return 1
+    if repository != pack.parent.resolve():
+        print("UNSAFE_PRIVATE_PACK_PATH")
+        return 1
+    ignored = subprocess.run(["git", "check-ignore", "--quiet", str(pack / "out" / "runner")],
+                             cwd=repository, check=False)
+    if ignored.returncode != 0:
         print("PRIVATE_OUTPUT_NOT_IGNORED")
         return 1
     try:
-        print(json.dumps(convert(pack, args.source_root)))
+        print(json.dumps(convert(pack, args.source_root or repository)))
     except (OSError, ValueError, KeyError, TypeError, UnicodeError):
         print("PRIVATE_PACK_CONVERSION_FAILED")
         return 1

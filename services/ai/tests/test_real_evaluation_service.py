@@ -172,6 +172,29 @@ def test_expired_price_fails_closed(monkeypatch, tmp_path):
     assert "test-reviewer" not in message
 
 
+def test_unsigned_policy_fails_closed(monkeypatch, tmp_path):
+    _prices, policies, _price_file, policy_file = configure_real_service(monkeypatch, tmp_path)
+    policies["deepseek-flash"]["verified_by"] = "draft-not-owner-signed"
+    policy_file.write_text(json.dumps(policies), encoding="utf-8")
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_POLICY_FILE"
+
+
+def test_unsigned_price_fails_closed(monkeypatch, tmp_path):
+    prices, _policies, price_file, _policy_file = configure_real_service(monkeypatch, tmp_path)
+    prices["deepseek-flash"]["verified_by"] = "draft-not-owner-signed"
+    price_file.write_text(json.dumps(prices), encoding="utf-8")
+
+    with pytest.raises(RuntimeError) as error:
+        real_service.create_real_app()
+
+    assert "KNOWFLOW_BUDGET_PRICE_FILE" in str(error.value)
+    assert "draft-not-owner-signed" not in str(error.value)
+
+
 def test_corrupt_shared_ledger_fails_closed(monkeypatch, tmp_path):
     configure_real_service(monkeypatch, tmp_path)
     ledger_path = tmp_path / "ledger.sqlite3"

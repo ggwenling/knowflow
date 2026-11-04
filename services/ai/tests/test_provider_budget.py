@@ -98,6 +98,79 @@ async def test_provider_thresholds_stop_before_http(monkeypatch, caplog, spent, 
     assert ledger.summary()["paid_reservations"] == 1
 
 
+def test_provider_budget_accepts_positive_siliconflow_price_source(tmp_path):
+    from knowflow_ai.provider_budget import reserve_provider_call_sync
+
+    now = datetime.now(timezone.utc)
+    quote = {"provider": "siliconflow", "model": "BAAI/bge-m3",
+             "input_cny_per_million": "1", "output_cny_per_million": "0",
+             "source_url": "https://api.siliconflow.cn/pricing", "verified_by": "test-reviewer",
+             "verified_at": (now - timedelta(minutes=1)).isoformat(),
+             "valid_until": (now + timedelta(hours=1)).isoformat()}
+    policy = {"provider": "siliconflow", "bound_kind": "provider_context_limit",
+              "source_url": quote["source_url"], "verified_by": "test-reviewer",
+              "verified_at": quote["verified_at"], "valid_until": quote["valid_until"],
+              "input_tokens_upper": 1000, "output_tokens_upper": 0, "max_payload_bytes": 10000}
+    price_path, policy_path = tmp_path / "prices.json", tmp_path / "policies.json"
+    price_path.write_text(json.dumps({"BAAI/bge-m3": quote}), encoding="utf-8")
+    policy_path.write_text(json.dumps({"BAAI/bge-m3": policy}), encoding="utf-8")
+    env = {"KNOWFLOW_BUDGET_LEDGER_PATH": str(tmp_path / "ledger.sqlite3"),
+           "KNOWFLOW_BUDGET_PRICE_FILE": str(price_path),
+           "KNOWFLOW_BUDGET_POLICY_FILE": str(policy_path)}
+
+    reserve_provider_call_sync("siliconflow", "BAAI/bge-m3",
+                               {"model": "BAAI/bge-m3", "input": ["synthetic"]}, environ=env)
+
+    assert BudgetLedger(env["KNOWFLOW_BUDGET_LEDGER_PATH"]).summary()["paid_reservations"] == 1
+
+
+@pytest.mark.parametrize("table,quote,allow_zero", [
+    ("reservations", {"provider": "synthetic", "model": "model-a",
+                      "input_cny_per_million": "1", "output_cny_per_million": "1",
+                      "source_url": "https://example.test/prices"}, False),
+    ("zero_price_reservations", {"provider": "siliconflow", "model": "BAAI/bge-m3",
+                                  "input_cny_per_million": "0", "output_cny_per_million": "0",
+                                  "source_url": "https://siliconflow.cn/pricing"}, True),
+])
+def test_ledger_rejects_ignored_reservation_insert(tmp_path, table, quote, allow_zero):
+    import sqlite3
+    from knowflow_ai.budget import BudgetLedger
+
+    now = datetime.now(timezone.utc)
+    quote.update({"verified_by": "test-reviewer",
+                  "verified_at": (now - timedelta(minutes=1)).isoformat(),
+                  "valid_until": (now + timedelta(hours=1)).isoformat()})
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+    with sqlite3.connect(ledger.path) as db:
+        db.execute(f"CREATE TRIGGER ignore_insert BEFORE INSERT ON {table} "
+                   "BEGIN SELECT RAISE(IGNORE); END")
+
+    with pytest.raises(ValueError, match="BUDGET_RESERVATION_FAILED"):
+        ledger.reserve("provider:ignored", provider=quote["provider"], model=quote["model"],
+                       input_tokens_upper=1000, output_tokens_upper=0, quote=quote,
+                       allow_zero_price_embedding=allow_zero)
+
+    assert ledger.summary()["reserved_microyuan"] == 0
+
+
+def test_ledger_rejects_explicitly_unsigned_price(tmp_path):
+    from knowflow_ai.budget import BudgetLedger
+
+    now = datetime.now(timezone.utc)
+    quote = {"provider": "synthetic", "model": "model-a", "input_cny_per_million": "1",
+             "output_cny_per_million": "1", "source_url": "https://example.test/prices",
+             "verified_by": "draft-not-owner-signed",
+             "verified_at": (now - timedelta(minutes=1)).isoformat(),
+             "valid_until": (now + timedelta(hours=1)).isoformat()}
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+
+    with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
+        ledger.reserve("draft-price", provider="synthetic", model="model-a",
+                       input_tokens_upper=1000, output_tokens_upper=0, quote=quote)
+
+    assert ledger.summary()["reserved_microyuan"] == 0
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("operation", ["embed", "generate", "stream"])
 async def test_guarded_real_adapters_reserve_once_per_failed_http_attempt(monkeypatch, operation):

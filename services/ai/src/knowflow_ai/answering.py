@@ -120,7 +120,6 @@ class LlmSettings:
 
 
 class DeepSeekAdapter:
-    budgeted_provider_adapter = True
     def __init__(self, settings: LlmSettings, client: httpx.AsyncClient | None = None):
         self.settings = settings
         self._owns_client = client is None

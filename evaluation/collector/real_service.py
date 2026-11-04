@@ -133,7 +133,9 @@ def _validate_policy(policy, *, provider, model, variable):
         _not_ready(variable)
     if (policy.get("provider") != provider or policy.get("bound_kind") != "provider_context_limit"
             or not isinstance(policy.get("verified_by"), str)
-            or not policy["verified_by"].strip()):
+            or not policy["verified_by"].strip()
+            or policy["verified_by"].strip().lower() in {
+                "draft", "unsigned", "unverified", "draft-not-owner-signed", "not-owner-signed"}):
         _not_ready(variable)
     try:
         source = urlsplit(policy["source_url"])

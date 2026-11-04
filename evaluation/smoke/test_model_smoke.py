@@ -18,11 +18,15 @@ import model_smoke as smoke
 class SmokeTests(unittest.TestCase):
     def setUp(self):
         self.env = {
-            "KNOWFLOW_MODEL_BASE_URL": "https://example.invalid/v1",
+            "KNOWFLOW_EMBEDDING_BASE_URL": "https://api.siliconflow.cn/v1",
+            "KNOWFLOW_EMBEDDING_KEY_ENV": "SILICONFLOW_API_KEY",
+            "SILICONFLOW_API_KEY": "siliconflow-test-key",
             "KNOWFLOW_EMBEDDING_MODEL": "BAAI/bge-m3",
+            "KNOWFLOW_LLM_BASE_URL": "https://api.deepseek.com",
+            "KNOWFLOW_LLM_KEY_ENV": "DEEPSEEK_API_KEY",
+            "DEEPSEEK_API_KEY": "deepseek-test-key",
             "KNOWFLOW_LLM_MODEL": "deepseek-flash",
             "KNOWFLOW_EMBEDDING_DIMENSIONS": "2",
-            "OPENAI_API_KEY": "secret-must-never-appear",
         }
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)
@@ -104,13 +108,25 @@ class SmokeTests(unittest.TestCase):
                     "https://example.invalid/v1?key=secret", "https://example.invalid/v1#secret",
                     "https://example.invalid:bad/v1"):
             with self.subTest(url=url), patch.object(smoke.request, "build_opener") as build:
-                report, code = smoke.run({**self.env, "KNOWFLOW_MODEL_BASE_URL": url}, 1)
+                report, code = smoke.run({**self.env, "KNOWFLOW_EMBEDDING_BASE_URL": url}, 1)
                 self.assertEqual(code, 1)
                 self.assertEqual(report["status"], "FAILED")
                 build.assert_not_called()
 
+    def test_rejects_provider_mismatched_base_urls_before_network(self):
+        for role, url in (("EMBEDDING", "https://api.deepseek.com"),
+                          ("LLM", "https://api.siliconflow.cn/v1")):
+            with self.subTest(role=role), patch.object(smoke.request, "build_opener") as build:
+                report, code = smoke.run({**self.env, "KNOWFLOW_" + role + "_BASE_URL": url}, 1)
+                self.assertEqual(code, 1)
+                self.assertEqual(report["error"], "PROVIDER_ENDPOINT_MISMATCH")
+                build.assert_not_called()
+
     def test_key_environment_selector(self):
-        env = {**self.env, "KNOWFLOW_MODEL_KEY_ENV": "PROVIDER_API_KEY", "PROVIDER_API_KEY": "another-secret"}
+        env = {**self.env,
+               "KNOWFLOW_EMBEDDING_KEY_ENV": "PROVIDER_API_KEY",
+               "KNOWFLOW_LLM_KEY_ENV": "PROVIDER_API_KEY",
+               "PROVIDER_API_KEY": "another-secret"}
         config, missing = smoke.read_config(env)
         self.assertFalse(missing)
         self.assertEqual(config["embedding"]["key"], "another-secret")
@@ -225,10 +241,10 @@ class SmokeTests(unittest.TestCase):
 
     def test_split_providers_use_separate_urls_and_credentials(self):
         env = {**self.env,
-               "KNOWFLOW_EMBEDDING_BASE_URL": "https://embedding.example.invalid/v1/",
+               "KNOWFLOW_EMBEDDING_BASE_URL": "https://api.siliconflow.cn/v1/",
                "KNOWFLOW_EMBEDDING_KEY_ENV": "EMBEDDING_API_KEY",
                "EMBEDDING_API_KEY": "embedding-only-secret",
-               "KNOWFLOW_LLM_BASE_URL": "https://chat.example.invalid/",
+               "KNOWFLOW_LLM_BASE_URL": "https://api.deepseek.com/",
                "KNOWFLOW_LLM_KEY_ENV": "CHAT_API_KEY",
                "CHAT_API_KEY": "chat-only-secret",
                "KNOWFLOW_LLM_THINKING": "disabled"}
@@ -241,9 +257,9 @@ class SmokeTests(unittest.TestCase):
             report, code = smoke.run(env, 1)
         self.assertEqual(code, 0)
         first, second = [call.args[0] for call in opened.call_args_list]
-        self.assertEqual(first.full_url, "https://embedding.example.invalid/v1/embeddings")
+        self.assertEqual(first.full_url, "https://api.siliconflow.cn/v1/embeddings")
         self.assertEqual(first.get_header("Authorization"), "Bearer embedding-only-secret")
-        self.assertEqual(second.full_url, "https://chat.example.invalid/chat/completions")
+        self.assertEqual(second.full_url, "https://api.deepseek.com/chat/completions")
         self.assertEqual(second.get_header("Authorization"), "Bearer chat-only-secret")
         self.assertNotIn("embedding-only-secret", second.data.decode())
         self.assertEqual(json.loads(second.data)["thinking"], {"type": "disabled"})
@@ -251,7 +267,8 @@ class SmokeTests(unittest.TestCase):
         self.assertNotIn("secret", json.dumps(report))
 
     def test_split_endpoint_never_inherits_shared_key_without_selector(self):
-        env = {**self.env, "KNOWFLOW_LLM_BASE_URL": "https://other.example.invalid"}
+        env = {key: value for key, value in self.env.items()
+               if key != "KNOWFLOW_LLM_KEY_ENV"}
         with patch.object(smoke.request, "build_opener") as build:
             report, code = smoke.run(env, 1)
         build.assert_not_called()

@@ -340,29 +340,27 @@ async def test_guard_rejects_factory_using_a_different_model_before_call(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_guard_checks_authoritative_adapter_ledger_path_before_reservation(monkeypatch, tmp_path):
+async def test_guard_does_not_trust_self_declared_budget_marker(tmp_path):
     wiring = load("wiring")
     ledger_path = tmp_path / "ledger.sqlite3"
-    monkeypatch.setenv("KNOWFLOW_BUDGET_LEDGER_PATH", str(tmp_path / "different.sqlite3"))
-    closed = []
-    class ProductAdapter:
+    ledger = wiring.BudgetLedger(ledger_path)
+    reservations_seen_by_adapter = []
+    class MarkerAdapter:
         budgeted_provider_adapter = True
         settings = SimpleNamespace(model="model-a")
-        async def embed(self, *_args, **_kwargs): pytest.fail("must reject before HTTP")
-        async def aclose(self): closed.append(True)
+        async def embed(self, *_args, **_kwargs):
+            reservations_seen_by_adapter.append(ledger.summary()["paid_reservations"])
+        async def aclose(self): pass
 
-    config = {"adapter_factory": lambda: ProductAdapter(), "provider": "synthetic", "model": "model-a",
+    config = {"adapter_factory": MarkerAdapter, "provider": "synthetic", "model": "model-a",
               "quote": current_quote(), "token_bounds": verified_bounds(lambda *_: (100, 0)),
               "bound_evidence": current_bound_evidence()}
-    factories = wiring.EvaluationFactories(ledger=wiring.BudgetLedger(ledger_path),
-                                           embedding=config, llm=config)
+    factories = wiring.EvaluationFactories(ledger=ledger, embedding=config, llm=config)
     factories.preflight()
     guard = factories.embedding_factory()
-    with pytest.raises(ValueError, match="BUDGET_LEDGER_CONFIGURATION_MISMATCH"):
-        await guard.embed(["synthetic"], request_id="r")
-    assert closed == [True]
-    with closing(sqlite3.connect(ledger_path)) as db:
-        assert db.execute("SELECT count(*) FROM reservations").fetchone()[0] == 0
+    await guard.embed(["synthetic"], request_id="r")
+    assert reservations_seen_by_adapter == [1]
+    assert ledger.summary()["paid_reservations"] == 1
 
 
 @pytest.mark.asyncio

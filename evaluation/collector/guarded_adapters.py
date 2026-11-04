@@ -49,8 +49,9 @@ class _GuardedAdapter:
                 await candidate.aclose()
                 raise ValueError("ADAPTER_MODEL_MISMATCH")
             self._adapter = candidate
-            self._authoritative_adapter_boundary = bool(
-                getattr(candidate, "budgeted_provider_adapter", False))
+            provider, adapter_type = self._product_adapter_boundary()
+            self._authoritative_adapter_boundary = (
+                self._provider == provider and type(candidate) is adapter_type)
 
         authoritative_adapter_boundary = self._authoritative_adapter_boundary
         if authoritative_adapter_boundary:
@@ -98,6 +99,9 @@ class _GuardedAdapter:
         except (AttributeError, TypeError, ValueError):
             raise ValueError("TOKEN_BOUND_EVIDENCE_REQUIRED") from None
 
+    def _product_adapter_boundary(self):
+        return None, None
+
     async def aclose(self):
         self._closed = True
         if self._adapter is not None:
@@ -105,6 +109,10 @@ class _GuardedAdapter:
 
 
 class GuardedEmbedding(_GuardedAdapter):
+    def _product_adapter_boundary(self):
+        from knowflow_ai.embedding import SiliconFlowEmbeddingAdapter
+        return "siliconflow", SiliconFlowEmbeddingAdapter
+
     async def embed(self, texts, *, request_id):
         snapshot = deepcopy(texts)
         adapter = await self._reserve("embed", snapshot)
@@ -112,6 +120,10 @@ class GuardedEmbedding(_GuardedAdapter):
 
 
 class GuardedLlm(_GuardedAdapter):
+    def _product_adapter_boundary(self):
+        from knowflow_ai.answering import DeepSeekAdapter
+        return "deepseek", DeepSeekAdapter
+
     @property
     def last_usage(self):
         return getattr(self._adapter, "last_usage", None)

@@ -77,6 +77,9 @@ class BudgetLedger:
             raise ValueError("UNVERIFIED_PRICE")
         if any(not isinstance(quote[k], str) or not quote[k].strip() for k in ("provider", "model", "verified_by")):
             raise ValueError("UNVERIFIED_PRICE")
+        if quote["verified_by"].strip().lower() in {
+                "draft", "unsigned", "unverified", "draft-not-owner-signed", "not-owner-signed"}:
+            raise ValueError("UNVERIFIED_PRICE")
         if provider != quote["provider"] or model != quote["model"]:
             raise ValueError("PRICE_MODEL_MISMATCH")
         parsed = urlparse(quote["source_url"]) if isinstance(quote["source_url"], str) else None
@@ -123,13 +126,15 @@ class BudgetLedger:
             if spent + amount > SOFT_STOP_MICROYUAN:
                 raise ValueError("BUDGET_SOFT_STOP")
             if zero_price:
-                db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
-                           (request_id, input_tokens_upper, output_tokens_upper,
-                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                inserted = db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
+                                      (request_id, input_tokens_upper, output_tokens_upper,
+                                       json.dumps(quote, sort_keys=True, separators=(",", ":"))))
             else:
-                db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
-                           (request_id, amount, input_tokens_upper, output_tokens_upper,
-                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                inserted = db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
+                                      (request_id, amount, input_tokens_upper, output_tokens_upper,
+                                       json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+            if inserted.rowcount != 1:
+                raise ValueError("BUDGET_RESERVATION_FAILED")
             db.commit()
         return {"reserved_microyuan": amount, "total_reserved_microyuan": spent + amount,
                 "remaining_microyuan": self.limit - spent - amount}

@@ -2,6 +2,7 @@ import importlib.util
 from hashlib import sha256
 import json
 from pathlib import Path
+import subprocess
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 
@@ -16,10 +17,24 @@ run = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(run)
 
 
+def test_private_output_must_share_ignored_pack_root(tmp_path):
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+    (repository / ".gitignore").write_text(".blindtest/\n", encoding="utf-8")
+    dataset = repository / ".blindtest" / "out" / "runner"
+    dataset.mkdir(parents=True)
+    output = repository / ".blindtest" / "out" / "predictions.json"
+
+    assert run.private_output_is_ignored(dataset, output)
+    assert not run.private_output_is_ignored(dataset, repository / "predictions.json")
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reach_soft_limit_on_last_question", [False, True])
+@pytest.mark.parametrize("return_error_on_first_question", [False, True])
 async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_http(
-        tmp_path, reach_soft_limit_on_last_question):
+        tmp_path, reach_soft_limit_on_last_question, return_error_on_first_question):
     dataset = ROOT / "evaluation/data/seed-v1"
     manifest, questions, _documents, sources, _digest = run.scorer._load_dataset(dataset)
     uploaded, captures, runtime_rows, cleanup = [], {}, {}, []
@@ -57,7 +72,8 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
                            input_tokens_upper=8_000_000, output_tokens_upper=0, quote=quote)
         key = request.headers["Idempotency-Key"]
         request_id = "req-" + str(len(runtime_rows))
-        runtime_rows[key] = {"id": str(UUID(int=len(runtime_rows) + 1)), "request_id": request_id}
+        runtime_rows[key] = {"id": str(UUID(int=len(runtime_rows) + 1)), "request_id": request_id,
+                             "failure_code": "AI_PROCESSING_FAILED" if return_error_on_first_question else None}
         response = {"request_id": request_id, "answer": "Synthetic refusal", "has_answer": False, "sources": []}
         trace = []
         for index, document in enumerate(uploaded):
@@ -67,7 +83,7 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
                           "locator": {"kind": "text_range", "unit": "unicode_code_point", "start": 0, "end": len(text)},
                           "text_sha256": sha256(text.encode("utf-8")).hexdigest()})
         captures[request_id] = {"request_id": request_id, "response": response, "error_code": None, "trace": trace}
-        return httpx.Response(200, json=response)
+        return httpx.Response(503 if return_error_on_first_question else 200, json=response)
     async def ai_transport(request):
         return httpx.Response(200, json=captures.pop(request.url.path.rsplit("/", 1)[1]))
     async def fetch(sql, params):
@@ -77,17 +93,31 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
     output = tmp_path / "predictions.json"
     async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
         async with httpx.AsyncClient(base_url="http://ai.test", transport=httpx.MockTransport(ai_transport)) as ai:
-            payload = await run.collect_dataset(
-                java=java, ai=ai, dataset=dataset, split="development", output=output,
-                run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
-                              "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
-                fetch_row=fetch, ledger=ledger)
+            if return_error_on_first_question:
+                with pytest.raises(ValueError, match="COLLECTION_INCOMPLETE"):
+                    await run.collect_dataset(
+                        java=java, ai=ai, dataset=dataset, split="development", output=output,
+                        run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                                      "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                        fetch_row=fetch, ledger=ledger)
+                payload = json.loads(output.read_text())
+            else:
+                payload = await run.collect_dataset(
+                    java=java, ai=ai, dataset=dataset, split="development", output=output,
+                    run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                                  "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                    fetch_row=fetch, ledger=ledger)
     expected = sum(q["split"] == "development" for q in questions)
     assert len(uploaded) == 10
-    assert len(payload["predictions"]) == expected
-    assert all(len(row["retrieved_evidence"]) == 10 for row in payload["predictions"])
+    assert len(payload["predictions"]) == (1 if return_error_on_first_question else expected)
+    if not return_error_on_first_question:
+        assert all(len(row["retrieved_evidence"]) == 10 for row in payload["predictions"])
+    assert len(question_calls) == (1 if return_error_on_first_question else expected)
     assert cleanup == ["/api/v1/knowledge-bases/kb"]
-    assert json.loads(output.with_suffix(".status.json").read_text())["complete"] is True
-    assert run.scorer.evaluate(output, dataset_root=dataset)["sample_count"] == expected
-    assert json.loads(output.with_suffix(".status.json").read_text())["complete"] is True
-    assert ledger.summary()["reserved_microyuan"] == (8_000_000 if reach_soft_limit_on_last_question else 0)
+    status = json.loads(output.with_suffix(".status.json").read_text())
+    assert status["complete"] is not return_error_on_first_question
+    assert bool(status["failures"]) is return_error_on_first_question
+    if not return_error_on_first_question:
+        assert run.scorer.evaluate(output, dataset_root=dataset)["sample_count"] == expected
+    assert ledger.summary()["reserved_microyuan"] == (
+        8_000_000 if reach_soft_limit_on_last_question and not return_error_on_first_question else 0)
