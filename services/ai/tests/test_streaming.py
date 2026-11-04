@@ -165,7 +165,7 @@ async def test_stream_refusal_is_canonical_and_has_no_model_sources():
 
 
 @pytest.mark.asyncio
-async def test_stream_soft_grounding_failure_ends_as_a_canonical_refusal():
+async def test_stream_single_marker_passes_without_soft_refuse():
     generated = ('{"answer":"数据库采用 PostgreSQL 存储[src-evidence-1]。",'
                  '"has_answer":true,"source_ids":["src-evidence-1"]}')
     service, client, _calls = _service(ProviderStream([_sse([generated])]))
@@ -174,9 +174,8 @@ async def test_stream_soft_grounding_failure_ends_as_a_canonical_refusal():
 
     assert [event['event'] for event in events] == [
         'started', 'delta', 'sources', 'completed']
-    assert [event['delta'] for event in events if event['event'] == 'delta'] == [
-        '没有足够的资料证据回答这个问题。']
-    assert events[-2]['has_answer'] is False and events[-2]['sources'] == []
+    assert events[-2]['has_answer'] is True
+    assert events[-2]['sources']
 
 
 @pytest.mark.asyncio

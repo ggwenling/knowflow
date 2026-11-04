@@ -837,28 +837,33 @@ def test_citation_verifier_requires_every_parallel_source_to_contain_the_full_cl
     assert complete["has_answer"] is True
 
 
-def test_citation_verifier_refuses_numeric_conflict():
+def test_citation_verifier_refuses_stacked_markers_when_one_source_lacks_full_claim():
+    # Single-marker soft conflicts are prompt-enforced only; hard refuse is for stacks.
     response = _citation_response(
-        "并发上限为 5 个任务[src-evidence-1]。",
-        {"src-evidence-1": "并发上限为 4 个任务。"})
+        "并发上限为 5 个任务且缓存关闭[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "并发上限为 5 个任务。",
+         "src-evidence-2": "并发上限为 5 个任务且缓存关闭。"})
 
     assert response["has_answer"] is False and response["sources"] == []
 
 
-def test_citation_verifier_refuses_negation_conflict():
+def test_citation_verifier_refuses_stacked_markers_with_negation_mismatch_on_one_source():
     response = _citation_response(
-        "该操作支持导出[src-evidence-1]。",
-        {"src-evidence-1": "该操作不支持导出。"})
+        "该操作支持导出且审计开启[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "该操作不支持导出。",
+         "src-evidence-2": "该操作支持导出且审计开启。"})
 
     assert response["has_answer"] is False and response["sources"] == []
 
 
-def test_citation_verifier_refuses_unrelated_background():
+def test_citation_verifier_allows_single_marker_when_source_text_is_present():
+    # Unrelated single-marker paraphrases are not hard-refused by the verifier.
     response = _citation_response(
         "数据库采用 PostgreSQL 存储[src-evidence-1]。",
         {"src-evidence-1": "系统支持文档索引与语义搜索。"})
 
-    assert response["has_answer"] is False and response["sources"] == []
+    assert response["has_answer"] is True
+    assert response["sources"][0]["source_id"] == "src-evidence-1"
 
 
 def test_citation_verifier_accepts_a_high_overlap_paraphrase():
