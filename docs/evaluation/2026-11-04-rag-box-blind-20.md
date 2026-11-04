@@ -1,5 +1,9 @@
 # RAG Box 盲测跑评（20 题）
 
+
+
+> **Heuristic scorer status (2026-11-05):** `evaluation/runner/heuristic_review.py` is a **proxy, not gating** smoke tool. Sol R4 residual P1 remains a known limitation (not closed). Formal support/citation gates use the LLM-judged reviews in [`2026-11-05-box-blind-20-judged.md`](./2026-11-05-box-blind-20-judged.md).
+
 ## 运行信息（原始采集）
 
 - 时间（Asia/Shanghai）：collection status 2026-11-05T00:07:04+08:00；正式门禁完成 2026-11-05T00:08:25+08:00。
@@ -142,3 +146,7 @@
 - 价格为 draft peak、非 owner-signed；support/citation 仍为脚本启发式 proxy。
 - 诊断后重跑已污染盲测；原始结果与重跑结果均保留。
 - `git ls-files` 对 `.blindtest/` 与 private-blind 路径检查为 0 命中；公开聚合 JSON 的 `question_results` 仅保留 id_hash、outcome、category。
+
+## LLM 门禁审阅
+
+启发式分数仅作 proxy。门禁口径见 [`2026-11-05-box-blind-20-judged.md`](./2026-11-05-box-blind-20-judged.md)（双法官 + Sol 仲裁，spend RMB 0）。

@@ -208,3 +208,7 @@ git diff --check
 heuristic 测试启动有 pytest-asyncio fixture 默认作用域弃用提示；answering 的两条 warning 来自取消检索测试中本地 socket 服务线程的 `ConnectionResetError`，未导致失败。未新增测试文件、缓存或探针产物。现有测试通过，但未覆盖本轮“且”连接的事实绑定、追加独立引用触发裁剪绕过、以及正确小数端到端正例，不能据此关闭上述 Findings。
 
 最终结论：原样回归及报告同步已完成，仍有可复现的事实冲突误接受和引用裁剪绕过，故本轮不批准。仅提交本审阅文档。
+
+## Follow-up (2026-11-05 supervisor)
+
+KNOWN LIMITATION — residual P1 items above are **not closed**. Heuristic review is demoted to **proxy, not gating**. Gating support/citation moves to independent LLM judge records in `docs/evaluation/2026-11-05-box-blind-20-judged.md`.

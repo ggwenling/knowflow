@@ -1,4 +1,9 @@
-"""Heuristic support and citation review shared by offline review scripts."""
+"""Heuristic support and citation review shared by offline review scripts.
+
+PROXY, NOT GATING: Sol R4 left residual P1 attribution edge cases open. Do not use
+these judgements as quality-gate support/citation scores; use independent LLM/human
+review records instead. Keep this module for smoke/regression probes only.
+"""
 from __future__ import annotations
 
 import re

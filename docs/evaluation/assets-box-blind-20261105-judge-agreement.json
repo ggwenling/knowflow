@@ -1,0 +1,29 @@
+{
+  "original": {
+    "support_agree": 15,
+    "support_total": 16,
+    "citation_agree": 24,
+    "citation_total": 25,
+    "support_rate": 0.9375,
+    "citation_rate": 0.96,
+    "disagreement_count": 2,
+    "resolver": "sol-high-llm-judge-r3"
+  },
+  "postdiag": {
+    "support_agree": 13,
+    "support_total": 14,
+    "citation_agree": 14,
+    "citation_total": 20,
+    "support_rate": 0.9286,
+    "citation_rate": 0.7,
+    "disagreement_count": 7,
+    "resolver": "sol-high-llm-judge-r3"
+  },
+  "judges": [
+    "sol-high-llm-judge",
+    "codebuddy-kimi-k3.1-pro"
+  ],
+  "rubric_version": "2026-11-05-v1",
+  "spend_rmb": 0.0,
+  "note": "All judge I/O kept under /workspace/knowflow-private-blind/2026-11-04/judged/; Codex+CodeBuddy subscription only"
+}
