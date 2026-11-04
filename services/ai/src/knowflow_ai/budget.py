@@ -125,15 +125,23 @@ class BudgetLedger:
                 raise ValueError("BUDGET_EXCEEDED")
             if spent + amount > SOFT_STOP_MICROYUAN:
                 raise ValueError("BUDGET_SOFT_STOP")
+            serialized_quote = json.dumps(quote, sort_keys=True, separators=(",", ":"))
             if zero_price:
+                expected = (request_id, input_tokens_upper, output_tokens_upper, serialized_quote)
                 inserted = db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
-                                      (request_id, input_tokens_upper, output_tokens_upper,
-                                       json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                                      expected)
+                recorded = db.execute(
+                    "SELECT request_id, input_tokens_upper, output_tokens_upper, price_quote "
+                    "FROM zero_price_reservations WHERE request_id = ?", (request_id,)).fetchone()
             else:
+                expected = (request_id, amount, input_tokens_upper, output_tokens_upper, serialized_quote)
                 inserted = db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
-                                      (request_id, amount, input_tokens_upper, output_tokens_upper,
-                                       json.dumps(quote, sort_keys=True, separators=(",", ":"))))
-            if inserted.rowcount != 1:
+                                      expected)
+                recorded = db.execute(
+                    "SELECT request_id, microyuan, input_tokens_upper, output_tokens_upper, price_quote "
+                    "FROM reservations WHERE request_id = ?", (request_id,)).fetchone()
+            # A trigger may ignore, delete, or alter the row after the insert reports success.
+            if inserted.rowcount != 1 or recorded != expected:
                 raise ValueError("BUDGET_RESERVATION_FAILED")
             db.commit()
         return {"reserved_microyuan": amount, "total_reserved_microyuan": spent + amount,

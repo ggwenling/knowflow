@@ -87,7 +87,7 @@ Set-Location $repo
 
 ## 3. 采集（协议规定的 split，私有包转换后为 holdout）
 
-另开采集窗口，设置 `$repo`、`$pack` 并重新注入 `KNOWFLOW_EVALUATION_ACCESS_TOKEN`、`KNOWFLOW_EVALUATION_DATABASE_URL`、`KNOWFLOW_INTERNAL_SHARED_SECRET`、`KNOWFLOW_EVALUATION_CONTROL_SECRET`，以及第 0 节的 PRICE/POLICY 路径。`run-metadata.json` 必填：`code_sha`、`schema_sha256`、`config_sha256`、`prompt_sha256`、`model`（均为真实指纹，勿编造）。
+另开采集窗口，设置 `$repo`、`$pack` 并重新注入 `KNOWFLOW_EVALUATION_ACCESS_TOKEN`、`KNOWFLOW_EVALUATION_DATABASE_URL`、`KNOWFLOW_BUDGET_LEDGER_PATH`（须与服务窗口相同）、`KNOWFLOW_INTERNAL_SHARED_SECRET`、`KNOWFLOW_EVALUATION_CONTROL_SECRET`，以及 PRICE/POLICY 路径。`run-metadata.json` 必填：`code_sha`、`schema_sha256`、`config_sha256`、`prompt_sha256`、`model`（均为真实指纹，勿编造）。
 
 ```powershell
 $repo = (git rev-parse --show-toplevel).Trim()
@@ -101,6 +101,9 @@ $model = "deepseek-flash+BAAI/bge-m3"
 
 $env:KNOWFLOW_EVALUATION_ACCESS_TOKEN = "<owner bearer>"
 $env:KNOWFLOW_EVALUATION_DATABASE_URL = "postgresql://knowflow_app:<pwd>@127.0.0.1:55432/knowflow"
+$env:KNOWFLOW_BUDGET_LEDGER_PATH = "$pack\out\budget-ledger.sqlite3"
+$env:KNOWFLOW_BUDGET_PRICE_FILE = "$pack\config\PRICE_FILE.json"
+$env:KNOWFLOW_BUDGET_POLICY_FILE = "$pack\config\POLICY_FILE.json"
 
 .\services\ai\.venv\Scripts\python.exe evaluation\collector\run.py `
   --dataset "$pack\out\runner" `

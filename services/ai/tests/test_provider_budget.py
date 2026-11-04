@@ -132,7 +132,8 @@ def test_provider_budget_accepts_positive_siliconflow_price_source(tmp_path):
                                   "input_cny_per_million": "0", "output_cny_per_million": "0",
                                   "source_url": "https://siliconflow.cn/pricing"}, True),
 ])
-def test_ledger_rejects_ignored_reservation_insert(tmp_path, table, quote, allow_zero):
+@pytest.mark.parametrize("trigger", ["ignore_before", "delete_after", "mutate_after"])
+def test_ledger_rejects_missing_reservation_after_trigger(tmp_path, table, quote, allow_zero, trigger):
     import sqlite3
     from knowflow_ai.budget import BudgetLedger
 
@@ -142,8 +143,20 @@ def test_ledger_rejects_ignored_reservation_insert(tmp_path, table, quote, allow
                   "valid_until": (now + timedelta(hours=1)).isoformat()})
     ledger = BudgetLedger(tmp_path / "budget.sqlite3")
     with sqlite3.connect(ledger.path) as db:
-        db.execute(f"CREATE TRIGGER ignore_insert BEFORE INSERT ON {table} "
-                   "BEGIN SELECT RAISE(IGNORE); END")
+        if trigger == "ignore_before":
+            sql = f"CREATE TRIGGER ignore_insert BEFORE INSERT ON {table} BEGIN SELECT RAISE(IGNORE); END"
+        elif trigger == "mutate_after" and table == "reservations":
+            sql = ("CREATE TRIGGER mutate_after_insert AFTER INSERT ON reservations "
+                   "BEGIN UPDATE reservations SET microyuan = microyuan + 1 "
+                   "WHERE request_id = NEW.request_id; END")
+        elif trigger == "mutate_after":
+            sql = ("CREATE TRIGGER mutate_after_insert AFTER INSERT ON zero_price_reservations "
+                   "BEGIN UPDATE zero_price_reservations SET input_tokens_upper = input_tokens_upper + 1 "
+                   "WHERE request_id = NEW.request_id; END")
+        else:
+            sql = (f"CREATE TRIGGER delete_after_insert AFTER INSERT ON {table} "
+                   "BEGIN DELETE FROM " + table + " WHERE request_id = NEW.request_id; END")
+        db.execute(sql)
 
     with pytest.raises(ValueError, match="BUDGET_RESERVATION_FAILED"):
         ledger.reserve("provider:ignored", provider=quote["provider"], model=quote["model"],
