@@ -42,7 +42,7 @@ def _sse(fragments, *, finish='stop', done=True, model='deepseek-flash'):
     return body + (b'data: [DONE]\n\n' if done else b'')
 
 
-def _service(stream, *, status=200, model_profile=None):
+def _service(stream, *, status=200, model_profile=None, evidence=None):
     calls = []
 
     def handler(request):
@@ -51,7 +51,8 @@ def _service(stream, *, status=200, model_profile=None):
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     adapter = DeepSeekAdapter(LlmSettings(api_key=KEY), client)
-    service = AnswerService('unused', _contract(), retriever=FakeRetriever(_evidence()),
+    service = AnswerService('unused', _contract(),
+                            retriever=FakeRetriever(_evidence() if evidence is None else evidence),
                             llm_factory=lambda: adapter, model_profile=model_profile)
     return service, client, calls
 
@@ -96,6 +97,29 @@ async def test_stream_buffers_answer_until_provider_finish_and_citation_validati
         assert (await anext(events))['event'] == 'sources'
         assert (await anext(events))['event'] == 'completed'
     assert stream.closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('url', [
+    'https://docs.example.test/search?q=cache',
+    'https://docs.example.test/items;view=all',
+])
+async def test_stream_final_answer_preserves_url_boundary_characters(url):
+    answer = f'请访问 {url}[src-evidence-1]。'
+    evidence = _evidence()
+    evidence[0]['text_content'] = f'请访问 {url}。'
+    generated = json.dumps({'answer': answer, 'has_answer': True,
+                            'source_ids': ['src-evidence-1']}, ensure_ascii=False)
+    service, client, _calls = _service(
+        ProviderStream([_sse([generated])]), evidence=evidence)
+
+    async with client:
+        events = [event async for event in service.stream(_request())]
+
+    assert ''.join(event['delta'] for event in events if event['event'] == 'delta') == answer
+    assert events[-2]['event'] == 'sources' and events[-2]['has_answer'] is True
+    assert [source['source_id'] for source in events[-2]['sources']] == ['src-evidence-1']
+    assert events[-1]['event'] == 'completed'
 
 
 @pytest.mark.asyncio

@@ -13,7 +13,8 @@ _MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
 _BOUNDARIES = frozenset("。！？.!?；;\n")
 _URL = re.compile(r"https?://[^\s<>\[\]{}]+", re.IGNORECASE)
 _EMAIL = re.compile(
-    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@"
+    r"""(?<![A-Za-z0-9.!#$%&'*+/=?^_`{|}~-])"""
+    r"""(?:"(?:[^"\\\r\n]|\\.)+"|[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+)@"""
     r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?![A-Za-z0-9-])",
     re.ASCII,
 )
@@ -32,26 +33,33 @@ def _normalized(text):
     return " ".join(unicodedata.normalize("NFC", text).split())
 
 
-def _protected_periods(text):
-    """Return periods inside URLs or email addresses, excluding URL punctuation."""
+def _protected_boundaries(text):
+    """Return sentence-boundary characters inside URLs and email addresses."""
     spans = []
     for match in _URL.finditer(text):
+        start = match.start()
         end = match.end()
+        # URLs are often followed immediately by CJK prose, without whitespace.
+        # Full-width sentence terminators end the URL even when more text follows.
+        for position in range(start, end):
+            if text[position] in "。！？；":
+                end = position
+                break
         while end > match.start() and text[end - 1] in _URL_TRAILING_PUNCTUATION:
             end -= 1
-        spans.append((match.start(), end))
+        spans.append((start, end))
     spans.extend((match.start(), match.end()) for match in _EMAIL.finditer(text))
     return {position for start, end in spans
-            for position in range(start, end) if text[position] == "."}
+            for position in range(start, end) if text[position] in _BOUNDARIES}
 
 
-def _is_boundary(answer, position, in_marker, protected_periods):
+def _is_boundary(answer, position, in_marker, protected_boundaries):
     char = answer[position]
     if char not in _BOUNDARIES:
         return False
     if in_marker:
         return False
-    if char == "." and position in protected_periods:
+    if position in protected_boundaries:
         return False
     # A decimal point belongs to the number, not the surrounding sentence.
     if (char == "." and position > 0 and position + 1 < len(answer)
@@ -79,7 +87,7 @@ def _claim_segments(answer):
     """Split an answer while retaining the source spans needed for pruning."""
     markers = list(_MARKER.finditer(answer))
     spans = [(marker.start(), marker.end()) for marker in markers]
-    protected_periods = _protected_periods(answer)
+    protected_boundaries = _protected_boundaries(answer)
     units = []
     start = 0
     marker_index = 0
@@ -93,7 +101,7 @@ def _claim_segments(answer):
                 span_index += 1
             in_marker = (span_index < len(spans)
                          and spans[span_index][0] <= position < spans[span_index][1])
-            if not _is_boundary(answer, position, in_marker, protected_periods):
+            if not _is_boundary(answer, position, in_marker, protected_boundaries):
                 continue
         end = position
         unit_markers = []
@@ -114,7 +122,7 @@ def _evidence_units(evidence):
     """Keep negation and numeric checks local to likely supporting text."""
     markers = list(_MARKER.finditer(evidence))
     spans = [(marker.start(), marker.end()) for marker in markers]
-    protected_periods = _protected_periods(evidence)
+    protected_boundaries = _protected_boundaries(evidence)
     units = []
     start = 0
     span_index = 0
@@ -123,7 +131,7 @@ def _evidence_units(evidence):
             span_index += 1
         in_marker = (span_index < len(spans)
                      and spans[span_index][0] <= position < spans[span_index][1])
-        if _is_boundary(evidence, position, in_marker, protected_periods):
+        if _is_boundary(evidence, position, in_marker, protected_boundaries):
             unit = _normalized(evidence[start:position])
             if unit:
                 units.append(unit)

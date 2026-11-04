@@ -938,6 +938,51 @@ def test_citation_verifier_keeps_url_and_email_dots_inside_the_claim(answer, cla
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
+@pytest.mark.parametrize("url", [
+    "https://docs.example.test/search?q=cache",
+    "https://docs.example.test/items;view=all",
+])
+def test_citation_pruning_and_response_preserve_url_boundary_characters(url):
+    answer = f"请访问 {url}[src-evidence-1]。"
+    evidence = f"请访问 {url}。"
+
+    result = prune_ungrounded_claims(answer, {"src-evidence-1": evidence})
+    response = _citation_response(answer, {"src-evidence-1": evidence})
+
+    assert [claim for claim, _ in _claim_units(answer)] == [f"请访问 {url}"]
+    assert result == {"pruned_answer": answer,
+                      "kept_source_ids": ["src-evidence-1"], "ok": True}
+    assert response["has_answer"] is True
+    assert response["answer"] == answer
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+
+
+@pytest.mark.parametrize("email", [
+    "help!desk@example.test",
+    "help?desk@example.test",
+    '"help;desk"@example.test',
+])
+def test_citation_pruning_preserves_internal_email_boundary_characters(email):
+    answer = f"联系 {email}[src-evidence-1]。"
+    evidence = f"联系 {email}。"
+    response = _citation_response(answer, {"src-evidence-1": evidence})
+
+    assert [claim for claim, _ in _claim_units(answer)] == [f"联系 {email}"]
+    assert response["has_answer"] is True
+    assert response["answer"] == answer
+
+
+@pytest.mark.parametrize("url", [
+    "https://docs.example.test/search?q=cache",
+    "https://docs.example.test/items;view=all",
+])
+def test_sentence_terminator_outside_url_still_splits_claims(url):
+    units = _claim_units(f"先访问 {url}。后续说明")
+
+    assert [(claim, markers) for claim, markers in units] == [
+        (f"先访问 {url}", []), ("后续说明", [])]
+
+
 @pytest.mark.asyncio
 async def test_answer_refusal_includes_validated_model_profile_without_provider_call():
     model_profile = {"embedding_model_profile_id": "BAAI/bge-m3",
