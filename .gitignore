@@ -52,3 +52,6 @@ model-cache/
 Thumbs.db
 .idea/
 .vscode/
+
+# Pytest/review scratch dirs accidentally created at repo root
+/.review-*
