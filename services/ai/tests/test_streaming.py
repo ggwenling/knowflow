@@ -78,16 +78,23 @@ def test_incremental_parser_rejects_duplicate_truncated_unicode_and_oversized_js
 
 
 @pytest.mark.asyncio
-async def test_stream_emits_delta_before_provider_finish_and_closes_on_iterator_close():
-    stream = ProviderStream([_sse(['{"has_answer":true,"answer":"首段'],
-                                  finish=None, done=False)], block=True)
+async def test_stream_buffers_answer_until_provider_finish_and_citation_validation():
+    generated = ('{"has_answer":true,"answer":"索引 READY 后才可检索'
+                 '[src-evidence-1]。","source_ids":["src-evidence-1"]}')
+    stream = ProviderStream([_sse([generated])], block=True)
     service, client, calls = _service(stream)
     async with client, aclosing(service.stream(_request())) as events:
         assert (await anext(events))['event'] == 'started'
-        delta = await anext(events)
-        assert delta['delta'] == '首段'
-        assert not stream.waiting.is_set()
+        pending_delta = asyncio.create_task(anext(events))
+        await asyncio.wait_for(stream.waiting.wait(), 1)
+        assert not pending_delta.done()
         assert calls[0]['stream'] is True
+        stream.release.set()
+        delta = await asyncio.wait_for(pending_delta, 1)
+        assert delta['event'] == 'delta' and delta['sequence'] == 2
+        assert delta['delta'] == '索引 READY 后才可检索[src-evidence-1]。'
+        assert (await anext(events))['event'] == 'sources'
+        assert (await anext(events))['event'] == 'completed'
     assert stream.closed
 
 
@@ -155,6 +162,21 @@ async def test_stream_refusal_is_canonical_and_has_no_model_sources():
     assert [event['event'] for event in events] == ['started', 'delta', 'sources', 'completed']
     assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
     assert events[2]['has_answer'] is False and events[2]['sources'] == []
+
+
+@pytest.mark.asyncio
+async def test_stream_soft_grounding_failure_ends_as_a_canonical_refusal():
+    generated = ('{"answer":"数据库采用 PostgreSQL 存储[src-evidence-1]。",'
+                 '"has_answer":true,"source_ids":["src-evidence-1"]}')
+    service, client, _calls = _service(ProviderStream([_sse([generated])]))
+    async with client:
+        events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert [event['delta'] for event in events if event['event'] == 'delta'] == [
+        '没有足够的资料证据回答这个问题。']
+    assert events[-2]['has_answer'] is False and events[-2]['sources'] == []
 
 
 @pytest.mark.asyncio

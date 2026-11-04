@@ -678,6 +678,25 @@ def _prediction_fixture():
     return question_id, rows, mappings, scope
 
 
+@pytest.mark.parametrize("answer", [
+    "索引就绪[src-a.v1][src-b]。",
+    "索引就绪[550e8400-e29b-41d4-a716-446655440000][src-b]。",
+])
+def test_collector_claim_keeps_dotted_and_uuid_parallel_markers_in_one_unit(answer):
+    markers = list(prediction._MARKER.finditer(answer))
+
+    assert len(markers) == 2
+    assert [prediction._claim(answer, marker.start(), marker.end()) for marker in markers] == [
+        answer, answer]
+
+
+def test_collector_claim_keeps_decimal_numbers_inside_the_claim():
+    answer = "任务上限为 1.5 MB[src-a.v1]。"
+    marker = prediction._MARKER.search(answer)
+
+    assert prediction._claim(answer, marker.start(), marker.end()) == answer
+
+
 @pytest.mark.asyncio
 async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tmp_path):
     spec = importlib.util.spec_from_file_location(

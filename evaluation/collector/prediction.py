@@ -38,9 +38,26 @@ def _mapped_trace(runtime_question_id, trace, mappings, latency_ms):
 
 
 def _claim(answer, start, end):
-    before = max((answer.rfind(mark, 0, start) for mark in "。！？.!?；;\n"), default=-1)
-    following = [answer.find(mark, end) for mark in "。！？.!?；;\n"]
-    following = [position for position in following if position >= 0]
+    marker_spans = [(match.start(), match.end()) for match in _MARKER.finditer(answer)]
+    separators = []
+    span_index = 0
+    for position, char in enumerate(answer):
+        while span_index < len(marker_spans) and marker_spans[span_index][1] <= position:
+            span_index += 1
+        if span_index < len(marker_spans):
+            marker_start, marker_end = marker_spans[span_index]
+            if marker_start <= position < marker_end:
+                continue
+        if char not in "。！？.!?；;\n":
+            continue
+        # Keep a decimal such as 1.5 in the claim rather than treating it as
+        # a sentence boundary.
+        if (char == "." and position > 0 and position + 1 < len(answer)
+                and answer[position - 1].isdigit() and answer[position + 1].isdigit()):
+            continue
+        separators.append(position)
+    before = max((position for position in separators if position < start), default=-1)
+    following = [position for position in separators if position >= end]
     stop = min(following) + 1 if following else len(answer)
     result = answer[before + 1:stop].strip()
     return result or answer[start:end]

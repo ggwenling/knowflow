@@ -18,9 +18,13 @@ refusal text and an empty sources list after validating the provider result.
 
 The provider request uses OpenAI-compatible `stream: true` and consumes only
 SSE `choices[0].delta.content`. A bounded incremental JSON-string parser handles
-escaped content and emits provisional deltas. It validates the complete final
-JSON object, source IDs, citations, and snapshot membership before emitting
-`sources`. Truncated or malformed provider streams have one `error` terminal.
+escaped content while buffering the answer. After the provider finishes, the
+service validates the complete JSON object, source IDs, citations, snapshot
+membership, and claim grounding. It then emits the validated answer as `delta`
+before `sources`; an answer rejected by citation validation emits only the
+canonical refusal text. Truncated or malformed provider streams have one
+`error` terminal. The answer therefore appears after generation and citation
+checking finish, rather than during generation.
 
 The request has a 28-second end-to-end deadline, a 1 MiB provider body cap, a
 64 Ki-codepoint JSON cap, and a 16,000-codepoint answer cap. Cancellation during

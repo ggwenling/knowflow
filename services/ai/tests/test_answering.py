@@ -679,7 +679,7 @@ async def test_long_question_runs_through_embedding_http_and_llm_without_truncat
         return httpx.Response(200, json={
             "model": "deepseek-flash",
             "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
-                "answer": f"有证据。[{source_id}]", "has_answer": True,
+                "answer": f"索引 READY 后才可检索[{source_id}]。", "has_answer": True,
                 "source_ids": [source_id],
             })}}],
         })
@@ -744,7 +744,7 @@ async def test_long_question_runs_through_embedding_http_and_llm_without_truncat
 @pytest.mark.asyncio
 async def test_answer_service_returns_only_cited_scope_sources():
     rows = _evidence()
-    model = FakeLlm({"answer": "索引 READY 后才可检索。[src-evidence-1]",
+    model = FakeLlm({"answer": "索引 READY 后才可检索[src-evidence-1]。",
                      "has_answer": True, "source_ids": ["src-evidence-1"]})
     model_profile = {"embedding_model_profile_id": "BAAI/bge-m3",
                      "llm_model_profile_id": "deepseek-flash"}
@@ -756,6 +756,90 @@ async def test_answer_service_returns_only_cited_scope_sources():
     assert response["sources"][0]["quote"] == rows[0]["text_content"]
     assert response["model_profile"] == model_profile
     _contract().validate("AnswerResponse", response)
+
+
+def _citation_response(answer, source_texts):
+    rows = []
+    for index, (source_id, text_content) in enumerate(source_texts.items(), 1):
+        rows.append({"source_id": source_id, "document_id": "doc-example-1",
+                     "content_version_id": "content-example-1",
+                     "index_version_id": "index-example-1", "chunk_id": f"chunk-{index}",
+                     "text_content": text_content,
+                     "locator": {"kind": "text_range", "start": 0, "end": len(text_content),
+                                 "unit": "unicode_code_point"}})
+    service = AnswerService("unused", _contract(), retriever=FakeRetriever(rows))
+    generated = {"answer": answer, "has_answer": True,
+                 "source_ids": list(source_texts)}
+    return service._response_from_generated(_request(), rows, generated)
+
+
+def test_citation_verifier_accepts_a_supported_single_citation():
+    response = _citation_response(
+        "索引 READY 后才可检索[src-evidence-1]。",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+    assert response["has_answer"] is True
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+
+
+def test_citation_verifier_refuses_parallel_markers_that_only_support_half_the_claim():
+    response = _citation_response(
+        "索引 READY 后才可检索，缓存默认关闭[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "索引 READY 后才可检索。",
+         "src-evidence-2": "缓存默认关闭。"})
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["sources"] == []
+
+
+def test_citation_verifier_refuses_numeric_conflict():
+    response = _citation_response(
+        "并发上限为 5 个任务[src-evidence-1]。",
+        {"src-evidence-1": "并发上限为 4 个任务。"})
+
+    assert response["has_answer"] is False and response["sources"] == []
+
+
+def test_citation_verifier_refuses_negation_conflict():
+    response = _citation_response(
+        "该操作支持导出[src-evidence-1]。",
+        {"src-evidence-1": "该操作不支持导出。"})
+
+    assert response["has_answer"] is False and response["sources"] == []
+
+
+def test_citation_verifier_refuses_unrelated_background():
+    response = _citation_response(
+        "数据库采用 PostgreSQL 存储[src-evidence-1]。",
+        {"src-evidence-1": "系统支持文档索引与语义搜索。"})
+
+    assert response["has_answer"] is False and response["sources"] == []
+
+
+def test_citation_verifier_accepts_a_high_overlap_paraphrase():
+    response = _citation_response(
+        "索引 READY 后即可检索[src-evidence-1]。",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+    assert response["has_answer"] is True
+    assert response["sources"][0]["quote"] == "索引 READY 后才可检索。"
+
+
+def test_citation_verifier_accepts_paraphrase_supported_across_the_full_chunk():
+    response = _citation_response(
+        "READY 状态使索引可检索，任务发布后内容可查询[src-evidence-1]。",
+        {"src-evidence-1": "READY 状态使索引能够检索。任务发布后内容可以查询。"})
+
+    assert response["has_answer"] is True
+
+
+def test_citation_verifier_ignores_negation_in_an_unrelated_source_sentence():
+    response = _citation_response(
+        "索引 READY 后即可检索[src-evidence-1]。",
+        {"src-evidence-1": "未授权访客不得访问后台。索引 READY 后才可检索。"})
+
+    assert response["has_answer"] is True
 
 
 @pytest.mark.asyncio
@@ -843,6 +927,12 @@ def test_deepseek_prompt_refuses_when_core_question_is_not_supported():
     assert "即使资料能提供相关背景" in system_prompt
     assert "has_answer=false 和空 source_ids" in system_prompt
     assert "不要用背景信息冒充对核心问题的回答" in system_prompt
+    assert "每个可核查断言都必须紧邻 [source_id]，放在断言后、句末标点前" in system_prompt
+    assert "不同事实用独立句或分号分隔并分别引用" in system_prompt
+    assert "禁止多事实合一句后在句末堆 [s1][s2]" in system_prompt
+    assert "每个引用必须独立支持其所附着的完整断言" in system_prompt
+    assert "尽量沿用资料中的完整短句" in system_prompt
+    assert "不要添加无引用的背景前言或总结" in system_prompt
 
 
 def test_llm_settings_maps_invalid_port_to_configuration_error():

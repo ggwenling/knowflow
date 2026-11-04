@@ -284,9 +284,10 @@ async def provider_content(adapter, question, evidence, *, request_id):
 async def answer_events(service, request):
     """One event iterator, sequence 1..N and one terminal on exhaustion.
 
-    Deltas are provisional until sources/completed. Cancellation of an active
-    anext closes provider/retrieval first, then yields cancelled once. Closing an
-    iterator or an HTTP disconnect closes resources without a deliverable event.
+    Answer text is buffered until the provider result and citations are fully
+    validated. Cancellation of an active anext closes provider/retrieval first,
+    then yields cancelled once. Closing an iterator or an HTTP disconnect closes
+    resources without a deliverable event.
     """
     from .answering import ANSWER_DEADLINE_SECONDS
     service._contract.validate("TrustedAnswerRequest", request)
@@ -324,9 +325,7 @@ async def answer_events(service, request):
                                     fragment = await anext(content)
                             except StopAsyncIteration:
                                 break
-                            delta = parser.feed(fragment)
-                            if delta:
-                                yield event("delta", delta=delta)
+                            parser.feed(fragment)
                 finally:
                     await model.aclose()
                 _logger.info("ai_stage request_id=%s stage=generation duration_ms=%d usage=%s outcome=success",
@@ -338,7 +337,7 @@ async def answer_events(service, request):
             if time.monotonic() >= deadline:
                 raise TimeoutError
             response = service._response_from_generated(request, evidence, generated)
-            if not response["has_answer"]:
+            if response["answer"]:
                 yield event("delta", delta=response["answer"])
             yield event("sources", has_answer=response["has_answer"], sources=response["sources"])
             terminal = event("completed")
