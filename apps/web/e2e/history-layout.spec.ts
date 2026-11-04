@@ -19,6 +19,7 @@ test("desktop history scrolls to pagination while account controls stay accessib
     await route.fulfill({ json: body });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "对话", exact: true }).click();
   const oldest = page.getByRole("button", { name: /^历史问题 50/ });
   await expect(oldest).toBeAttached();
   const history = oldest.locator("..");

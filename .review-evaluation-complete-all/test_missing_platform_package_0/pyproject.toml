@@ -1,0 +1,5 @@
+[project]
+dependencies = ["example==1.0"]
+[build-system]
+requires = ["missing-builder==1.0"]
+build-backend = "missing_builder"

@@ -1,7 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { ArrowRight, Folder } from "lucide-react";
+import Dashboard from "./dashboard";
+import "@fontsource/dm-sans/latin-400.css";
+import "@fontsource/dm-sans/latin-700.css";
+import "@fontsource/dm-serif-display/latin-400.css";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, Document, KnowledgeBase, QuestionDetail, QuestionHistory, Source, streamQuestion, User } from "@/lib/api";
+import { api, type ApiError, Document, KnowledgeBase, QuestionDetail, QuestionHistory, Source, streamQuestion, User } from "@/lib/api";
 import styles from "./workspace.module.css";
 import SourceViewer from "./source-viewer";
 
@@ -17,15 +24,21 @@ const labels: Record<string, string> = {
 function statusLabel(value: string) { return labels[value] ?? value; }
 function formatLabel(value: string) { const format = value.toUpperCase(); return format === "PDF" || format === "MD" ? format : "TXT"; }
 function messageOf(error: unknown) { return error instanceof Error ? error.message : "操作未能完成"; }
-function ApiModeBanner() {
+function ApiModeBanner({ externalOnly = false }: { externalOnly?: boolean }) {
   const [mode, setMode] = useState("unknown");
   useEffect(() => { fetch("/api/mode", { cache: "no-store" }).then((response) => response.json()).then((body) => setMode(body.mode)).catch(() => undefined); }, []);
+  if (externalOnly && mode !== "external") return null;
   return mode === "synthetic" ? <div className={styles.modeBanner} role="status">合成模型 · 仅用于本地工程验证；不代表真实模型质量或费用</div>
     : mode === "external" ? <div className={styles.modeBanner} role="note">请只上传已获授权的资料。文档片段和问题会发送到当前配置的模型服务。</div>
       : <div className={styles.modeBanner} role="note">模型模式尚未配置。上传前请先确认资料获准使用，并确认模型服务的数据处理范围。</div>;
 }
 
+const Flow = dynamic(() => import("./flow"), { ssr: false });
+
 export default function Workspace() {
+  const [view, setView] = useState<"home" | "chat" | "bases" | "documents">("home");
+  const [resetHelp, setResetHelp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -193,9 +206,9 @@ export default function Workspace() {
         const current = await api<User>("me");
         if (!active) return;
         setUser(current);
-        await loadBases();
+        await loadBases().catch((error) => { if (active) setNotice(messageOf(error)); });
       } catch (error) {
-        if (active) { setUser(null); setNotice(messageOf(error)); }
+        if (active && (error as ApiError).status !== 401) setAuthError(messageOf(error));
       } finally { if (active) setAuthLoading(false); }
     })();
     return () => { active = false; };
@@ -206,27 +219,30 @@ export default function Workspace() {
   const readyDocuments = useMemo(() => documents.filter((document) => document.status === "READY" && document.active_index_version_id), [documents]);
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setAuthError(""); setBusy(true);
+    event.preventDefault(); setAuthError(""); setNotice(""); setBusy(true);
     try {
       await api(`auth/${authMode}`, { method: "POST", body: JSON.stringify({ contract_version: contractVersion, email, password }) });
       setUser(await api<User>("me"));
-      await loadBases();
       setPassword("");
+      setShowPassword(false);
+      await loadBases().catch((error) => setNotice(messageOf(error)));
     } catch (error) { setAuthError(messageOf(error)); }
     finally { setBusy(false); }
   }
 
   async function signOut() {
     try { await api("auth/logout", { method: "POST", body: "{}" }); } catch { /* The proxy clears expired sessions too. */ }
-    leaveQuestion(); selectBase(""); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
+    leaveQuestion(); setView("home"); setAuthMode("login"); setResetHelp(false); setShowPassword(false);
+    setDraft(""); setNotice(""); setViewing(null); setOpenMenu(""); selectBase(""); setUser(null); setBases([]); setDocuments([]); setHistory([]); setAnswer(null);
   }
 
   async function createBase(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = new FormData(event.currentTarget); const name = String(form.get("name") ?? "").trim();
+    event.preventDefault(); const element = event.currentTarget; const form = new FormData(element); const name = String(form.get("name") ?? "").trim();
     if (!name) return;
     setWorking(true); setNotice("");
     try {
       await api("knowledge-bases", { method: "POST", body: JSON.stringify({ contract_version: contractVersion, name }) });
+      element.reset();
       await loadBases();
     } catch (error) { setNotice(messageOf(error)); }
     finally { setWorking(false); }
@@ -276,7 +292,8 @@ export default function Workspace() {
 
   async function ask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedBase || !draft.trim() || busy) return;
+    if (!selectedBase || !readyDocuments.length || !draft.trim() || busy) return;
+    setView("chat");
     const question = draft.trim();
     setBusy(true); setActiveQuestion(question); setDraft(""); setAnswer(null); setNotice("");
     const controller = new AbortController(); abortRef.current = controller;
@@ -313,14 +330,17 @@ export default function Workspace() {
 
   async function openHistory(item: QuestionHistory) {
     leaveQuestion();
+    setView("chat");
+    const questionView = questionViewRef.current;
     selectBase(item.knowledge_base_id);
+    const isCurrent = () => selectedBaseRef.current === item.knowledge_base_id && questionViewRef.current === questionView;
     try {
       await refresh(item.knowledge_base_id);
-      if (selectedBaseRef.current !== item.knowledge_base_id) return;
+      if (!isCurrent()) return;
       const detail = await api<QuestionDetail>(`questions/${item.question_id}`);
-      if (selectedBaseRef.current === item.knowledge_base_id) setAnswer(detail);
+      if (isCurrent()) setAnswer(detail);
     }
-    catch (error) { if (selectedBaseRef.current === item.knowledge_base_id) setNotice(messageOf(error)); }
+    catch (error) { if (isCurrent()) setNotice(messageOf(error)); }
   }
 
   async function deleteHistory(item: QuestionDetail) {
@@ -342,34 +362,76 @@ export default function Workspace() {
 
   if (authLoading) return <main className={styles.loading}>正在检查登录状态…</main>;
   if (!user) return (
-    <main className={styles.authPage}>
-      <section className={styles.authCard}>
-        <div className={styles.brandMark}>K</div><span className={styles.eyebrow}>PERSONAL KNOWLEDGE BASE</span>
-        <h1>{authMode === "login" ? "回到你的资料" : "建立个人知识库"}</h1>
-        <p>上传研发文档，回答问题时可以回到原文核对。</p>
-        <form className={styles.authForm} onSubmit={submitAuth}>
-          <label>邮箱<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label>密码<input type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} /><small>12–128 个字符</small></label>
-          {authError && <p className={styles.error} role="alert">{authError}</p>}
-          <button className={styles.primary} disabled={busy}>{busy ? "正在处理…" : authMode === "login" ? "登录" : "创建账户"}</button>
+    <main className={styles.loginPage} lang="en">
+      <div className="loginFlow" aria-hidden="true"><Flow /></div>
+      <section className={styles.loginContent}>
+        <div className={styles.loginBrand}>KnowFlow</div>
+        <h1>{authMode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}</h1>
+        <p>{authMode === "login" ? <>Sign in to KnowFlow and keep your<br className={styles.loginBreak} /> knowledge in motion.</> : "Create an account to start building your knowledge base."}</p>
+        <form className={styles.loginForm} onSubmit={submitAuth}>
+          <label htmlFor="auth-email">Email</label>
+          <input id="auth-email" type="email" placeholder="Enter your email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+          <label htmlFor="auth-password">Password</label>
+          <div className={styles.passwordField}>
+            <input id="auth-password" type={showPassword ? "text" : "password"} placeholder="Enter your password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={12} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} />
+            <button type="button" aria-controls="auth-password" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button>
+          </div>
+          {authMode === "register" && <small>Use 12–128 characters.</small>}
+          {authError && <p className={styles.error} lang="zh-CN" role="alert">{authError}</p>}
+          <button className={styles.loginSubmit} disabled={busy}>{busy ? "Please wait…" : authMode === "login" ? "Sign in" : "Create account"}</button>
         </form>
-        <button className={styles.textButton} onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(""); }}>
-          {authMode === "login" ? "还没有账户？创建账户" : "已有账户？返回登录"}
-        </button>
-        <div className={styles.authNote}>个人知识库 · 单轮问答 · 原文可核验</div>
+        <div className={styles.loginLinks}>
+          {authMode === "login" && <button type="button" onClick={() => setResetHelp(!resetHelp)} aria-expanded={resetHelp}>Forgot password?</button>}
+          <button type="button" disabled={busy} onClick={() => {
+            setAuthMode(authMode === "login" ? "register" : "login");
+            setAuthError(""); setPassword(""); setShowPassword(false); setResetHelp(false);
+          }}>{authMode === "login" ? "Create an account" : "Back to sign in"}</button>
+        </div>
+        {resetHelp && <p className={styles.resetHelp} role="status">Self-service password reset is currently unavailable.</p>}
       </section>
     </main>
+  );
+
+  function chooseBase(baseId: string) {
+    if (baseId === selectedBaseRef.current) return;
+    leaveQuestion();
+    selectBase(baseId);
+    void refresh(baseId).catch((error) => {
+      if (selectedBaseRef.current === baseId) setNotice(messageOf(error));
+    });
+  }
+
+  if (view === "home") return (
+    <Dashboard
+      email={user.email} bases={bases} selectedBase={selectedBase} history={history}
+      documentCount={refreshing ? undefined : documents.length} moreDocuments={moreDocuments}
+      draft={draft} canAsk={readyDocuments.length > 0 && !busy} busy={busy}
+      notice={notice} onDismissNotice={() => setNotice("")}
+      modelNotice={<ApiModeBanner externalOnly />}
+      onDraftChange={setDraft} onAsk={ask} onChooseBase={chooseBase}
+      onOpenBase={(id) => { chooseBase(id); setView("documents"); }}
+      onOpenHistory={openHistory} onNavigate={setView} onSignOut={signOut} onCreateBase={() => {
+        setView("bases");
+        requestAnimationFrame(() => document.getElementById("new-base-name")?.focus());
+      }}
+    />
   );
 
   const selectedKnowledgeBase = bases.find((base) => base.id === selectedBase);
   return (
     <main className={styles.appShell}>
       <aside className={styles.sidebar}>
-        <a className={styles.brand} href="#"><span className={styles.brandMark}>K</span><span>KnowFlow<small>文档核验工作台</small></span></a>
+        <Link className={styles.brand} href="/" onClick={(event) => { event.preventDefault(); setView("home"); }}><span className={styles.brandMark}>K</span><span>KnowFlow<small>文档核验工作台</small></span></Link>
+        <nav className={styles.deskNav} aria-label="工作台">
+          <button onClick={() => setView("home")}>首页</button>
+          <button aria-current={view === "chat" ? "page" : undefined} onClick={() => setView("chat")}>对话</button>
+          <button aria-current={view === "bases" ? "page" : undefined} onClick={() => setView("bases")}>知识库</button>
+          <button aria-current={view === "documents" ? "page" : undefined} onClick={() => setView("documents")}>文档</button>
+        </nav>
         <div className={styles.sideLabel}>我的知识库</div>
         <div className={styles.baseList}>{bases.map((base) => <button key={base.id} className={`${styles.baseItem} ${selectedBase === base.id ? styles.activeBase : ""}`} onClick={() => { leaveQuestion(); selectBase(base.id); setAnswer(null); void refresh(base.id).catch((error) => { if (selectedBaseRef.current === base.id) setNotice(messageOf(error)); }); }}><span className={styles.baseGlyph}>▤</span>{base.name}</button>)}</div>
         {bases.length === 0 && <p className={styles.sideEmpty}>这里还没有知识库。</p>}
-        <form className={styles.newBase} onSubmit={createBase}><input aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
+        <form className={styles.newBase} onSubmit={createBase}><input id="new-base-name" aria-label="新知识库名称" name="name" placeholder="新建知识库名称" maxLength={200} /><button aria-label="创建知识库" disabled={working}>＋</button></form>
         <div className={styles.sideLabel}>最近问答</div>
         <div className={styles.historyList}>{history.map((item) => <button key={item.question_id} className={styles.historyItem} onClick={() => openHistory(item)}><span>{item.question}</span><small>{statusLabel(item.status)}</small></button>)}{moreHistory && <button className={styles.textButton} disabled={loadingPage || refreshing} onClick={() => void loadMore("history")}>加载更多问答</button>}</div>
         <div className={styles.account}><span className={styles.avatar}>{user.email.slice(0, 1).toUpperCase()}</span><span className={styles.accountText}>{user.email}<small>个人空间</small></span><button className={styles.textButton} onClick={signOut}>退出</button></div>
@@ -379,8 +441,16 @@ export default function Workspace() {
         <header className={styles.topbar}><div><span className={styles.eyebrow}>KNOWLEDGE DESK</span><h1>{selectedKnowledgeBase?.name ?? "开始整理你的资料"}</h1></div><div className={styles.topActions}><span className={styles.readyCount}>{readyDocuments.length} 份资料可用于问答</span><label className={styles.uploadButton}>＋ 上传资料<input type="file" accept=".txt,.md,.pdf" disabled={!selectedBase || working} onChange={(event) => { void upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div></header>
         <ApiModeBanner />
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button aria-label="关闭提示" onClick={() => setNotice("")}>×</button></div>}
-        <div className={styles.workArea}>
-          <div className={styles.chatColumn}>
+        {view === "bases" ? <section className={styles.library} aria-label="全部知识库">
+          <h2>全部知识库</h2>
+          <div className={styles.libraryGrid}>{bases.map((base) => (
+            <button key={base.id} onClick={() => { chooseBase(base.id); setView("documents"); }}>
+              <Folder size={20} /><span>{base.name}</span><ArrowRight size={18} />
+            </button>
+          ))}</div>
+          {!bases.length && <p>创建第一座知识库，开始整理你的资料。</p>}
+        </section> : <div className={view === "chat" ? styles.workArea : styles.documentsView}>
+          {view === "chat" && <div className={styles.chatColumn}>
             <div className={styles.sectionHead}><div><span className={styles.eyebrow}>ASK YOUR DOCUMENTS</span><h2>问答与依据</h2></div><span className={styles.singleTurn}>单轮问答</span></div>
             {answer ? <article className={styles.answerCard}>
               <div className={styles.questionLine}><span className={styles.questionMark}>问</span><p>{answer.question || activeQuestion}</p>{answer.question_id && answer.status !== "PROCESSING" && <button className={styles.deleteQuestion} onClick={() => void deleteHistory(answer)}>删除记录</button>}</div>
@@ -389,14 +459,14 @@ export default function Workspace() {
               {answer.status !== "SUCCEEDED" && answer.status !== "PROCESSING" && <div className={styles.expired}>此问答状态：{statusLabel(answer.status)}。可在历史记录中查看。</div>}
             </article> : <div className={styles.emptyAnswer}><div className={styles.documentGlyph}>文</div><p>从一个具体问题开始</p><span>回答会附上可打开的原文来源，方便你核对关键事实。</span></div>}
             <form className={styles.askBox} onSubmit={ask}><textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={readyDocuments.length ? "例如：这个接口有哪些必填字段？" : "上传并等待至少一份资料就绪后即可提问。"} maxLength={4000} disabled={busy || readyDocuments.length === 0} rows={3} /><div className={styles.askActions}><span>问题会独立检索，不会引用上一轮对话作为上下文。</span>{busy ? <button className={styles.stopButton} type="button" onClick={() => void cancelQuestion()}>停止生成</button> : <button className={styles.primary} disabled={!readyDocuments.length || !draft.trim()}>提问 <span>↗</span></button>}</div></form>
-          </div>
+          </div>}
 
           <aside className={styles.documentPanel}><div className={styles.sectionHead}><div><span className={styles.eyebrow}>SOURCE LIBRARY</span><h2>资料 <span className={styles.documentCount}>{documents.length}</span></h2></div><label className={styles.iconUpload} aria-label="上传资料">＋<input type="file" accept=".txt,.md,.pdf" disabled={!selectedBase || working} onChange={(event) => { void upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label></div>
             {documents.length === 0 ? <div className={styles.emptyDocuments}><div>＋</div><strong>添加第一份资料</strong><span>支持 TXT、Markdown 和可读取文本的 PDF</span><small>最大 8 MiB · PDF 最多 200 页</small></div> : <div className={styles.documentList}>{documents.map((document) => <article key={document.id} className={styles.documentCard}><div className={styles.fileIcon}>{formatLabel(document.format)}</div><div className={styles.documentInfo}><strong title={document.original_name}>{document.original_name}</strong><span>{(document.byte_size / 1024).toFixed(0)} KB · {statusLabel(document.status)}</span>{document.status === "FAILED" && <small className={styles.failure}>索引失败，可尝试重建。</small>}</div><div className={styles.documentMenu}><button aria-expanded={openMenu === document.id} aria-label={`${document.original_name} 操作`} title="资料操作" onClick={() => setOpenMenu(openMenu === document.id ? "" : document.id)}>···</button>{openMenu === document.id && <div role="menu"><button role="menuitem" onClick={() => { setOpenMenu(""); window.document.getElementById(`update-${document.id}`)?.click(); }}>更新资料</button><button role="menuitem" onClick={() => { setOpenMenu(""); void rebuild(document); }}>重建索引</button><button role="menuitem" onClick={() => { setOpenMenu(""); void removeDocument(document); }}>删除资料</button></div>}<input id={`update-${document.id}`} type="file" accept=".txt,.md,.pdf" hidden onChange={(event) => { void upload(event.target.files?.[0], document); event.currentTarget.value = ""; }} /></div><div className={`${styles.statusDot} ${document.status === "READY" ? styles.statusReady : document.status === "FAILED" ? styles.statusFailed : ""}`} title={statusLabel(document.status)} /></article>)}</div>}
             {moreDocuments && <button className={styles.textButton} disabled={loadingPage || refreshing} onClick={() => void loadMore("documents")}>加载更多资料</button>}
             <div className={styles.privacyNote}><span>◈</span><p><strong>资料访问范围</strong><br />仅你可以访问此知识库。上传文档会进入索引流程，只有状态显示“已就绪”后才参与问答。</p></div>
           </aside>
-        </div>
+        </div>}
       </section>
 
       {viewing && <SourceViewer source={viewing.source} documentName={viewing.documentName} onClose={closeViewer} />}

@@ -56,6 +56,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks(); vi.unstubAl
 
 async function openWorkspace() {
   render(<Workspace />);
+  fireEvent.click(await screen.findByRole("button", { name: /^对话$/ }));
   await screen.findByText(document.original_name);
 }
 
@@ -70,6 +71,7 @@ it("shows the ninth history item and loads the next document and history pages",
     throw new Error(`Unexpected API path: ${path}`);
   });
   render(<Workspace />);
+  fireEvent.click(await screen.findByRole("button", { name: /^对话$/ }));
   expect(await screen.findByText("问题 8")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
   expect(await screen.findByText("第51份.md")).toBeVisible();
@@ -112,6 +114,7 @@ it("blocks pagination while refreshing and resumes at the refreshed offset", asy
     throw new Error(`Unexpected API path: ${path}`);
   });
   render(<Workspace />);
+  fireEvent.click(await screen.findByRole("button", { name: /^对话$/ }));
   await screen.findByText("资料0.md");
   fireEvent.click(screen.getByRole("button", { name: "加载更多资料" }));
   await screen.findByText("资料99.md");

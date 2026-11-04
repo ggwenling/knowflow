@@ -81,11 +81,16 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const email = `web-${randomUUID()}@example.test`;
   const password = "KnowFlow-e2e-only-2026!";
   await page.goto("/");
-  await page.getByRole("button", { name: "还没有账户？创建账户" }).click();
-  await page.getByLabel("邮箱").fill(email);
-  await page.getByLabel("密码").fill(password);
-  await page.getByRole("button", { name: "创建账户" }).click();
+  await page.getByRole("button", { name: "Create an account" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
 
+  await expect(page.getByRole("heading", { name: "KnowFlow", exact: true })).toBeVisible();
+  await expect(page.getByText("这里还没有知识库。")).toBeVisible();
+  await page.getByRole("button", { name: "创建知识库" }).click();
+  await expect(page.getByLabel("新知识库名称")).toBeFocused();
+  await page.getByRole("button", { name: "对话", exact: true }).click();
   await expect(page.getByRole("heading", { name: "开始整理你的资料" })).toBeVisible();
   await expect(page.getByLabel("新知识库名称")).toBeVisible();
   await expect(page.getByText("我的知识库")).toBeVisible();
@@ -117,7 +122,11 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await expect(markdownCard).toContainText("已就绪", { timeout: 90_000 });
 
   const streamResponse = page.waitForResponse((response) => response.url().includes("/questions/stream"));
-  await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("什么时候允许使用这份资料进行问答？");
+  await page.getByRole("button", { name: "首页", exact: true }).click();
+  await page.getByRole("button", { name: "总结最新的产品功能" }).click();
+  const homeQuestion = page.getByRole("textbox", { name: "向知识库提问" });
+  await expect(homeQuestion).toHaveValue("总结最新的产品功能");
+  await homeQuestion.fill("什么时候允许使用这份资料进行问答？");
   await page.getByRole("button", { name: "提问" }).click();
   const firstStream = await streamResponse;
   const streamEvents = parseSseEvents(await capturedStream(page, "什么时候允许使用这份资料进行问答？"));
@@ -222,10 +231,10 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const secondPage = await secondContext.newPage();
   const secondEmail = `other-${randomUUID()}@example.test`;
   await secondPage.goto("/");
-  await secondPage.getByRole("button", { name: "还没有账户？创建账户" }).click();
-  await secondPage.getByLabel("邮箱").fill(secondEmail);
-  await secondPage.getByLabel("密码").fill(password);
-  await secondPage.getByRole("button", { name: "创建账户" }).click();
+  await secondPage.getByRole("button", { name: "Create an account" }).click();
+  await secondPage.getByLabel("Email").fill(secondEmail);
+  await secondPage.getByLabel("Password", { exact: true }).fill(password);
+  await secondPage.getByRole("button", { name: "Create account", exact: true }).click();
   await expect(secondPage.getByText("这里还没有知识库。")).toBeVisible();
   const sourceStatus = await secondPage.evaluate((id) => fetch(`/api/v1/sources/${id}`).then((response) => response.status), source.source_id);
   const fileStatus = await secondPage.evaluate(({ documentId, versionId }) => fetch(`/api/v1/documents/${documentId}/contents/${versionId}/file`).then((response) => response.status), { documentId: source.document_id, versionId: source.content_version_id });
@@ -263,6 +272,19 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   await page.getByRole("button").filter({ hasText: pdfName }).filter({ hasText: `第 ${pdfSource.locator.page} 页` }).first().click();
   await expect(page.getByRole("dialog", { name: "原文依据" }).locator("iframe")).toHaveAttribute("src", new RegExp(`#page=${pdfSource.locator.page}$`));
   expect(uploaded.document_id).toBe(source.document_id);
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "KnowFlow", exact: true })).toBeVisible();
+  await page.getByLabel("账户菜单").click();
+  await page.getByRole("button", { name: "退出", exact: true }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password + "-wrong");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "KnowFlow", exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
   const capturePath = process.env.KNOWFLOW_E2E_STREAM_CAPTURE;
   if (!capturePath) throw new Error("KNOWFLOW_E2E_STREAM_CAPTURE is required");
   await writeFile(capturePath, JSON.stringify({ text: streamEvents, pdf: pdfEvents, ...failureCaptures }, null, 2), "utf8");
