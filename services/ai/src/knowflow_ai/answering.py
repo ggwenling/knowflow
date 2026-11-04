@@ -17,7 +17,7 @@ import psycopg
 
 from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
-from .citation_verify import citations_are_grounded
+from .citation_verify import prune_ungrounded_claims
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION
@@ -507,8 +507,10 @@ class AnswerService:
             if cited != set(ids) or not set(ids) <= by_id.keys():
                 raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
             evidence_text = {source_id: by_id[source_id]["text_content"] for source_id in ids}
-            if citations_are_grounded(generated["answer"], evidence_text):
-                answer = generated["answer"]
+            pruning = prune_ungrounded_claims(generated["answer"], evidence_text)
+            if pruning["ok"]:
+                answer = pruning["pruned_answer"]
+                ids = pruning["kept_source_ids"]
                 sources = [{"source_id": source_id,
                             "document_id": by_id[source_id]["document_id"],
                             "content_version_id": by_id[source_id]["content_version_id"],

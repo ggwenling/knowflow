@@ -6,6 +6,7 @@ language entailment checker. It uses only the source text cited by each claim.
 import re
 import unicodedata
 from collections import Counter
+from dataclasses import dataclass
 
 
 _MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
@@ -61,6 +62,21 @@ def _is_boundary(answer, position, in_marker, protected_periods):
 
 def _claim_units(answer):
     """Return (unmarked claim text, markers) for sentence/semicolon/newline units."""
+    return [(unit.claim, list(unit.markers)) for unit in _claim_segments(answer)
+            if unit.claim or unit.markers]
+
+
+@dataclass(frozen=True)
+class _ClaimSegment:
+    start: int
+    end: int
+    boundary: str | None
+    claim: str
+    markers: tuple
+
+
+def _claim_segments(answer):
+    """Split an answer while retaining the source spans needed for pruning."""
     markers = list(_MARKER.finditer(answer))
     spans = [(marker.start(), marker.end()) for marker in markers]
     protected_periods = _protected_periods(answer)
@@ -87,8 +103,8 @@ def _claim_units(answer):
             marker_index += 1
         raw = answer[start:end]
         claim = _MARKER.sub("", raw).strip()
-        if claim or unit_markers:
-            units.append((claim, unit_markers))
+        boundary = None if at_end else answer[position]
+        units.append(_ClaimSegment(start, end, boundary, claim, tuple(unit_markers)))
         start = position + 1
 
     return units
@@ -164,49 +180,86 @@ def _grounded(claim, evidence):
     return False
 
 
-def citations_are_grounded(answer, evidence_by_id):
-    """Check each cited claim against every source attached to it.
+def prune_ungrounded_claims(answer, evidence_by_id):
+    """Remove unsupported claim units and return the citations that remain.
 
-    Unmarked units are ignored. A marker-only unit attaches to the previous
-    non-empty claim, matching the collector's backward attachment rule. For
-    parallel markers, every cited source is checked against the full claim.
+    Marker-only units attach to the preceding claim, matching the collector's
+    backward attachment rule. A stack is pruned marker by marker using strict
+    full-claim substring coverage; a single marker keeps the existing
+    non-empty-source policy.
     """
-    units = _claim_units(answer)
-    if not units:
-        return False
-
+    segments = _claim_segments(answer)
     claims = []
-    previous_claim_index = None
-    for claim, markers in units:
-        if claim:
-            claims.append([claim, list(markers)])
-            previous_claim_index = len(claims) - 1
-        elif markers:
-            if previous_claim_index is None:
-                return False
-            claims[previous_claim_index][1].extend(markers)
+    previous_claim = None
+    for segment in segments:
+        if segment.claim:
+            claim = {"text": segment.claim, "markers": list(segment.markers),
+                     "segments": [segment]}
+            claims.append(claim)
+            previous_claim = claim
+        elif segment.markers and previous_claim is not None:
+            previous_claim["markers"].extend(segment.markers)
+            previous_claim["segments"].append(segment)
 
-    checked_claims = 0
-    for claim, markers in claims:
-        if not markers:
+    kept_claims = []
+    for claim in claims:
+        markers = claim["markers"]
+        normalized_claim = _normalized(claim["text"])
+        if not markers or not normalized_claim:
             continue
-        checked_claims += 1
-        parallel = len(markers) > 1
-        normalized_claim = _normalized(claim)
-        if not normalized_claim:
-            return False
-        for marker in markers:
+        if len(markers) > 1:
+            supported = []
+            for marker in markers:
+                evidence = evidence_by_id.get(marker.group(1))
+                if (isinstance(evidence, str)
+                        and normalized_claim in _normalized(evidence)):
+                    supported.append(marker)
+        else:
+            marker = markers[0]
             evidence = evidence_by_id.get(marker.group(1))
-            if not isinstance(evidence, str):
-                return False
-            if parallel:
-                # Stacked markers must each independently contain the full claim.
-                if normalized_claim not in _normalized(evidence):
-                    return False
-            else:
-                # Single-marker paraphrases are enforced by the generation prompt;
-                # soft n-gram refuse caused mass false refusals on public seed.
-                # Still require a non-empty cited source string.
-                if not _normalized(evidence):
-                    return False
-    return checked_claims > 0
+            supported = ([marker] if isinstance(evidence, str)
+                         and _normalized(evidence) else [])
+        if supported:
+            kept_claims.append((claim, supported))
+
+    answer_parts = []
+    for claim, supported in kept_claims:
+        supported_spans = {(marker.start(), marker.end()) for marker in supported}
+        chunks = []
+        for segment in claim["segments"]:
+            cursor = segment.start
+            piece = []
+            for marker in segment.markers:
+                if (marker.start(), marker.end()) not in supported_spans:
+                    piece.append(answer[cursor:marker.start()])
+                    cursor = marker.end()
+                else:
+                    piece.append(answer[cursor:marker.end()])
+                    cursor = marker.end()
+            piece.append(answer[cursor:segment.end])
+            if segment.boundary:
+                piece.append(segment.boundary)
+            chunks.append("".join(piece))
+        readable = _normalized("".join(chunks))
+        readable = re.sub(r"\s+([。！？.!?；;，,、])", r"\1", readable)
+        if readable:
+            answer_parts.append(readable)
+
+    pruned_answer = " ".join(answer_parts).strip().rstrip(" ;；,，、").rstrip()
+    # Derive IDs from actual retained markers in answer order, including the
+    # unusual marker-only suffix form handled by _claim_segments.
+    kept_source_ids = []
+    seen_source_ids = set()
+    for marker in _MARKER.finditer(pruned_answer):
+        source_id = marker.group(1)
+        if source_id not in seen_source_ids:
+            seen_source_ids.add(source_id)
+            kept_source_ids.append(source_id)
+    return {"pruned_answer": pruned_answer,
+            "kept_source_ids": kept_source_ids,
+            "ok": bool(kept_source_ids)}
+
+
+def citations_are_grounded(answer, evidence_by_id):
+    """Compatibility boolean wrapper around the structured pruning result."""
+    return prune_ungrounded_claims(answer, evidence_by_id)["ok"]

@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+import re
 import socket
 import struct
 import threading
@@ -17,7 +18,11 @@ from knowflow_ai.answering import (
     LlmSettings,
     ReadOnlyRetriever,
 )
-from knowflow_ai.citation_verify import _claim_units, citations_are_grounded
+from knowflow_ai.citation_verify import (
+    _claim_units,
+    citations_are_grounded,
+    prune_ungrounded_claims,
+)
 from knowflow_ai.config import ConfigurationError
 from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from knowflow_ai.protocol import CONTRACT_VERSION, ContractConsumer, InvalidMessage
@@ -783,13 +788,13 @@ def test_citation_verifier_accepts_a_supported_single_citation():
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
-def test_citation_verifier_allows_uncited_preface_before_supported_claim():
+def test_citation_verifier_prunes_uncited_preface_before_supported_claim():
     response = _citation_response(
         "先说明一个简短背景。索引 READY 后才可检索[src-evidence-1]。",
         {"src-evidence-1": "索引 READY 后才可检索。"})
 
     assert response["has_answer"] is True
-    assert response["answer"] == "先说明一个简短背景。索引 READY 后才可检索[src-evidence-1]。"
+    assert response["answer"] == "索引 READY 后才可检索[src-evidence-1]。"
 
 
 def test_citation_verifier_attaches_marker_only_unit_to_previous_claim():
@@ -821,7 +826,7 @@ def test_citation_verifier_refuses_parallel_markers_that_only_support_half_the_c
     assert response["sources"] == []
 
 
-def test_citation_verifier_requires_every_parallel_source_to_contain_the_full_claim():
+def test_citation_verifier_keeps_only_parallel_sources_containing_the_full_claim():
     answer = "生产环境支持批量导入，缓存关闭[src-evidence-1][src-evidence-2]"
     partial = _citation_response(answer, {
         "src-evidence-1": "生产环境支持批量导入。",
@@ -832,28 +837,55 @@ def test_citation_verifier_requires_every_parallel_source_to_contain_the_full_cl
         "src-evidence-2": "生产环境支持批量导入，缓存关闭。",
     })
 
-    assert partial["has_answer"] is False
-    assert partial["sources"] == []
+    assert partial["has_answer"] is True
+    assert partial["answer"] == "生产环境支持批量导入，缓存关闭[src-evidence-2]"
+    assert [source["source_id"] for source in partial["sources"]] == ["src-evidence-2"]
     assert complete["has_answer"] is True
 
 
-def test_citation_verifier_refuses_stacked_markers_when_one_source_lacks_full_claim():
-    # Single-marker soft conflicts are prompt-enforced only; hard refuse is for stacks.
+def test_citation_verifier_prunes_unsupported_marker_from_a_stack():
     response = _citation_response(
         "并发上限为 5 个任务且缓存关闭[src-evidence-1][src-evidence-2]。",
         {"src-evidence-1": "并发上限为 5 个任务。",
          "src-evidence-2": "并发上限为 5 个任务且缓存关闭。"})
 
-    assert response["has_answer"] is False and response["sources"] == []
+    assert response["has_answer"] is True
+    assert response["answer"] == "并发上限为 5 个任务且缓存关闭[src-evidence-2]。"
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-2"]
 
 
-def test_citation_verifier_refuses_stacked_markers_with_negation_mismatch_on_one_source():
+def test_citation_verifier_prunes_stacked_marker_with_negation_mismatch():
     response = _citation_response(
         "该操作支持导出且审计开启[src-evidence-1][src-evidence-2]。",
         {"src-evidence-1": "该操作不支持导出。",
          "src-evidence-2": "该操作支持导出且审计开启。"})
 
-    assert response["has_answer"] is False and response["sources"] == []
+    assert response["has_answer"] is True
+    assert response["answer"] == "该操作支持导出且审计开启[src-evidence-2]。"
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-2"]
+
+
+def test_citation_verifier_drops_unsupported_claim_but_keeps_grounded_content():
+    response = _citation_response(
+        "索引 READY 后才可检索[src-evidence-1]。缓存默认开启[src-evidence-2][src-evidence-3]。",
+        {"src-evidence-1": "索引 READY 后才可检索。",
+         "src-evidence-2": "缓存默认关闭。",
+         "src-evidence-3": "索引 READY 后才可检索。"})
+
+    assert response["has_answer"] is True
+    assert response["answer"] == "索引 READY 后才可检索[src-evidence-1]。"
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+    assert {source["source_id"] for source in response["sources"]} == {
+        marker[1:-1] for marker in re.findall(r"\[[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\]",
+                                               response["answer"])}
+
+
+def test_citation_pruner_returns_false_when_all_claims_are_ungrounded():
+    result = prune_ungrounded_claims(
+        "索引 READY 后才可检索[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "索引可以查询。", "src-evidence-2": "后台提供管理功能。"})
+
+    assert result == {"pruned_answer": "", "kept_source_ids": [], "ok": False}
 
 
 def test_citation_verifier_allows_single_marker_when_source_text_is_present():
