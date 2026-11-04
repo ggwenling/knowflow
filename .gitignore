@@ -29,7 +29,7 @@ target/
 # Local application data and private fixtures
 /data/private/
 /data/raw/
-/.blindtest/
+/.blindtest*/
 *.sqlite
 *.sqlite3
 *.db
