@@ -42,9 +42,11 @@ def _normalized(text):
 def _protected_boundaries(text):
     """Return sentence-boundary characters inside URLs and email addresses."""
     spans = []
-    for match in _URL.finditer(text):
+    search_from = 0
+    while match := _URL.search(text, search_from):
         start = match.start()
-        end = match.end()
+        matched_end = match.end()
+        end = matched_end
         # The URL regex accepts quotes and backticks, so a quoted URL can
         # otherwise absorb punctuation and prose after its closing delimiter.
         opening_quote = text[start - 1] if start else None
@@ -62,6 +64,10 @@ def _protected_boundaries(text):
         while end > match.start() and text[end - 1] in _URL_TRAILING_PUNCTUATION:
             end -= 1
         spans.append((start, end))
+        # A greedy match may have crossed a closing quote (and swallowed a
+        # later URL). Resume at the shortened boundary so that URL gets scanned
+        # independently instead of being lost to the original match span.
+        search_from = end if end < matched_end else matched_end
     spans.extend((match.start(), match.end()) for match in _EMAIL.finditer(text))
     return {position for start, end in spans
             for position in range(start, end) if text[position] in _BOUNDARIES}

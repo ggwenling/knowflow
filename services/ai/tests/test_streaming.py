@@ -150,6 +150,33 @@ async def test_stream_prunes_claim_after_a_quoted_url(quote, separator):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(('quote', 'second_url'), [
+    ('"', 'https://docs.example.test/search?q=cache'),
+    ('"', 'https://docs.example.test/items;view=all'),
+    ('`', 'https://docs.example.test/search?q=cache'),
+    ('`', 'https://docs.example.test/items;view=all'),
+])
+async def test_stream_rescans_each_quoted_url(quote, second_url):
+    claim = (f'入口{quote}https://docs.example.test/start{quote}和'
+             f'{quote}{second_url}{quote}')
+    answer = claim + '[src-evidence-1]。'
+    evidence = _evidence()
+    evidence[0]['text_content'] = claim + '。'
+    generated = json.dumps({'answer': answer, 'has_answer': True,
+                            'source_ids': ['src-evidence-1']}, ensure_ascii=False)
+    service, client, _calls = _service(
+        ProviderStream([_sse([generated])]), evidence=evidence)
+
+    async with client:
+        events = [event async for event in service.stream(_request())]
+
+    assert ''.join(event['delta'] for event in events if event['event'] == 'delta') == answer
+    assert events[-2]['event'] == 'sources' and events[-2]['has_answer'] is True
+    assert [source['source_id'] for source in events[-2]['sources']] == ['src-evidence-1']
+    assert events[-1]['event'] == 'completed'
+
+
+@pytest.mark.asyncio
 async def test_provider_stream_accepts_fragmented_utf8_and_validates_final_sources():
     generated = '{"has_answer":true,"answer":"READY😀[src-evidence-1]","source_ids":["src-evidence-1"]}'
     body = _sse(list(generated))

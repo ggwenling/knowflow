@@ -975,6 +975,35 @@ def test_citation_pruning_stops_url_at_a_closing_quote(quote, separator):
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
+@pytest.mark.parametrize(("quote", "second_url"), [
+    ('"', "https://docs.example.test/search?q=cache"),
+    ('"', "https://docs.example.test/items;view=all"),
+    ("`", "https://docs.example.test/search?q=cache"),
+    ("`", "https://docs.example.test/items;view=all"),
+])
+@pytest.mark.asyncio
+async def test_answer_service_rescans_each_quoted_url(quote, second_url):
+    claim = (f"入口{quote}https://docs.example.test/start{quote}和"
+             f"{quote}{second_url}{quote}")
+    answer = claim + "[src-evidence-1]。"
+    evidence_text = claim + "。"
+    rows = _evidence()
+    rows[0]["text_content"] = evidence_text
+    model = FakeLlm({"answer": answer, "has_answer": True,
+                     "source_ids": ["src-evidence-1"]})
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(rows))
+
+    result = prune_ungrounded_claims(answer, {"src-evidence-1": evidence_text})
+    response = await service.answer(_request())
+
+    assert result == {"pruned_answer": answer,
+                      "kept_source_ids": ["src-evidence-1"], "ok": True}
+    assert response["has_answer"] is True
+    assert response["answer"] == answer
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+
+
 @pytest.mark.parametrize("email", [
     "help!desk@example.test",
     "help?desk@example.test",
