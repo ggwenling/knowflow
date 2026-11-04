@@ -55,3 +55,27 @@ Prompt SHA：BEFORE `3115dbae…` → AFTER/holdout `6a7be9f9cef66bb16a54ae5be02
 ## 仓外产物
 
 `/workspace/knowflow-runtime/reports/citation-fix-20261105/`（predictions、judged-*、ledger.path）；私有盲测 `/workspace/knowflow-private-blind/2026-11-05/`（不入库）。
+
+## 剪枝轮次（over-refusal 修复）
+
+根因：post-gen verifier 失败时整答拒答，把可保留 grounded 断言一并丢掉（盲测 v2：answerable 0.733）。
+
+实现（`d077e6a` → URL 边界 `6ff1074`/`75baab5`/`f00a17d`）：`prune_ungrounded_claims` 删除未 grounding 的断言/引用；仅当无可保留 grounded 内容时才标准拒答。Sol 对 P1c 复审 **APPROVE**（`docs/reviews/2026-11-05-sol-citation-prune-p1c-rereview.md`）。
+
+### 公开 seed-v2（prune 后 LLM consensus）
+
+| Split | code_sha | gate | Support | Citation | Unans refuse | Ans answer |
+|---|---|---|---:|---:|---:|---:|
+| development prune | `d077e6a` | **passed** | 1.000 (31/31) | 1.000 (40/40) | 1.000 | **1.000** |
+| holdout prune | `502bc9f` | **passed** | 1.000 (19/19) | 1.000 (28/28) | 1.000 | **1.000** |
+
+holdout 第二法官曾对 2 题标 incomplete→unsupported；Sol 仲裁维持 supported。
+
+### 盲测
+
+- v2（`aea779a`，整答拒答策略）：answerable **0.733 failed**；citation/support 1.0 — [`2026-11-05-box-blind-20-v2.md`](./2026-11-05-box-blind-20-v2.md)
+- v3（`f00a17d`，剪枝策略）：answerable **0.800 failed**；support 0.917、citation 0.966 passed — [`2026-11-05-box-blind-20-v3.md`](./2026-11-05-box-blind-20-v3.md)
+
+### 花费更新
+
+citation-fix 共享账本预留合计约 **CNY 2.68**（paid reservations 持续累积；含多次 holdout 重试与盲测 v2/v3）。超过本轮期望额外 <1 / 项目软目标 <2 的指导线，已停止新增 real collect。
