@@ -40,12 +40,15 @@ def validate(path):
                 raise ValueError(f"SSE_REQUEST_MISMATCH_{kind}_{sequence}")
         names = [frame["name"] for frame in frames]
         terminal = "error" if kind == "timeout" else kind if kind in {"error", "cancelled"} else "completed"
-        if (names[0] != "started" or names.count("started") != 1 or "delta" not in names
+        # Completed/refusal: started → delta+ → sources → completed (delta required).
+        # Failure terminals: started → error|cancelled only — answer text is buffered until
+        # citation validation, so aborted/failed streams emit no delta (answer-streaming.md).
+        if (names[0] != "started" or names.count("started") != 1
                 or names[-1] != terminal
                 or sum(name in {"completed", "error", "cancelled"} for name in names) != 1
-                or (terminal == "completed" and (names[-2] != "sources"
+                or (terminal == "completed" and ("delta" not in names or names[-2] != "sources"
                     or any(name != "delta" for name in names[1:-2])))
-                or (terminal != "completed" and any(name != "delta" for name in names[1:-1]))):
+                or (terminal != "completed" and (len(names) != 2 or "delta" in names or "sources" in names))):
             raise ValueError(f"SSE_LIFECYCLE_MISMATCH_{kind}")
         if kind == "timeout" and frames[-1]["data"]["code"] != "PROCESSING_TIMEOUT":
             raise ValueError("SSE_TIMEOUT_CODE_MISMATCH")

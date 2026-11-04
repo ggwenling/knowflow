@@ -220,7 +220,8 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   });
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(slowQuestion);
   await page.getByRole("button", { name: "提问" }).click();
-  await expect(page.getByText("合成中断片段", { exact: false })).toBeVisible();
+  // Answer text is buffered until citation validation; sync on in-progress UI (Stop), not draft text.
+  await expect(page.getByRole("button", { name: "停止生成" })).toBeVisible();
   await page.getByRole("button", { name: "停止生成" }).click();
   await expect(page.getByText("此问答状态：已取消。可在历史记录中查看。")).toBeVisible();
   const stopped = await expectUnfinishedHistory(page, slowQuestion, "CANCELLED");

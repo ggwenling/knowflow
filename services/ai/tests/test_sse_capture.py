@@ -16,14 +16,15 @@ _spec.loader.exec_module(_module)
 def captures():
     result = {}
     for kind in ("text", "pdf", "error", "cancelled", "timeout", "refusal"):
-        events = [("started", {}), ("delta", {"delta": "partial"})]
         if kind in {"text", "pdf", "refusal"}:
-            events += [("sources", {"has_answer": False, "sources": []}), ("completed", {})]
+            events = [("started", {}), ("delta", {"delta": "partial"}),
+                      ("sources", {"has_answer": False, "sources": []}), ("completed", {})]
         elif kind in {"error", "timeout"}:
             code = "PROCESSING_TIMEOUT" if kind == "timeout" else "AI_PROCESSING_FAILED"
-            events += [("error", {"code": code, "message": code, "retryable": kind == "timeout"})]
+            events = [("started", {}),
+                      ("error", {"code": code, "message": code, "retryable": kind == "timeout"})]
         else:
-            events += [("cancelled", {})]
+            events = [("started", {}), ("cancelled", {})]
         result[kind] = [{"name": name, "data": {
             "contract_version": "0.2.0-draft.10", "request_id": "request-" + kind,
             "sequence": index, "event": name, **fields,
@@ -38,7 +39,7 @@ def validate(tmp_path, value):
 
 
 def test_complete_and_failed_captures_pass(tmp_path):
-    assert validate(tmp_path, captures()) == {"text": 4, "pdf": 4, "error": 3, "cancelled": 3, "timeout": 3, "refusal": 4}
+    assert validate(tmp_path, captures()) == {"text": 4, "pdf": 4, "error": 2, "cancelled": 2, "timeout": 2, "refusal": 4}
 
 
 @pytest.mark.parametrize("case", ["missing_path", "mixed_request", "sequence", "schema", "after_terminal", "wrong_terminal", "missing_delta", "missing_sources", "sources_before_delta", "timeout_code", "refusal_flag"])
@@ -68,7 +69,7 @@ def test_invalid_capture_is_rejected(tmp_path, case):
         for sequence, frame in enumerate(value["text"], 1):
             frame["data"]["sequence"] = sequence
     else:
-        kind, event = ("cancelled", "delta") if case == "missing_delta" else ("pdf", "sources")
+        kind, event = ("text", "delta") if case == "missing_delta" else ("pdf", "sources")
         value[kind] = [frame for frame in value[kind] if frame["name"] != event]
         for sequence, frame in enumerate(value[kind], 1):
             frame["data"]["sequence"] = sequence
