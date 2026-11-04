@@ -136,5 +136,6 @@
     }
   ],
   "checker": "BLIND_V3_CHECKER_DONE ok=1 fixes=0",
-  "spend_cny_ledger_citation_fix": 1.268328
+  "spend_cny_ledger_at_v3_collect_end": 1.268328,
+  "spend_cny_ledger_citation_fix_current": 2.684136
 }

@@ -78,4 +78,4 @@ holdout 第二法官曾对 2 题标 incomplete→unsupported；Sol 仲裁维持 
 
 ### 花费更新
 
-citation-fix 共享账本预留合计约 **CNY 2.68**（paid reservations 持续累积；含多次 holdout 重试与盲测 v2/v3）。超过本轮期望额外 <1 / 项目软目标 <2 的指导线，已停止新增 real collect。
+citation-fix 共享账本两口径：盲测 v3 **采集结束快照** reserved **CNY 1.268328**（paid 516）；报告撰写时账本累计 **CNY 2.684136**（paid 1092，含采集后继续发生的 provider 预留/重试）。超过项目软目标 <2 的指导线；已停止新增 real collect 并停服务。
