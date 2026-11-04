@@ -19,6 +19,12 @@ _EMAIL = re.compile(
     re.ASCII,
 )
 _URL_TRAILING_PUNCTUATION = ".,!?;:。！？；，、)]}"
+_URL_QUOTE_PAIRS = {
+    '"': '"', "'": "'", "`": "`",
+    "“": "”", "‘": "’", "„": "“", "‚": "‘",
+    "«": "»", "‹": "›", "「": "」", "『": "』",
+    "《": "》", "〈": "〉",
+}
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_])\d+(?:\.\d+)?%?(?![A-Za-z0-9_])", re.ASCII)
 _NEGATION = re.compile(
     r"并非|不是|没有|不曾|不再|不能|不可|不得|不应|禁止|否认|否定|未能|未曾|"
@@ -39,6 +45,14 @@ def _protected_boundaries(text):
     for match in _URL.finditer(text):
         start = match.start()
         end = match.end()
+        # The URL regex accepts quotes and backticks, so a quoted URL can
+        # otherwise absorb punctuation and prose after its closing delimiter.
+        opening_quote = text[start - 1] if start else None
+        closing_quote = _URL_QUOTE_PAIRS.get(opening_quote)
+        if closing_quote is not None:
+            closing_position = text.find(closing_quote, start, end)
+            if closing_position >= 0:
+                end = closing_position
         # URLs are often followed immediately by CJK prose, without whitespace.
         # Full-width sentence terminators end the URL even when more text follows.
         for position in range(start, end):

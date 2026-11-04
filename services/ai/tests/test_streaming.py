@@ -123,6 +123,33 @@ async def test_stream_final_answer_preserves_url_boundary_characters(url):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('quote', ['"', '`'])
+@pytest.mark.parametrize('separator', [';', '!', '?'])
+async def test_stream_prunes_claim_after_a_quoted_url(quote, separator):
+    answer = (f'参考 {quote}https://docs.example.test/start{quote}{separator}'
+              '缓存默认关闭[src-evidence-1][src-evidence-2]。')
+    evidence = _evidence()
+    evidence[0]['text_content'] = '缓存默认关闭。'
+    evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
+                     'chunk_id': 'chunk-example-2',
+                     'text_content': '缓存默认开启。'})
+    generated = json.dumps({'answer': answer, 'has_answer': True,
+                            'source_ids': ['src-evidence-1', 'src-evidence-2']},
+                           ensure_ascii=False)
+    service, client, _calls = _service(
+        ProviderStream([_sse([generated])]), evidence=evidence)
+
+    async with client:
+        events = [event async for event in service.stream(_request())]
+
+    assert ''.join(event['delta'] for event in events if event['event'] == 'delta') == (
+        '缓存默认关闭[src-evidence-1]。')
+    assert events[-2]['event'] == 'sources' and events[-2]['has_answer'] is True
+    assert [source['source_id'] for source in events[-2]['sources']] == ['src-evidence-1']
+    assert events[-1]['event'] == 'completed'
+
+
+@pytest.mark.asyncio
 async def test_provider_stream_accepts_fragmented_utf8_and_validates_final_sources():
     generated = '{"has_answer":true,"answer":"READY😀[src-evidence-1]","source_ids":["src-evidence-1"]}'
     body = _sse(list(generated))

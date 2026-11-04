@@ -957,6 +957,24 @@ def test_citation_pruning_and_response_preserve_url_boundary_characters(url):
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
+@pytest.mark.parametrize("quote", ['"', '`'])
+@pytest.mark.parametrize("separator", [";", "!", "?"])
+def test_citation_pruning_stops_url_at_a_closing_quote(quote, separator):
+    answer = (f"参考 {quote}https://docs.example.test/start{quote}{separator}"
+              "缓存默认关闭[src-evidence-1][src-evidence-2]。")
+    evidence = {"src-evidence-1": "缓存默认关闭。",
+                "src-evidence-2": "缓存默认开启。"}
+
+    result = prune_ungrounded_claims(answer, evidence)
+    response = _citation_response(answer, evidence)
+
+    assert result == {"pruned_answer": "缓存默认关闭[src-evidence-1]。",
+                      "kept_source_ids": ["src-evidence-1"], "ok": True}
+    assert response["has_answer"] is True
+    assert response["answer"] == "缓存默认关闭[src-evidence-1]。"
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+
+
 @pytest.mark.parametrize("email", [
     "help!desk@example.test",
     "help?desk@example.test",
