@@ -1,6 +1,0 @@
-[[package]]
-name = "example"
-version = "1.0"
-[[package]]
-name = "platform-only"
-version = "3.0"

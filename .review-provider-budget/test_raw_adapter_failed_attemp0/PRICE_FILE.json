@@ -1,1 +1,0 @@
-{"deepseek-flash": {"provider": "deepseek", "model": "deepseek-flash", "input_cny_per_million": "1", "output_cny_per_million": "2", "source_url": "https://example.test/prices", "verified_by": "synthetic-test", "verified_at": "2026-11-03T12:51:50.747290+00:00", "valid_until": "2026-11-03T14:51:50.747290+00:00"}}
