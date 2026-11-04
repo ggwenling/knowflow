@@ -10,6 +10,13 @@ from collections import Counter
 
 _MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
 _BOUNDARIES = frozenset("。！？.!?；;\n")
+_URL = re.compile(r"https?://[^\s<>\[\]{}]+", re.IGNORECASE)
+_EMAIL = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@"
+    r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?![A-Za-z0-9-])",
+    re.ASCII,
+)
+_URL_TRAILING_PUNCTUATION = ".,!?;:。！？；，、)]}"
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_])\d+(?:\.\d+)?%?(?![A-Za-z0-9_])", re.ASCII)
 _NEGATION = re.compile(
     r"并非|不是|没有|不曾|不再|不能|不可|不得|不应|禁止|否认|否定|未能|未曾|"
@@ -24,11 +31,26 @@ def _normalized(text):
     return " ".join(unicodedata.normalize("NFC", text).split())
 
 
-def _is_boundary(answer, position, in_marker):
+def _protected_periods(text):
+    """Return periods inside URLs or email addresses, excluding URL punctuation."""
+    spans = []
+    for match in _URL.finditer(text):
+        end = match.end()
+        while end > match.start() and text[end - 1] in _URL_TRAILING_PUNCTUATION:
+            end -= 1
+        spans.append((match.start(), end))
+    spans.extend((match.start(), match.end()) for match in _EMAIL.finditer(text))
+    return {position for start, end in spans
+            for position in range(start, end) if text[position] == "."}
+
+
+def _is_boundary(answer, position, in_marker, protected_periods):
     char = answer[position]
     if char not in _BOUNDARIES:
         return False
     if in_marker:
+        return False
+    if char == "." and position in protected_periods:
         return False
     # A decimal point belongs to the number, not the surrounding sentence.
     if (char == "." and position > 0 and position + 1 < len(answer)
@@ -41,6 +63,7 @@ def _claim_units(answer):
     """Return (unmarked claim text, markers) for sentence/semicolon/newline units."""
     markers = list(_MARKER.finditer(answer))
     spans = [(marker.start(), marker.end()) for marker in markers]
+    protected_periods = _protected_periods(answer)
     units = []
     start = 0
     marker_index = 0
@@ -54,7 +77,7 @@ def _claim_units(answer):
                 span_index += 1
             in_marker = (span_index < len(spans)
                          and spans[span_index][0] <= position < spans[span_index][1])
-            if not _is_boundary(answer, position, in_marker):
+            if not _is_boundary(answer, position, in_marker, protected_periods):
                 continue
         end = position
         unit_markers = []
@@ -75,6 +98,7 @@ def _evidence_units(evidence):
     """Keep negation and numeric checks local to likely supporting text."""
     markers = list(_MARKER.finditer(evidence))
     spans = [(marker.start(), marker.end()) for marker in markers]
+    protected_periods = _protected_periods(evidence)
     units = []
     start = 0
     span_index = 0
@@ -83,7 +107,7 @@ def _evidence_units(evidence):
             span_index += 1
         in_marker = (span_index < len(spans)
                      and spans[span_index][0] <= position < spans[span_index][1])
-        if _is_boundary(evidence, position, in_marker):
+        if _is_boundary(evidence, position, in_marker, protected_periods):
             unit = _normalized(evidence[start:position])
             if unit:
                 units.append(unit)
@@ -141,20 +165,43 @@ def _grounded(claim, evidence):
 
 
 def citations_are_grounded(answer, evidence_by_id):
-    """Check every complete cited claim against each source attached to it.
+    """Check each cited claim against every source attached to it.
 
-    Every non-empty claim unit must have at least one citation. For a unit with
-    parallel markers, every cited source is independently checked against the
-    full claim unit.
+    Unmarked units are ignored. A marker-only unit attaches to the previous
+    non-empty claim, matching the collector's backward attachment rule. For
+    parallel markers, every cited source is checked against the full claim.
     """
     units = _claim_units(answer)
     if not units:
         return False
+
+    claims = []
+    previous_claim_index = None
     for claim, markers in units:
-        if not claim or not markers:
+        if claim:
+            claims.append([claim, list(markers)])
+            previous_claim_index = len(claims) - 1
+        elif markers:
+            if previous_claim_index is None:
+                return False
+            claims[previous_claim_index][1].extend(markers)
+
+    checked_claims = 0
+    for claim, markers in claims:
+        if not markers:
+            continue
+        checked_claims += 1
+        parallel = len(markers) > 1
+        normalized_claim = _normalized(claim)
+        if not normalized_claim:
             return False
         for marker in markers:
             evidence = evidence_by_id.get(marker.group(1))
-            if not isinstance(evidence, str) or not _grounded(claim, evidence):
+            if not isinstance(evidence, str):
                 return False
-    return True
+            if parallel:
+                if normalized_claim not in _normalized(evidence):
+                    return False
+            elif not _grounded(claim, evidence):
+                return False
+    return checked_claims > 0

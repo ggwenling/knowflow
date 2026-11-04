@@ -16,7 +16,26 @@ def _local(name):
 
 _mapping = _local("mapping")
 _MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
+_URL = re.compile(r"https?://[^\s<>\[\]{}]+", re.IGNORECASE)
+_EMAIL = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@"
+    r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(?![A-Za-z0-9-])",
+    re.ASCII,
+)
+_URL_TRAILING_PUNCTUATION = ".,!?;:。！？；，、)]}"
 _ERROR_CODE = re.compile(r"[A-Z0-9_]{1,80}\Z", re.ASCII)
+
+
+def _protected_periods(text):
+    spans = []
+    for match in _URL.finditer(text):
+        end = match.end()
+        while end > match.start() and text[end - 1] in _URL_TRAILING_PUNCTUATION:
+            end -= 1
+        spans.append((match.start(), end))
+    spans.extend((match.start(), match.end()) for match in _EMAIL.finditer(text))
+    return {position for start, end in spans
+            for position in range(start, end) if text[position] == "."}
 
 
 def _latency(value):
@@ -39,6 +58,7 @@ def _mapped_trace(runtime_question_id, trace, mappings, latency_ms):
 
 def _claim(answer, start, end):
     marker_spans = [(match.start(), match.end()) for match in _MARKER.finditer(answer)]
+    protected_periods = _protected_periods(answer)
     separators = []
     span_index = 0
     for position, char in enumerate(answer):
@@ -49,6 +69,8 @@ def _claim(answer, start, end):
             if marker_start <= position < marker_end:
                 continue
         if char not in "。！？.!?；;\n":
+            continue
+        if char == "." and position in protected_periods:
             continue
         # Keep a decimal such as 1.5 in the claim rather than treating it as
         # a sentence boundary.

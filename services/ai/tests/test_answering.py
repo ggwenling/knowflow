@@ -17,6 +17,7 @@ from knowflow_ai.answering import (
     LlmSettings,
     ReadOnlyRetriever,
 )
+from knowflow_ai.citation_verify import _claim_units, citations_are_grounded
 from knowflow_ai.config import ConfigurationError
 from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from knowflow_ai.protocol import CONTRACT_VERSION, ContractConsumer, InvalidMessage
@@ -782,6 +783,33 @@ def test_citation_verifier_accepts_a_supported_single_citation():
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
+def test_citation_verifier_allows_uncited_preface_before_supported_claim():
+    response = _citation_response(
+        "先说明一个简短背景。索引 READY 后才可检索[src-evidence-1]。",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+    assert response["has_answer"] is True
+    assert response["answer"] == "先说明一个简短背景。索引 READY 后才可检索[src-evidence-1]。"
+
+
+def test_citation_verifier_attaches_marker_only_unit_to_previous_claim():
+    assert citations_are_grounded(
+        "索引 READY 后才可检索。[src-evidence-1]",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+
+def test_citation_verifier_rejects_marker_only_unit_without_previous_claim():
+    assert not citations_are_grounded(
+        "[src-evidence-1]。索引 READY 后才可检索。",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+
+def test_citation_verifier_rejects_answer_with_no_cited_claims():
+    assert not citations_are_grounded(
+        "索引 READY 后才可检索。",
+        {"src-evidence-1": "索引 READY 后才可检索。"})
+
+
 def test_citation_verifier_refuses_parallel_markers_that_only_support_half_the_claim():
     response = _citation_response(
         "索引 READY 后才可检索，缓存默认关闭[src-evidence-1][src-evidence-2]。",
@@ -791,6 +819,22 @@ def test_citation_verifier_refuses_parallel_markers_that_only_support_half_the_c
     assert response["has_answer"] is False
     assert response["answer"] == "没有足够的资料证据回答这个问题。"
     assert response["sources"] == []
+
+
+def test_citation_verifier_requires_every_parallel_source_to_contain_the_full_claim():
+    answer = "生产环境支持批量导入，缓存关闭[src-evidence-1][src-evidence-2]"
+    partial = _citation_response(answer, {
+        "src-evidence-1": "生产环境支持批量导入。",
+        "src-evidence-2": "生产环境支持批量导入，缓存关闭。",
+    })
+    complete = _citation_response(answer, {
+        "src-evidence-1": "记录：生产环境支持批量导入，缓存关闭。",
+        "src-evidence-2": "生产环境支持批量导入，缓存关闭。",
+    })
+
+    assert partial["has_answer"] is False
+    assert partial["sources"] == []
+    assert complete["has_answer"] is True
 
 
 def test_citation_verifier_refuses_numeric_conflict():
@@ -840,6 +884,21 @@ def test_citation_verifier_ignores_negation_in_an_unrelated_source_sentence():
         {"src-evidence-1": "未授权访客不得访问后台。索引 READY 后才可检索。"})
 
     assert response["has_answer"] is True
+
+
+@pytest.mark.parametrize(("answer", "claim"), [
+    ("请访问 https://docs.example.test/start[src-evidence-1]。",
+     "请访问 https://docs.example.test/start"),
+    ("联系 help@example.test[src-evidence-1]。",
+     "联系 help@example.test"),
+])
+def test_citation_verifier_keeps_url_and_email_dots_inside_the_claim(answer, claim):
+    units = _claim_units(answer)
+    response = _citation_response(answer, {"src-evidence-1": claim + "。"})
+
+    assert [unit_claim for unit_claim, _ in units] == [claim]
+    assert response["has_answer"] is True
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
 
 
 @pytest.mark.asyncio

@@ -697,6 +697,17 @@ def test_collector_claim_keeps_decimal_numbers_inside_the_claim():
     assert prediction._claim(answer, marker.start(), marker.end()) == answer
 
 
+@pytest.mark.parametrize("answer", [
+    "请访问 https://docs.example.test/start[src-a.v1]。",
+    "联系 help@example.test[src-a.v1]。",
+])
+def test_collector_claim_keeps_url_and_email_inside_the_claim(answer):
+    marker = prediction._MARKER.search(answer)
+
+    assert marker is not None
+    assert prediction._claim(answer, marker.start(), marker.end()) == answer
+
+
 @pytest.mark.asyncio
 async def test_prediction_binds_single_trace_remaps_every_citation_occurrence(tmp_path):
     spec = importlib.util.spec_from_file_location(
