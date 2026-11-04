@@ -1,0 +1,208 @@
+{
+  "report_version": 2,
+  "dataset_id": "private-66c2d61e526026f60b0313f779cd3d9c866a57b3795fe60bf8275db419223c46",
+  "dataset_sha256": "7ff4e731ed21ae7ac0355516a067161d7846a64bfeb86cdb12a0ea50588aa96f",
+  "predictions_sha256": "71d8fc2e04436d4b47b073d8cc825ac4d36b594080208c5d7b0c13ef907cc107",
+  "run": {
+    "code_sha": "374b75651ffbbd86763858a4dfc25a7513716171",
+    "schema_sha256": "20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f",
+    "model": "deepseek-flash+BAAI/bge-m3",
+    "config_sha256": "7e97d46b338042fdbb03b5570d5132350ab4864b64e5825404c85afe3176c220",
+    "prompt_sha256": "3115dbaedeb7b5a650e1a1b332dd243d6cb5ffe4fbc22217c61deb2acf647f6b"
+  },
+  "split": "holdout",
+  "sample_count": 20,
+  "metrics": {
+    "sample_count": 20,
+    "execution_error_count": 0,
+    "execution_error_rate": 0.0,
+    "gold_evidence_span_count": 30,
+    "gold_evidence_span_hit_count_at_5": 30,
+    "recall_at_5": 1.0,
+    "mrr_at_10": 1.0,
+    "answerable_question_count": 15,
+    "answerable_answered_count": 14,
+    "answerable_answer_rate": 0.9333,
+    "answerable_refused_count": 1,
+    "answerable_false_refusal_rate": 0.0667,
+    "unanswerable_question_count": 5,
+    "unanswerable_refused_count": 5,
+    "unanswerable_refusal_rate": 1.0,
+    "answered_count": 14,
+    "human_supported_answer_count": 2,
+    "human_support_reviewed_answer_count": 14,
+    "human_supported_answer_rate": 0.1429,
+    "human_support_review_coverage": 1.0,
+    "citation_count": 20,
+    "citation_reviewed_count": 20,
+    "citation_supported_count": 9,
+    "citation_review_coverage": 1.0,
+    "citation_accuracy": 0.45,
+    "cited_gold_span_overlap_count": 20,
+    "cited_gold_span_overlap_rate": 1.0,
+    "by_category": {
+      "uncategorized": {
+        "sample_count": 20,
+        "answered_count": 14,
+        "refused_count": 6,
+        "error_count": 0,
+        "answerable_count": 15,
+        "unanswerable_count": 5,
+        "answerable_answered_count": 14,
+        "unanswerable_refused_count": 5
+      }
+    },
+    "latency_ms": {
+      "p50_nearest_rank": 2786.5,
+      "p95_nearest_rank": 3147.88
+    }
+  },
+  "quality_gate": {
+    "status": "failed",
+    "gate_version": 2,
+    "checks": {
+      "recall_at_5": {
+        "minimum": 0.85,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "mrr_at_10": {
+        "minimum": 0.75,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "human_supported_answer_rate": {
+        "minimum": 0.9,
+        "observed": 0.1429,
+        "status": "failed"
+      },
+      "citation_accuracy": {
+        "minimum": 0.95,
+        "observed": 0.45,
+        "status": "failed"
+      },
+      "unanswerable_refusal_rate": {
+        "minimum": 0.9,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "answerable_answer_rate": {
+        "minimum": 0.9,
+        "observed": 0.9333,
+        "status": "passed"
+      },
+      "human_support_review_coverage": {
+        "minimum": 1.0,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "citation_review_coverage": {
+        "minimum": 1.0,
+        "observed": 1.0,
+        "status": "passed"
+      }
+    }
+  },
+  "question_results": [
+    {
+      "id_hash": "55515dc10c356599f11a59f6f2bec299357e5969361eebe692487cbffb3a8575",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "4da8b119c0c79d121d6e72a82918ef9d62613373d3e3a45709a4dc4d2b67516b",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "9bfc45cfb3f28a0d8513cf19bfc11da63cf0c608e877def85e60493694311836",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "e5017d30953a89f8230e54e30b664a3ff6801588f0a619705bc31f0b954e14a4",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "e224b8d1b48dc78b46a88ebf7babe689448388ef76695ad653cfe09175c5e9ad",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "d2087ac961bd03da03bc72f430bb65e91a131c79d7084a271438f382f369df82",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "df90d4f7736db7f733a031458a84f8e02ad6215bb84a58ee93b5590e5dd79fe2",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "e98c66d832241a36cf718fb63ff8210167e2507ebf983d2becb3a6b6b3012a97",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "5a9f0e93802b5e25260c9cf68ee5581602f7186e32feff07f426958ee5db48e8",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "7ee3f7e0772b8cffd921d4ffea15c2097f17bfed133a27f3ca1ba06438b5af89",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "1931ea79adc1df34c143966ae8a48099575c3527f3fd10d669d7464ef0e63ca7",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "b4100d740cf29aefdcf6dbc663f4510370e2805464829194311fd4807a44cb9d",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "339c8aa2ffe9297cae4afa9069364bb5fc8872b95f5341a55c72d492f0fb02e3",
+      "outcome": "refused",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "b120491b97dfeed33ecddbe68c5dee4f9f75863afdb4f25b8491297f36daf454",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "42379e288178c1f2666dd44dbe798268a9d91f4d64c8a57e0652f79d66bfff57",
+      "outcome": "answered",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "9781c755af8625f640eb88f7578965701a8b942f9b30232160ac3e2768b6c724",
+      "outcome": "refused",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "4c8e0d6a33e7c8ff1fcf995c3a187823e918d68fce639bb478e023a9f3d60793",
+      "outcome": "refused",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "22d252ae8204939c5f43ba5901b39d53b1d405f3b811b71124cf61fa17d95507",
+      "outcome": "refused",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "5ca5d6731f8335b40fd6dcb897474bdc9acbc08cfd82d76f21a64f402a48c51b",
+      "outcome": "refused",
+      "category": "uncategorized"
+    },
+    {
+      "id_hash": "ba9f7c2c40b04c74d6371f7168815dfd804be0b3276440ce7a6a9a6de50b6b85",
+      "outcome": "refused",
+      "category": "uncategorized"
+    }
+  ]
+}

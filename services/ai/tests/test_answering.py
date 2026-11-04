@@ -833,6 +833,18 @@ async def test_deepseek_adapter_uses_fixed_host_and_disabled_thinking():
     await client.aclose()
 
 
+def test_deepseek_prompt_refuses_when_core_question_is_not_supported():
+    adapter = object.__new__(DeepSeekAdapter)
+    adapter.settings = LlmSettings(api_key=KEY)
+
+    system_prompt = adapter._payload("问题", _evidence())["messages"][0]["content"]
+
+    assert "问题的核心所问无法被资料充分支持或确定" in system_prompt
+    assert "即使资料能提供相关背景" in system_prompt
+    assert "has_answer=false 和空 source_ids" in system_prompt
+    assert "不要用背景信息冒充对核心问题的回答" in system_prompt
+
+
 def test_llm_settings_maps_invalid_port_to_configuration_error():
     with pytest.raises(ConfigurationError, match="LLM_BASE_URL_INVALID"):
         LlmSettings(base_url="https://api.deepseek.com:invalid", api_key=KEY)
