@@ -25,7 +25,14 @@ function parseSseEvents(body: string) {
 
 function expectStream(events: ReturnType<typeof parseSseEvents>, terminal: string) {
   expect(events[0].name).toBe("started");
-  expect(events.some(({ name }) => name === "delta")).toBeTruthy();
+  // Answer text is buffered until citation validation finishes (see services/ai/docs/answer-streaming.md).
+  // Failure terminals (error/cancelled) therefore may have no delta; completed still emits validated text.
+  if (terminal === "completed") {
+    expect(events.some(({ name }) => name === "delta")).toBeTruthy();
+  } else {
+    expect(events.some(({ name }) => name === "delta")).toBeFalsy();
+    expect(events.some(({ name }) => name === "sources")).toBeFalsy();
+  }
   expect(events.at(-1)?.name).toBe(terminal);
   expect(events.filter(({ name }) => ["completed", "error", "cancelled"].includes(name ?? ""))).toHaveLength(1);
   events.forEach(({ name, data }, index) => {
