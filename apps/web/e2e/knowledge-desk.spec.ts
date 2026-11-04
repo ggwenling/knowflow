@@ -218,9 +218,13 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   page.on("request", (request) => {
     if (request.url().includes("/questions/stream") && request.postDataJSON()?.question === slowQuestion) slowRequests++;
   });
+  const slowStream = page.waitForResponse((item) => item.url().includes("/questions/stream"));
   await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill(slowQuestion);
   await page.getByRole("button", { name: "提问" }).click();
-  // Answer text is buffered until citation validation; sync on in-progress UI (Stop), not draft text.
+  // Wait until the stream is admitted and the PROCESSING card exists (answer object set after fetch),
+  // not for draft text (buffered until citation validation) and not for Stop alone (busy is set earlier).
+  await slowStream;
+  await expect(page.getByText("正在检索并生成回答…")).toBeVisible();
   await expect(page.getByRole("button", { name: "停止生成" })).toBeVisible();
   await page.getByRole("button", { name: "停止生成" }).click();
   await expect(page.getByText("此问答状态：已取消。可在历史记录中查看。")).toBeVisible();
