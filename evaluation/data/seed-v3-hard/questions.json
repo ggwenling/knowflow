@@ -49,7 +49,7 @@
     "split": "development",
     "leakage_group": "retry_effective_params",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: draft vs ADR conflict, answer needs both docs plus status line."
   },
   {
@@ -82,7 +82,7 @@
     "split": "development",
     "leakage_group": "cancel_and_publish",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: cancellation semantics plus publisher role."
   },
   {
@@ -115,7 +115,7 @@
     "split": "development",
     "leakage_group": "batch_and_required_fields",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: request schema in api doc, batch cap in chunk doc."
   },
   {
@@ -148,7 +148,7 @@
     "split": "development",
     "leakage_group": "codepoint_units",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: unit convention in locator doc aligned with chunk sizing."
   },
   {
@@ -181,7 +181,7 @@
     "split": "development",
     "leakage_group": "create_and_timeout_status",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: two status codes from two docs, easy to conflate."
   },
   {
@@ -214,7 +214,7 @@
     "split": "development",
     "leakage_group": "scanned_pdf_flow",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: file-boundary limitation chained to outbound payload rule."
   },
   {
@@ -247,7 +247,7 @@
     "split": "holdout",
     "leakage_group": "delete_then_cancel",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: cancellation limits plus deleted-resource response code."
   },
   {
@@ -280,7 +280,7 @@
     "split": "development",
     "leakage_group": "demo_limits_pair",
     "category": "multi_hop",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "multi_hop: demo size cap plus default chunk size, both easily swapped."
   },
   {
@@ -303,7 +303,7 @@
     "split": "development",
     "leakage_group": "chunk_default_size",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: default chunk size asked in colloquial wording."
   },
   {
@@ -326,7 +326,7 @@
     "split": "development",
     "leakage_group": "chunk_overlap",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: overlap restated as duplicated content between neighbours."
   },
   {
@@ -349,7 +349,7 @@
     "split": "development",
     "leakage_group": "api_path",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: endpoint asked without naming the spec."
   },
   {
@@ -372,7 +372,7 @@
     "split": "holdout",
     "leakage_group": "files_ocr",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: OCR capability asked as \"will it recognise the text\"."
   },
   {
@@ -405,7 +405,7 @@
     "split": "development",
     "leakage_group": "access_404",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: existence-leak framing over the uniform 404 rule."
   },
   {
@@ -428,7 +428,7 @@
     "split": "development",
     "leakage_group": "timeout_code",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: timeout code asked from the caller perspective."
   },
   {
@@ -451,7 +451,7 @@
     "split": "development",
     "leakage_group": "publish_owner",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: publisher asked as \"which service flips the live version\"."
   },
   {
@@ -474,7 +474,7 @@
     "split": "development",
     "leakage_group": "timeout_retry_count",
     "category": "paraphrase",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "paraphrase: retry count asked as \"how many extra attempts\"."
   },
   {
@@ -497,7 +497,7 @@
     "split": "development",
     "leakage_group": "adr_effective_date",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: effective date of the superseding ADR."
   },
   {
@@ -520,7 +520,7 @@
     "split": "development",
     "leakage_group": "api_effective_date",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: effective date of the published API spec."
   },
   {
@@ -553,7 +553,7 @@
     "split": "holdout",
     "leakage_group": "draft_edit_date",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: date plus status, tempting to treat as live config."
   },
   {
@@ -576,7 +576,7 @@
     "split": "development",
     "leakage_group": "chunk_range",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: numeric range of allowed chunk sizes."
   },
   {
@@ -599,7 +599,7 @@
     "split": "development",
     "leakage_group": "timeout_budget",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: timeout budget paired with retry count."
   },
   {
@@ -622,7 +622,7 @@
     "split": "holdout",
     "leakage_group": "locator_example",
     "category": "numeric_date",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "numeric_date: emoji surrogate trap, code-point count not byte length."
   },
   {
@@ -645,7 +645,7 @@
     "split": "development",
     "leakage_group": "offset_rule",
     "category": "partial_evidence",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "partial_evidence: only the offset clause answers; rest is background."
   },
   {
@@ -678,7 +678,7 @@
     "split": "development",
     "leakage_group": "publish_checklist",
     "category": "partial_evidence",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "partial_evidence: enumerate the four checks, not just \"verify everything\"."
   },
   {
@@ -701,7 +701,7 @@
     "split": "holdout",
     "leakage_group": "outbound_pricing",
     "category": "partial_evidence",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "partial_evidence: explicit non-fact clause often skipped when skimming."
   },
   {
@@ -724,7 +724,7 @@
     "split": "development",
     "leakage_group": "pdf_page_rule",
     "category": "partial_evidence",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "partial_evidence: page numbering plus the no-fabrication clause."
   },
   {
@@ -747,7 +747,7 @@
     "split": "development",
     "leakage_group": "retry_cap_current",
     "category": "background_phrased",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "background_phrased: draft value in stem, asks the live cap."
   },
   {
@@ -780,7 +780,7 @@
     "split": "development",
     "leakage_group": "python_role",
     "category": "background_phrased",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "background_phrased: transaction context in stem, asks Python boundary."
   },
   {
@@ -803,7 +803,7 @@
     "split": "development",
     "leakage_group": "single_file_cap",
     "category": "background_phrased",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "background_phrased: format support in stem, asks whether cap is a product limit."
   },
   {
@@ -826,7 +826,7 @@
     "split": "holdout",
     "leakage_group": "llm_payload",
     "category": "background_phrased",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "background_phrased: synthetic-content clause in stem, asks actual payload."
   },
   {
@@ -838,7 +838,7 @@
     "split": "development",
     "leakage_group": "unans_vendor_price",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: cost topic present, explicitly excluded from corpus."
   },
   {
@@ -850,7 +850,7 @@
     "split": "development",
     "leakage_group": "unans_lease_ttl",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: lease mentioned as a check, no duration given."
   },
   {
@@ -862,7 +862,7 @@
     "split": "holdout",
     "leakage_group": "unans_overlap_max",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: only a default is stated, no permitted max."
   },
   {
@@ -874,7 +874,7 @@
     "split": "development",
     "leakage_group": "unans_vector_dim",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: vector integrity named, no dimension."
   },
   {
@@ -886,7 +886,7 @@
     "split": "development",
     "leakage_group": "unans_ocr_engine",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: OCR named only to say it is not implemented."
   },
   {
@@ -898,7 +898,7 @@
     "split": "development",
     "leakage_group": "unans_pdf_pages",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: size cap exists, page cap does not."
   },
   {
@@ -910,7 +910,7 @@
     "split": "holdout",
     "leakage_group": "unans_jobid_format",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: jobId exists, format unspecified; UUID belongs to documentId."
   },
   {
@@ -922,7 +922,7 @@
     "split": "development",
     "leakage_group": "unans_isolation",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: transaction required, isolation level absent."
   },
   {
@@ -934,7 +934,7 @@
     "split": "development",
     "leakage_group": "unans_owner_algo",
     "category": "unanswerable_background",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_background: generation rule stated, algorithm not."
   },
   {
@@ -946,7 +946,7 @@
     "split": "development",
     "leakage_group": "unans_concurrency",
     "category": "unanswerable_other",
-    "annotation_status": "authored",
+    "annotation_status": "reviewed",
     "annotation": "unanswerable_other: plausible capacity question, no capacity fact at all."
   }
 ]
