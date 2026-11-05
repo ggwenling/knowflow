@@ -1,0 +1,147 @@
+{
+  "report_version": 2,
+  "dataset_id": "private-01f196061ebb6d947869385c1def2e32deb5b7da39f54230daa8d4193443323c",
+  "dataset_sha256": "4ae70c1d29327e21791d2679ca5a07a1078dbd8c8d7d097e2486e978b1b9e682",
+  "predictions_sha256": "6ee2be6b1174bb54da62686918a4c7a800764d7fea738b6849ff0d1f11021598",
+  "run": {
+    "code_sha": "b03c7104f78a6ded9140b6705791d35b96d2cc07",
+    "questions_sha256": "01f196061ebb6d947869385c1def2e32deb5b7da39f54230daa8d4193443323c",
+    "corpus_sha256": "f8ee1accc7dd3f20d1d982e379088557d6b3db87f630667a4ff03d5c375f15e4",
+    "predictions_sha256": "6ee2be6b1174bb54da62686918a4c7a800764d7fea738b6849ff0d1f11021598",
+    "dataset_sha256": "4ae70c1d29327e21791d2679ca5a07a1078dbd8c8d7d097e2486e978b1b9e682"
+  },
+  "split": "holdout",
+  "sample_count": 20,
+  "metrics": {
+    "sample_count": 20,
+    "execution_error_count": 0,
+    "execution_error_rate": 0.0,
+    "gold_evidence_span_count": 34,
+    "gold_evidence_span_hit_count_at_5": 34,
+    "recall_at_5": 1.0,
+    "mrr_at_10": 1.0,
+    "answerable_question_count": 15,
+    "answerable_answered_count": 13,
+    "answerable_answer_rate": 0.8667,
+    "answerable_refused_count": 2,
+    "answerable_false_refusal_rate": 0.1333,
+    "unanswerable_question_count": 5,
+    "unanswerable_refused_count": 5,
+    "unanswerable_refusal_rate": 1.0,
+    "answered_count": 13,
+    "human_supported_answer_count": 13,
+    "human_support_reviewed_answer_count": 13,
+    "human_supported_answer_rate": 1.0,
+    "human_support_review_coverage": 1.0,
+    "citation_count": 30,
+    "citation_reviewed_count": 30,
+    "citation_supported_count": 30,
+    "citation_review_coverage": 1.0,
+    "citation_accuracy": 1.0,
+    "cited_gold_span_overlap_count": 30,
+    "cited_gold_span_overlap_rate": 1.0,
+    "by_category": {
+      "uncategorized": {
+        "sample_count": 20,
+        "answered_count": 13,
+        "refused_count": 7,
+        "error_count": 0,
+        "answerable_count": 15,
+        "unanswerable_count": 5,
+        "answerable_answered_count": 13,
+        "unanswerable_refused_count": 5
+      }
+    },
+    "latency_ms": {
+      "p50_nearest_rank": 2875.28,
+      "p95_nearest_rank": 3815.5
+    }
+  },
+  "quality_gate": {
+    "status": "failed",
+    "gate_version": 2,
+    "checks": {
+      "recall_at_5": {
+        "minimum": 0.85,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "mrr_at_10": {
+        "minimum": 0.75,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "human_supported_answer_rate": {
+        "minimum": 0.9,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "citation_accuracy": {
+        "minimum": 0.95,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "unanswerable_refusal_rate": {
+        "minimum": 0.9,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "answerable_answer_rate": {
+        "minimum": 0.9,
+        "observed": 0.8667,
+        "status": "failed"
+      },
+      "human_support_review_coverage": {
+        "minimum": 1.0,
+        "observed": 1.0,
+        "status": "passed"
+      },
+      "citation_review_coverage": {
+        "minimum": 1.0,
+        "observed": 1.0,
+        "status": "passed"
+      }
+    }
+  },
+  "failures": [
+    {
+      "id_hash12": "4f9bce35a92c",
+      "categories": [
+        "false_refusal"
+      ],
+      "outcome": "refused",
+      "answerable": true
+    },
+    {
+      "id_hash12": "a42397c17dd6",
+      "categories": [
+        "false_refusal"
+      ],
+      "outcome": "refused",
+      "answerable": true
+    }
+  ],
+  "agreement": {
+    "support_agree": 8,
+    "support_total": 13,
+    "citation_agree": 30,
+    "citation_total": 30,
+    "disagreements_resolved": 5,
+    "arbitrator": "sol-high",
+    "arbitration_result": "all_supported"
+  },
+  "config": {
+    "KNOWFLOW_ANSWER_REPAIR": "off",
+    "note": "shipped default after Sol APPROVE b7dced8/b03c710"
+  },
+  "spend": {
+    "ledger": "blind-v4-20261105-144958.sqlite3",
+    "before_reserved_microyuan": 0,
+    "after_reserved_microyuan": 49160,
+    "round_cny": 0.04916,
+    "cumulative_after_v3_closeout_cny": 2.733296,
+    "price_file": "PRICE_FILE.draft.json",
+    "price_sha256": "674baf7fabea92a28882b489fbae1667fa410e7f72f231eea2a1be30f2701b67",
+    "policy_sha256": "0399b2ae841d3dad5a3ae3c61a9dd67d8efae6d4c4d71e7adea76b144dbedd4d"
+  }
+}
