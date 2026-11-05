@@ -13,9 +13,12 @@ from test_answering import (
     FakeRetriever, KEY, _contract, _evidence, _grounded_generated,
     _length_expanding_evidence, _length_expanding_generated, _request,
     _two_evidence, _ungrounded_generated, _REPAIR_DEFAULT_ON_SETTINGS,
-    _REPAIR_OFF_SETTINGS, _REPAIR_MATRIX_CASES, _set_repair_setting,
+    _REPAIR_OFF_SETTINGS, _REPAIR_MATRIX_CASES, _REPAIR_CONTEXT_CASES,
+    _REPAIR_CONTEXT_SETTINGS, _set_repair_setting,
 )
-from repair_test_fixtures import MatrixRepairModel, repair_scenario
+from repair_test_fixtures import (
+    MatrixRepairModel, append_repair_context, repair_scenario,
+)
 
 
 class ProviderStream(httpx.AsyncByteStream):
@@ -484,6 +487,42 @@ async def test_sse_explicit_off_repair_matrix_emits_only_the_first_refusal(
     assert repaired['answer'] not in events[1]['delta']
     assert service.last_diagnostics['repair_attempt'] == 0
     assert service.last_diagnostics['repair_outcome'] == 'not_attempted'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('context,expected_reason', _REPAIR_CONTEXT_CASES)
+@pytest.mark.parametrize('setting', _REPAIR_CONTEXT_SETTINGS)
+async def test_sse_rejects_unparsed_cache_context_without_relation_anchor(
+        context, expected_reason, setting, monkeypatch):
+    _set_repair_setting(monkeypatch, setting)
+    request, evidence, first, repaired = repair_scenario('P1')
+    append_repair_context(evidence, context)
+    model = MatrixRepairModel(first, repaired)
+    service = AnswerService('unused', _contract(), retriever=FakeRetriever(evidence),
+                            llm_factory=lambda: model)
+
+    initial, initial_diagnostics = service._evaluate_generated(request, evidence, first)
+    assert initial['answer'] == '没有足够的资料证据回答这个问题。'
+    assert initial['has_answer'] is False and initial['sources'] == []
+    assert initial_diagnostics['reason'] == 'empty_after_prune'
+    assert initial_diagnostics['kept_claims'] == 0
+
+    events = [event async for event in service.stream(request)]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert repaired['answer'] not in events[1]['delta']
+    if setting[1] == 'off':
+        assert model.generate_calls == 1 and model.repair_calls == 0
+        assert service.last_diagnostics['repair_attempt'] == 0
+        assert service.last_diagnostics['repair_outcome'] == 'not_attempted'
+    else:
+        assert model.generate_calls == model.repair_calls == 1
+        assert service.last_diagnostics['repair_attempt'] == 1
+        assert service.last_diagnostics['repair_outcome'] == 'failed_unrelated'
+        assert service.last_diagnostics['repair_gate_reason'] == expected_reason
 
 
 @pytest.mark.asyncio

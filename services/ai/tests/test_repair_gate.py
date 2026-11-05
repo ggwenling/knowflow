@@ -158,3 +158,29 @@ def test_candidate_rejects_unparsed_relevant_chunks_and_conflicting_facts():
                      "text_content": "原始资料说明公司 2027 年净利润为 200 万元。"})
     result = check_repair_candidate(target, generated, response, diagnostics, evidence)
     assert (result.accepted, result.reason) == (False, "conflicting_evidence")
+
+
+def test_cache_context_without_a_contiguous_relation_anchor_is_not_ignored():
+    target = _target("2027 年缓存默认关闭吗？")
+    candidate = "原始资料说明 2027 年缓存默认关闭。"
+    contexts = (
+        ("2027 年缓存的默认状态为开启，并非关闭。", "unsupported_context"),
+        ("2027 年缓存 默认开启。", "unsupported_context"),
+        ("原始资料说明 2027 年缓存默认开启。", "conflicting_evidence"),
+        ("预测草案：2027 年缓存默认开启。", "unsupported_context"),
+    )
+    for context, expected_reason in contexts:
+        generated, response, diagnostics, evidence = _candidate(candidate)
+        evidence.append({"source_id": "src-context-3", "text_content": context})
+        result = check_repair_candidate(target, generated, response, diagnostics, evidence)
+        assert (result.accepted, result.reason) == (False, expected_reason)
+
+
+def test_same_relation_with_different_constraints_is_not_proven_unrelated():
+    target = _target("2027 年缓存默认关闭吗？")
+    generated, response, diagnostics, evidence = _candidate(
+        "原始资料说明 2027 年缓存默认关闭。")
+    evidence.append({"source_id": "src-context-3",
+                     "text_content": "原始资料说明 2028 年缓存默认开启。"})
+    result = check_repair_candidate(target, generated, response, diagnostics, evidence)
+    assert (result.accepted, result.reason) == (False, "unsupported_context")

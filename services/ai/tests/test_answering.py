@@ -29,7 +29,9 @@ from knowflow_ai.citation_verify import (
 from knowflow_ai.config import ConfigurationError
 from knowflow_ai.embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from knowflow_ai.protocol import CONTRACT_VERSION, ContractConsumer, InvalidMessage
-from repair_test_fixtures import MatrixRepairModel, repair_scenario
+from repair_test_fixtures import (
+    MatrixRepairModel, append_repair_context, repair_scenario,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -1755,6 +1757,21 @@ _REPAIR_OFF_SETTINGS = [
     pytest.param(("no", " No "), id="no"),
 ]
 _REPAIR_MATRIX_CASES = ["N0", "N1", "N2", "N3", "N4", "P0", "P1"]
+_REPAIR_CONTEXT_CASES = [
+    pytest.param("2027 年缓存的默认状态为开启，并非关闭。",
+                 "unsupported_context", id="rewritten-contradiction"),
+    pytest.param("2027 年缓存 默认开启。", "unsupported_context",
+                 id="whitespace-variant"),
+    pytest.param("原始资料说明 2027 年缓存默认开启。",
+                 "conflicting_evidence", id="parsed-conflict"),
+    pytest.param("预测草案：2027 年缓存默认开启。", "unsupported_context",
+                 id="prediction-draft"),
+]
+_REPAIR_CONTEXT_SETTINGS = [
+    pytest.param(("unset", None), id="unset"),
+    pytest.param(("explicit-on", "on"), id="explicit-on"),
+    pytest.param(("off", "off"), id="off"),
+]
 
 
 def _set_repair_setting(monkeypatch, setting):
@@ -1823,4 +1840,37 @@ async def test_sync_explicit_off_repair_matrix_keeps_the_first_refusal(
     assert response["has_answer"] is False and response["sources"] == []
     assert service.last_diagnostics["repair_attempt"] == 0
     assert service.last_diagnostics["repair_outcome"] == "not_attempted"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("context,expected_reason", _REPAIR_CONTEXT_CASES)
+@pytest.mark.parametrize("setting", _REPAIR_CONTEXT_SETTINGS)
+async def test_sync_rejects_unparsed_cache_context_without_relation_anchor(
+        context, expected_reason, setting, monkeypatch):
+    _set_repair_setting(monkeypatch, setting)
+    request, evidence, first, repaired = repair_scenario("P1")
+    append_repair_context(evidence, context)
+    model = MatrixRepairModel(first, repaired)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(evidence))
+
+    initial, initial_diagnostics = service._evaluate_generated(request, evidence, first)
+    assert initial["answer"] == "没有足够的资料证据回答这个问题。"
+    assert initial["has_answer"] is False and initial["sources"] == []
+    assert initial_diagnostics["reason"] == "empty_after_prune"
+    assert initial_diagnostics["kept_claims"] == 0
+
+    response = await service.answer(request)
+
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["has_answer"] is False and response["sources"] == []
+    if setting[1] == "off":
+        assert model.generate_calls == 1 and model.repair_calls == 0
+        assert service.last_diagnostics["repair_attempt"] == 0
+        assert service.last_diagnostics["repair_outcome"] == "not_attempted"
+    else:
+        assert model.generate_calls == model.repair_calls == 1
+        assert service.last_diagnostics["repair_attempt"] == 1
+        assert service.last_diagnostics["repair_outcome"] == "failed_unrelated"
+        assert service.last_diagnostics["repair_gate_reason"] == expected_reason
 

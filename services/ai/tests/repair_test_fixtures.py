@@ -102,6 +102,18 @@ def repair_scenario(name):
     return request, evidence, dict(_FIRST), repaired
 
 
+def append_repair_context(evidence, text):
+    """Add an independent third source to a synthetic repair scenario."""
+    evidence.append({
+        **evidence[0],
+        "source_id": "src-context-3",
+        "chunk_id": "chunk-context-3",
+        "text_content": text,
+        "locator": {"kind": "text_range", "start": 0, "end": len(text),
+                    "unit": "unicode_code_point"},
+    })
+
+
 class MatrixRepairModel:
     """Deterministic first generation and one re-ask for both route tests."""
 

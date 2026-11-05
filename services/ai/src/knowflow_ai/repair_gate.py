@@ -255,16 +255,21 @@ def _relevant_evidence_context(target: RepairTarget, evidence: list[dict[str, An
         normalized = _normalize(text)
         fact = _parse_fact(normalized)
         if fact is not None:
-            if (fact.subject == target.subject and fact.relation == target.relation
-                    and fact.constraints == target.constraints
-                    and (fact.value_type != cited_fact.value_type
-                         or fact.value != cited_fact.value
-                         or fact.unit != cited_fact.unit)):
-                return "conflicting_evidence"
+            if fact.subject == target.subject and fact.relation == target.relation:
+                if fact.constraints != target.constraints:
+                    # A parsed fact about the same relation is not proven
+                    # irrelevant merely because its constraints differ.
+                    return "unsupported_context"
+                if (fact.value_type != cited_fact.value_type
+                        or fact.value != cited_fact.value
+                        or fact.unit != cited_fact.unit):
+                    return "conflicting_evidence"
             continue
         # Do not split long chunks or discard headings, conditions, negation,
         # quoted examples, or embedded instructions to recover a local clause.
-        if target.subject in normalized and _relation_anchor_present(target, normalized):
+        # An unparsed source naming the requested subject is not demonstrably
+        # unrelated; a relation-anchor substring is not required as proof.
+        if target.subject in normalized:
             return "unsupported_context"
     return None
 
