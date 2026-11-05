@@ -336,7 +336,7 @@ async def answer_events(service, request):
                 generated = {"answer": REFUSAL, "has_answer": False, "source_ids": []}
             if time.monotonic() >= deadline:
                 raise TimeoutError
-            response = service._response_from_generated(request, evidence, generated)
+            response = await service._finalize_generation(request, evidence, generated, deadline)
             if response["answer"]:
                 yield event("delta", delta=response["answer"])
             yield event("sources", has_answer=response["has_answer"], sources=response["sources"])
