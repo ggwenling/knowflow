@@ -1166,8 +1166,8 @@ async def test_deepseek_adapter_rejects_invalid_provider_shapes(provider):
     {"KNOWFLOW_ANSWER_REPAIR": "  "},
     {"KNOWFLOW_ANSWER_REPAIR": "sometimes"},
 ])
-def test_answer_repair_stays_enabled_when_unset_empty_or_unrecognized(environ):
-    assert answer_repair_enabled(environ) is True
+def test_answer_repair_stays_disabled_when_unset_empty_or_unrecognized(environ):
+    assert answer_repair_enabled(environ) is False
 
 
 @pytest.mark.parametrize("value", ["on", "ON", "true", "1", "yes"])
@@ -1190,11 +1190,20 @@ def test_repair_relevance_requires_half_of_question_content_tokens():
         "公司 2027 年净利润是多少？", "公司缓存默认关闭 2027")
 
 
-def test_answer_service_repair_is_on_when_the_switch_is_unset(monkeypatch):
+def test_repair_relevance_requires_the_question_focus_to_be_covered():
+    question = "缓存默认关闭时，公司 2027 年净利润是多少？"
+    assert not _has_question_content_overlap(
+        question, "公司 2027 年缓存默认关闭[src-evidence-2]。")
+    assert _has_question_content_overlap(
+        "2027 年索引何时可检索？",
+        "2027 年索引 READY 后才可检索[src-evidence-1]。")
+
+
+def test_answer_service_repair_is_off_when_the_switch_is_unset(monkeypatch):
     monkeypatch.delenv("KNOWFLOW_ANSWER_REPAIR", raising=False)
     service = AnswerService("unused", _contract(), retriever=FakeRetriever([]))
 
-    assert service._repair_enabled is True
+    assert service._repair_enabled is False
 
 
 def _two_evidence():
@@ -1452,7 +1461,8 @@ async def test_answer_service_rejects_grounded_repair_missing_question_core(case
                     "has_answer": True, "source_ids": ["src-evidence-2"]}
     else:
         request["question"] = "缓存默认关闭时，公司 2027 年净利润是多少？"
-        repaired = {"answer": "缓存默认关闭[src-evidence-2]。",
+        evidence[1]["text_content"] = "原始资料说明公司 2027 年缓存默认关闭。"
+        repaired = {"answer": "公司 2027 年缓存默认关闭[src-evidence-2]。",
                     "has_answer": True, "source_ids": ["src-evidence-2"]}
 
     model = RepairLlm(_ungrounded_generated(), repaired)
@@ -1460,17 +1470,28 @@ async def test_answer_service_rejects_grounded_repair_missing_question_core(case
                             retriever=FakeRetriever(evidence))
     service._repair_enabled = True
 
-    repaired_response, repaired_diagnostics = service._evaluate_generated(
-        request, evidence, repaired)
-    assert repaired_diagnostics["decision"] == "answered"
-    assert repaired_response["has_answer"] is True
-
     response = await service.answer(request)
 
     assert response["answer"] == "没有足够的资料证据回答这个问题。"
     assert response["has_answer"] is False and response["sources"] == []
     assert model.repair_calls == 1
     assert service.last_diagnostics["repair_outcome"] == "failed_unrelated"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_does_not_reask_when_the_switch_is_unset(monkeypatch):
+    monkeypatch.delenv("KNOWFLOW_ANSWER_REPAIR", raising=False)
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["has_answer"] is False and response["sources"] == []
+    assert model.repair_calls == 0
+    assert service.last_diagnostics["repair_attempt"] == 0
+    assert service.last_diagnostics["repair_outcome"] == "not_attempted"
 
 
 @pytest.mark.asyncio

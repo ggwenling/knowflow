@@ -34,6 +34,10 @@ _REPAIR_INSTRUCTION = (
     "若无法逐句引用，返回 has_answer=false 和空 source_ids。")
 _REPAIR_DISABLED_VALUES = frozenset({"0", "false", "off", "no"})
 _REPAIR_ENABLED_VALUES = frozenset({"1", "true", "on", "yes"})
+_QUESTION_FOCUS_MARKER = re.compile(
+    r"是多少|是什么|什么时候|何时|何地|哪里|多少|多大|谁|什么|哪些|哪个|哪种|"
+    r"如何|怎样|为什么|为何"
+)
 _ANSWER_MARKER = re.compile(r"\[[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\]", re.ASCII)
 _NUMBER_TOKEN = re.compile(r"\d+(?:[.,]\d+)*%?")
 _CONTENT_RUN = re.compile(
@@ -76,7 +80,7 @@ def _content_tokens(text):
 
 
 def _has_question_content_overlap(question, answer):
-    """Require numeric coverage and substantial content overlap for a repair."""
+    """Require numeric, question-focus, and substantial content overlap for repair."""
     question_text = _ANSWER_MARKER.sub(" ", question)
     answer_text = _ANSWER_MARKER.sub(" ", answer)
     question_tokens = _content_tokens(question_text)
@@ -89,25 +93,31 @@ def _has_question_content_overlap(question, answer):
     if not question_numbers.issubset(answer_numbers):
         return False
 
+    # Keep a question's requested subject from being satisfied entirely by
+    # background words. For a recognized Chinese wh-question, require all
+    # content tokens in the final subject phrase before the wh-word.
+    normalized_question = question_text.rstrip(" \t\r\n?？。.!！")
+    focus_marker = _QUESTION_FOCUS_MARKER.search(normalized_question)
+    if focus_marker:
+        prefix = normalized_question[:focus_marker.start()]
+        focus_phrase = re.search(r"([\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+)$", prefix)
+        focus_tokens = _content_tokens(focus_phrase.group(1)) if focus_phrase else set()
+        if focus_tokens and not focus_tokens.issubset(answer_tokens):
+            return False
+
     covered = len(question_tokens & answer_tokens) / len(question_tokens)
     return covered >= 0.5
 
 
 def answer_repair_enabled(environ=None):
-    """Read the single-re-ask switch; unset/unknown keep the bounded re-ask on.
-
-    Acceptance still requires the tightened question-overlap gate, so a default-on
-    re-ask cannot publish a grounded extract that misses the question's core.
-    """
+    """Read the opt-in single-re-ask switch; only explicit truthy values enable it."""
     env = os.environ if environ is None else environ
     raw = env.get("KNOWFLOW_ANSWER_REPAIR", "").strip().lower()
-    if raw in _REPAIR_DISABLED_VALUES:
-        return False
     if raw in _REPAIR_ENABLED_VALUES:
         return True
-    if raw:
-        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_enabled")
-    return True
+    if raw and raw not in _REPAIR_DISABLED_VALUES:
+        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_disabled")
+    return False
 
 
 def _citation_diagnostics(reason):

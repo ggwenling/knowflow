@@ -298,16 +298,12 @@ async def test_stream_refuses_grounded_repair_missing_question_core(case):
                     'has_answer': True, 'source_ids': ['src-evidence-2']}
     else:
         request['question'] = '缓存默认关闭时，公司 2027 年净利润是多少？'
-        repaired = {'answer': '缓存默认关闭[src-evidence-2]。',
+        evidence[1]['text_content'] = '原始资料说明公司 2027 年缓存默认关闭。'
+        repaired = {'answer': '公司 2027 年缓存默认关闭[src-evidence-2]。',
                     'has_answer': True, 'source_ids': ['src-evidence-2']}
     repairs = []
     service = _reasking_service(first, repaired, evidence, repairs)
     service._repair_enabled = True
-
-    repaired_response, repaired_diagnostics = service._evaluate_generated(
-        request, evidence, repaired)
-    assert repaired_diagnostics['decision'] == 'answered'
-    assert repaired_response['has_answer'] is True
 
     events = [event async for event in service.stream(request)]
 
@@ -317,6 +313,24 @@ async def test_stream_refuses_grounded_repair_missing_question_core(case):
     assert events[2]['has_answer'] is False and events[2]['sources'] == []
     assert len(repairs) == 1
     assert service.last_diagnostics['repair_outcome'] == 'failed_unrelated'
+
+
+@pytest.mark.asyncio
+async def test_stream_does_not_reask_when_the_switch_is_unset(monkeypatch):
+    monkeypatch.delenv('KNOWFLOW_ANSWER_REPAIR', raising=False)
+    repairs = []
+    service = _reasking_service(_ungrounded_generated(), _grounded_generated(),
+                                _two_evidence(), repairs)
+
+    events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert repairs == []
+    assert service.last_diagnostics['repair_attempt'] == 0
+    assert service.last_diagnostics['repair_outcome'] == 'not_attempted'
 
 
 @pytest.mark.asyncio

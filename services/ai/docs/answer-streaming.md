@@ -30,13 +30,18 @@ checking finish, rather than during generation.
 
 When the model claims an answer but every claim fails citation validation, the
 service spends at most one extra non-streaming provider call on the **same**
-evidence before refusing (`KNOWFLOW_ANSWER_REPAIR`, on by default; set `off`/`false`/`0`/`no` to disable; unset, empty, or an unrecognized value keeps it on). The tightened overlap gate must keep unanswerable refusals stable; verify on public seed holdout. The
+evidence before refusing. This is disabled by default; only explicit
+`KNOWFLOW_ANSWER_REPAIR=on`/`true`/`1`/`yes` enables it. Unset, empty, and
+unrecognized values remain off. Before enabling it in a deployment or
+evaluation, check unanswerable refusal performance on holdout. The
 re-ask receives the previous answer text
 (truncated to 4,000 code points), adds no evidence and no sources, and its
 result passes through the identical JSON, ID, scope, and grounding checks. A
 repair is accepted only when every numeric token from the question appears
 outside citation markers and at least half of the question's content tokens
-overlap. This is a relevance check, not an entailment check. A failed,
+overlap; for recognized wh-questions, the final subject phrase before the
+question word must also be covered. These are relevance checks, not entailment
+checks. A failed,
 malformed, budget-stopped, or still-ungrounded re-ask leaves the canonical
 refusal in place; it never becomes an `error` terminal.
 

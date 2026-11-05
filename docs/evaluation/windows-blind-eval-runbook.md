@@ -47,7 +47,7 @@ $env:KNOWFLOW_EVALUATION_CONTROL_SECRET = "<local >=32 chars>"
 ```
 
 - BudgetLedger soft **CNY 8** / hard **CNY 10**：累计预留到 8 必须停。
-- 补问显式启用时，每题最多 **2 次 DeepSeek 尝试**：1 次生成 + 至多 1 次引用补问（`KNOWFLOW_ANSWER_REPAIR=on`；默认开启）。补问只发生在「模型自称有答案、但引用校验把答案剪空」的题上，仍按 policy 上界预约。启用前须在 public seed holdout 上核对 unanswerable 拒答表现。若评测选择开启，按 CNY 估算整个包时按每题 2 次生成预留留量，不要用单次价乘题数。
+- 补问默认关闭。若在 holdout 核对 `unanswerable` 拒答表现后选择显式启用（`KNOWFLOW_ANSWER_REPAIR=on`），每题最多 **2 次 DeepSeek 尝试**：1 次生成 + 至多 1 次引用补问。补问只发生在「模型自称有答案、但引用校验把答案剪空」的题上，仍按 policy 上界预约。若评测选择开启，按 CNY 估算整个包时按每题 2 次生成预留留量，不要用单次价乘题数。
 
 ## 1. 适配私有包 → runner 输入
 
