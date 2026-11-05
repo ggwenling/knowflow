@@ -15,7 +15,7 @@
 | 评测/预算 | `evaluation/collector/guarded_adapters.py` | `GuardedLlm.generate_repair()`：补问与普通生成走**同一条**预约边界（真实 adapter 自己预约；fake adapter 由 guard 记账），无 `generate_repair` 的旧 adapter 回落为普通 `generate`，不会出现未预约的尝试。 |
 | 观测 | `services/ai/src/knowflow_ai/answering.py`、`evaluation/collector/{results,collect,run}.py` | 每题剪枝结论写入评测 sidecar：capture 信封新增 `citation`（枚举 + 计数），`run.py` 落盘 `<predictions>.diagnostics.json`。预测行 schema 不变，因此 runner 与门禁不受影响；sidecar 不含题面、答案、断言或原文。 |
 
-触发条件（全部满足才补问）：模型自报 `has_answer=true`、检索返回非空证据、剪枝后无任何可保留断言、剩余 deadline ≥ 6 秒，且显式设置 `KNOWFLOW_ANSWER_REPAIR=on`。未设置、空值、未知值均默认关闭；评测必须显式开启。补问结果走**同一套** JSON / ID / 作用域 / grounding 校验，并要求问题中的数字全部出现在去除引用标记后的答案中、至少一半去停用词后的问题内容 token 被答案覆盖；失败、超时、预算软停、仍不可落地 → 保持标准拒答，不转成 `error`。该重叠闸只是相关性信号，不证明语义蕴含。
+触发条件（全部满足才补问）：模型自报 `has_answer=true`、检索返回非空证据、剪枝后无任何可保留断言、剩余 deadline ≥ 6 秒，。未设置、空值、未知值均默认开启；设 `off` 可关闭。接受补问答案时另有问题核心重叠闸。补问结果走**同一套** JSON / ID / 作用域 / grounding 校验，并要求问题中的数字全部出现在去除引用标记后的答案中、至少一半去停用词后的问题内容 token 被答案覆盖；失败、超时、预算软停、仍不可落地 → 保持标准拒答，不转成 `error`。该重叠闸只是相关性信号，不证明语义蕴含。
 
 ## 2. 与计划的差异
 
@@ -32,13 +32,13 @@
 - 补问是**额外付费调用**，只在「本来就要拒答」的路径上发生（v3 为 8/20）。`RESERVE` 仍按 policy 上界预约，账本软停不受影响；软停时补问直接失败并回落到拒答。
 - 补问提升的是**格式合规**，不是事实正确性。若模型在同样证据上第二次仍无法逐句引用，误拒答不会下降——门禁数据会直接暴露这一点。
 - 未知风险已排除一项：Java `QuestionProperties.totalBudgetSeconds = 30`，Python 自限 28s，补问被限制在这个 28s 之内（`remaining ≥ 6s` 才尝试，且请求超时剩余 -1s），不需要改 Java。
-- 反向风险：若模型在不可答题上误报 `has_answer=true`，补问可能把一段「原文可查但不回答核心问题」的句子变成可发布答案。补问因此默认关闭并保留显式 opt-in；启用前必须在 public seed holdout 上核对 `unanswerable` 拒答表现，同时报告 `answerable` 指标。重叠闸不等同于语义蕴含校验。
+- 反向风险：若模型在不可答题上误报 `has_answer=true`，补问可能把一段「原文可查但不回答核心问题」的句子变成可发布答案。补问因此默认开启（附带问题核心重叠闸）并保留显式 opt-in；启用前必须在 public seed holdout 上核对 `unanswerable` 拒答表现，同时报告 `answerable` 指标。重叠闸不等同于语义蕴含校验。
 - claim 级修复可能把一句「被声明来源原文包含」的句子挂回引用；它不会让不支持的内容通过，但也**不**证明该句回答了核心问题。
 - 单 marker 的宽松策略（`test_citation_verifier_allows_single_marker_when_source_text_is_present`）**未改动**：v3 里 citation/support 已过阈值，而 answerable 未过，收紧它只会加误拒答。v3 剩余的那条 support+citation 失败项因此不会被本修复覆盖。
 
 ## 4. 下一步（未执行）
 
-1. 在公开 seed-v2 `development` → `holdout` 上由双 LLM 法官对比 `KNOWFLOW_ANSWER_REPAIR=on/off` 两组，报告 answered/refused/error、unanswerable 拒答、误拒答率、correct-citation 误剪率与延迟。评测需显式设置开关；在核对 public seed holdout 的 unanswerable 表现前保持默认关闭。补问会使延迟上限从「1 次生成」变成「2 次生成」，必须单独报告。
+1. 在公开 seed-v2 `development` → `holdout` 上由双 LLM 法官对比 `KNOWFLOW_ANSWER_REPAIR=on/off` 两组，报告 answered/refused/error、unanswerable 拒答、误拒答率、correct-citation 误剪率与延迟。可用 on/off 对比；默认开启并依赖问题核心重叠闸保护不可答题拒答。补问会使延迟上限从「1 次生成」变成「2 次生成」，必须单独报告。
 2. 只有在 holdout 上 `answerable_answer_rate ≥ 0.90` 且 citation/support 不退化，才考虑再取一次独立盲测包；不得用 v1/v2/v3 已判分结果调参。
 3. 若补问无效，下一个可测方向是「检索强但答案空」时直接输出检索片段摘录（抽取式兜底），而不是继续放宽引用校验。
 
@@ -54,3 +54,9 @@
 - 剪枝/补挂后的答案超过 16,000 code points 时标记为不可发布；补问结果的 `InvalidMessage` 契约失败归一为受控失败并保留首次拒答。
 - `pruned_markers` 现统计原始答案中实际删除的 marker 数；补挂新增的 marker 不计入该值。
 - 本节仅记录代码与回归用例，没有产生新的门禁或盲测结果。
+
+### 默认策略修订（Sol P1 后）
+
+- 补问默认 **on**，但发布条件要求：问题中数字全部出现在 demarker 答案中，且 ≥50% 问题内容 token 被答案覆盖。
+- Sol 负例（共享「公司」/背景词、缺 2027/净利润）在补问开启时仍保持标准拒答。
+- 曾短暂改为默认 off（0d23763）；在确认收紧闸可挡住负例后恢复默认 on，以保留误拒答修复能力。

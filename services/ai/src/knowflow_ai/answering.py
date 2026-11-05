@@ -94,16 +94,20 @@ def _has_question_content_overlap(question, answer):
 
 
 def answer_repair_enabled(environ=None):
-    """Read the opt-in single-re-ask switch; unset and unknown values stay off."""
+    """Read the single-re-ask switch; unset/unknown keep the bounded re-ask on.
+
+    Acceptance still requires the tightened question-overlap gate, so a default-on
+    re-ask cannot publish a grounded extract that misses the question's core.
+    """
     env = os.environ if environ is None else environ
     raw = env.get("KNOWFLOW_ANSWER_REPAIR", "").strip().lower()
-    if raw in _REPAIR_ENABLED_VALUES:
-        return True
     if raw in _REPAIR_DISABLED_VALUES:
         return False
+    if raw in _REPAIR_ENABLED_VALUES:
+        return True
     if raw:
-        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_disabled")
-    return False
+        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_enabled")
+    return True
 
 
 def _citation_diagnostics(reason):

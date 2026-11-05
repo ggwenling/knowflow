@@ -1166,13 +1166,18 @@ async def test_deepseek_adapter_rejects_invalid_provider_shapes(provider):
     {"KNOWFLOW_ANSWER_REPAIR": "  "},
     {"KNOWFLOW_ANSWER_REPAIR": "sometimes"},
 ])
-def test_answer_repair_is_disabled_when_unset_empty_or_unrecognized(environ):
-    assert answer_repair_enabled(environ) is False
+def test_answer_repair_stays_enabled_when_unset_empty_or_unrecognized(environ):
+    assert answer_repair_enabled(environ) is True
 
 
 @pytest.mark.parametrize("value", ["on", "ON", "true", "1", "yes"])
-def test_answer_repair_requires_an_explicit_enable_value(value):
+def test_answer_repair_accepts_explicit_enable_value(value):
     assert answer_repair_enabled({"KNOWFLOW_ANSWER_REPAIR": value}) is True
+
+
+@pytest.mark.parametrize("value", ["off", "OFF", "false", "0", "no"])
+def test_answer_repair_accepts_explicit_disable_value(value):
+    assert answer_repair_enabled({"KNOWFLOW_ANSWER_REPAIR": value}) is False
 
 
 def test_repair_numeric_coverage_ignores_numbers_inside_source_markers():
@@ -1185,11 +1190,11 @@ def test_repair_relevance_requires_half_of_question_content_tokens():
         "公司 2027 年净利润是多少？", "公司缓存默认关闭 2027")
 
 
-def test_answer_service_repair_is_off_when_the_switch_is_unset(monkeypatch):
+def test_answer_service_repair_is_on_when_the_switch_is_unset(monkeypatch):
     monkeypatch.delenv("KNOWFLOW_ANSWER_REPAIR", raising=False)
     service = AnswerService("unused", _contract(), retriever=FakeRetriever([]))
 
-    assert service._repair_enabled is False
+    assert service._repair_enabled is True
 
 
 def _two_evidence():

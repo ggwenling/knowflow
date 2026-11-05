@@ -30,9 +30,7 @@ checking finish, rather than during generation.
 
 When the model claims an answer but every claim fails citation validation, the
 service spends at most one extra non-streaming provider call on the **same**
-evidence before refusing (`KNOWFLOW_ANSWER_REPAIR`, opt-in; unset, empty, or an
-unrecognized value keeps it off; set `on`/`true`/`1`/`yes` to enable). Before
-enabling it, verify unanswerable behavior on the public seed holdout. The
+evidence before refusing (`KNOWFLOW_ANSWER_REPAIR`, on by default; set `off`/`false`/`0`/`no` to disable; unset, empty, or an unrecognized value keeps it on). The tightened overlap gate must keep unanswerable refusals stable; verify on public seed holdout. The
 re-ask receives the previous answer text
 (truncated to 4,000 code points), adds no evidence and no sources, and its
 result passes through the identical JSON, ID, scope, and grounding checks. A
