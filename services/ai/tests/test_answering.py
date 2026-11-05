@@ -17,6 +17,8 @@ from knowflow_ai.answering import (
     DeepSeekAdapter,
     LlmSettings,
     ReadOnlyRetriever,
+    _has_question_content_overlap,
+    answer_repair_enabled,
 )
 from knowflow_ai.citation_verify import (
     _claim_units,
@@ -1158,6 +1160,38 @@ async def test_deepseek_adapter_rejects_invalid_provider_shapes(provider):
 # --- prune reason codes and claim-level repair -------------------------------
 
 
+@pytest.mark.parametrize("environ", [
+    {},
+    {"KNOWFLOW_ANSWER_REPAIR": ""},
+    {"KNOWFLOW_ANSWER_REPAIR": "  "},
+    {"KNOWFLOW_ANSWER_REPAIR": "sometimes"},
+])
+def test_answer_repair_is_disabled_when_unset_empty_or_unrecognized(environ):
+    assert answer_repair_enabled(environ) is False
+
+
+@pytest.mark.parametrize("value", ["on", "ON", "true", "1", "yes"])
+def test_answer_repair_requires_an_explicit_enable_value(value):
+    assert answer_repair_enabled({"KNOWFLOW_ANSWER_REPAIR": value}) is True
+
+
+def test_repair_numeric_coverage_ignores_numbers_inside_source_markers():
+    assert not _has_question_content_overlap(
+        "缓存默认关闭 2027 吗？", "缓存默认关闭[src-evidence-2027]。")
+
+
+def test_repair_relevance_requires_half_of_question_content_tokens():
+    assert not _has_question_content_overlap(
+        "公司 2027 年净利润是多少？", "公司缓存默认关闭 2027")
+
+
+def test_answer_service_repair_is_off_when_the_switch_is_unset(monkeypatch):
+    monkeypatch.delenv("KNOWFLOW_ANSWER_REPAIR", raising=False)
+    service = AnswerService("unused", _contract(), retriever=FakeRetriever([]))
+
+    assert service._repair_enabled is False
+
+
 def _two_evidence():
     rows = _evidence()
     rows.append({**rows[0], "source_id": "src-evidence-2", "chunk_id": "chunk-example-2",
@@ -1334,7 +1368,8 @@ async def test_answer_service_refuses_when_first_generation_expands_past_answer_
 
 
 @pytest.mark.asyncio
-async def test_answer_service_keeps_refusal_when_repair_expands_past_answer_limit():
+async def test_answer_service_keeps_refusal_when_repair_expands_past_answer_limit(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     evidence = [*_two_evidence(), *_length_expanding_evidence()]
     model = RepairLlm(_ungrounded_generated(), _length_expanding_generated())
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
@@ -1351,15 +1386,22 @@ async def test_answer_service_keeps_refusal_when_repair_expands_past_answer_limi
 
 
 @pytest.mark.asyncio
-async def test_answer_service_reasks_once_and_prefers_the_grounded_repair():
-    model = RepairLlm(_ungrounded_generated(), _grounded_generated())
+async def test_answer_service_reasks_once_and_prefers_the_grounded_repair(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    evidence = _two_evidence()
+    evidence[0]["text_content"] = "原始资料说明 2027 年索引 READY 后才可检索。"
+    repaired = {"answer": "原始资料说明 2027 年索引 READY 后才可检索[src-evidence-1]。",
+                "has_answer": True, "source_ids": ["src-evidence-1"]}
+    model = RepairLlm(_ungrounded_generated(), repaired)
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
-                            retriever=FakeRetriever(_two_evidence()))
+                            retriever=FakeRetriever(evidence))
+    request = _request()
+    request["question"] = "2027 年索引何时可检索？"
 
-    response = await service.answer(_request())
+    response = await service.answer(request)
 
     assert response["has_answer"] is True
-    assert response["answer"] == "原始资料说明索引 READY 后才可检索[src-evidence-1]。"
+    assert response["answer"] == repaired["answer"]
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
     assert model.generate_calls == 1 and model.repair_calls == 1
     assert model.previous_answers == [_ungrounded_generated()["answer"]]
@@ -1368,7 +1410,8 @@ async def test_answer_service_reasks_once_and_prefers_the_grounded_repair():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_rejects_grounded_repair_unrelated_to_question():
+async def test_answer_service_rejects_grounded_repair_unrelated_to_question(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     request = _request()
     request["question"] = "公司 2027 年净利润是多少？"
     unrelated = {"answer": "原始资料说明缓存默认关闭[src-evidence-2]。",
@@ -1393,7 +1436,42 @@ async def test_answer_service_rejects_grounded_repair_unrelated_to_question():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_refuses_after_an_ungrounded_repair_without_a_third_call():
+@pytest.mark.parametrize("case", ["shared_company", "shared_cache_background"])
+async def test_answer_service_rejects_grounded_repair_missing_question_core(case):
+    request = _request()
+    evidence = _two_evidence()
+    if case == "shared_company":
+        request["question"] = "公司 2027 年净利润是多少？"
+        evidence[1]["text_content"] = "原始资料说明公司缓存默认关闭。"
+        repaired = {"answer": "公司缓存默认关闭[src-evidence-2]。",
+                    "has_answer": True, "source_ids": ["src-evidence-2"]}
+    else:
+        request["question"] = "缓存默认关闭时，公司 2027 年净利润是多少？"
+        repaired = {"answer": "缓存默认关闭[src-evidence-2]。",
+                    "has_answer": True, "source_ids": ["src-evidence-2"]}
+
+    model = RepairLlm(_ungrounded_generated(), repaired)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(evidence))
+    service._repair_enabled = True
+
+    repaired_response, repaired_diagnostics = service._evaluate_generated(
+        request, evidence, repaired)
+    assert repaired_diagnostics["decision"] == "answered"
+    assert repaired_response["has_answer"] is True
+
+    response = await service.answer(request)
+
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["has_answer"] is False and response["sources"] == []
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_outcome"] == "failed_unrelated"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_refuses_after_an_ungrounded_repair_without_a_third_call(
+        monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm(_ungrounded_generated(), _ungrounded_generated())
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
                             retriever=FakeRetriever(_two_evidence()))
@@ -1409,7 +1487,8 @@ async def test_answer_service_refuses_after_an_ungrounded_repair_without_a_third
 
 
 @pytest.mark.asyncio
-async def test_answer_service_records_a_declined_repair_as_such():
+async def test_answer_service_records_a_declined_repair_as_such(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm(_ungrounded_generated(),
                       {"answer": "没有足够的资料证据回答这个问题。",
                        "has_answer": False, "source_ids": []})
@@ -1424,7 +1503,8 @@ async def test_answer_service_records_a_declined_repair_as_such():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_does_not_reask_when_the_model_declines():
+async def test_answer_service_does_not_reask_when_the_model_declines(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm({"answer": "没有足够的资料证据回答这个问题。",
                        "has_answer": False, "source_ids": []}, _grounded_generated())
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
@@ -1437,7 +1517,8 @@ async def test_answer_service_does_not_reask_when_the_model_declines():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_keeps_the_refusal_when_the_repair_call_fails():
+async def test_answer_service_keeps_the_refusal_when_the_repair_call_fails(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm(_ungrounded_generated(), _grounded_generated(),
                       repair_error=ProcessingError("MODEL_FAILURE", 502, retryable=True))
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
@@ -1451,7 +1532,8 @@ async def test_answer_service_keeps_the_refusal_when_the_repair_call_fails():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_keeps_the_refusal_when_the_repair_is_malformed():
+async def test_answer_service_keeps_the_refusal_when_the_repair_is_malformed(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm(_ungrounded_generated(), {"answer": "x", "has_answer": True})
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
                             retriever=FakeRetriever(_two_evidence()))
@@ -1463,7 +1545,8 @@ async def test_answer_service_keeps_the_refusal_when_the_repair_is_malformed():
 
 
 @pytest.mark.asyncio
-async def test_answer_service_keeps_refusal_when_repair_contract_validation_fails():
+async def test_answer_service_keeps_refusal_when_repair_contract_validation_fails(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     repaired = _grounded_generated()
     model = RepairLlm(_ungrounded_generated(), repaired)
     service = AnswerService("unused", _contract_rejecting_answer(repaired["answer"]),
@@ -1480,7 +1563,8 @@ async def test_answer_service_keeps_refusal_when_repair_contract_validation_fail
 
 
 @pytest.mark.asyncio
-async def test_answer_service_skips_the_repair_without_deadline_headroom():
+async def test_answer_service_skips_the_repair_without_deadline_headroom(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm(_ungrounded_generated(), _grounded_generated())
     service = AnswerService("unused", _contract(), llm_factory=lambda: model,
                             retriever=FakeRetriever(_two_evidence()))

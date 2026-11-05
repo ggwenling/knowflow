@@ -33,8 +33,9 @@ _REPAIR_INSTRUCTION = (
     "只写资料中可直接照录的完整短句，不要改写、补充或合并多个来源；"
     "若无法逐句引用，返回 has_answer=false 和空 source_ids。")
 _REPAIR_DISABLED_VALUES = frozenset({"0", "false", "off", "no"})
-_REPAIR_ENABLED_VALUES = frozenset({"", "1", "true", "on", "yes"})
+_REPAIR_ENABLED_VALUES = frozenset({"1", "true", "on", "yes"})
 _ANSWER_MARKER = re.compile(r"\[[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\]", re.ASCII)
+_NUMBER_TOKEN = re.compile(r"\d+(?:[.,]\d+)*%?")
 _CONTENT_RUN = re.compile(
     r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+|"
     r"\d+(?:[.,]\d+)*%?|[A-Za-z]+(?:[-'][A-Za-z]+)*")
@@ -75,22 +76,34 @@ def _content_tokens(text):
 
 
 def _has_question_content_overlap(question, answer):
-    """Cheap relevance signal for accepting a citation repair, not entailment."""
-    question_tokens = _content_tokens(question)
-    answer_tokens = _content_tokens(answer)
-    return bool(question_tokens and answer_tokens and question_tokens & answer_tokens)
+    """Require numeric coverage and substantial content overlap for a repair."""
+    question_text = _ANSWER_MARKER.sub(" ", question)
+    answer_text = _ANSWER_MARKER.sub(" ", answer)
+    question_tokens = _content_tokens(question_text)
+    answer_tokens = _content_tokens(answer_text)
+    if not question_tokens or not answer_tokens:
+        return False
+
+    question_numbers = set(_NUMBER_TOKEN.findall(question_text))
+    answer_numbers = set(_NUMBER_TOKEN.findall(answer_text))
+    if not question_numbers.issubset(answer_numbers):
+        return False
+
+    covered = len(question_tokens & answer_tokens) / len(question_tokens)
+    return covered >= 0.5
 
 
 def answer_repair_enabled(environ=None):
-    """Read the single-re-ask switch; an unknown value keeps the bounded re-ask."""
+    """Read the opt-in single-re-ask switch; unset and unknown values stay off."""
     env = os.environ if environ is None else environ
     raw = env.get("KNOWFLOW_ANSWER_REPAIR", "").strip().lower()
-    if raw in _REPAIR_DISABLED_VALUES:
-        return False
     if raw in _REPAIR_ENABLED_VALUES:
         return True
-    _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_enabled")
-    return True
+    if raw in _REPAIR_DISABLED_VALUES:
+        return False
+    if raw:
+        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_disabled")
+    return False
 
 
 def _citation_diagnostics(reason):

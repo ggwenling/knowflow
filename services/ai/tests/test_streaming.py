@@ -286,16 +286,28 @@ def _reasking_service(first, repaired, evidence, repairs):
 
 
 @pytest.mark.asyncio
-async def test_stream_refuses_a_grounded_repair_unrelated_to_the_question(monkeypatch):
-    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
+@pytest.mark.parametrize('case', ['shared_company', 'shared_cache_background'])
+async def test_stream_refuses_grounded_repair_missing_question_core(case):
     evidence = _two_evidence()
     first = _ungrounded_generated()
-    repaired = {'answer': '原始资料说明缓存默认关闭[src-evidence-2]。',
-                'has_answer': True, 'source_ids': ['src-evidence-2']}
+    request = _request()
+    if case == 'shared_company':
+        request['question'] = '公司 2027 年净利润是多少？'
+        evidence[1]['text_content'] = '原始资料说明公司缓存默认关闭。'
+        repaired = {'answer': '公司缓存默认关闭[src-evidence-2]。',
+                    'has_answer': True, 'source_ids': ['src-evidence-2']}
+    else:
+        request['question'] = '缓存默认关闭时，公司 2027 年净利润是多少？'
+        repaired = {'answer': '缓存默认关闭[src-evidence-2]。',
+                    'has_answer': True, 'source_ids': ['src-evidence-2']}
     repairs = []
     service = _reasking_service(first, repaired, evidence, repairs)
-    request = _request()
-    request['question'] = '公司 2027 年净利润是多少？'
+    service._repair_enabled = True
+
+    repaired_response, repaired_diagnostics = service._evaluate_generated(
+        request, evidence, repaired)
+    assert repaired_diagnostics['decision'] == 'answered'
+    assert repaired_response['has_answer'] is True
 
     events = [event async for event in service.stream(request)]
 
@@ -329,6 +341,7 @@ async def test_stream_keeps_refusal_when_repair_contract_validation_fails():
     repaired = _grounded_generated()
     repairs = []
     service = _reasking_service(first, repaired, _two_evidence(), repairs)
+    service._repair_enabled = True
     contract = _contract()
     validate = contract.validate
 
@@ -354,22 +367,23 @@ async def test_stream_reasks_once_and_emits_the_repaired_answer():
     evidence = _evidence()
     evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
                      'chunk_id': 'chunk-example-2',
-                     'text_content': '原始资料说明缓存默认关闭。'})
+                     'text_content': '原始资料说明 2027 年缓存默认关闭。'})
     first = {'answer': '索引 READY 后才可检索，缓存默认关闭'
                        '[src-evidence-1][src-evidence-2]。',
              'has_answer': True, 'source_ids': ['src-evidence-1', 'src-evidence-2']}
-    repaired = {'answer': '原始资料说明缓存默认关闭[src-evidence-2]。',
+    repaired = {'answer': '原始资料说明 2027 年缓存默认关闭[src-evidence-2]。',
                 'has_answer': True, 'source_ids': ['src-evidence-2']}
     repairs = []
     service = _reasking_service(first, repaired, evidence, repairs)
     request = _request()
-    request['question'] = '缓存默认是什么状态？'
+    request['question'] = '2027 年缓存默认关闭吗？'
+    service._repair_enabled = True
 
     events = [event async for event in service.stream(request)]
 
     assert [event['event'] for event in events] == [
         'started', 'delta', 'sources', 'completed']
-    assert events[1]['delta'] == '原始资料说明缓存默认关闭[src-evidence-2]。'
+    assert events[1]['delta'] == repaired['answer']
     assert events[2]['has_answer'] is True
     assert [source['source_id'] for source in events[2]['sources']] == ['src-evidence-2']
     assert repairs == [first['answer']]
@@ -386,6 +400,7 @@ async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungroun
              'has_answer': True, 'source_ids': ['src-evidence-1', 'src-evidence-2']}
     repairs = []
     service = _reasking_service(first, first, evidence, repairs)
+    service._repair_enabled = True
 
     events = [event async for event in service.stream(_request())]
 

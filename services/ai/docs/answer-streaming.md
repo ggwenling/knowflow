@@ -30,12 +30,17 @@ checking finish, rather than during generation.
 
 When the model claims an answer but every claim fails citation validation, the
 service spends at most one extra non-streaming provider call on the **same**
-evidence before refusing (`KNOWFLOW_ANSWER_REPAIR`, default on; set
-`off`/`0`/`false` to disable). The re-ask receives the previous answer text
+evidence before refusing (`KNOWFLOW_ANSWER_REPAIR`, opt-in; unset, empty, or an
+unrecognized value keeps it off; set `on`/`true`/`1`/`yes` to enable). Before
+enabling it, verify unanswerable behavior on the public seed holdout. The
+re-ask receives the previous answer text
 (truncated to 4,000 code points), adds no evidence and no sources, and its
 result passes through the identical JSON, ID, scope, and grounding checks. A
-failed, malformed, budget-stopped, or still-ungrounded re-ask leaves the
-canonical refusal in place; it never becomes an `error` terminal.
+repair is accepted only when every numeric token from the question appears
+outside citation markers and at least half of the question's content tokens
+overlap. This is a relevance check, not an entailment check. A failed,
+malformed, budget-stopped, or still-ungrounded re-ask leaves the canonical
+refusal in place; it never becomes an `error` terminal.
 
 The re-ask is skipped when the model itself declines (`has_answer=false`), when
 retrieval returned no evidence, and when fewer than 6 seconds remain of the
