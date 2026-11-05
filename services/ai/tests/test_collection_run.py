@@ -66,7 +66,9 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
                           "index_version_id": str(index), "source_id": "src-" + str(index),
                           "locator": {"kind": "text_range", "unit": "unicode_code_point", "start": 0, "end": len(text)},
                           "text_sha256": sha256(text.encode("utf-8")).hexdigest()})
-        captures[request_id] = {"request_id": request_id, "response": response, "error_code": None, "trace": trace}
+        captures[request_id] = {"request_id": request_id, "response": response, "error_code": None, "trace": trace,
+                                "citation": {"decision": "refused", "reason": "empty_evidence",
+                                             "repair_attempt": 0, "repair_outcome": "not_attempted"}}
         return httpx.Response(200, json=response)
     async def ai_transport(request):
         return httpx.Response(200, json=captures.pop(request.url.path.rsplit("/", 1)[1]))
@@ -91,6 +93,13 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
     assert run.scorer.evaluate(output, dataset_root=dataset)["sample_count"] == expected
     assert json.loads(output.with_suffix(".status.json").read_text())["complete"] is True
     assert ledger.summary()["reserved_microyuan"] == (8_000_000 if reach_soft_limit_on_last_question else 0)
+    diagnostics = json.loads(output.with_suffix(".diagnostics.json").read_text())
+    assert diagnostics["dataset_sha256"] == payload["dataset_sha256"]
+    assert [entry["question_id"] for entry in diagnostics["diagnostics"]] == [
+        row["question_id"] for row in payload["predictions"]]
+    assert all(entry["outcome"] == "refused" for entry in diagnostics["diagnostics"])
+    assert all(entry["citation"]["reason"] == "empty_evidence"
+               for entry in diagnostics["diagnostics"])
 
 
 @pytest.mark.asyncio

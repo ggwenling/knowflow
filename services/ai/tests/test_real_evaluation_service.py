@@ -16,18 +16,54 @@ real_service = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(real_service)
 
 
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _loopback_host(host):
+    return host in _LOOPBACK_HOSTS or host.startswith("127.")
+
+
+def _target_is_local(args, kwargs):
+    """True only when every host argument in a socket call is loopback.
+
+    Windows builds ``asyncio``'s ProactorEventLoop self-pipe from a loopback
+    ``socket.socketpair()``, so a blanket ``connect`` ban kills every
+    ``asyncio.run`` in this module instead of only external egress.
+    """
+    hosts = []
+    for value in (*args, *kwargs.values()):
+        if isinstance(value, tuple) and value and isinstance(value[0], str):
+            hosts.append(value[0])
+        elif isinstance(value, str):
+            hosts.append(value)
+    return bool(hosts) and all(_loopback_host(host) for host in hosts)
+
+
 @pytest.fixture(autouse=True)
 def block_external_network(monkeypatch):
     """Reject real outbound network; loopback MockTransport paths stay local."""
 
-    def refuse(*_args, **_kwargs):
-        raise RuntimeError("EXTERNAL_NETWORK_DISABLED_IN_TEST")
+    def guard(operation):
+        def refuse(*args, **kwargs):
+            if _target_is_local(args, kwargs):
+                return operation(*args, **kwargs)
+            raise RuntimeError("EXTERNAL_NETWORK_DISABLED_IN_TEST")
+        return refuse
 
-    monkeypatch.setattr(socket.socket, "connect", refuse)
-    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
-    monkeypatch.setattr(socket.socket, "sendto", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
-    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    monkeypatch.setattr(socket.socket, "connect", guard(socket.socket.connect))
+    monkeypatch.setattr(socket.socket, "connect_ex", guard(socket.socket.connect_ex))
+    monkeypatch.setattr(socket.socket, "sendto", guard(socket.socket.sendto))
+    monkeypatch.setattr(socket, "create_connection", guard(socket.create_connection))
+    monkeypatch.setattr(socket, "getaddrinfo", guard(socket.getaddrinfo))
+
+
+def test_network_guard_blocks_non_loopback_targets():
+    bound_socket = object()
+    assert not _target_is_local((bound_socket, ("example.test", 443)), {})
+    assert not _target_is_local(("example.test", 443), {})
+    assert _target_is_local((bound_socket, ("127.0.0.1", 5432)), {})
+    assert _target_is_local(("localhost", 8000), {})
+    assert not _target_is_local((), {})
 
 
 def configure_real_service(monkeypatch, tmp_path):

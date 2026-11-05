@@ -263,6 +263,14 @@ def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatc
         assert captured.status_code == 200
         assert len(captured.json()['trace']) == 10
         assert captured.json()['response']['request_id'] == 'sync'
+        citation = captured.json()['citation']
+        assert citation['decision'] == 'refused' and citation['reason'] == 'model_declined'
+        assert citation['repair_attempt'] == 0
+        assert set(citation) == {
+            'decision', 'reason', 'repairable', 'claims', 'kept_claims', 'uncited_claims',
+            'dropped_claims', 'repaired_claims', 'pruned_markers', 'repair_attempt',
+            'repair_outcome'}
+        assert 'insufficient' not in json.dumps(citation)
         assert client.post(capture_url, headers=control_headers).status_code == 404
         payload['request_id'] = 'stream'
         response = client.post('/internal/v1/answers/stream', headers={**headers, 'X-Request-ID': 'stream'}, json=payload)
@@ -313,6 +321,75 @@ async def test_guard_reserves_every_embedding_and_llm_attempt_before_adapter_use
     assert calls == [("embed", 1), ("embed", 2), ("generate", 3), ("stream", 4)]
     assert reserved_count() == 4  # Timeout and stream cancellation never refund.
     await embedding.aclose()
+    await llm.aclose()
+
+
+@pytest.mark.asyncio
+async def test_guard_forwards_the_citation_reask_after_the_same_reservation(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    ledger = budget.BudgetLedger(path)
+    calls = []
+
+    def reserved_count():
+        with closing(sqlite3.connect(path)) as db:
+            return db.execute("SELECT count(*) FROM reservations").fetchone()[0]
+
+    class Adapter:
+        settings = SimpleNamespace(model="model-a")
+
+        async def generate(self, question, evidence, *, request_id):
+            calls.append(("generate", reserved_count(), evidence[0]["source_id"]))
+            return {}
+
+        async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+            calls.append(("repair", reserved_count(), previous_answer))
+            return {}
+
+        async def aclose(self): pass
+
+    @verified_bounds
+    def bounds(operation, *_args):
+        return (100, 0 if operation == "embed" else 1024)
+
+    llm = guarded.GuardedLlm(
+        adapter_factory=Adapter, ledger=ledger, provider="synthetic", model="model-a",
+        quote=current_quote(), token_bounds=bounds, bound_evidence=current_bound_evidence())
+    evidence = [{"source_id": "src-1", "text_content": "证据"}]
+    await llm.generate("q", evidence, request_id="reask")
+    await llm.generate_repair("q", evidence, "上一版答案", request_id="reask")
+
+    assert calls == [("generate", 1, "src-1"), ("repair", 2, "上一版答案")]
+    assert evidence == [{"source_id": "src-1", "text_content": "证据"}]
+    await llm.aclose()
+
+
+@pytest.mark.asyncio
+async def test_guard_reask_falls_back_for_adapters_without_a_repair_path(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    ledger = budget.BudgetLedger(path)
+    calls = []
+
+    class LegacyAdapter:
+        settings = SimpleNamespace(model="model-a")
+
+        async def generate(self, question, evidence, *, request_id):
+            calls.append("generate")
+            return {}
+
+        async def aclose(self): pass
+
+    @verified_bounds
+    def bounds(operation, *_args):
+        return (100, 0 if operation == "embed" else 1024)
+
+    llm = guarded.GuardedLlm(
+        adapter_factory=lambda: LegacyAdapter(), ledger=ledger, provider="synthetic",
+        model="model-a", quote=current_quote(), token_bounds=bounds,
+        bound_evidence=current_bound_evidence())
+    await llm.generate_repair("q", [{"source_id": "src-1", "text_content": "证据"}],
+                              "上一版答案", request_id="reask")
+
+    assert calls == ["generate"]
     await llm.aclose()
 
 

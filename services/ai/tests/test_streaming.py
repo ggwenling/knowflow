@@ -256,6 +256,75 @@ async def test_stream_single_marker_passes_without_soft_refuse():
     assert events[-2]['sources']
 
 
+class ReaskingModel:
+    """Streams the first generation, then answers the bounded citation re-ask."""
+
+    def __init__(self, first, repaired, repairs):
+        self.first, self.repaired, self.repairs = first, repaired, repairs
+
+    async def stream_content(self, question, evidence, *, request_id):
+        yield json.dumps(self.first, ensure_ascii=False)
+
+    async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+        self.repairs.append(previous_answer)
+        return self.repaired
+
+    async def aclose(self):
+        return None
+
+
+def _reasking_service(first, repaired, evidence, repairs):
+    service = AnswerService('unused', _contract(),
+                            retriever=FakeRetriever(evidence),
+                            llm_factory=lambda: ReaskingModel(first, repaired, repairs))
+    return service
+
+
+@pytest.mark.asyncio
+async def test_stream_reasks_once_and_emits_the_repaired_answer():
+    evidence = _evidence()
+    evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
+                     'chunk_id': 'chunk-example-2',
+                     'text_content': '原始资料说明缓存默认关闭。'})
+    first = {'answer': '索引 READY 后才可检索，缓存默认关闭'
+                       '[src-evidence-1][src-evidence-2]。',
+             'has_answer': True, 'source_ids': ['src-evidence-1', 'src-evidence-2']}
+    repaired = {'answer': '原始资料说明缓存默认关闭[src-evidence-2]。',
+                'has_answer': True, 'source_ids': ['src-evidence-2']}
+    repairs = []
+    service = _reasking_service(first, repaired, evidence, repairs)
+
+    events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '原始资料说明缓存默认关闭[src-evidence-2]。'
+    assert events[2]['has_answer'] is True
+    assert [source['source_id'] for source in events[2]['sources']] == ['src-evidence-2']
+    assert repairs == [first['answer']]
+
+
+@pytest.mark.asyncio
+async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungrounded():
+    evidence = _evidence()
+    evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
+                     'chunk_id': 'chunk-example-2',
+                     'text_content': '原始资料说明缓存默认关闭。'})
+    first = {'answer': '索引 READY 后才可检索，缓存默认关闭'
+                       '[src-evidence-1][src-evidence-2]。',
+             'has_answer': True, 'source_ids': ['src-evidence-1', 'src-evidence-2']}
+    repairs = []
+    service = _reasking_service(first, first, evidence, repairs)
+
+    events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert len(repairs) == 1
+
+
 @pytest.mark.asyncio
 async def test_stream_cancellation_closes_provider_and_yields_one_terminal():
     stream = ProviderStream([], block=True)

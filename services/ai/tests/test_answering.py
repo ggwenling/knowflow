@@ -21,6 +21,7 @@ from knowflow_ai.answering import (
 from knowflow_ai.citation_verify import (
     _claim_units,
     citations_are_grounded,
+    prune_claims,
     prune_ungrounded_claims,
 )
 from knowflow_ai.config import ConfigurationError
@@ -1139,3 +1140,263 @@ async def test_deepseek_adapter_rejects_invalid_provider_shapes(provider):
     with pytest.raises(ProcessingError, match="MODEL_FAILURE"):
         await adapter.generate("问题", _evidence(), request_id="answer-invalid-provider")
     await client.aclose()
+
+
+# --- prune reason codes and claim-level repair -------------------------------
+
+
+def _two_evidence():
+    rows = _evidence()
+    rows.append({**rows[0], "source_id": "src-evidence-2", "chunk_id": "chunk-example-2",
+                 "text_content": "原始资料说明缓存默认关闭。"})
+    return rows
+
+
+def test_prune_claims_reports_grounded_reason_and_counts():
+    result = prune_claims(
+        "索引 READY 后才可检索[src-evidence-1]。背景说明。",
+        {"src-evidence-1": "原始资料说明索引 READY 后才可检索。"})
+
+    assert result["ok"] is True
+    assert result["reason"] == "grounded"
+    assert result["claims"] == 2
+    assert result["kept_claims"] == 1
+    assert result["uncited_claims"] == 1
+    assert result["dropped_claims"] == 1
+    assert result["repaired_claims"] == 0
+    assert result["pruned_markers"] == 0
+
+
+def test_prune_claims_reports_empty_after_prune_and_pruned_markers():
+    result = prune_claims(
+        "索引 READY 后才可检索，缓存默认关闭[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "索引可以查询。", "src-evidence-2": "后台提供管理功能。"})
+
+    assert result["ok"] is False
+    assert result["reason"] == "empty_after_prune"
+    assert result["pruned_markers"] == 2
+    assert result["kept_source_ids"] == []
+
+
+def test_prune_claims_reports_no_cited_claims_for_an_unmarked_answer():
+    result = prune_claims("索引 READY 后才可检索。",
+                          {"src-evidence-1": "索引 READY 后才可检索。"})
+
+    assert result["ok"] is False
+    assert result["reason"] == "no_cited_claims"
+
+
+def test_prune_claims_reattaches_an_uncited_claim_to_a_declared_source():
+    result = prune_claims(
+        "索引 READY 后才可检索[src-evidence-1]。缓存默认关闭。",
+        {"src-evidence-1": "原始资料说明索引 READY 后才可检索。缓存默认关闭。"})
+
+    assert result["ok"] is True
+    assert result["reason"] == "grounded"
+    assert result["repaired_claims"] == 1
+    assert result["pruned_answer"] == ("索引 READY 后才可检索[src-evidence-1]。 "
+                                       "缓存默认关闭[src-evidence-1]。")
+    assert result["kept_source_ids"] == ["src-evidence-1"]
+
+
+def test_prune_claims_reattaches_a_stacked_claim_to_an_already_declared_source():
+    # Both stacked markers miss the full claim; a declared source carries it.
+    result = prune_claims(
+        "索引可检索[src-evidence-3]。缓存默认关闭[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "原始资料说明缓存默认开启。",
+         "src-evidence-2": "原始资料说明索引可检索。",
+         "src-evidence-3": "原始资料说明索引可检索。原始资料说明缓存默认关闭。"})
+
+    assert result["ok"] is True
+    assert result["repaired_claims"] == 1
+    assert result["pruned_answer"] == ("索引可检索[src-evidence-3]。 "
+                                       "缓存默认关闭[src-evidence-3]。")
+    assert result["kept_source_ids"] == ["src-evidence-3"]
+
+
+def test_prune_claims_never_reattaches_without_verbatim_evidence():
+    result = prune_claims(
+        "索引 READY 后才可检索，缓存默认关闭[src-evidence-1][src-evidence-2]。",
+        {"src-evidence-1": "索引 READY 后才可检索。",
+         "src-evidence-2": "缓存默认关闭。"})
+
+    assert result["ok"] is False
+    assert result["reason"] == "empty_after_prune"
+    assert result["repaired_claims"] == 0
+
+
+def test_prune_claims_does_not_reattach_when_an_answer_cites_nothing():
+    result = prune_claims("缓存默认关闭。", {"src-evidence-1": "原始资料说明缓存默认关闭。"})
+
+    assert result["ok"] is False
+    assert result["repaired_claims"] == 0
+    assert result["kept_source_ids"] == []
+
+
+class RepairLlm:
+    """First generation fails citation validation; the re-ask can differ."""
+
+    def __init__(self, first, repaired, *, repair_error=None):
+        self.first = first
+        self.repaired = repaired
+        self.repair_error = repair_error
+        self.generate_calls = 0
+        self.repair_calls = 0
+        self.previous_answers = []
+
+    async def generate(self, question, evidence, *, request_id):
+        self.generate_calls += 1
+        return self.first
+
+    async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+        self.repair_calls += 1
+        self.previous_answers.append(previous_answer)
+        if self.repair_error is not None:
+            raise self.repair_error
+        return self.repaired
+
+    async def aclose(self):
+        return None
+
+
+def _ungrounded_generated():
+    return {"answer": "索引 READY 后才可检索，缓存默认关闭[src-evidence-1][src-evidence-2]。",
+            "has_answer": True, "source_ids": ["src-evidence-1", "src-evidence-2"]}
+
+
+def _grounded_generated():
+    return {"answer": "原始资料说明索引 READY 后才可检索[src-evidence-1]。",
+            "has_answer": True, "source_ids": ["src-evidence-1"]}
+
+
+@pytest.mark.asyncio
+async def test_answer_service_reasks_once_and_prefers_the_grounded_repair():
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is True
+    assert response["answer"] == "原始资料说明索引 READY 后才可检索[src-evidence-1]。"
+    assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
+    assert model.generate_calls == 1 and model.repair_calls == 1
+    assert model.previous_answers == [_ungrounded_generated()["answer"]]
+    assert service.last_diagnostics["repair_outcome"] == "answered"
+    assert service.last_diagnostics["reason"] == "grounded"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_refuses_after_an_ungrounded_repair_without_a_third_call():
+    model = RepairLlm(_ungrounded_generated(), _ungrounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["sources"] == []
+    assert model.generate_calls == 1 and model.repair_calls == 1
+    assert service.last_diagnostics["repair_outcome"] == "still_ungrounded"
+    assert service.last_diagnostics["reason"] == "empty_after_prune"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_records_a_declined_repair_as_such():
+    model = RepairLlm(_ungrounded_generated(),
+                      {"answer": "没有足够的资料证据回答这个问题。",
+                       "has_answer": False, "source_ids": []})
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert service.last_diagnostics["repair_outcome"] == "declined"
+    assert service.last_diagnostics["repair_attempt"] == 1
+
+
+@pytest.mark.asyncio
+async def test_answer_service_does_not_reask_when_the_model_declines():
+    model = RepairLlm({"answer": "没有足够的资料证据回答这个问题。",
+                       "has_answer": False, "source_ids": []}, _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert model.repair_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_answer_service_keeps_the_refusal_when_the_repair_call_fails():
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated(),
+                      repair_error=ProcessingError("MODEL_FAILURE", 502, retryable=True))
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_answer_service_keeps_the_refusal_when_the_repair_is_malformed():
+    model = RepairLlm(_ungrounded_generated(), {"answer": "x", "has_answer": True})
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert model.repair_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_answer_service_skips_the_repair_without_deadline_headroom():
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    final = await service._finalize_generation(
+        _request(), _two_evidence(), _ungrounded_generated(), time.monotonic() + 1)
+
+    assert final["has_answer"] is False
+    assert final["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_answer_service_repair_switch_disables_the_reask(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "off")
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert model.repair_calls == 0
+
+
+def test_repair_payload_carries_the_previous_answer_and_no_new_evidence():
+    adapter = object.__new__(DeepSeekAdapter)
+    adapter.settings = LlmSettings(api_key=KEY)
+    evidence = _evidence()
+
+    plain = adapter._payload("问题", evidence)
+    repair = adapter._payload("问题", evidence, previous_answer="上一版答案[src-evidence-1]。")
+
+    assert "previous_answer" not in json.loads(plain["messages"][1]["content"])
+    body = json.loads(repair["messages"][1]["content"])
+    assert body["previous_answer"] == "上一版答案[src-evidence-1]。"
+    assert body["evidence"] == json.loads(plain["messages"][1]["content"])["evidence"]
+    assert set(body) == {"question", "evidence", "previous_answer"}
+    assert "上一版答案未通过引用校验" in repair["messages"][0]["content"]
+    assert "上一版答案未通过引用校验" not in plain["messages"][0]["content"]
+    assert repair["max_tokens"] == plain["max_tokens"] == 1024
+
