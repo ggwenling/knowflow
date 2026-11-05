@@ -60,6 +60,9 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
     output.parent.mkdir(parents=True, exist_ok=True)
     payload = {"prediction_version": 2, "dataset_id": manifest["dataset_id"],
                "dataset_sha256": fingerprint, "run": run_metadata, "predictions": []}
+    diagnostics_payload = {"prediction_version": 2, "dataset_id": manifest["dataset_id"],
+                           "dataset_sha256": fingerprint, "diagnostics": []}
+    diagnostics_path = output.with_suffix(".diagnostics.json")
     status = {"complete": False, "failures": [], "budget_steps": []}
     created = await java.post("/api/v1/knowledge-bases",
                               json={"contract_version": CONTRACT_VERSION, "name": "Evaluation collection"})
@@ -113,19 +116,26 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
         for question_index, question in enumerate(selected):
             if ledger.summary()["reserved_microyuan"] >= 8_000_000:
                 raise ValueError("BUDGET_SOFT_STOP")
+            diagnostics = {}
             try:
                 row = await collector.collect_question(
                     java=java, ai=ai, knowledge_base_id=knowledge_base_id,
                     question=question["question"], question_id=question["id"],
-                    mappings=mappings, lookup_question=lookup)
+                    mappings=mappings, lookup_question=lookup,
+                    diagnostics_out=diagnostics)
             except (ValueError, httpx.HTTPError):
                 status["failures"].append({"question_id": question["id"], "code": "COLLECTION_INCOMPLETE"})
                 row = {"question_id": question["id"], "outcome": "error", "answer": "",
                        "answer_sha256": sha256(b"").hexdigest(), "retrieved_evidence": [], "citations": [],
                        "latency_ms": 0, "error_code": "COLLECTION_INCOMPLETE"}
+                diagnostics = {}
             payload["predictions"].append(row)
+            diagnostics_payload["diagnostics"].append(
+                {"question_id": question["id"], "outcome": row["outcome"],
+                 "citation": diagnostics or None})
             status["budget_steps"].append({"stage": "question", **ledger.summary()})
             write_json(output, payload)
+            write_json(diagnostics_path, diagnostics_payload)
             write_json(output.with_suffix(".status.json"), status)
             if (question_index + 1 < len(selected)
                     and ledger.summary()["reserved_microyuan"] >= 8_000_000):

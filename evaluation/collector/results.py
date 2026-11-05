@@ -29,6 +29,8 @@ class RecordingAnswerService:
             self._factories.results[request_id] = {
                 "request_id": request_id, "response": deepcopy(response),
                 "error_code": error_code, "trace": trace,
+                # Reason codes and counts only; never answer, claim, or source text.
+                "citation": deepcopy(getattr(self._service, "last_diagnostics", None)),
             }
 
     async def stream(self, request):

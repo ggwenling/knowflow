@@ -10,8 +10,13 @@ _spec.loader.exec_module(prediction)
 
 
 async def collect_question(*, java, ai, knowledge_base_id, question, question_id,
-                           mappings, lookup_question):
-    """Clients own credentials; lookup uses the unique idempotency key to read Java's row."""
+                           mappings, lookup_question, diagnostics_out=None):
+    """Clients own credentials; lookup uses the unique idempotency key to read Java's row.
+
+    ``diagnostics_out``, when given, receives that question's citation reason
+    codes. It stays separate from the runner row so the frozen prediction schema
+    is unchanged. Missing or absent diagnostics leave it untouched.
+    """
     key = str(uuid4())
     started = time.monotonic()
     response = await java.post(f"/api/v1/knowledge-bases/{knowledge_base_id}/questions",
@@ -26,6 +31,8 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
     payload = captured.json()
     if payload.get("request_id") != request_id or payload.get("trace") is None:
         raise ValueError("EVALUATION_TRACE_INCOMPLETE")
+    if diagnostics_out is not None and isinstance(payload.get("citation"), dict):
+        diagnostics_out.update(payload["citation"])
     latency_ms = (time.monotonic() - started) * 1000
     if response.status_code != 200:
         code = runtime.get("failure_code")

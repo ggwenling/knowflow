@@ -121,6 +121,19 @@ class GuardedLlm(_GuardedAdapter):
         adapter = await self._reserve("generate", question, snapshot)
         return await adapter.generate(question, snapshot, request_id=request_id)
 
+    async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+        """Forward the bounded citation re-ask under the same reservation rules.
+
+        Providers that predate the re-ask keep working through their normal
+        generate path; the caller still cannot obtain an unreserved attempt.
+        """
+        snapshot = deepcopy(evidence)
+        adapter = await self._reserve("generate", question, snapshot)
+        repair = getattr(adapter, "generate_repair", None)
+        if repair is None:
+            return await adapter.generate(question, snapshot, request_id=request_id)
+        return await repair(question, snapshot, previous_answer, request_id=request_id)
+
     async def stream_content(self, question, evidence, *, request_id):
         snapshot = deepcopy(evidence)
         adapter = await self._reserve("stream", question, snapshot)
