@@ -12,8 +12,10 @@ from knowflow_ai.streaming import IncrementalAnswerParser
 from test_answering import (
     FakeRetriever, KEY, _contract, _evidence, _grounded_generated,
     _length_expanding_evidence, _length_expanding_generated, _request,
-    _two_evidence, _ungrounded_generated,
+    _two_evidence, _ungrounded_generated, _REPAIR_DEFAULT_ON_SETTINGS,
+    _REPAIR_OFF_SETTINGS, _REPAIR_MATRIX_CASES, _set_repair_setting,
 )
+from repair_test_fixtures import MatrixRepairModel, repair_scenario
 
 
 class ProviderStream(httpx.AsyncByteStream):
@@ -287,7 +289,8 @@ def _reasking_service(first, repaired, evidence, repairs):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('case', ['shared_company', 'shared_cache_background'])
-async def test_stream_refuses_grounded_repair_missing_question_core(case):
+async def test_stream_refuses_grounded_repair_missing_question_core(case, monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
     evidence = _two_evidence()
     first = _ungrounded_generated()
     request = _request()
@@ -303,7 +306,6 @@ async def test_stream_refuses_grounded_repair_missing_question_core(case):
                     'has_answer': True, 'source_ids': ['src-evidence-2']}
     repairs = []
     service = _reasking_service(first, repaired, evidence, repairs)
-    service._repair_enabled = True
 
     events = [event async for event in service.stream(request)]
 
@@ -316,7 +318,7 @@ async def test_stream_refuses_grounded_repair_missing_question_core(case):
 
 
 @pytest.mark.asyncio
-async def test_stream_does_not_reask_when_the_switch_is_unset(monkeypatch):
+async def test_stream_uses_default_on_to_repair_a_supported_request(monkeypatch):
     monkeypatch.delenv('KNOWFLOW_ANSWER_REPAIR', raising=False)
     repairs = []
     service = _reasking_service(_ungrounded_generated(), _grounded_generated(),
@@ -326,16 +328,16 @@ async def test_stream_does_not_reask_when_the_switch_is_unset(monkeypatch):
 
     assert [event['event'] for event in events] == [
         'started', 'delta', 'sources', 'completed']
-    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
-    assert events[2]['has_answer'] is False and events[2]['sources'] == []
-    assert repairs == []
-    assert service.last_diagnostics['repair_attempt'] == 0
-    assert service.last_diagnostics['repair_outcome'] == 'not_attempted'
+    assert events[1]['delta'] == _grounded_generated()['answer']
+    assert events[2]['has_answer'] is True and len(events[2]['sources']) == 1
+    assert len(repairs) == 1
+    assert service.last_diagnostics['repair_attempt'] == 1
+    assert service.last_diagnostics['repair_outcome'] == 'answered'
 
 
 @pytest.mark.asyncio
 async def test_stream_refuses_when_pruning_expands_answer_past_limit(monkeypatch):
-    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'off')
+    monkeypatch.delenv('KNOWFLOW_ANSWER_REPAIR', raising=False)
     repairs = []
     service = _reasking_service(_length_expanding_generated(), {},
                                 _length_expanding_evidence(), repairs)
@@ -350,12 +352,12 @@ async def test_stream_refuses_when_pruning_expands_answer_past_limit(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_stream_keeps_refusal_when_repair_contract_validation_fails():
+async def test_stream_keeps_refusal_when_repair_contract_validation_fails(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
     first = _ungrounded_generated()
     repaired = _grounded_generated()
     repairs = []
     service = _reasking_service(first, repaired, _two_evidence(), repairs)
-    service._repair_enabled = True
     contract = _contract()
     validate = contract.validate
 
@@ -377,7 +379,8 @@ async def test_stream_keeps_refusal_when_repair_contract_validation_fails():
 
 
 @pytest.mark.asyncio
-async def test_stream_reasks_once_and_emits_the_repaired_answer():
+async def test_stream_reasks_once_and_emits_the_repaired_answer(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
     evidence = _evidence()
     evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
                      'chunk_id': 'chunk-example-2',
@@ -391,7 +394,6 @@ async def test_stream_reasks_once_and_emits_the_repaired_answer():
     service = _reasking_service(first, repaired, evidence, repairs)
     request = _request()
     request['question'] = '2027 年缓存默认关闭吗？'
-    service._repair_enabled = True
 
     events = [event async for event in service.stream(request)]
 
@@ -404,7 +406,8 @@ async def test_stream_reasks_once_and_emits_the_repaired_answer():
 
 
 @pytest.mark.asyncio
-async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungrounded():
+async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungrounded(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
     evidence = _evidence()
     evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
                      'chunk_id': 'chunk-example-2',
@@ -414,7 +417,6 @@ async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungroun
              'has_answer': True, 'source_ids': ['src-evidence-1', 'src-evidence-2']}
     repairs = []
     service = _reasking_service(first, first, evidence, repairs)
-    service._repair_enabled = True
 
     events = [event async for event in service.stream(_request())]
 
@@ -423,6 +425,99 @@ async def test_stream_emits_only_the_canonical_refusal_when_the_reask_is_ungroun
     assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
     assert events[2]['has_answer'] is False and events[2]['sources'] == []
     assert len(repairs) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('scenario', _REPAIR_MATRIX_CASES)
+@pytest.mark.parametrize('setting', _REPAIR_DEFAULT_ON_SETTINGS)
+async def test_sse_default_on_repair_matrix_shares_finalize_and_hides_candidates(
+        scenario, setting, monkeypatch):
+    _set_repair_setting(monkeypatch, setting)
+    request, evidence, first, repaired = repair_scenario(scenario)
+    model = MatrixRepairModel(first, repaired)
+    service = AnswerService('unused', _contract(), retriever=FakeRetriever(evidence),
+                            llm_factory=lambda: model)
+
+    initial, initial_diagnostics = service._evaluate_generated(request, evidence, first)
+    assert initial['answer'] == '没有足够的资料证据回答这个问题。'
+    assert initial['has_answer'] is False and initial['sources'] == []
+    assert initial_diagnostics['reason'] == 'empty_after_prune'
+    assert initial_diagnostics['kept_claims'] == 0
+
+    events = [event async for event in service.stream(request)]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert model.generate_calls == model.repair_calls == 1
+    assert service.last_diagnostics['repair_attempt'] == 1
+    if scenario.startswith('N'):
+        assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+        assert events[2]['has_answer'] is False and events[2]['sources'] == []
+        assert repaired['answer'] not in events[1]['delta']
+        assert service.last_diagnostics['repair_outcome'] == 'failed_unrelated'
+    else:
+        assert events[1]['delta'] == repaired['answer']
+        assert events[2]['has_answer'] is True
+        assert [source['source_id'] for source in events[2]['sources']] == repaired['source_ids']
+        assert service.last_diagnostics['repair_outcome'] == 'answered'
+        assert service.last_diagnostics['repair_gate_reason'] == 'passed'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('scenario', _REPAIR_MATRIX_CASES)
+@pytest.mark.parametrize('setting', _REPAIR_OFF_SETTINGS)
+async def test_sse_explicit_off_repair_matrix_emits_only_the_first_refusal(
+        scenario, setting, monkeypatch):
+    _set_repair_setting(monkeypatch, setting)
+    request, evidence, first, repaired = repair_scenario(scenario)
+    model = MatrixRepairModel(first, repaired)
+    service = AnswerService('unused', _contract(), retriever=FakeRetriever(evidence),
+                            llm_factory=lambda: model)
+
+    events = [event async for event in service.stream(request)]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert model.generate_calls == 1 and model.repair_calls == 0
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert repaired['answer'] not in events[1]['delta']
+    assert service.last_diagnostics['repair_attempt'] == 0
+    assert service.last_diagnostics['repair_outcome'] == 'not_attempted'
+
+
+@pytest.mark.asyncio
+async def test_sse_cancellation_during_repair_emits_no_candidate_delta(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
+    request, evidence, first, _repaired = repair_scenario('P0')
+    repair_started = asyncio.Event()
+    state = {'repairs': 0, 'closed': 0}
+
+    class BlockingRepair:
+        async def stream_content(self, question, evidence, *, request_id):
+            yield json.dumps(first, ensure_ascii=False)
+
+        async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+            state['repairs'] += 1
+            repair_started.set()
+            await asyncio.Event().wait()
+
+        async def aclose(self):
+            state['closed'] += 1
+
+    service = AnswerService('unused', _contract(), retriever=FakeRetriever(evidence),
+                            llm_factory=BlockingRepair)
+    events = service.stream(request)
+    assert (await anext(events))['event'] == 'started'
+    operation = asyncio.create_task(anext(events))
+    await asyncio.wait_for(repair_started.wait(), 1)
+    operation.cancel()
+    terminal = await asyncio.wait_for(operation, 1)
+
+    assert terminal['event'] == 'cancelled'
+    assert state['repairs'] == 1 and state['closed'] == 2
+    with pytest.raises(StopAsyncIteration):
+        await anext(events)
 
 
 @pytest.mark.asyncio

@@ -22,6 +22,12 @@ from .citation_verify import MAX_ANSWER_CODEPOINTS, prune_claims
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION, InvalidMessage
+from .repair_gate import (
+    REPAIR_GATE_REASONS,
+    RepairGateRejection,
+    check_repair_candidate,
+    parse_repair_target,
+)
 
 ANSWER_DEADLINE_SECONDS = 28.0
 REPAIR_MINIMUM_SECONDS = 6.0
@@ -29,100 +35,47 @@ REPAIR_ANSWER_CODEPOINTS = 4000
 REFUSAL = "没有足够的资料证据回答这个问题。"
 _REPAIR_INSTRUCTION = (
     "上一版答案未通过引用校验：有断言没有紧邻 [source_id]，或所附来源未能完整支持该断言。"
-    "请只用同一批资料重写一次：每个断言单独成句或用分号分隔，标记放在断言之后、句末标点之前；"
-    "只写资料中可直接照录的完整短句，不要改写、补充或合并多个来源；"
+    "请只用同一批资料重写一次：只输出一条可直接回答问题核心请求的完整来源事实，"
+    "保留该事实的主体、关系、年份、条件、否定和单位；"
+    "标记放在该事实之后、句末标点之前；不要改写、补充或合并多个来源；"
     "若无法逐句引用，返回 has_answer=false 和空 source_ids。")
 _REPAIR_DISABLED_VALUES = frozenset({"0", "false", "off", "no"})
 _REPAIR_ENABLED_VALUES = frozenset({"1", "true", "on", "yes"})
-_QUESTION_FOCUS_MARKER = re.compile(
-    r"是多少|是什么|什么时候|何时|何地|哪里|多少|多大|谁|什么|哪些|哪个|哪种|"
-    r"如何|怎样|为什么|为何"
-)
-_ANSWER_MARKER = re.compile(r"\[[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\]", re.ASCII)
-_NUMBER_TOKEN = re.compile(r"\d+(?:[.,]\d+)*%?")
-_CONTENT_RUN = re.compile(
-    r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+|"
-    r"\d+(?:[.,]\d+)*%?|[A-Za-z]+(?:[-'][A-Za-z]+)*")
-_CJK_STOPWORDS = frozenset({
-    "一个", "一些", "这个", "那个", "这些", "那些", "是否", "可以", "能够",
-    "如何", "怎么", "什么", "多少", "哪些", "为什么", "请问", "一下", "根据",
-    "原始", "资料", "说明", "例如", "比如", "以及", "然后", "而且", "但是",
-    "并且", "或者", "因为", "所以", "结果", "关于", "时候", "是否", "是多",
-})
-_CJK_SINGLE_STOPWORDS = frozenset("的了和与是能有否吗呢么哪怎在于为到从向按")
-_LATIN_STOPWORDS = frozenset({
-    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "how",
-    "in", "is", "it", "of", "on", "or", "the", "to", "was", "were", "what",
-    "when", "where", "which", "who", "why", "with",
-})
 _logger = logging.getLogger(__name__)
 
 
-def _content_tokens(text):
-    """Return simple Chinese bigrams, numbers, and Latin words from text."""
-    text = _ANSWER_MARKER.sub(" ", text)
-    tokens = set()
-    for match in _CONTENT_RUN.finditer(text):
-        value = match.group(0)
-        if "\u3400" <= value[0] <= "\ufaff":
-            if len(value) == 1:
-                if value not in _CJK_SINGLE_STOPWORDS:
-                    tokens.add(value)
-                continue
-            tokens.update(value[index:index + 2]
-                          for index in range(len(value) - 1)
-                          if value[index:index + 2] not in _CJK_STOPWORDS)
-        else:
-            token = value.casefold()
-            if token not in _LATIN_STOPWORDS:
-                tokens.add(token)
-    return tokens
-
-
-def _has_question_content_overlap(question, answer):
-    """Require numeric, question-focus, and substantial content overlap for repair."""
-    question_text = _ANSWER_MARKER.sub(" ", question)
-    answer_text = _ANSWER_MARKER.sub(" ", answer)
-    question_tokens = _content_tokens(question_text)
-    answer_tokens = _content_tokens(answer_text)
-    if not question_tokens or not answer_tokens:
-        return False
-
-    question_numbers = set(_NUMBER_TOKEN.findall(question_text))
-    answer_numbers = set(_NUMBER_TOKEN.findall(answer_text))
-    if not question_numbers.issubset(answer_numbers):
-        return False
-
-    # Keep a question's requested subject from being satisfied entirely by
-    # background words. For a recognized Chinese wh-question, require all
-    # content tokens in the final subject phrase before the wh-word.
-    normalized_question = question_text.rstrip(" \t\r\n?？。.!！")
-    focus_marker = _QUESTION_FOCUS_MARKER.search(normalized_question)
-    if focus_marker:
-        prefix = normalized_question[:focus_marker.start()]
-        focus_phrase = re.search(r"([\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+)$", prefix)
-        focus_tokens = _content_tokens(focus_phrase.group(1)) if focus_phrase else set()
-        if focus_tokens and not focus_tokens.issubset(answer_tokens):
-            return False
-
-    covered = len(question_tokens & answer_tokens) / len(question_tokens)
-    return covered >= 0.5
-
-
 def answer_repair_enabled(environ=None):
-    """Read the opt-in single-re-ask switch; only explicit truthy values enable it."""
+    """Read the bounded repair switch; only explicit false aliases disable it."""
     env = os.environ if environ is None else environ
     raw = env.get("KNOWFLOW_ANSWER_REPAIR", "").strip().lower()
+    if raw in _REPAIR_DISABLED_VALUES:
+        return False
     if raw in _REPAIR_ENABLED_VALUES:
         return True
-    if raw and raw not in _REPAIR_DISABLED_VALUES:
-        _logger.warning("ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_disabled")
-    return False
+    if raw:
+        _logger.warning(
+            "ai_config setting=KNOWFLOW_ANSWER_REPAIR outcome=unrecognized_kept_enabled")
+    return True
+
+
+def _repair_trigger_eligible(generated, evidence, diagnostics, kept_source_ids):
+    """Return true only for the narrow citation-failure trigger."""
+    count_names = ("claims", "kept_claims", "dropped_claims", "uncited_claims")
+    counts = {name: diagnostics.get(name) for name in count_names}
+    if (not isinstance(generated, dict) or generated.get("has_answer") is not True
+            or not evidence or diagnostics.get("decision") != "refused"
+            or diagnostics.get("reason") not in {"empty_after_prune", "no_cited_claims"}
+            or any(type(value) is not int or value < 0 for value in counts.values())
+            or counts["claims"] <= 0 or counts["kept_claims"] != 0
+            or kept_source_ids != []):
+        return False
+    return counts["dropped_claims"] > 0 or counts["uncited_claims"] > 0
 
 
 def _citation_diagnostics(reason):
     """Reason codes and counts for one question; never carries answer text."""
     return {"decision": "refused", "reason": reason, "repairable": False,
+            "repair_gate_reason": "not_checked",
             "claims": 0, "kept_claims": 0, "uncited_claims": 0,
             "dropped_claims": 0, "repaired_claims": 0, "pruned_markers": 0,
             "repair_attempt": 0, "repair_outcome": "not_attempted"}
@@ -584,6 +537,7 @@ class AnswerService:
                      len(evidence))
         if not evidence:
             self.last_diagnostics = _citation_diagnostics("empty_evidence")
+            self.last_diagnostics["repair_gate_reason"] = "ineligible_reason"
             response = {"contract_version": CONTRACT_VERSION,
                         "request_id": request["request_id"],
                         "answer": REFUSAL,
@@ -606,21 +560,32 @@ class AnswerService:
             await model.aclose()
 
     async def _finalize_generation(self, request, evidence, generated, deadline, *, model=None):
-        """Validate one generation; re-ask at most once before a canonical refusal.
-
-        A prune to empty is the one case where the model produced an answer the
-        verifier could not bind to evidence. When retrieval did return evidence
-        and time remains, the service re-asks once on that same evidence instead
-        of refusing outright. The re-ask never adds sources, never bypasses the
-        verifier, and its own answer goes through the identical checks.
-        """
+        """Validate one generation and conditionally make one bounded re-ask."""
         response, diagnostics = self._evaluate_generated(request, evidence, generated)
         attempt, outcome = 0, "not_attempted"
         if self._repair_enabled and diagnostics["repairable"]:
+            parsed_target = parse_repair_target(request["question"])
+            if isinstance(parsed_target, RepairGateRejection):
+                # _evaluate_generated applies the same parser when deriving
+                # repairable; keep this defensive branch fail closed.
+                diagnostics["repairable"] = False
+                diagnostics["repair_gate_reason"] = parsed_target.reason
+                parsed_target = None
+        else:
+            parsed_target = None
+        if self._repair_enabled and parsed_target is not None:
+            # A pending cancellation must win before we record or enter a
+            # provider attempt. Cancellation during the await below propagates.
+            task = asyncio.current_task()
+            if task is not None and task.cancelling():
+                raise asyncio.CancelledError
             remaining = deadline - time.monotonic()
             if remaining < REPAIR_MINIMUM_SECONDS:
+                diagnostics["repairable"] = False
                 outcome = "skipped_deadline"
             else:
+                if task is not None and task.cancelling():
+                    raise asyncio.CancelledError
                 attempt = 1
                 try:
                     repaired = await self._repair_generation(
@@ -641,10 +606,16 @@ class AnswerService:
                         outcome = "failed_contract_validation"
                     else:
                         if repaired_diagnostics["decision"] == "answered":
-                            if _has_question_content_overlap(
-                                    request["question"], repaired_response["answer"]):
+                            gate = check_repair_candidate(
+                                parsed_target, repaired, repaired_response,
+                                repaired_diagnostics, evidence)
+                            diagnostics["repair_gate_reason"] = gate.reason
+                            if gate.accepted:
                                 response = repaired_response
-                                diagnostics = repaired_diagnostics
+                                diagnostics = {
+                                    **repaired_diagnostics,
+                                    "repair_gate_reason": "passed",
+                                }
                                 outcome = "answered"
                             else:
                                 outcome = "failed_unrelated"
@@ -652,14 +623,18 @@ class AnswerService:
                             outcome = "declined"
                         else:
                             outcome = "still_ungrounded"
+        if diagnostics.get("repair_gate_reason") not in REPAIR_GATE_REASONS:
+            diagnostics["repair_gate_reason"] = "ineligible_reason"
         _logger.info(
             "ai_stage request_id=%s stage=citation_verification decision=%s reason=%s "
             "claims=%d kept_claims=%d uncited_claims=%d dropped_claims=%d repaired_claims=%d "
-            "pruned_markers=%d repair_attempt=%d repair_outcome=%s",
+            "pruned_markers=%d repairable=%d repair_gate_reason=%s "
+            "repair_attempt=%d repair_outcome=%s",
             request["request_id"], diagnostics["decision"], diagnostics["reason"],
             diagnostics["claims"], diagnostics["kept_claims"], diagnostics["uncited_claims"],
             diagnostics["dropped_claims"], diagnostics["repaired_claims"],
-            diagnostics["pruned_markers"], attempt, outcome)
+            diagnostics["pruned_markers"], int(diagnostics["repairable"]),
+            diagnostics["repair_gate_reason"], attempt, outcome)
         self.last_diagnostics = {**diagnostics, "repair_attempt": attempt,
                                  "repair_outcome": outcome}
         return response
@@ -699,6 +674,7 @@ class AnswerService:
             if generated["source_ids"]:
                 raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
             answer, sources, has_answer = REFUSAL, [], False
+            diagnostics["repair_gate_reason"] = "ineligible_reason"
         else:
             ids = generated["source_ids"]
             if not 1 <= len(ids) <= 5:
@@ -711,7 +687,6 @@ class AnswerService:
             pruning = prune_claims(generated["answer"], evidence_text)
             diagnostics.update(
                 reason=pruning["reason"],
-                repairable=not pruning["ok"],
                 claims=pruning["claims"],
                 kept_claims=pruning["kept_claims"],
                 uncited_claims=pruning["uncited_claims"],
@@ -733,6 +708,17 @@ class AnswerService:
                 diagnostics["decision"] = "answered"
             else:
                 answer, sources, has_answer = REFUSAL, [], False
+                if pruning["claims"] == 0:
+                    diagnostics["repair_gate_reason"] = "no_claims"
+                elif not _repair_trigger_eligible(
+                        generated, evidence, diagnostics, pruning["kept_source_ids"]):
+                    diagnostics["repair_gate_reason"] = "ineligible_reason"
+                else:
+                    target = parse_repair_target(request["question"])
+                    if isinstance(target, RepairGateRejection):
+                        diagnostics["repair_gate_reason"] = target.reason
+                    else:
+                        diagnostics["repairable"] = self._repair_enabled
         response = {"contract_version": CONTRACT_VERSION,
                     "request_id": request["request_id"], "answer": answer,
                     "has_answer": has_answer, "sources": sources}

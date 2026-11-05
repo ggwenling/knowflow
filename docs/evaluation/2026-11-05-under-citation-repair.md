@@ -60,3 +60,44 @@
 - 补问默认 **off**；只有 `KNOWFLOW_ANSWER_REPAIR=on` / `true` / `1` / `yes` 显式开启。unset、空值、未知值均关闭。
 - 开启后保留数字全覆盖与 ≥50% 问题内容 token 覆盖闸，并增加已识别疑问句主体短语覆盖要求。Sol 年份背景负例在强制开启时仍须拒答。
 - 开启前须在 holdout 核对 `unanswerable` 拒答表现；盲测 v4 按出厂默认 off 执行并在报告中注明。
+
+## Answer repair default-on implementation (2026-11-05, repair-v1)
+
+This versioned update records the implementation against the ready design in
+[`docs/design/2026-11-05-answer-repair-default-on.md`](../design/2026-11-05-answer-repair-default-on.md).
+The earlier default-off statements above are historical facts about that
+implementation and the v4 run; they are not rewritten by this update.
+
+- Current switch behavior: repair is on when `KNOWFLOW_ANSWER_REPAIR` is unset,
+  empty, whitespace, a recognized true alias, or an unknown value. Only
+  `off/false/0/no` (after trim and lowercase) disables it. Unknown values emit
+  `unrecognized_kept_enabled` without recording the supplied value.
+- Trigger: a valid first generation claimed an answer, evidence is non-empty,
+  pruning refused with `empty_after_prune` or `no_cited_claims`, at least one
+  claim was dropped or uncited, the question fully matches the closed rule set,
+  and at least six seconds remain. `model_declined`, `empty_evidence`,
+  `answer_too_long_after_prune`, zero claims, unknown reasons, unsupported
+  questions, and ambiguous questions do not trigger a re-ask.
+- Acceptance: the existing verifier and response contract run first. A
+  candidate then must contain exactly one complete fact and one citation; its
+  full text must match the cited source under NFC and whitespace normalization;
+  subject, relation, year, conditions, and value type must match the parsed
+  request; and the complete evidence snapshot must contain no unresolved
+  relevant context or conflicting value. No overlap fallback or secondary
+  model judgment is used.
+- Streaming and synchronous requests continue through `_finalize_generation`.
+  A request gets at most one repair attempt (two generations total), the same
+  evidence snapshot, the existing budget reservation, a 28-second overall
+  deadline, and a six-second minimum headroom. Every rejected candidate,
+  controlled provider failure, and budget stop preserves the canonical
+  refusal. `repair_gate_reason` is a finite enum added only to internal
+  citation diagnostics; it contains no question, answer, evidence, source ID,
+  entity, or span. Prediction and response schemas remain unchanged.
+- The supported question forms are limited to search readiness, cache default
+  state, and net profit for the configured exact entity names. Rule version is
+  `repair-v1`; values outside those complete forms remain refused.
+- This implementation update contains only local code and synthetic tests.
+  Sol's independent default-on review is pending. It does not report a public
+  set metric result or any measured improvement on a later blind evaluation.
+  Do not infer later blind-test performance from the implementation or from
+  the historical v4 result.

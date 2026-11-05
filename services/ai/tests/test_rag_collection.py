@@ -14,6 +14,8 @@ import sqlite3
 import subprocess
 import sys
 
+from knowflow_ai.repair_gate import REPAIR_GATE_REASONS
+
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -266,11 +268,15 @@ def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatc
         citation = captured.json()['citation']
         assert citation['decision'] == 'refused' and citation['reason'] == 'model_declined'
         assert citation['repair_attempt'] == 0
+        assert citation['repair_gate_reason'] == 'ineligible_reason'
         assert set(citation) == {
-            'decision', 'reason', 'repairable', 'claims', 'kept_claims', 'uncited_claims',
+            'decision', 'reason', 'repairable', 'repair_gate_reason', 'claims',
+            'kept_claims', 'uncited_claims',
             'dropped_claims', 'repaired_claims', 'pruned_markers', 'repair_attempt',
             'repair_outcome'}
+        assert citation['repair_gate_reason'] in REPAIR_GATE_REASONS
         assert 'insufficient' not in json.dumps(citation)
+        assert 'src-evidence' not in json.dumps(citation)
         assert client.post(capture_url, headers=control_headers).status_code == 404
         payload['request_id'] = 'stream'
         response = client.post('/internal/v1/answers/stream', headers={**headers, 'X-Request-ID': 'stream'}, json=payload)

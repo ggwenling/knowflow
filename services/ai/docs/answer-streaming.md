@@ -28,28 +28,39 @@ checking finish, rather than during generation.
 
 ## Bounded citation re-ask
 
-When the model claims an answer but every claim fails citation validation, the
-service spends at most one extra non-streaming provider call on the **same**
-evidence before refusing. This is disabled by default; only explicit
-`KNOWFLOW_ANSWER_REPAIR=on`/`true`/`1`/`yes` enables it. Unset, empty, and
-unrecognized values remain off. Before enabling it in a deployment or
-evaluation, check unanswerable refusal performance on holdout. The
-re-ask receives the previous answer text
-(truncated to 4,000 code points), adds no evidence and no sources, and its
-result passes through the identical JSON, ID, scope, and grounding checks. A
-repair is accepted only when every numeric token from the question appears
-outside citation markers and at least half of the question's content tokens
-overlap; for recognized wh-questions, the final subject phrase before the
-question word must also be covered. These are relevance checks, not entailment
-checks. A failed,
-malformed, budget-stopped, or still-ungrounded re-ask leaves the canonical
-refusal in place; it never becomes an `error` terminal.
+When the model claims an answer but citation pruning leaves no claim, the
+service may make at most one extra non-streaming provider call on the **same**
+evidence. The default is on. Only explicit `off`, `false`, `0`, or `no`
+(case-insensitive, with surrounding whitespace allowed) disable it. Empty or
+unset values keep it on; an unknown value also keeps it on and logs only the
+`unrecognized_kept_enabled` configuration outcome.
+
+The trigger is limited to a non-empty evidence snapshot, a valid first
+generation that claimed an answer, a refused result with `empty_after_prune`
+or `no_cited_claims`, at least one dropped or uncited claim, and a question
+that fully matches the versioned `search_gate`, `default_cache_state`, or
+`net_profit` grammar. Unsupported and ambiguous questions remain refused
+without a re-ask. A `model_declined`, empty-evidence, grounded, zero-claim,
+unknown-reason, or over-length result is not repairable.
+
+The re-ask receives the previous answer text (truncated to 4,000 code points),
+adds no evidence or sources, and passes through the identical JSON, ID, scope,
+and grounding checks. A second, deterministic gate requires one complete
+answer fact and one citation, verbatim support from that source's entire text,
+the same subject and relation as the parsed question, exact year and condition
+binding, and the requested value type. Related but incomplete context,
+conflicting evidence, unsupported modifiers, and any extra or pruned answer
+claim fail closed. A failed, malformed, budget-stopped, unrelated, or still
+ungrounded re-ask leaves the canonical refusal in place; it never becomes an
+`error` terminal.
 
 The re-ask is skipped when the model itself declines (`has_answer=false`), when
 retrieval returned no evidence, and when fewer than 6 seconds remain of the
-28-second request deadline. Both the streaming and the non-streaming routes use
-the same finalize path, so a streamed request can never surface an answer the
-non-streaming route would refuse.
+28-second request deadline. The supported trigger consumes at most two
+generation attempts per request in total and retains the existing provider
+budget reservation. Both streaming and non-streaming routes use the same
+finalize path, so a streamed request cannot surface a repair candidate before
+the shared gate accepts it.
 
 Within one generation the verifier also performs deterministic claim-level
 repair at no model cost: an uncited claim, or a claim whose stacked markers all
@@ -59,12 +70,15 @@ and no undeclared source is introduced.
 
 ## Citation diagnostics
 
-Each request logs one `ai_stage ... stage=citation_verification` line with
+When a generation reaches citation finalization, the service logs one
+`ai_stage ... stage=citation_verification` line with
 `decision`, `reason` (`grounded`, `empty_after_prune`, `no_cited_claims`,
 `model_declined`), `claims`, `kept_claims`, `uncited_claims`, `dropped_claims`,
-`repaired_claims`, `pruned_markers`, `repair_attempt`, and `repair_outcome`.
-These are counts and enum codes only; answers, claims, quotes, and questions are
-not logged.
+`repaired_claims`, `pruned_markers`, `repairable`, `repair_gate_reason`,
+`repair_attempt`, and `repair_outcome`. `repair_gate_reason` is a finite enum
+such as `unsupported_question`, `candidate_incomplete`, `conflicting_evidence`,
+or `passed`. Diagnostics contain no spans, entities, source IDs, answer text,
+claims, quotes, or questions.
 
 
 The request has a 28-second end-to-end deadline, a 1 MiB provider body cap, a

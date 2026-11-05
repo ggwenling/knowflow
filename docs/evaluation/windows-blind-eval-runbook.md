@@ -47,7 +47,8 @@ $env:KNOWFLOW_EVALUATION_CONTROL_SECRET = "<local >=32 chars>"
 ```
 
 - BudgetLedger soft **CNY 8** / hard **CNY 10**：累计预留到 8 必须停。
-- 补问默认关闭。若在 holdout 核对 `unanswerable` 拒答表现后选择显式启用（`KNOWFLOW_ANSWER_REPAIR=on`），每题最多 **2 次 DeepSeek 尝试**：1 次生成 + 至多 1 次引用补问。补问只发生在「模型自称有答案、但引用校验把答案剪空」的题上，仍按 policy 上界预约。若评测选择开启，按 CNY 估算整个包时按每题 2 次生成预留留量，不要用单次价乘题数。
+- 补问默认开启；`KNOWFLOW_ANSWER_REPAIR` 未设置、空值或空白都保持开启。只有 `off/false/0/no`（忽略大小写并允许首尾空白）关闭；未知值也保持开启并记录 `unrecognized_kept_enabled` 配置告警。每题最多 **2 次 DeepSeek 尝试**：1 次生成 + 至多 1 次补问。补问只允许在首轮自报有答案、引用原因属于 `empty_after_prune` / `no_cited_claims`、确有断言被剪空、问题完整匹配封闭规则且剩余 deadline ≥6 秒时触发；`model_declined`、空证据、超长、零断言、未知原因、规则外或歧义问题均不补问。候选还必须是一条完整事实，并由单个来源全文逐字支持、精确绑定请求主体/关系/年份/条件和值；任一疑点均保留标准拒答。补问仍按 policy 上界预约。若需要 off 对照，显式设置 `KNOWFLOW_ANSWER_REPAIR=off`，按 CNY 估算时按每题最多 2 次生成预留留量，不要用单次价乘题数。
+- 当前实现策略仍未通过后续盲测提升验证；本 runbook 更新本身不构成默认开启的独立安全批准或质量门禁结果。
 
 ## 1. 适配私有包 → runner 输入
 

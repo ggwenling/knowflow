@@ -68,6 +68,7 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
                           "text_sha256": sha256(text.encode("utf-8")).hexdigest()})
         captures[request_id] = {"request_id": request_id, "response": response, "error_code": None, "trace": trace,
                                 "citation": {"decision": "refused", "reason": "empty_evidence",
+                                             "repair_gate_reason": "ineligible_reason",
                                              "repair_attempt": 0, "repair_outcome": "not_attempted"}}
         return httpx.Response(200, json=response)
     async def ai_transport(request):
@@ -99,6 +100,8 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
         row["question_id"] for row in payload["predictions"]]
     assert all(entry["outcome"] == "refused" for entry in diagnostics["diagnostics"])
     assert all(entry["citation"]["reason"] == "empty_evidence"
+               for entry in diagnostics["diagnostics"])
+    assert all(entry["citation"]["repair_gate_reason"] == "ineligible_reason"
                for entry in diagnostics["diagnostics"])
 
 
