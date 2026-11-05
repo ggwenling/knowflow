@@ -7,8 +7,13 @@ import pytest
 
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.answering import AnswerService, DeepSeekAdapter, LlmSettings
+from knowflow_ai.protocol import InvalidMessage
 from knowflow_ai.streaming import IncrementalAnswerParser
-from test_answering import FakeRetriever, KEY, _contract, _evidence, _request
+from test_answering import (
+    FakeRetriever, KEY, _contract, _evidence, _grounded_generated,
+    _length_expanding_evidence, _length_expanding_generated, _request,
+    _two_evidence, _ungrounded_generated,
+)
 
 
 class ProviderStream(httpx.AsyncByteStream):
@@ -281,6 +286,70 @@ def _reasking_service(first, repaired, evidence, repairs):
 
 
 @pytest.mark.asyncio
+async def test_stream_refuses_a_grounded_repair_unrelated_to_the_question(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'on')
+    evidence = _two_evidence()
+    first = _ungrounded_generated()
+    repaired = {'answer': '原始资料说明缓存默认关闭[src-evidence-2]。',
+                'has_answer': True, 'source_ids': ['src-evidence-2']}
+    repairs = []
+    service = _reasking_service(first, repaired, evidence, repairs)
+    request = _request()
+    request['question'] = '公司 2027 年净利润是多少？'
+
+    events = [event async for event in service.stream(request)]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert len(repairs) == 1
+    assert service.last_diagnostics['repair_outcome'] == 'failed_unrelated'
+
+
+@pytest.mark.asyncio
+async def test_stream_refuses_when_pruning_expands_answer_past_limit(monkeypatch):
+    monkeypatch.setenv('KNOWFLOW_ANSWER_REPAIR', 'off')
+    repairs = []
+    service = _reasking_service(_length_expanding_generated(), {},
+                                _length_expanding_evidence(), repairs)
+
+    events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert service.last_diagnostics['reason'] == 'answer_too_long_after_prune'
+
+
+@pytest.mark.asyncio
+async def test_stream_keeps_refusal_when_repair_contract_validation_fails():
+    first = _ungrounded_generated()
+    repaired = _grounded_generated()
+    repairs = []
+    service = _reasking_service(first, repaired, _two_evidence(), repairs)
+    contract = _contract()
+    validate = contract.validate
+
+    def reject_repair(definition, payload):
+        if definition == 'AnswerResponse' and payload.get('answer') == repaired['answer']:
+            raise InvalidMessage('INVALID_MESSAGE')
+        return validate(definition, payload)
+
+    contract.validate = reject_repair
+    service._contract = contract
+
+    events = [event async for event in service.stream(_request())]
+
+    assert [event['event'] for event in events] == [
+        'started', 'delta', 'sources', 'completed']
+    assert events[1]['delta'] == '没有足够的资料证据回答这个问题。'
+    assert events[2]['has_answer'] is False and events[2]['sources'] == []
+    assert service.last_diagnostics['repair_outcome'] == 'failed_contract_validation'
+
+
+@pytest.mark.asyncio
 async def test_stream_reasks_once_and_emits_the_repaired_answer():
     evidence = _evidence()
     evidence.append({**evidence[0], 'source_id': 'src-evidence-2',
@@ -293,8 +362,10 @@ async def test_stream_reasks_once_and_emits_the_repaired_answer():
                 'has_answer': True, 'source_ids': ['src-evidence-2']}
     repairs = []
     service = _reasking_service(first, repaired, evidence, repairs)
+    request = _request()
+    request['question'] = '缓存默认是什么状态？'
 
-    events = [event async for event in service.stream(_request())]
+    events = [event async for event in service.stream(request)]
 
     assert [event['event'] for event in events] == [
         'started', 'delta', 'sources', 'completed']

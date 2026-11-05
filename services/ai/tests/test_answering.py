@@ -74,6 +74,19 @@ def _contract():
     return ContractConsumer(ROOT / "contracts/schemas/protocol.schema.json")
 
 
+def _contract_rejecting_answer(answer):
+    contract = _contract()
+    validate = contract.validate
+
+    def reject_matching_answer(definition, payload):
+        if definition == "AnswerResponse" and payload.get("answer") == answer:
+            raise InvalidMessage("INVALID_MESSAGE")
+        return validate(definition, payload)
+
+    contract.validate = reject_matching_answer
+    return contract
+
+
 def _pg_message(tag, payload=b""):
     return tag + struct.pack("!I", len(payload) + 4) + payload
 
@@ -1186,6 +1199,13 @@ def test_prune_claims_reports_no_cited_claims_for_an_unmarked_answer():
     assert result["reason"] == "no_cited_claims"
 
 
+def test_prune_claims_counts_deleted_marker_without_a_claim():
+    result = prune_claims("[src-evidence-1]", {"src-evidence-1": "索引 READY 后才可检索。"})
+
+    assert result["ok"] is False
+    assert result["pruned_markers"] == 1
+
+
 def test_prune_claims_reattaches_an_uncited_claim_to_a_declared_source():
     result = prune_claims(
         "索引 READY 后才可检索[src-evidence-1]。缓存默认关闭。",
@@ -1197,6 +1217,8 @@ def test_prune_claims_reattaches_an_uncited_claim_to_a_declared_source():
     assert result["pruned_answer"] == ("索引 READY 后才可检索[src-evidence-1]。 "
                                        "缓存默认关闭[src-evidence-1]。")
     assert result["kept_source_ids"] == ["src-evidence-1"]
+    # The newly attached citation is not counted as a deleted input marker.
+    assert result["pruned_markers"] == 0
 
 
 def test_prune_claims_reattaches_a_stacked_claim_to_an_already_declared_source():
@@ -1212,6 +1234,8 @@ def test_prune_claims_reattaches_a_stacked_claim_to_an_already_declared_source()
     assert result["pruned_answer"] == ("索引可检索[src-evidence-3]。 "
                                        "缓存默认关闭[src-evidence-3]。")
     assert result["kept_source_ids"] == ["src-evidence-3"]
+    # Two unsupported input markers were removed while one new one was added.
+    assert result["pruned_markers"] == 2
 
 
 def test_prune_claims_never_reattaches_without_verbatim_evidence():
@@ -1269,6 +1293,63 @@ def _grounded_generated():
             "has_answer": True, "source_ids": ["src-evidence-1"]}
 
 
+_LONG_SOURCE_ID = "src-00000000-0000-0000-0000-000000000001"
+
+
+def _length_expanding_generated(source_id=_LONG_SOURCE_ID):
+    return {"answer": f"a[{source_id}]。" + "a。" * 400,
+            "has_answer": True, "source_ids": [source_id]}
+
+
+def _length_expanding_evidence(source_id=_LONG_SOURCE_ID):
+    return [{**_evidence()[0], "source_id": source_id, "text_content": "a。"}]
+
+
+def test_prune_claims_rejects_answer_that_exceeds_limit_after_reattachment():
+    generated = _length_expanding_generated()
+    result = prune_claims(generated["answer"], {_LONG_SOURCE_ID: "a。"})
+
+    assert len(generated["answer"]) < 16000
+    assert len(result["pruned_answer"]) > 16000
+    assert result["ok"] is False
+    assert result["reason"] == "answer_too_long_after_prune"
+    assert result["repaired_claims"] == 400
+    assert result["pruned_markers"] == 0
+
+
+@pytest.mark.asyncio
+async def test_answer_service_refuses_when_first_generation_expands_past_answer_limit(
+        monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "off")
+    model = RepairLlm(_length_expanding_generated(), _length_expanding_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_length_expanding_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 0
+    assert service.last_diagnostics["reason"] == "answer_too_long_after_prune"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_keeps_refusal_when_repair_expands_past_answer_limit():
+    evidence = [*_two_evidence(), *_length_expanding_evidence()]
+    model = RepairLlm(_ungrounded_generated(), _length_expanding_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(evidence))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "still_ungrounded"
+    assert service.last_diagnostics["reason"] == "empty_after_prune"
+
+
 @pytest.mark.asyncio
 async def test_answer_service_reasks_once_and_prefers_the_grounded_repair():
     model = RepairLlm(_ungrounded_generated(), _grounded_generated())
@@ -1284,6 +1365,31 @@ async def test_answer_service_reasks_once_and_prefers_the_grounded_repair():
     assert model.previous_answers == [_ungrounded_generated()["answer"]]
     assert service.last_diagnostics["repair_outcome"] == "answered"
     assert service.last_diagnostics["reason"] == "grounded"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_rejects_grounded_repair_unrelated_to_question():
+    request = _request()
+    request["question"] = "公司 2027 年净利润是多少？"
+    unrelated = {"answer": "原始资料说明缓存默认关闭[src-evidence-2]。",
+                 "has_answer": True, "source_ids": ["src-evidence-2"]}
+    model = RepairLlm(_ungrounded_generated(), unrelated)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    # The relevance gate belongs to repaired-output acceptance only.
+    initial_response = service._response_from_generated(request, _two_evidence(), unrelated)
+    assert initial_response["has_answer"] is True
+
+    response = await service.answer(request)
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["sources"] == []
+    assert model.generate_calls == 1 and model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "failed_unrelated"
+    assert service.last_diagnostics["decision"] == "refused"
 
 
 @pytest.mark.asyncio
@@ -1354,6 +1460,23 @@ async def test_answer_service_keeps_the_refusal_when_the_repair_is_malformed():
 
     assert response["has_answer"] is False
     assert model.repair_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_answer_service_keeps_refusal_when_repair_contract_validation_fails():
+    repaired = _grounded_generated()
+    model = RepairLlm(_ungrounded_generated(), repaired)
+    service = AnswerService("unused", _contract_rejecting_answer(repaired["answer"]),
+                            llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "failed_contract_validation"
 
 
 @pytest.mark.asyncio

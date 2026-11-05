@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 
 _MARKER = re.compile(r"\[([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\]", re.ASCII)
+MAX_ANSWER_CODEPOINTS = 16000
 _BOUNDARIES = frozenset("。！？.!?；;\n")
 _URL = re.compile(r"https?://[^\s<>\[\]{}]+", re.IGNORECASE)
 _EMAIL = re.compile(
@@ -266,8 +267,10 @@ def prune_claims(answer, evidence_by_id):
     """
     claims = _claim_groups(answer)
     declared_ids = _declared_source_ids(claims)
+    input_marker_count = len(_MARKER.findall(answer))
 
     kept_claims = []
+    retained_original_markers = set()
     uncited_claims = dropped_claims = repaired_claims = 0
     for claim in claims:
         markers = claim["markers"]
@@ -299,6 +302,8 @@ def prune_claims(answer, evidence_by_id):
             supported = ([marker] if isinstance(evidence, str)
                          and _normalized(evidence) else [])
         if supported:
+            retained_original_markers.update((marker.start(), marker.end())
+                                             for marker in supported)
             kept_claims.append((claim, supported, None))
             continue
         source_id = _verbatim_source(normalized_claim, declared_ids, evidence_by_id)
@@ -346,23 +351,24 @@ def prune_claims(answer, evidence_by_id):
         if source_id not in seen_source_ids:
             seen_source_ids.add(source_id)
             kept_source_ids.append(source_id)
-    if kept_source_ids:
+    if len(pruned_answer) > MAX_ANSWER_CODEPOINTS:
+        reason = "answer_too_long_after_prune"
+    elif kept_source_ids:
         reason = "grounded"
     elif not declared_ids:
         reason = "no_cited_claims"
     else:
         reason = "empty_after_prune"
-    retained_markers = len(_MARKER.findall(pruned_answer))
     return {"pruned_answer": pruned_answer,
             "kept_source_ids": kept_source_ids,
-            "ok": bool(kept_source_ids),
+            "ok": bool(kept_source_ids) and len(pruned_answer) <= MAX_ANSWER_CODEPOINTS,
             "reason": reason,
             "claims": len(claims),
             "kept_claims": len(kept_claims),
             "uncited_claims": uncited_claims,
             "dropped_claims": dropped_claims,
             "repaired_claims": repaired_claims,
-            "pruned_markers": len(_MARKER.findall(answer)) - retained_markers}
+            "pruned_markers": input_marker_count - len(retained_original_markers)}
 
 
 def prune_ungrounded_claims(answer, evidence_by_id):

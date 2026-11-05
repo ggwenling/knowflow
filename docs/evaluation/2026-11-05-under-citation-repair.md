@@ -47,3 +47,10 @@
 - `services/ai` 测试套件：`479 passed`（修复前 `458 passed, 1 failed`）。该失败项 `test_real_evaluation_service.py::test_real_app_uses_product_adapters_with_mock_transport` 为 Windows 专有：模块的网络禁闭 fixture 连 `socket.connect` 一并禁掉，而 Windows ProactorEventLoop 用 loopback `socketpair()` 建自管道。已改为只拦非 loopback 目标，该模块现 `27 passed`。
 - 新增测试：`test_answering.py` 13 条（reason code、claim 级修复正/负例、补问成功/失败/畸形/无 headroom/开关关闭、`repair_outcome` 枚举、payload 形状），`test_streaming.py` 2 条（流式补问成功与流式拒答），`test_rag_collection.py` 3 条（guard 转发补问、旧 adapter 回落、capture 信封 `citation` 字段集合），`test_collection_run.py` sidecar 断言并入既有用例，`test_real_evaluation_service.py` 1 条（网络守卫仍拦外网）。
 - 未运行：任何真实 provider 调用、公开集采集、法官评分、Web E2E。
+
+## Sol P1/P2 修复
+
+- 补问结果只有在引用校验通过且去除引用标记后的答案与问题存在内容 token 重叠时才可发布；检查只作用于补问接受路径，首次生成规则不变。无重叠时保留首次标准拒答，并记录 `failed_unrelated`。
+- 剪枝/补挂后的答案超过 16,000 code points 时标记为不可发布；补问结果的 `InvalidMessage` 契约失败归一为受控失败并保留首次拒答。
+- `pruned_markers` 现统计原始答案中实际删除的 marker 数；补挂新增的 marker 不计入该值。
+- 本节仅记录代码与回归用例，没有产生新的门禁或盲测结果。

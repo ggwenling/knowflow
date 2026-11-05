@@ -18,10 +18,10 @@ import psycopg
 
 from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
-from .citation_verify import prune_claims
+from .citation_verify import MAX_ANSWER_CODEPOINTS, prune_claims
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
-from .protocol import CONTRACT_VERSION
+from .protocol import CONTRACT_VERSION, InvalidMessage
 
 ANSWER_DEADLINE_SECONDS = 28.0
 REPAIR_MINIMUM_SECONDS = 6.0
@@ -34,7 +34,51 @@ _REPAIR_INSTRUCTION = (
     "若无法逐句引用，返回 has_answer=false 和空 source_ids。")
 _REPAIR_DISABLED_VALUES = frozenset({"0", "false", "off", "no"})
 _REPAIR_ENABLED_VALUES = frozenset({"", "1", "true", "on", "yes"})
+_ANSWER_MARKER = re.compile(r"\[[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\]", re.ASCII)
+_CONTENT_RUN = re.compile(
+    r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+|"
+    r"\d+(?:[.,]\d+)*%?|[A-Za-z]+(?:[-'][A-Za-z]+)*")
+_CJK_STOPWORDS = frozenset({
+    "一个", "一些", "这个", "那个", "这些", "那些", "是否", "可以", "能够",
+    "如何", "怎么", "什么", "多少", "哪些", "为什么", "请问", "一下", "根据",
+    "原始", "资料", "说明", "例如", "比如", "以及", "然后", "而且", "但是",
+    "并且", "或者", "因为", "所以", "结果", "关于", "时候", "是否", "是多",
+})
+_CJK_SINGLE_STOPWORDS = frozenset("的了和与是能有否吗呢么哪怎在于为到从向按")
+_LATIN_STOPWORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "how",
+    "in", "is", "it", "of", "on", "or", "the", "to", "was", "were", "what",
+    "when", "where", "which", "who", "why", "with",
+})
 _logger = logging.getLogger(__name__)
+
+
+def _content_tokens(text):
+    """Return simple Chinese bigrams, numbers, and Latin words from text."""
+    text = _ANSWER_MARKER.sub(" ", text)
+    tokens = set()
+    for match in _CONTENT_RUN.finditer(text):
+        value = match.group(0)
+        if "\u3400" <= value[0] <= "\ufaff":
+            if len(value) == 1:
+                if value not in _CJK_SINGLE_STOPWORDS:
+                    tokens.add(value)
+                continue
+            tokens.update(value[index:index + 2]
+                          for index in range(len(value) - 1)
+                          if value[index:index + 2] not in _CJK_STOPWORDS)
+        else:
+            token = value.casefold()
+            if token not in _LATIN_STOPWORDS:
+                tokens.add(token)
+    return tokens
+
+
+def _has_question_content_overlap(question, answer):
+    """Cheap relevance signal for accepting a citation repair, not entailment."""
+    question_tokens = _content_tokens(question)
+    answer_tokens = _content_tokens(answer)
+    return bool(question_tokens and answer_tokens and question_tokens & answer_tokens)
 
 
 def answer_repair_enabled(environ=None):
@@ -558,17 +602,25 @@ class AnswerService:
                     # The refusal was already earned by the first generation;
                     # a failed re-ask must not be reported as insufficient evidence.
                     outcome = "failed_" + exc.code
+                except InvalidMessage:
+                    outcome = "failed_contract_validation"
                 else:
                     try:
                         repaired_response, repaired_diagnostics = self._evaluate_generated(
                             request, evidence, repaired)
                     except ProcessingError as exc:
                         outcome = "failed_" + exc.code
+                    except InvalidMessage:
+                        outcome = "failed_contract_validation"
                     else:
                         if repaired_diagnostics["decision"] == "answered":
-                            response = repaired_response
-                            diagnostics = repaired_diagnostics
-                            outcome = "answered"
+                            if _has_question_content_overlap(
+                                    request["question"], repaired_response["answer"]):
+                                response = repaired_response
+                                diagnostics = repaired_diagnostics
+                                outcome = "answered"
+                            else:
+                                outcome = "failed_unrelated"
                         elif repaired_diagnostics["reason"] == "model_declined":
                             outcome = "declined"
                         else:
@@ -609,7 +661,7 @@ class AnswerService:
                 or set(generated) != {"answer", "has_answer", "source_ids"}
                 or type(generated["has_answer"]) is not bool
                 or not isinstance(generated["answer"], str)
-                or len(generated["answer"]) > 16000
+                or len(generated["answer"]) > MAX_ANSWER_CODEPOINTS
                 or not isinstance(generated["source_ids"], list)
                 or any(not isinstance(source_id, str) for source_id in generated["source_ids"])
                 or len(set(generated["source_ids"])) != len(generated["source_ids"])):
