@@ -208,14 +208,8 @@ def _grounded(claim, evidence):
     return False
 
 
-def prune_ungrounded_claims(answer, evidence_by_id):
-    """Remove unsupported claim units and return the citations that remain.
-
-    Marker-only units attach to the preceding claim, matching the collector's
-    backward attachment rule. A stack is pruned marker by marker using strict
-    full-claim substring coverage; a single marker keeps the existing
-    non-empty-source policy.
-    """
+def _claim_groups(answer):
+    """Group claim segments into claims with their own and attached markers."""
     segments = _claim_segments(answer)
     claims = []
     previous_claim = None
@@ -228,12 +222,69 @@ def prune_ungrounded_claims(answer, evidence_by_id):
         elif segment.markers and previous_claim is not None:
             previous_claim["markers"].extend(segment.markers)
             previous_claim["segments"].append(segment)
+    return claims
+
+
+def _declared_source_ids(claims):
+    """Source IDs in first-appearance order across the answer's own markers."""
+    declared = []
+    for claim in claims:
+        for marker in claim["markers"]:
+            source_id = marker.group(1)
+            if source_id not in declared:
+                declared.append(source_id)
+    return declared
+
+
+def _verbatim_source(normalized_claim, declared_ids, evidence_by_id):
+    """First declared source whose full text contains the claim verbatim.
+
+    Re-attachment is deliberately all-or-nothing: a claim is only rebound to a
+    source that carries the complete claim, so a repair can never turn a pruned
+    citation into a partial-coverage citation.
+    """
+    for source_id in declared_ids:
+        evidence = evidence_by_id.get(source_id)
+        if isinstance(evidence, str) and normalized_claim in _normalized(evidence):
+            return source_id
+    return None
+
+
+def prune_claims(answer, evidence_by_id):
+    """Remove unsupported claim units and report why an answer kept or lost all.
+
+    Marker-only units attach to the preceding claim, matching the collector's
+    backward attachment rule. A stack is pruned marker by marker using strict
+    full-claim substring coverage; a single marker keeps the existing
+    non-empty-source policy.
+
+    Under-citation repair runs at claim granularity and adds no evidence: an
+    uncited claim, or a claim whose stacked markers were all unsupported, is
+    rebound to one of the source IDs the model itself declared when that source
+    contains the complete claim verbatim. Nothing is invented and no coverage
+    threshold is relaxed; a claim with no verbatim home is still dropped.
+    """
+    claims = _claim_groups(answer)
+    declared_ids = _declared_source_ids(claims)
 
     kept_claims = []
+    uncited_claims = dropped_claims = repaired_claims = 0
     for claim in claims:
         markers = claim["markers"]
         normalized_claim = _normalized(claim["text"])
-        if not markers or not normalized_claim:
+        if not normalized_claim:
+            continue
+        if not markers:
+            # A partially cited answer may leave a sentence unmarked; keep it
+            # only when a declared source carries that exact sentence.
+            uncited_claims += 1
+            source_id = (_verbatim_source(normalized_claim, declared_ids, evidence_by_id)
+                         if declared_ids else None)
+            if source_id is None:
+                dropped_claims += 1
+            else:
+                repaired_claims += 1
+                kept_claims.append((claim, [], source_id))
             continue
         if len(markers) > 1:
             supported = []
@@ -248,10 +299,22 @@ def prune_ungrounded_claims(answer, evidence_by_id):
             supported = ([marker] if isinstance(evidence, str)
                          and _normalized(evidence) else [])
         if supported:
-            kept_claims.append((claim, supported))
+            kept_claims.append((claim, supported, None))
+            continue
+        source_id = _verbatim_source(normalized_claim, declared_ids, evidence_by_id)
+        if source_id is None:
+            dropped_claims += 1
+        else:
+            repaired_claims += 1
+            kept_claims.append((claim, [], source_id))
 
     answer_parts = []
-    for claim, supported in kept_claims:
+    for claim, supported, rebound_source_id in kept_claims:
+        if rebound_source_id is not None:
+            boundary = claim["segments"][-1].boundary or ""
+            answer_parts.append(_normalized(
+                claim["text"] + "[" + rebound_source_id + "]" + boundary))
+            continue
         supported_spans = {(marker.start(), marker.end()) for marker in supported}
         chunks = []
         for segment in claim["segments"]:
@@ -283,9 +346,31 @@ def prune_ungrounded_claims(answer, evidence_by_id):
         if source_id not in seen_source_ids:
             seen_source_ids.add(source_id)
             kept_source_ids.append(source_id)
+    if kept_source_ids:
+        reason = "grounded"
+    elif not declared_ids:
+        reason = "no_cited_claims"
+    else:
+        reason = "empty_after_prune"
+    retained_markers = len(_MARKER.findall(pruned_answer))
     return {"pruned_answer": pruned_answer,
             "kept_source_ids": kept_source_ids,
-            "ok": bool(kept_source_ids)}
+            "ok": bool(kept_source_ids),
+            "reason": reason,
+            "claims": len(claims),
+            "kept_claims": len(kept_claims),
+            "uncited_claims": uncited_claims,
+            "dropped_claims": dropped_claims,
+            "repaired_claims": repaired_claims,
+            "pruned_markers": len(_MARKER.findall(answer)) - retained_markers}
+
+
+def prune_ungrounded_claims(answer, evidence_by_id):
+    """Compatibility projection of :func:`prune_claims` without diagnostics."""
+    result = prune_claims(answer, evidence_by_id)
+    return {"pruned_answer": result["pruned_answer"],
+            "kept_source_ids": result["kept_source_ids"],
+            "ok": result["ok"]}
 
 
 def citations_are_grounded(answer, evidence_by_id):
