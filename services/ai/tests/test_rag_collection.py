@@ -268,7 +268,9 @@ def test_injected_app_uses_same_guarded_factories_for_sync_and_stream(monkeypatc
         citation = captured.json()['citation']
         assert citation['decision'] == 'refused' and citation['reason'] == 'model_declined'
         assert citation['repair_attempt'] == 0
-        assert citation['repair_gate_reason'] == 'ineligible_reason'
+        # The decline now goes through the common eligibility decision, so an
+        # unparseable question reports the parser's registered rejection.
+        assert citation['repair_gate_reason'] == 'unsupported_question'
         assert set(citation) == {
             'decision', 'reason', 'repairable', 'repair_gate_reason', 'claims',
             'kept_claims', 'uncited_claims',

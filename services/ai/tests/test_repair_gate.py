@@ -1,4 +1,5 @@
 from knowflow_ai.repair_gate import (
+    RULE_VERSION,
     RepairGateRejection,
     RepairTarget,
     check_repair_candidate,
@@ -37,6 +38,10 @@ def _check(target, text, evidence_text=None, *, candidate_source_ids=None,
     if candidate_source_ids is not None:
         generated["source_ids"] = candidate_source_ids
     return check_repair_candidate(target, generated, response, diagnostics, evidence)
+
+
+def test_rule_version_remains_repair_v1():
+    assert RULE_VERSION == "repair-v1"
 
 
 def test_parse_repair_target_supports_only_the_complete_versioned_forms():

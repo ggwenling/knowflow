@@ -1197,7 +1197,8 @@ def test_answer_service_repair_is_on_when_the_switch_is_unset(monkeypatch):
 
 def test_repair_trigger_requires_the_reason_and_claim_counts():
     generated = {"has_answer": True}
-    evidence = [{"source_id": "src-evidence-1"}]
+    evidence = [{"source_id": "src-evidence-1",
+                 "text_content": "原始资料说明索引 READY 后才可检索。"}]
     base = {"decision": "refused", "reason": "empty_after_prune", "claims": 1,
             "kept_claims": 0, "dropped_claims": 1, "uncited_claims": 0}
     assert _repair_trigger_eligible(generated, evidence, base, []) is True
@@ -1216,6 +1217,28 @@ def test_repair_trigger_requires_the_reason_and_claim_counts():
     # itself still applies the explicit, reviewed white-list.
     assert _repair_trigger_eligible(
         generated, evidence, {**base, "reason": "no_cited_claims"}, []) is True
+    # Direct declines and the length refusal use their own consistency rules.
+    declined = {"has_answer": False, "source_ids": []}
+    declined_base = {"decision": "refused", "reason": "model_declined", "claims": 0,
+                     "kept_claims": 0, "dropped_claims": 0, "uncited_claims": 0}
+    assert _repair_trigger_eligible(declined, evidence, declined_base, []) is True
+    assert _repair_trigger_eligible(declined, [], declined_base, []) is False
+    assert _repair_trigger_eligible(
+        declined, [{"source_id": "src-evidence-1", "text_content": "   "}],
+        declined_base, []) is False
+    assert _repair_trigger_eligible(
+        declined, [{"source_id": "src-evidence-1"}], declined_base, []) is False
+    assert _repair_trigger_eligible(
+        declined, [{"source_id": "", "text_content": "资料"}], declined_base, []) is False
+    assert _repair_trigger_eligible(
+        {"has_answer": False, "source_ids": ["src-evidence-1"]},
+        evidence, declined_base, []) is False
+    assert _repair_trigger_eligible(
+        generated, evidence,
+        {**base, "reason": "answer_too_long_after_prune", "kept_claims": 1},
+        ["src-evidence-1"]) is True
+    assert _repair_trigger_eligible(
+        generated, evidence, {**base, "reason": "grounded"}, []) is False
 
 
 def _two_evidence():
@@ -1389,7 +1412,11 @@ async def test_answer_service_refuses_when_first_generation_expands_past_answer_
 
     assert response["has_answer"] is False
     assert response["answer"] == "没有足够的资料证据回答这个问题。"
-    assert model.repair_calls == 0
+    # The length refusal is now repairable; the re-ask also expands past the
+    # limit, so the refusal stands after one bounded re-ask.
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "still_ungrounded"
     assert service.last_diagnostics["reason"] == "answer_too_long_after_prune"
 
 
@@ -1541,7 +1568,7 @@ async def test_answer_service_records_a_declined_repair_as_such(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_answer_service_does_not_reask_when_the_model_declines(monkeypatch):
+async def test_answer_service_reasks_when_the_model_declines_with_usable_evidence(monkeypatch):
     monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
     model = RepairLlm({"answer": "没有足够的资料证据回答这个问题。",
                        "has_answer": False, "source_ids": []}, _grounded_generated())
@@ -1550,8 +1577,91 @@ async def test_answer_service_does_not_reask_when_the_model_declines(monkeypatch
 
     response = await service.answer(_request())
 
+    assert response["has_answer"] is True
+    assert response["answer"] == _grounded_generated()["answer"]
+    assert model.generate_calls == 1 and model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "answered"
+    assert service.last_diagnostics["repair_gate_reason"] == "passed"
+    assert service.last_diagnostics["reason"] == "grounded"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("evidence", [
+    [],
+    [{**_evidence()[0], "text_content": "   "}],
+    [{key: value for key, value in _evidence()[0].items()
+      if key != "text_content"}],
+    [{**_evidence()[0], "source_id": ""}],
+])
+async def test_answer_service_does_not_repair_a_decline_without_usable_evidence(
+        evidence, monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    model = RepairLlm({"answer": "没有足够的资料证据回答这个问题。",
+                       "has_answer": False, "source_ids": []}, _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(evidence))
+
+    response = await service.answer(_request())
+
     assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
     assert model.repair_calls == 0
+    assert service.last_diagnostics["repair_attempt"] == 0
+    assert service.last_diagnostics["repair_outcome"] == "not_attempted"
+    assert service.last_diagnostics["repair_gate_reason"] == "ineligible_reason"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_repair_switch_disables_the_reask_for_a_decline(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "off")
+    model = RepairLlm({"answer": "没有足够的资料证据回答这个问题。",
+                       "has_answer": False, "source_ids": []}, _grounded_generated())
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 0
+    assert service.last_diagnostics["repair_attempt"] == 0
+    assert service.last_diagnostics["repair_outcome"] == "not_attempted"
+    assert service.last_diagnostics["repair_gate_reason"] == "not_checked"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_records_a_declined_repair_after_a_first_decline_as_such(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    decline = {"answer": "没有足够的资料证据回答这个问题。",
+               "has_answer": False, "source_ids": []}
+    model = RepairLlm(decline, decline)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "declined"
+
+
+@pytest.mark.asyncio
+async def test_answer_service_keeps_the_refusal_when_the_repair_times_out(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    model = RepairLlm(_ungrounded_generated(), _grounded_generated(),
+                      repair_error=ProcessingError("PROCESSING_TIMEOUT", 504))
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_two_evidence()))
+
+    response = await service.answer(_request())
+
+    assert response["has_answer"] is False
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "failed_PROCESSING_TIMEOUT"
 
 
 @pytest.mark.asyncio
@@ -1738,8 +1848,8 @@ def test_repair_payload_carries_the_previous_answer_and_no_new_evidence():
     assert body["previous_answer"] == "上一版答案[src-evidence-1]。"
     assert body["evidence"] == json.loads(plain["messages"][1]["content"])["evidence"]
     assert set(body) == {"question", "evidence", "previous_answer"}
-    assert "上一版答案未通过引用校验" in repair["messages"][0]["content"]
-    assert "上一版答案未通过引用校验" not in plain["messages"][0]["content"]
+    assert "重新考虑问题" in repair["messages"][0]["content"]
+    assert "重新考虑问题" not in plain["messages"][0]["content"]
     assert repair["max_tokens"] == plain["max_tokens"] == 1024
 
 

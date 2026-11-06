@@ -34,11 +34,12 @@ REPAIR_MINIMUM_SECONDS = 6.0
 REPAIR_ANSWER_CODEPOINTS = 4000
 REFUSAL = "没有足够的资料证据回答这个问题。"
 _REPAIR_INSTRUCTION = (
-    "上一版答案未通过引用校验：有断言没有紧邻 [source_id]，或所附来源未能完整支持该断言。"
-    "请只用同一批资料重写一次：只输出一条可直接回答问题核心请求的完整来源事实，"
+    "请仅使用提供的同一批资料重新考虑问题。若资料直接支持答案，"
+    "请按要求的引用格式和响应契约返回简洁答案，并删除无来源支持的断言；"
+    "只输出一条可直接回答问题核心请求的完整来源事实，"
     "保留该事实的主体、关系、年份、条件、否定和单位；"
     "标记放在该事实之后、句末标点之前；不要改写、补充或合并多个来源；"
-    "若无法逐句引用，返回 has_answer=false 和空 source_ids。")
+    "若支持不足或无法逐句引用，返回 has_answer=false 和空 source_ids。")
 _REPAIR_DISABLED_VALUES = frozenset({"0", "false", "off", "no"})
 _REPAIR_ENABLED_VALUES = frozenset({"1", "true", "on", "yes"})
 _logger = logging.getLogger(__name__)
@@ -59,17 +60,36 @@ def answer_repair_enabled(environ=None):
 
 
 def _repair_trigger_eligible(generated, evidence, diagnostics, kept_source_ids):
-    """Return true only for the narrow citation-failure trigger."""
+    """Return true only for a direct decline or a closed-set pruning refusal."""
+    if (not isinstance(generated, dict)
+            or not isinstance(evidence, list)
+            or not any(
+                isinstance(item, dict)
+                and isinstance(item.get("source_id"), str)
+                and bool(item["source_id"].strip())
+                and isinstance(item.get("text_content"), str)
+                and bool(item["text_content"].strip())
+                for item in evidence)
+            or diagnostics.get("decision") != "refused"):
+        return False
+    reason = diagnostics.get("reason")
+    if reason == "model_declined":
+        # The caller validates the full generation contract before eligibility.
+        return generated.get("has_answer") is False and generated.get("source_ids") == []
+    if (generated.get("has_answer") is not True
+            or reason not in {
+                "empty_after_prune", "no_cited_claims", "answer_too_long_after_prune"}):
+        return False
     count_names = ("claims", "kept_claims", "dropped_claims", "uncited_claims")
     counts = {name: diagnostics.get(name) for name in count_names}
-    if (not isinstance(generated, dict) or generated.get("has_answer") is not True
-            or not evidence or diagnostics.get("decision") != "refused"
-            or diagnostics.get("reason") not in {"empty_after_prune", "no_cited_claims"}
-            or any(type(value) is not int or value < 0 for value in counts.values())
-            or counts["claims"] <= 0 or counts["kept_claims"] != 0
-            or kept_source_ids != []):
+    if (any(type(value) is not int or value < 0 for value in counts.values())
+            or counts["claims"] <= 0):
         return False
-    return counts["dropped_claims"] > 0 or counts["uncited_claims"] > 0
+    if reason == "answer_too_long_after_prune":
+        return (counts["kept_claims"] > 0
+                and isinstance(kept_source_ids, list) and bool(kept_source_ids))
+    return (counts["kept_claims"] == 0 and kept_source_ids == []
+            and (counts["dropped_claims"] > 0 or counts["uncited_claims"] > 0))
 
 
 def _citation_diagnostics(reason):
@@ -670,11 +690,11 @@ class AnswerService:
             raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
         diagnostics = _citation_diagnostics(
             "empty_evidence" if not evidence else "model_declined")
+        kept_source_ids = []
         if not generated["has_answer"]:
             if generated["source_ids"]:
                 raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
             answer, sources, has_answer = REFUSAL, [], False
-            diagnostics["repair_gate_reason"] = "ineligible_reason"
         else:
             ids = generated["source_ids"]
             if not 1 <= len(ids) <= 5:
@@ -708,17 +728,25 @@ class AnswerService:
                 diagnostics["decision"] = "answered"
             else:
                 answer, sources, has_answer = REFUSAL, [], False
-                if pruning["claims"] == 0:
+                kept_source_ids = pruning["kept_source_ids"]
+        if not has_answer:
+            if not _repair_trigger_eligible(
+                    generated, evidence, diagnostics, kept_source_ids):
+                # Preserve the existing zero-claims diagnostic for a pruning
+                # refusal that found no claims at all.
+                if (diagnostics.get("claims") == 0
+                        and diagnostics.get("reason") in {
+                            "empty_after_prune", "no_cited_claims",
+                            "answer_too_long_after_prune"}):
                     diagnostics["repair_gate_reason"] = "no_claims"
-                elif not _repair_trigger_eligible(
-                        generated, evidence, diagnostics, pruning["kept_source_ids"]):
-                    diagnostics["repair_gate_reason"] = "ineligible_reason"
                 else:
-                    target = parse_repair_target(request["question"])
-                    if isinstance(target, RepairGateRejection):
-                        diagnostics["repair_gate_reason"] = target.reason
-                    else:
-                        diagnostics["repairable"] = self._repair_enabled
+                    diagnostics["repair_gate_reason"] = "ineligible_reason"
+            elif self._repair_enabled:
+                target = parse_repair_target(request["question"])
+                if isinstance(target, RepairGateRejection):
+                    diagnostics["repair_gate_reason"] = target.reason
+                else:
+                    diagnostics["repairable"] = True
         response = {"contract_version": CONTRACT_VERSION,
                     "request_id": request["request_id"], "answer": answer,
                     "has_answer": has_answer, "sources": sources}
