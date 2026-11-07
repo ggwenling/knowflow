@@ -16,6 +16,7 @@ from .adapters import ProcessingError
 from .answering import AnswerService, LlmSettings
 from .embedding import EmbeddingSettings
 from .java_client import JavaGateway
+from .provider_probe import ProviderReadiness
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
@@ -111,7 +112,8 @@ class BoundaryMiddleware:
             await send(message)
 
         auth = [v for k, v in headers if k.lower() == b'authorization']
-        public = scope['path'] == '/health/live' and scope['method'] == 'GET'
+        public = (scope['path'] in ('/health/live', '/health/ready')
+                  and scope['method'] == 'GET')
         authenticated = False
         if len(auth) == 1:
             scheme, sep, credential = auth[0].partition(b' ')
@@ -131,7 +133,7 @@ class BoundaryMiddleware:
 
 
 def create_app(settings: Settings | None = None, *, worker_factory=None,
-               answer_service_factory=None) -> FastAPI:
+               answer_service_factory=None, provider_readiness_factory=None) -> FastAPI:
     settings = settings or Settings.from_environment()
     contract = ContractConsumer(settings.contract_path)
     worker_factory = worker_factory if worker_factory is not None else IndexWorker
@@ -158,6 +160,9 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
                   openapi_url=None, lifespan=lifespan)
     app.state.contract = contract
     app.state.question_admission = QuestionAdmission(settings.max_concurrent_questions)
+    app.state.provider_readiness = (
+        provider_readiness_factory() if provider_readiness_factory is not None
+        else ProviderReadiness.from_environment())
     app.add_middleware(BoundaryMiddleware, secret=settings.internal_secret)
 
     @app.exception_handler(HTTPException)
@@ -193,6 +198,12 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     @app.get('/health/live')
     async def live():
         return {'status': 'UP'}
+
+    @app.get('/health/ready')
+    async def ready(request: Request):
+        result = await request.app.state.provider_readiness.check()
+        status = 200 if result['status'] == 'UP' else 503
+        return JSONResponse(result, status_code=status)
 
     @app.get('/internal/v1/health')
     async def internal_health(request: Request):

@@ -21,6 +21,7 @@ from .config import ConfigurationError
 from .citation_verify import MAX_ANSWER_CODEPOINTS, claims_are_verbatim, prune_claims
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
+from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
 from .protocol import CONTRACT_VERSION, InvalidMessage
 from .repair_gate import (
     REPAIR_GATE_REASONS,
@@ -198,8 +199,10 @@ class LlmSettings:
 
 class DeepSeekAdapter:
     budgeted_provider_adapter = True
-    def __init__(self, settings: LlmSettings, client: httpx.AsyncClient | None = None):
+    def __init__(self, settings: LlmSettings, client: httpx.AsyncClient | None = None,
+                 retry_policy: ProviderRetryPolicy | None = None):
         self.settings = settings
+        self.retry_policy = retry_policy or ProviderRetryPolicy.from_environment()
         self._owns_client = client is None
         self._client = client or build_async_client(settings.timeout_seconds,
                                                     environment_proxy_fallback=True)
@@ -260,7 +263,14 @@ class DeepSeekAdapter:
 
     async def _generate(self, payload: dict, *, request_id: str) -> dict:
         self.last_usage = None
+        return await run_provider_with_retry(
+            partial(self._generate_once, payload, request_id=request_id),
+            policy=self.retry_policy, request_id=request_id, provider="deepseek")
+
+    async def _generate_once(self, payload: dict, *, request_id: str) -> dict:
         from .provider_budget import reserve_provider_call
+        # Every attempt reserves before its HTTP request; a soft stop therefore
+        # raises a non-retryable error and ends the retry loop immediately.
         await reserve_provider_call("deepseek", self.settings.model, payload)
 
         try:
@@ -271,23 +281,33 @@ class DeepSeekAdapter:
                              "X-Request-ID": request_id},
                     json=payload, timeout=self.settings.timeout_seconds, follow_redirects=False) as response:
                 if response.status_code != 200:
-                    raise ProcessingError("MODEL_FAILURE", 502,
-                                          retryable=response.status_code == 429 or response.status_code >= 500)
+                    status = response.status_code
+                    raise ProcessingError(
+                        "MODEL_FAILURE", 502,
+                        retryable=status == 429 or status >= 500,
+                        provider_status=status,
+                        retry_after=(retry_after_seconds(response.headers.get("retry-after"))
+                                     if status == 429 else None),
+                        retry_reason="HTTP_" + str(status))
                 body = bytearray()
                 async for part in response.aiter_bytes():
                     body.extend(part)
                     if len(body) > self.settings.max_response_bytes:
-                        raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+                        raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                              retry_reason="RESPONSE_TOO_LARGE")
         except ProcessingError:
             raise
         except httpx.TimeoutException:
-            raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True) from None
+            raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True,
+                                  retry_reason="TIMEOUT") from None
         except asyncio.CancelledError:
             raise
         except httpx.HTTPError:
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=True) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=True,
+                                  retry_reason="TRANSPORT") from None
         except Exception:
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="UNEXPECTED") from None
         try:
             provider = json.loads(body)
             if not isinstance(provider, dict) or provider.get("model") != self.settings.model:
@@ -304,7 +324,8 @@ class DeepSeekAdapter:
             result = json.loads(message["content"])
             self.last_usage = _provider_usage(provider.get("usage"))
         except (ValueError, TypeError, KeyError, IndexError, UnicodeDecodeError):
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="INVALID_RESPONSE") from None
         return result
 
 

@@ -115,7 +115,7 @@ async def test_adapter_rejects_wrong_model_index_or_vector(payload):
 
 
 @pytest.mark.asyncio
-async def test_provider_failure_is_fixed_redacted_and_never_retried():
+async def test_provider_failure_is_fixed_redacted_and_retried():
     attempts = 0
 
     async def handler(_request):
@@ -127,7 +127,7 @@ async def test_provider_failure_is_fixed_redacted_and_never_retried():
     adapter = SiliconFlowEmbeddingAdapter(settings(), client)
     with pytest.raises(ProcessingError) as exc:
         await adapter.embed(["synthetic"], request_id=REQUEST_ID)
-    assert attempts == 1
+    assert attempts == 3  # default policy: 3 bounded attempts
     assert exc.value.code == "MODEL_FAILURE" and exc.value.retryable
     assert KEY not in str(exc.value) and "PRIVATE" not in str(exc.value)
     await client.aclose()
@@ -172,7 +172,7 @@ async def test_adapter_bounds_response_and_rejects_redirect_without_following():
 
 
 @pytest.mark.asyncio
-async def test_provider_timeout_is_retryable_but_adapter_does_not_retry():
+async def test_provider_timeout_is_retryable_and_bounded():
     attempts = 0
 
     async def handler(_request):
@@ -184,7 +184,7 @@ async def test_provider_timeout_is_retryable_but_adapter_does_not_retry():
     adapter = SiliconFlowEmbeddingAdapter(settings(), client)
     with pytest.raises(ProcessingError) as exc:
         await adapter.embed(["synthetic"], request_id=REQUEST_ID)
-    assert attempts == 1
+    assert attempts == 3  # default policy: 3 bounded attempts
     assert exc.value.code == "MODEL_TIMEOUT" and exc.value.retryable
     assert KEY not in str(exc.value)
     await client.aclose()

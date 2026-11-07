@@ -6,10 +6,15 @@ import math
 
 
 class ProcessingError(RuntimeError):
-    def __init__(self, code: str, status: int = 502, *, retryable: bool | None = None):
+    def __init__(self, code: str, status: int = 502, *, retryable: bool | None = None,
+                 provider_status: int | None = None, retry_after: float | None = None,
+                 retry_reason: str | None = None):
         super().__init__(code)
         self.code, self.status = code, status
         self.retryable = status in (502, 504) if retryable is None else retryable
+        self.provider_status = provider_status
+        self.retry_after = retry_after
+        self.retry_reason = retry_reason
 
 
 class ModelAdapter(Protocol):

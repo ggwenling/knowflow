@@ -9,6 +9,7 @@ import httpx
 
 from .adapters import ProcessingError
 from .config import ConfigurationError
+from .provider_retry import retry_after_seconds, retry_delay
 from .protocol import CONTRACT_VERSION
 
 _logger = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ REFUSAL = "没有足够的资料证据回答这个问题。"
 
 
 def _model_failure():
-    return ProcessingError("MODEL_FAILURE", 502, retryable=False)
+    return ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                           retry_reason="INVALID_STREAM")
 
 
 def _unique_object(pairs):
@@ -191,11 +193,54 @@ class IncrementalAnswerParser:
 
 
 async def provider_content(adapter, question, evidence, *, request_id):
-    """Yield real OpenAI-compatible SSE delta.content, never completed JSON."""
+    """Yield SSE content with bounded retry until the first fragment is emitted."""
     payload = adapter._payload(question, evidence)
     payload["stream"] = True
     payload["messages"][0]["content"] += "先输出 has_answer，再输出 answer，最后输出 source_ids。"
+    policy = adapter.retry_policy
+    started = time.monotonic()
+    attempt = 0
+    while True:
+        attempt += 1
+        emitted = False
+        try:
+            async with aclosing(_provider_content_once(
+                    adapter, payload, request_id=request_id)) as fragments:
+                async for fragment in fragments:
+                    emitted = True
+                    yield fragment
+            return
+        except ProcessingError as exc:
+            retryable = bool(getattr(exc, "retryable", False))
+            # Once bytes have been delivered a retry would duplicate output.
+            if emitted or not retryable:
+                raise
+            if attempt >= policy.max_attempts:
+                _logger.warning(
+                    "provider_retry_exhausted request_id=%s provider=deepseek attempts=%d reason=%s status=%s",
+                    request_id, attempt, getattr(exc, "retry_reason", None) or exc.code,
+                    getattr(exc, "provider_status", None))
+                raise
+            delay = retry_delay(policy, exc, attempt)
+            remaining = policy.total_seconds - (time.monotonic() - started)
+            if remaining <= 0 or delay > remaining:
+                _logger.warning(
+                    "provider_retry_abandoned request_id=%s provider=deepseek attempts=%d "
+                    "reason=%s status=%s remaining_ms=%d delay_ms=%d",
+                    request_id, attempt, getattr(exc, "retry_reason", None) or exc.code,
+                    getattr(exc, "provider_status", None),
+                    max(0, round(remaining * 1000)), round(delay * 1000))
+                raise
+            _logger.info(
+                "provider_retry request_id=%s provider=deepseek attempt=%d reason=%s status=%s delay_ms=%d",
+                request_id, attempt, getattr(exc, "retry_reason", None) or exc.code,
+                getattr(exc, "provider_status", None), round(delay * 1000))
+            await asyncio.sleep(delay)
+
+
+async def _provider_content_once(adapter, payload, *, request_id):
     from .provider_budget import reserve_provider_call
+    # Each attempt reserves before opening the stream.
     await reserve_provider_call("deepseek", adapter.settings.model, payload)
     finished = done = False
     total_bytes = 0
@@ -210,8 +255,14 @@ async def provider_content(adapter, question, evidence, *, request_id):
                 json=payload, timeout=adapter.settings.timeout_seconds,
                 follow_redirects=False) as response:
             if response.status_code != 200:
-                raise ProcessingError("MODEL_FAILURE", 502,
-                                      retryable=response.status_code == 429 or response.status_code >= 500)
+                status = response.status_code
+                raise ProcessingError(
+                    "MODEL_FAILURE", 502,
+                    retryable=status == 429 or status >= 500,
+                    provider_status=status,
+                    retry_after=(retry_after_seconds(response.headers.get("retry-after"))
+                                 if status == 429 else None),
+                    retry_reason="HTTP_" + str(status))
             if response.headers.get("content-type", "").split(";", 1)[0].strip() != "text/event-stream":
                 raise _model_failure()
             async for part in response.aiter_bytes():
@@ -274,9 +325,11 @@ async def provider_content(adapter, question, evidence, *, request_id):
     except ProcessingError:
         raise
     except httpx.TimeoutException:
-        raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True) from None
+        raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True,
+                              retry_reason="TIMEOUT") from None
     except httpx.HTTPError:
-        raise ProcessingError("MODEL_FAILURE", 502, retryable=True) from None
+        raise ProcessingError("MODEL_FAILURE", 502, retryable=True,
+                              retry_reason="TRANSPORT") from None
     except (ValueError, TypeError, KeyError, UnicodeDecodeError):
         raise _model_failure() from None
 

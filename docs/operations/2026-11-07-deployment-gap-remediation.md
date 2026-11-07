@@ -279,13 +279,13 @@ pwsh -NoProfile -File deploy/scripts/preflight.ps1 -EnvFile deploy/.env.producti
 
 | 项 | 状态 |
 | --- | --- |
-| Provider 过载导致带引用答案未验收 | 未解决（外部依赖）；探针与结论见 §7 |
-| 应用无 5xx/超时重试 | 未改（业务逻辑约束）；列为可选方案 |
+| Provider 过载导致带引用答案未验收 | **已闭环**（2026-11-07 复测，见 §12.4） |
+| 应用无 5xx/超时重试 | **已实现**有界重试（见 §12） |
 | 无镜像仓库与不可变发布 tag | 仍未解决；回滚依赖本机镜像 |
 | Flyway 无 down 脚本 | 仍未解决；跨迁移回滚需 `pg_dump` 恢复 |
-| 健康检查不探活 provider / 预算 | 仍未解决；建议纳入发布门禁 |
+| 健康检查不探活 provider / 预算 | **已实现** `/health/ready`（见 §12） |
 | `provider-egress` 无域名白名单 | 需宿主机防火墙/代理补足，见 §5.3 |
-| 工作树有未提交改动 | 本次修复未提交，符合“不提交 git”约束；生产构建应来自干净提交 |
+| 工作树有未提交改动 | 部署修复已提交为 `e79b838`；§12 的重试/探针改动另行提交 |
 | 旧演练手册仍引用已删除的 override 与 3100 端口 | 本记录为准；旧手册保留历史证据 |
 
 ## 10. 清理
@@ -306,3 +306,81 @@ docker compose -p knowflow-prod --env-file deploy/.env.production `
 - Provider 探针：`D:\konwflow-prod-drill\evidence\provider-probe-2026-11-07.txt`
 - 账本：命名卷 `knowflow-prod_budget-ledger`（查询命令见 §3.2）
 - TLS 证书：`deploy/tls/fullchain.pem`、`deploy/tls/privkey.pem`（gitignored）
+
+## 12. Provider 韧性加固与带引用验收（2026-11-07 补测）
+
+### 12.1 有界重试
+
+`services/ai/src/knowflow_ai/provider_retry.py` 新增，接入 `answering.py`（非流式生成）、`embedding.py`、`streaming.py`（流式生成）：
+
+| 类别 | 行为 |
+| --- | --- |
+| 5xx / 读超时 / 连接错误 | 可重试，指数退避 |
+| 4xx（含 400/401/403/404） | 不重试，立即失败 |
+| 429 | 按 `Retry-After`（秒数或 HTTP 日期）退避；无该头时用指数退避 |
+| 流式 | 只在首片段发出前重试；已输出后重试会重复内容，立即失败 |
+| 上限 | `max_attempts=3`（可配 1–5）、`base_seconds=0.5`（0–5）、`total_seconds=25`（0–60） |
+| 预算 | 预留放在每次尝试内部；每次重试都是独立预留，软停/超限立即以非可重试错误停止 |
+
+`total_seconds` 约束的是重试窗口（含退避等待）；单次在途请求仍受各适配器自身的 HTTP 超时约束，因此总耗时仍有硬上界（`max_attempts × 单次超时 + 重试窗口`）。
+
+配置项（compose 与 env 示例均已登记）：`KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS`、`KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS`、`KNOWFLOW_PROVIDER_RETRY_TOTAL_SECONDS`。
+
+### 12.2 就绪探针
+
+`services/ai/src/knowflow_ai/provider_probe.py` 新增，`app.py` 增加 `GET /health/ready`，`deploy/tls/nginx.conf` 转发该路径：
+
+- `/health/live`：仅代表进程存活，保持原有的容器 healthcheck 语义。
+- `/health/ready`：检查 `budget`（三件套路径与文件可读）、`llm`、`embedding`；全部 UP 才返回 200，否则 503 且逐项给出 `reason` / `provider_status`。
+- 探针只调 `GET {base}/models`，不调 chat/completions 或 embeddings，不产生 token；结果 10s TTL 缓存。
+
+配置项：`KNOWFLOW_PROVIDER_PROBE_TIMEOUT_SECONDS`（默认 5，1–15）、`KNOWFLOW_PROVIDER_PROBE_TTL_SECONDS`（默认 10，0–60）。
+
+### 12.3 实测
+
+单元/集成测试：受影响用例 65 passed；AI 全量 **712 passed**。
+
+生产形态栈上（`knowflow-ai:2a7e68a` 重建）：
+
+```text
+/health/ready（provider 正常） -> 200 {"status":"UP", budget/llm/embedding 均 UP} 0.25s
+注入无效 LLM key（真实 401）  -> 503 {"status":"UNAVAILABLE",
+                                  llm:{"status":"DOWN","reason":"AUTH_REJECTED","provider_status":401}}
+                                 同时容器内 /health/live -> 200 {"status":"UP"}
+恢复真实 key                  -> 200 UP
+容器内重试（预算账本前后 20 -> 26）：
+  503 -> attempts=3，退避 100/200ms，provider_retry_exhausted reason=HTTP_503，retryable=True
+  400 -> attempts=1，retryable=False
+  429 + Retry-After: 0 -> attempts=2，随后成功
+```
+
+账本增量 6 与 3+1+2 次尝试完全一致，说明每次重试都计入预算。
+
+### 12.4 带引用问答验收（HTTPS 全流程）
+
+`production-smoke.ps1` 未使用 `-AllowProviderBlocked`，任一步失败即 FAIL。结果 **PASS**，证据：`D:\konwflow-prod-drill\evidence\smoke-acceptance-retry.json`。
+
+| 步骤 | 状态 | 实际耗时 |
+| --- | --- | --- |
+| `/api/mode` | 200 `{"mode":"external"}` | 0.21s |
+| register | 201 | 0.28s |
+| login（HttpOnly cookie，token 不输出） | 200 | 0.13s |
+| `/api/v1/me` | 200 | 0.03s |
+| 创建知识库 | 201 | 0.04s |
+| 上传文档 | 202 | 0.11s |
+| 索引完成 | `SUCCEEDED` / `READY` | 2.07s（含 2s 轮询间隔） |
+| 可答问题 | 200，`has_answer=True`，**sources=1** | 1.15s |
+| 不可答问题 | 200，`has_answer=False`，`sources=0` | 1.15s |
+
+可答问题实际答案：
+
+```text
+项目代号：QL-2026[c22a6590-6dec-3be5-9f5d-4d3d33c266fb]
+```
+
+引用条数 1，引用 ID 与索引版本 `5364872c-658d-4eaf-a84e-cc61618f32ab` 对应。不可答问题返回固定拒答文案且不附来源。整轮冒烟从 16:19:05.29 到 16:19:10.46，共约 5.17s。
+
+### 12.5 残余
+
+- 镜像仓库/不可变发布 tag、Flyway down、`provider-egress` 域名白名单仍未解决（见 §9）。
+- 探针只验证 provider 的模型列表可达；它不能替代一次真实生成，发布门禁仍建议在验收阶段跑 §12.4 的完整冒烟。

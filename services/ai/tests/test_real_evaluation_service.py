@@ -328,19 +328,20 @@ def test_real_app_uses_product_adapters_with_mock_transport(monkeypatch, tmp_pat
                 await embedding_guard.embed(["hello"], request_id="emb-test-1")
             assert emb_error.value.code == "MODEL_FAILURE"
             mid = factories._ledger.summary()
-            assert mid["paid_reservations"] == 1
+            # Product adapters retry a 5xx three times; every attempt reserves.
+            assert mid["paid_reservations"] == 3
             assert any("/embeddings" in url for url in requests_seen)
             with pytest.raises(ProcessingError) as llm_error:
                 await llm_guard.generate(
                     "q", [{"source_id": "s1", "text_content": "t"}],
                     request_id="llm-test-1")
             assert llm_error.value.code == "MODEL_FAILURE"
-            assert factories._ledger.summary()["paid_reservations"] == 2
+            assert factories._ledger.summary()["paid_reservations"] == 6
             assert any("/chat/completions" in url for url in requests_seen)
 
         assert factories._ledger.summary()["paid_reservations"] == 0
         asyncio.run(exercise_guards())
-        assert len(requests_seen) == 2
+        assert len(requests_seen) == 6
     finally:
         async def close_adapters():
             await embedding_adapter.aclose()

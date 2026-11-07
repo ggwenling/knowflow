@@ -50,6 +50,24 @@ def test_question_concurrency_limit_is_validated(limit):
         Settings(SECRET, max_concurrent_questions=limit)
 
 
+def test_readiness_reports_provider_failure_while_liveness_stays_up():
+    class FakeReadiness:
+        async def check(self):
+            return {"status": "UNAVAILABLE", "checks": {
+                "budget": {"status": "UP"},
+                "llm": {"status": "DOWN", "reason": "PROVIDER_ERROR", "provider_status": 503},
+                "embedding": {"status": "UP"},
+            }}
+
+    app = create_app(Settings(SECRET), provider_readiness_factory=lambda: FakeReadiness())
+    with TestClient(app) as client:
+        assert client.get('/health/live').json() == {'status': 'UP'}
+        ready = client.get('/health/ready')
+        assert ready.status_code == 503
+        assert ready.json()['status'] == 'UNAVAILABLE'
+        assert ready.json()['checks']['llm']['provider_status'] == 503
+
+
 def test_health_does_not_probe_models_or_database(client):
     assert client.get('/health/live').json() == {'status': 'UP'}
     r = client.get('/internal/v1/health', headers={**AUTH, 'X-Request-ID': 'java-trace-01'})

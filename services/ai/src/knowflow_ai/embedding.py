@@ -1,6 +1,7 @@
 """Bounded SiliconFlow BAAI/bge-m3 embedding adapter (KF2-018 B03)."""
 import asyncio
 from dataclasses import dataclass, field
+from functools import partial
 import json
 import math
 import os
@@ -13,6 +14,7 @@ import httpx
 from .adapters import ProcessingError, validate_provider_result
 from .config import ConfigurationError
 from .http_client import build_async_client
+from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
 
 
 EXPECTED_MODEL = "BAAI/bge-m3"
@@ -97,11 +99,13 @@ class EmbeddingSettings:
 
 
 class SiliconFlowEmbeddingAdapter:
-    """One-request, no-retry adapter. The injected HTTP client remains caller-owned."""
+    """Embedding adapter with bounded retry. The injected HTTP client remains caller-owned."""
     budgeted_provider_adapter = True
 
-    def __init__(self, settings: EmbeddingSettings, client: httpx.AsyncClient | None = None):
+    def __init__(self, settings: EmbeddingSettings, client: httpx.AsyncClient | None = None,
+                 retry_policy: ProviderRetryPolicy | None = None):
         self.settings = settings
+        self.retry_policy = retry_policy or ProviderRetryPolicy.from_environment()
         self._owns_client = client is None
         self._client = client or build_async_client(settings.timeout_seconds,
                                                     environment_proxy_fallback=True)
@@ -119,7 +123,13 @@ class SiliconFlowEmbeddingAdapter:
             raise ProcessingError("INVALID_EMBEDDING_INPUT", 400, retryable=False)
 
         payload = {"model": self.settings.model, "input": texts, "encoding_format": "float"}
+        return await run_provider_with_retry(
+            partial(self._embed_once, texts, payload, request_id=request_id),
+            policy=self.retry_policy, request_id=request_id, provider="siliconflow")
+
+    async def _embed_once(self, texts: list[str], payload: dict, *, request_id: str) -> dict:
         from .provider_budget import reserve_provider_call
+        # Each retry reserves again, so retries cannot exceed the ledger limit.
         await reserve_provider_call("siliconflow", self.settings.model, payload)
         try:
             async with self._client.stream(
@@ -130,38 +140,50 @@ class SiliconFlowEmbeddingAdapter:
                     json=payload,
                     timeout=self.settings.timeout_seconds,
                     follow_redirects=False) as response:
-                if response.status_code == 429:
-                    raise ProcessingError("MODEL_FAILURE", 502, retryable=True)
                 if response.status_code != 200:
-                    raise ProcessingError("MODEL_FAILURE", 502, retryable=response.status_code >= 500)
+                    status = response.status_code
+                    raise ProcessingError(
+                        "MODEL_FAILURE", 502,
+                        retryable=status == 429 or status >= 500,
+                        provider_status=status,
+                        retry_after=(retry_after_seconds(response.headers.get("retry-after"))
+                                     if status == 429 else None),
+                        retry_reason="HTTP_" + str(status))
                 body = bytearray()
                 async for part in response.aiter_bytes():
                     body.extend(part)
                     if len(body) > self.settings.max_response_bytes:
-                        raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+                        raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                              retry_reason="RESPONSE_TOO_LARGE")
         except ProcessingError:
             raise
         except httpx.TimeoutException:
-            raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True) from None
+            raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True,
+                                  retry_reason="TIMEOUT") from None
         except asyncio.CancelledError:
             raise
         except httpx.HTTPError:
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=True) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=True,
+                                  retry_reason="TRANSPORT") from None
         except Exception:
             # Transport/plugin exceptions can include URL details or request headers.
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="UNEXPECTED") from None
 
         try:
             provider_result = json.loads(body, object_pairs_hook=_json_object_without_duplicate_keys)
         except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="INVALID_RESPONSE") from None
         if not isinstance(provider_result, dict):
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False)
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="INVALID_RESPONSE")
         try:
             validate_provider_result(provider_result, self.settings.model,
                                      count=len(texts), dimensions=self.settings.dimensions)
         except ProcessingError:
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=False) from None
+            raise ProcessingError("MODEL_FAILURE", 502, retryable=False,
+                                  retry_reason="INVALID_RESPONSE") from None
 
         # Provider rows may contain fields such as `object` that are not part
         # of the shared internal EmbeddingResult schema. Normalize at this

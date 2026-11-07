@@ -122,6 +122,12 @@ services:
       KNOWFLOW_BUDGET_POLICY_FILE: ${KNOWFLOW_BUDGET_POLICY_FILE:?set KNOWFLOW_BUDGET_POLICY_FILE}
       # 可选：受控 egress 代理。为空时 httpx 忽略；设置后仅外网 provider 调用走代理。
       HTTPS_PROXY: ${KNOWFLOW_EGRESS_HTTPS_PROXY:-}
+      # 有界重试与就绪探针（默认值即生产建议值）。
+      KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS: ${KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS:-3}
+      KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS: ${KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS:-0.5}
+      KNOWFLOW_PROVIDER_RETRY_TOTAL_SECONDS: ${KNOWFLOW_PROVIDER_RETRY_TOTAL_SECONDS:-25}
+      KNOWFLOW_PROVIDER_PROBE_TIMEOUT_SECONDS: ${KNOWFLOW_PROVIDER_PROBE_TIMEOUT_SECONDS:-5}
+      KNOWFLOW_PROVIDER_PROBE_TTL_SECONDS: ${KNOWFLOW_PROVIDER_PROBE_TTL_SECONDS:-10}
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,7 +149,8 @@ services:
         target: /etc/knowflow-budget
         read_only: true
     # 只有 ai 同时接入 internal 知识网络与受控 egress；其余服务没有外网出口。
-    networks: [knowflow, provider-egress]
+    # 额外接入 web-edge 仅供 edge 转发 /health/ready（只读状态，无密钥）。
+    networks: [knowflow, provider-egress, web-edge]
 
   # 一次性修正预算账本卷属主；ai 以 10001 运行，卷默认属主是 root。
   budget-init:

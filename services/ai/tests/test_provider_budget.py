@@ -7,6 +7,7 @@ import pytest
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.answering import DeepSeekAdapter, LlmSettings
 from knowflow_ai.embedding import SiliconFlowEmbeddingAdapter, EmbeddingSettings
+from knowflow_ai.provider_retry import ProviderRetryPolicy
 from knowflow_ai.budget import BudgetLedger
 from pathlib import Path
 import os
@@ -60,12 +61,15 @@ async def test_raw_adapter_failed_attempts_are_reserved_individually(monkeypatch
         calls.append(request)
         return httpx.Response(503)
     async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
-        adapter = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+        adapter = DeepSeekAdapter(
+            LlmSettings(api_key="fake-key-" * 8), client,
+            retry_policy=ProviderRetryPolicy(max_attempts=3, base_seconds=0, total_seconds=5))
         for _ in range(2):
             with pytest.raises(ProcessingError):
                 await adapter.generate("synthetic", [], request_id="same-product-request")
-    assert len(calls) == 2
-    assert BudgetLedger(ledger_path).summary()["paid_reservations"] == 2
+    # Two logical calls x three retry attempts; every attempt reserved.
+    assert len(calls) == 6
+    assert BudgetLedger(ledger_path).summary()["paid_reservations"] == 6
 
 
 @pytest.mark.asyncio
@@ -128,11 +132,15 @@ async def test_guarded_real_adapters_reserve_once_per_failed_http_attempt(monkey
     ledger = wiring.BudgetLedger(ledger_path)
     async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
         if operation == "embed":
-            adapter = SiliconFlowEmbeddingAdapter(EmbeddingSettings(api_key="fake-key-" * 8), client)
+            adapter = SiliconFlowEmbeddingAdapter(
+                EmbeddingSettings(api_key="fake-key-" * 8), client,
+                retry_policy=ProviderRetryPolicy(max_attempts=1))
             arguments = {"texts": ["synthetic"], "request_id": "same-request"}
             invoke = lambda guard: guard.embed(**arguments)
         else:
-            adapter = DeepSeekAdapter(LlmSettings(api_key="fake-key-" * 8), client)
+            adapter = DeepSeekAdapter(
+                LlmSettings(api_key="fake-key-" * 8), client,
+                retry_policy=ProviderRetryPolicy(max_attempts=1))
             arguments = {"question": "synthetic", "evidence": [], "request_id": "same-request"}
             invoke = (lambda guard: guard.generate(**arguments)) if operation == "generate" else (
                 lambda guard: guard.stream_content(**arguments))
