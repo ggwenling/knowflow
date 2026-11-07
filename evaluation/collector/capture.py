@@ -51,11 +51,15 @@ class CaptureStore:
                 key = (row["document_id"], row["content_version_id"], row["index_version_id"])
                 source_id = row["source_id"]
                 locator = row["locator"]
+                if not isinstance(locator, dict) or locator.get("kind") != "text_range":
+                    # The scorer compares character spans and source hashes;
+                    # PDF page locators need a separate design, so reject them
+                    # with a distinct, readable code instead of a generic error.
+                    raise ValueError("UNSUPPORTED_LOCATOR_KIND")
                 if (key not in allowed or not isinstance(source_id, str)
                         or not _REQUEST_ID.fullmatch(source_id) or source_id in sources
-                        or not isinstance(locator, dict)
                         or set(locator) != {"kind", "unit", "start", "end"}
-                        or locator["kind"] != "text_range" or locator["unit"] != "unicode_code_point"
+                        or locator["unit"] != "unicode_code_point"
                         or type(locator["start"]) is not int or type(locator["end"]) is not int
                         or not 0 <= locator["start"] < locator["end"]
                         or not isinstance(row["text_sha256"], str)
@@ -76,6 +80,16 @@ class CaptureStore:
             if request_id not in self._traces:
                 raise ValueError("TRACE_NOT_AVAILABLE")
             return self._traces.pop(request_id)
+
+    def take_nowait(self, request_id):
+        """Pop a trace without suspending; safe inside cancellation cleanup.
+
+        The store is process-local and mutated only from the event loop, so a
+        synchronous pop is atomic with respect to other tasks.
+        """
+        if request_id not in self._traces:
+            raise ValueError("TRACE_NOT_AVAILABLE")
+        return self._traces.pop(request_id)
 
 
 class CapturingRetriever:

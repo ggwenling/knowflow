@@ -42,8 +42,14 @@ def map_retrieval(question_id, rows, mappings):
                 raise ValueError("SOURCE_HASH_MISMATCH")
             text = source.decode("utf-8")
             locator = row["locator"]
+            if not isinstance(locator, dict):
+                raise ValueError("INVALID_SOURCE_RANGE")
+            if locator.get("kind") != "text_range":
+                # Page-level PDF locators cannot be hashed against character
+                # spans; reject them explicitly instead of a generic mapping error.
+                raise ValueError("UNSUPPORTED_LOCATOR_KIND")
             start, end = locator["start"], locator["end"]
-            if (locator["kind"] != "text_range" or locator["unit"] != "unicode_code_point"
+            if (locator.get("unit") != "unicode_code_point"
                     or type(start) is not int or type(end) is not int or not 0 <= start < end <= len(text)):
                 raise ValueError("INVALID_SOURCE_RANGE")
             text_hash = sha256(text[start:end].encode("utf-8")).hexdigest()

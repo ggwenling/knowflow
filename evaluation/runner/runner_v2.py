@@ -168,6 +168,9 @@ def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None,
     gold_total = sum(len(q["evidence"]) for q in expected.values())
     gold_hits = reciprocal = answered_count = supported = reviewed = citations_total = citations_reviewed = citations_supported = cited_gold_overlap = 0
     answered_answerable = refused_answerable = refused_unanswerable = errors = 0
+    # MRR is defined over questions with at least one gold span: a question
+    # without gold evidence has no relevant item to rank and is excluded.
+    mrr_questions = 0
     result_rows = []
     categories = {}
     for row in payload["predictions"]:
@@ -175,6 +178,7 @@ def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None,
         ev = row["retrieved_evidence"]
         gold_hits += sum(legacy._covered(g, ev[:5]) for g in q["evidence"])
         if q["answerable"] and q["evidence"]:
+            mrr_questions += 1
             rank = next((i for i, span in enumerate(ev, 1) if any(legacy._covered(g, [span]) for g in q["evidence"])), None)
             if rank: reciprocal += 1 / rank
         outcome = row["outcome"]
@@ -210,7 +214,8 @@ def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None,
     metrics = {"sample_count": len(expected), "execution_error_count": errors,
                "execution_error_rate": ratio(errors, len(expected)), "gold_evidence_span_count": gold_total,
                "gold_evidence_span_hit_count_at_5": gold_hits, "recall_at_5": ratio(gold_hits, gold_total),
-               "mrr_at_10": ratio(reciprocal, answerable), "answerable_question_count": answerable,
+               "mrr_at_10": ratio(reciprocal, mrr_questions), "mrr_at_10_question_count": mrr_questions,
+               "answerable_question_count": answerable,
                "answerable_answered_count": answered_answerable, "answerable_answer_rate": ratio(answered_answerable, answerable),
                "answerable_refused_count": refused_answerable, "answerable_false_refusal_rate": ratio(refused_answerable, answerable),
                "unanswerable_question_count": unanswerable, "unanswerable_refused_count": refused_unanswerable,
@@ -234,7 +239,7 @@ def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None,
                 or any(type(config["minimums"][k]) not in (int, float) or not math.isfinite(config["minimums"][k])
                        or not MINIMUMS[k] <= config["minimums"][k] <= 1 for k in MINIMUMS)):
             raise ValueError("INVALID_QUALITY_CONFIG")
-        raw_metrics = {"recall_at_5": (gold_hits, gold_total), "mrr_at_10": (reciprocal, answerable),
+        raw_metrics = {"recall_at_5": (gold_hits, gold_total), "mrr_at_10": (reciprocal, mrr_questions),
                        "human_supported_answer_rate": (supported, reviewed), "citation_accuracy": (citations_supported, citations_reviewed),
                        "unanswerable_refusal_rate": (refused_unanswerable, unanswerable), "answerable_answer_rate": (answered_answerable, answerable),
                        "human_support_review_coverage": (reviewed, answered_count), "citation_review_coverage": (citations_reviewed, citations_total)}

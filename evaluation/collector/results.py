@@ -1,4 +1,5 @@
 """Process-local, single-use synchronous answer capture for evaluation."""
+import asyncio
 from copy import deepcopy
 
 from knowflow_ai.adapters import ProcessingError
@@ -14,6 +15,9 @@ class RecordingAnswerService:
         try:
             response = await self._service.answer(request)
             return response
+        except asyncio.CancelledError:
+            error_code = "EXECUTION_CANCELLED"
+            raise
         except ProcessingError as error:
             error_code = error.code
             raise
@@ -22,8 +26,11 @@ class RecordingAnswerService:
             raise
         finally:
             request_id = request["request_id"]
+            # Never await during cancellation cleanup: a second cancellation
+            # would abort before the result lands. The trace store is local,
+            # so a synchronous pop is atomic.
             try:
-                trace = await self._factories.traces.take(request_id)
+                trace = self._factories.traces.take_nowait(request_id)
             except ValueError:
                 trace = None
             self._factories.results[request_id] = {

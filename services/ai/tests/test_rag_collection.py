@@ -1118,3 +1118,101 @@ async def test_zero_price_quote_is_enabled_only_for_embedding_guard(tmp_path):
         await llm.generate("synthetic", [], request_id="synthetic-llm")
     with closing(sqlite3.connect(ledger.path)) as db:
         assert db.execute("SELECT count(*) FROM zero_price_reservations").fetchone()[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_capture_rejects_pdf_page_locators_with_a_readable_code():
+    scope = {"indexes": [{"document_id": "d", "content_version_id": "c", "index_version_id": "i"}]}
+    row = {"document_id": "d", "content_version_id": "c", "index_version_id": "i",
+           "source_id": "src", "locator": {"kind": "pdf_page", "page": 2},
+           "text_sha256": "a" * 64}
+
+    class Retriever:
+        async def retrieve(self, *args, **kwargs): return [row]
+
+    with pytest.raises(ValueError, match="UNSUPPORTED_LOCATOR_KIND"):
+        await capture.CapturingRetriever(Retriever(), capture.CaptureStore()).retrieve("q", scope, "r")
+
+
+def test_trace_mapping_rejects_pdf_page_locators_with_a_readable_code():
+    source = "甲证据乙".encode("utf-8")
+    key = ("runtime-doc", "runtime-content", "runtime-index")
+    entry = {"dataset_document_id": "doc", "dataset_content_version_id": "version",
+             "source_bytes": source, "source_sha256": sha256(source).hexdigest()}
+    row = {"document_id": key[0], "content_version_id": key[1], "index_version_id": key[2],
+           "source_id": "src-1", "locator": {"kind": "pdf_page", "page": 2},
+           "text_sha256": "a" * 64}
+
+    with pytest.raises(ValueError, match="UNSUPPORTED_LOCATOR_KIND"):
+        mapping.map_retrieval("550e8400-e29b-41d4-a716-446655440000", [row], {key: entry})
+
+
+@pytest.mark.asyncio
+async def test_recording_answer_service_writes_the_result_without_awaiting_on_cancel():
+    class NoAwaitStore(capture.CaptureStore):
+        async def take(self, request_id):
+            raise AssertionError("take must not be awaited during cancellation cleanup")
+
+    class Service:
+        last_diagnostics = {"decision": "refused"}
+        async def answer(self, request):
+            started.set()
+            await asyncio.sleep(60)
+
+    started = asyncio.Event()
+    store = NoAwaitStore()
+    await store.begin("req-cancel")
+    await store.record("req-cancel", [], {"indexes": []})
+    results = {"req-cancel": None}
+    service = load("results").RecordingAnswerService(
+        Service(), SimpleNamespace(traces=store, results=results))
+    task = asyncio.create_task(service.answer({"request_id": "req-cancel"}))
+    await started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert results["req-cancel"]["error_code"] == "EXECUTION_CANCELLED"
+    assert results["req-cancel"]["response"] is None
+    assert results["req-cancel"]["trace"] == []
+
+
+def test_mrr_denominator_excludes_answerable_questions_without_gold(monkeypatch, tmp_path):
+    spec = importlib.util.spec_from_file_location(
+        "runner_v2_under_test", ROOT / "evaluation" / "runner" / "runner_v2.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    source = "gold span here"
+    gold = {"document_id": "doc", "content_version_id": "cv", "start": 0, "end": 4,
+            "text_sha256": sha256(source[:4].encode("utf-8")).hexdigest()}
+    questions = [
+        {"id": "q-gold", "question": "有证据", "answerable": True,
+         "reference_answer": "x", "evidence": [gold], "split": "holdout", "leakage_group": "g1"},
+        {"id": "q-nogold", "question": "无证据", "answerable": True,
+         "reference_answer": "x", "evidence": [], "split": "holdout", "leakage_group": "g2"},
+        {"id": "q-no", "question": "不可答", "answerable": False,
+         "reference_answer": "x", "evidence": [], "split": "holdout", "leakage_group": "g3"},
+    ]
+    monkeypatch.setattr(runner.legacy, "_load_dataset",
+                        lambda _root: ({"dataset_id": "synthetic"}, questions,
+                                       {"doc": {"content_version_id": "cv"}},
+                                       {"doc": source}, "e" * 64))
+    prediction_row = lambda question_id, evidence: {
+        "question_id": question_id, "outcome": "refused", "answer": "没有足够的资料证据。",
+        "answer_sha256": sha256("没有足够的资料证据。".encode("utf-8")).hexdigest(),
+        "retrieved_evidence": evidence, "citations": [], "latency_ms": 1, "error_code": None}
+    payload = {
+        "prediction_version": 2, "dataset_id": "synthetic", "dataset_sha256": "e" * 64,
+        "run": {"code_sha": "a" * 40, "schema_sha256": "b" * 64, "model": "m",
+                "config_sha256": "c" * 64, "prompt_sha256": "d" * 64},
+        "predictions": [prediction_row("q-gold", [dict(gold, source_id="src-1")]),
+                        prediction_row("q-nogold", []), prediction_row("q-no", [])],
+    }
+    path = tmp_path / "predictions.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    report = runner.evaluate(str(path), split="holdout", dataset_root=str(tmp_path))
+
+    assert report["metrics"]["answerable_question_count"] == 2
+    assert report["metrics"]["mrr_at_10_question_count"] == 1
+    assert report["metrics"]["mrr_at_10"] == 1.0

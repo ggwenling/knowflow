@@ -139,30 +139,6 @@ def _claim_segments(answer):
     return units
 
 
-def _evidence_units(evidence):
-    """Keep negation and numeric checks local to likely supporting text."""
-    markers = list(_MARKER.finditer(evidence))
-    spans = [(marker.start(), marker.end()) for marker in markers]
-    protected_boundaries = _protected_boundaries(evidence)
-    units = []
-    start = 0
-    span_index = 0
-    for position in range(len(evidence)):
-        while span_index < len(spans) and spans[span_index][1] <= position:
-            span_index += 1
-        in_marker = (span_index < len(spans)
-                     and spans[span_index][0] <= position < spans[span_index][1])
-        if _is_boundary(evidence, position, in_marker, protected_boundaries):
-            unit = _normalized(evidence[start:position])
-            if unit:
-                units.append(unit)
-            start = position + 1
-    final = _normalized(evidence[start:])
-    if final:
-        units.append(final)
-    return units
-
-
 def _bigrams(text):
     return Counter(zip(text, text[1:]))
 
@@ -184,29 +160,6 @@ def _bigram_coverage(claim_bigrams, evidence):
     matched = sum(min(count, evidence_bigrams[bigram])
                   for bigram, count in claim_bigrams.items())
     return matched / claim_size
-
-
-def _grounded(claim, evidence):
-    claim = _normalized(claim)
-    if not claim:
-        return False
-    claim_bigrams = _bigrams(claim)
-    normalized_evidence = _normalized(evidence)
-    if _numeric_conflict(claim, normalized_evidence):
-        return False
-
-    # Match against the complete retrieved chunk first. Splitting the chunk
-    # can lose overlap when a paraphrase draws on adjacent sentences.
-    comparison_texts = [normalized_evidence, *_evidence_units(evidence)]
-    for comparison_text in comparison_texts:
-        coverage = _bigram_coverage(claim_bigrams, comparison_text)
-        if coverage >= 0.55 and _negation_conflict(claim, comparison_text):
-            continue
-        if claim in comparison_text:
-            return True
-        if coverage >= 0.55:
-            return True
-    return False
 
 
 def _claim_groups(answer):
