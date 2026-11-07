@@ -778,7 +778,14 @@ async def test_answer_service_returns_only_cited_scope_sources():
     response = await service.answer(_request())
     assert response["has_answer"] is True
     assert [source["source_id"] for source in response["sources"]] == ["src-evidence-1"]
-    assert response["sources"][0]["quote"] == rows[0]["text_content"]
+    source = response["sources"][0]
+    claim = "索引 READY 后才可检索"
+    text = rows[0]["text_content"]
+    assert source["quote"] == claim
+    assert source["locator"] == {"kind": "text_range",
+                                 "start": rows[0]["locator"]["start"] + text.find(claim),
+                                 "end": rows[0]["locator"]["start"] + text.find(claim) + len(claim),
+                                 "unit": "unicode_code_point"}
     assert response["model_profile"] == model_profile
     _contract().validate("AnswerResponse", response)
 
@@ -923,7 +930,34 @@ def test_citation_verifier_accepts_a_high_overlap_paraphrase():
         {"src-evidence-1": "索引 READY 后才可检索。"})
 
     assert response["has_answer"] is True
-    assert response["sources"][0]["quote"] == "索引 READY 后才可检索。"
+    assert response["sources"][0]["quote"] == "索引 READY 后才可检索"
+
+
+def test_citation_locator_narrows_to_the_supporting_sentence():
+    text = "发布说明。索引 READY 后才可检索。其他内容。"
+    claim = "索引 READY 后才可检索"
+    response = _citation_response(f"{claim}[src-evidence-1]。", {"src-evidence-1": text})
+
+    assert response["has_answer"] is True
+    locator = response["sources"][0]["locator"]
+    start, end = text.find(claim), text.find(claim) + len(claim)
+    assert locator == {"kind": "text_range", "start": start, "end": end,
+                       "unit": "unicode_code_point"}
+    assert (locator["start"], locator["end"]) != (0, len(text))
+    assert claim in text[locator["start"]:locator["end"]]
+    assert response["sources"][0]["quote"] == claim
+
+
+def test_citation_locator_falls_back_to_the_chunk_when_no_span_matches():
+    text = "完全无关的背景说明。"
+    response = _citation_response(
+        "索引 READY 后才可检索[src-evidence-1]。", {"src-evidence-1": text})
+
+    assert response["has_answer"] is True
+    assert response["sources"][0]["locator"] == {
+        "kind": "text_range", "start": 0, "end": len(text),
+        "unit": "unicode_code_point"}
+    assert response["sources"][0]["quote"] == text
 
 
 def test_citation_verifier_accepts_paraphrase_supported_across_the_full_chunk():

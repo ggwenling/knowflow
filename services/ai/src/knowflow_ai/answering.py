@@ -18,7 +18,12 @@ import psycopg
 
 from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
-from .citation_verify import MAX_ANSWER_CODEPOINTS, claims_are_verbatim, prune_claims
+from .citation_verify import (
+    MAX_ANSWER_CODEPOINTS,
+    claims_are_verbatim,
+    prune_claims,
+    source_claim_spans,
+)
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
 from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
@@ -92,6 +97,28 @@ def _repair_trigger_eligible(generated, evidence, diagnostics, kept_source_ids):
                 and isinstance(kept_source_ids, list) and bool(kept_source_ids))
     return (counts["kept_claims"] == 0 and kept_source_ids == []
             and (counts["dropped_claims"] > 0 or counts["uncited_claims"] > 0))
+
+
+def _citation_excerpt(item, span):
+    """Return the citation locator and quote for one source.
+
+    ``span`` is a chunk-local claim span. When it is available for a text
+    source, publish only that excerpt; otherwise keep the whole chunk so the
+    user still has a valid fallback location.
+    """
+    locator = item["locator"]
+    text = item["text_content"]
+    if (span is None or not isinstance(locator, dict)
+            or locator.get("kind") != "text_range"
+            or not isinstance(locator.get("start"), int)):
+        return locator, text
+    start, end = span
+    if not 0 <= start < end <= len(text):
+        return locator, text
+    return ({"kind": "text_range", "start": locator["start"] + start,
+             "end": locator["start"] + end,
+             "unit": locator.get("unit", "unicode_code_point")},
+            text[start:end])
 
 
 def _citation_diagnostics(reason):
@@ -762,14 +789,18 @@ class AnswerService:
             if pruning["ok"]:
                 answer = pruning["pruned_answer"]
                 ids = pruning["kept_source_ids"]
-                sources = [{"source_id": source_id,
-                            "document_id": by_id[source_id]["document_id"],
-                            "content_version_id": by_id[source_id]["content_version_id"],
-                            "index_version_id": by_id[source_id]["index_version_id"],
-                            "chunk_id": by_id[source_id]["chunk_id"],
-                            "locator": by_id[source_id]["locator"],
-                            "quote": by_id[source_id]["text_content"]}
-                           for source_id in ids]
+                spans = source_claim_spans(answer, evidence_text)
+                sources = []
+                for source_id in ids:
+                    item = by_id[source_id]
+                    locator, quote = _citation_excerpt(item, spans.get(source_id))
+                    sources.append({"source_id": source_id,
+                                    "document_id": item["document_id"],
+                                    "content_version_id": item["content_version_id"],
+                                    "index_version_id": item["index_version_id"],
+                                    "chunk_id": item["chunk_id"],
+                                    "locator": locator,
+                                    "quote": quote})
                 has_answer = True
                 diagnostics["decision"] = "answered"
             else:

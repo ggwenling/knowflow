@@ -469,14 +469,14 @@ public class QuestionService {
             if (!source.quote().equals(chunk.text()) && !chunk.text().contains(source.quote())) {
                 throw ApiFailure.aiProcessingFailed();
             }
-            if (!sameLocator(source.locator(), chunk.locator())) {
+            if (!locatorWithinChunk(source.locator(), chunk.locator())) {
                 throw ApiFailure.aiProcessingFailed();
             }
             UUID publicSourceId = UUID.nameUUIDFromBytes((snapshot.questionId() + ":"
                     + source.sourceId()).getBytes(StandardCharsets.UTF_8));
             storedSources.add(new SourceResponse(ApiError.CONTRACT_VERSION, publicSourceId,
                     source.documentId(), source.contentVersionId(), source.indexVersionId(),
-                    source.chunkId(), toPublicLocator(chunk.locator()), source.quote()));
+                    source.chunkId(), toPublicLocator(source.locator()), source.quote()));
             publicAnswer = publicAnswer.replace("[" + source.sourceId() + "]",
                     "[" + publicSourceId + "]");
         }
@@ -640,13 +640,27 @@ public class QuestionService {
         }
     }
 
-    private static boolean sameLocator(AiAnswerResponse.Locator actual,
-                                       AiAnswerResponse.Locator stored) {
-        return actual != null && java.util.Objects.equals(actual.kind(), stored.kind())
-                && java.util.Objects.equals(actual.page(), stored.page())
-                && java.util.Objects.equals(actual.start(), stored.start())
-                && java.util.Objects.equals(actual.end(), stored.end())
-                && java.util.Objects.equals(actual.unit(), stored.unit());
+    static boolean locatorWithinChunk(AiAnswerResponse.Locator actual,
+                                      AiAnswerResponse.Locator stored) {
+        if (actual == null || stored == null
+                || !java.util.Objects.equals(actual.kind(), stored.kind())) {
+            return false;
+        }
+        if ("pdf_page".equals(stored.kind())) {
+            return java.util.Objects.equals(actual.page(), stored.page())
+                    && actual.start() == null && actual.end() == null
+                    && actual.unit() == null;
+        }
+        if ("text_range".equals(stored.kind())) {
+            return actual.page() == null
+                    && java.util.Objects.equals(actual.unit(), stored.unit())
+                    && actual.start() != null && actual.end() != null
+                    && stored.start() != null && stored.end() != null
+                    && actual.start() >= stored.start()
+                    && actual.end() > actual.start()
+                    && actual.end() <= stored.end();
+        }
+        return false;
     }
 
     private static SourceResponse.Locator toPublicLocator(AiAnswerResponse.Locator locator) {

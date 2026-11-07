@@ -268,6 +268,98 @@ def claims_are_verbatim(answer, evidence_by_id):
     return True
 
 
+def claim_units(answer):
+    """Return ``(claim text, cited source IDs)`` in answer order."""
+    return [(claim["text"], [marker.group(1) for marker in claim["markers"]])
+            for claim in _claim_groups(answer)]
+
+
+def _sentence_spans(text):
+    """Split evidence text into sentence units while retaining source offsets."""
+    markers = list(_MARKER.finditer(text))
+    spans = [(marker.start(), marker.end()) for marker in markers]
+    protected_boundaries = _protected_boundaries(text)
+    units = []
+    start = 0
+    span_index = 0
+    for position in range(len(text) + 1):
+        at_end = position == len(text)
+        in_marker = False
+        if not at_end:
+            while span_index < len(spans) and spans[span_index][1] <= position:
+                span_index += 1
+            in_marker = (span_index < len(spans)
+                         and spans[span_index][0] <= position < spans[span_index][1])
+            if not _is_boundary(text, position, in_marker, protected_boundaries):
+                continue
+        if text[start:position].strip():
+            units.append((start, position))
+        start = position + 1
+    return units
+
+
+def locate_claim_span(claim, text):
+    """Return the ``[start, end)`` slice of ``text`` supporting ``claim``.
+
+    A verbatim claim maps exactly. Otherwise the best matching sentence unit is
+    used, guarded by the same numeric/negation checks as grounding. ``None``
+    means no confident span exists and callers must fall back to the chunk.
+    """
+    if (not isinstance(claim, str) or not claim.strip()
+            or not isinstance(text, str) or not text):
+        return None
+    position = text.find(claim)
+    if position >= 0:
+        return position, position + len(claim)
+    normalized_claim = _normalized(claim)
+    if not normalized_claim:
+        return None
+    claim_bigrams = _bigrams(normalized_claim)
+    best = None
+    best_coverage = 0.0
+    for start, end in _sentence_spans(text):
+        unit = _normalized(text[start:end])
+        if not unit:
+            continue
+        if normalized_claim in unit:
+            return start, end
+        coverage = _bigram_coverage(claim_bigrams, unit)
+        if coverage < 0.55 or coverage <= best_coverage:
+            continue
+        if (_numeric_conflict(normalized_claim, unit)
+                or _negation_conflict(normalized_claim, unit)):
+            continue
+        best = (start, end)
+        best_coverage = coverage
+    return best
+
+
+def source_claim_spans(answer, text_by_source):
+    """Map each cited source to the smallest chunk-local span covering its claims.
+
+    A source whose claim cannot be located is omitted so the caller can fall
+    back to the whole chunk instead of publishing a partial or wrong range.
+    """
+    spans = {}
+    failed = set()
+    for claim, source_ids in claim_units(answer):
+        for source_id in source_ids:
+            if source_id in failed:
+                continue
+            text = text_by_source.get(source_id)
+            span = locate_claim_span(claim, text) if isinstance(text, str) else None
+            if span is None:
+                failed.add(source_id)
+                spans.pop(source_id, None)
+                continue
+            start, end = span
+            current = spans.get(source_id)
+            spans[source_id] = ((start, end) if current is None
+                                else (min(current[0], start), max(current[1], end)))
+    return {source_id: span for source_id, span in spans.items()
+            if source_id not in failed}
+
+
 def prune_claims(answer, evidence_by_id):
     """Remove unsupported claim units and report why an answer kept or lost all.
 

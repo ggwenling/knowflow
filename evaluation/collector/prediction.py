@@ -90,6 +90,25 @@ def _claim(answer, start, end):
     return result or answer[start:end]
 
 
+def _locator_within(actual, chunk):
+    """Accept a citation locator that is the chunk locator or a finer sub-range."""
+    if not isinstance(actual, dict) or not isinstance(chunk, dict):
+        return False
+    if actual.get("kind") != chunk.get("kind"):
+        return False
+    if chunk.get("kind") == "pdf_page":
+        return set(actual) == {"kind", "page"} and actual.get("page") == chunk.get("page")
+    if chunk.get("kind") == "text_range":
+        return (set(actual) == {"kind", "start", "end", "unit"}
+                and actual.get("unit") == chunk.get("unit")
+                and type(actual.get("start")) is int
+                and type(actual.get("end")) is int
+                and type(chunk.get("start")) is int
+                and type(chunk.get("end")) is int
+                and chunk["start"] <= actual["start"] < actual["end"] <= chunk["end"])
+    return False
+
+
 def answer_prediction(*, question_id, runtime_question_id, trace, mappings, response, latency_ms):
     """Build a dataset-keyed row from one runtime question and its captured trace."""
     evidence, runtime_to_public = _mapped_trace(
@@ -125,7 +144,7 @@ def answer_prediction(*, question_id, runtime_question_id, trace, mappings, resp
         if (runtime is None
                 or any(source.get(field) != runtime[field] for field in
                        ("document_id", "content_version_id", "index_version_id"))
-                or source.get("locator") != runtime["locator"]):
+                or not _locator_within(source.get("locator"), runtime["locator"])):
             raise ValueError("SERVICE_SOURCE_TRACE_MISMATCH")
 
     citations = []

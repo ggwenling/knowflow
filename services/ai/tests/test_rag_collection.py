@@ -945,6 +945,54 @@ async def test_prediction_rejects_citation_outside_generation_top5_and_request_m
 
 
 @pytest.mark.asyncio
+async def test_prediction_accepts_a_citation_locator_narrower_than_the_traced_chunk():
+    question_id, rows, mappings, scope = _prediction_fixture()
+    store = capture.CaptureStore()
+    await store.begin("req-narrow")
+    await store.record("req-narrow", rows, scope)
+    response = {
+        "request_id": "req-narrow", "answer": "证据[src-0]。",
+        "has_answer": True,
+        "sources": [{"source_id": "src-0", "document_id": rows[0]["document_id"],
+                     "content_version_id": rows[0]["content_version_id"],
+                     "index_version_id": rows[0]["index_version_id"],
+                     "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                 "start": 2, "end": 6}}],
+    }
+
+    row = await prediction.bind_response(
+        trace_store=store, request_id="req-narrow", question_id=question_id,
+        runtime_question_id=question_id, mappings=mappings,
+        response=response, latency_ms=10)
+
+    assert row["outcome"] == "answered"
+    assert row["citations"][0]["claim"] == row["answer"]
+
+
+@pytest.mark.asyncio
+async def test_prediction_rejects_a_citation_locator_outside_the_traced_chunk():
+    question_id, rows, mappings, scope = _prediction_fixture()
+    store = capture.CaptureStore()
+    await store.begin("req-wide")
+    await store.record("req-wide", rows, scope)
+    response = {
+        "request_id": "req-wide", "answer": "证据[src-0]。",
+        "has_answer": True,
+        "sources": [{"source_id": "src-0", "document_id": rows[0]["document_id"],
+                     "content_version_id": rows[0]["content_version_id"],
+                     "index_version_id": rows[0]["index_version_id"],
+                     "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                 "start": 0, "end": 9}}],
+    }
+
+    with pytest.raises(ValueError, match="SERVICE_SOURCE_TRACE_MISMATCH"):
+        await prediction.bind_response(
+            trace_store=store, request_id="req-wide", question_id=question_id,
+            runtime_question_id=question_id, mappings=mappings,
+            response=response, latency_ms=10)
+
+
+@pytest.mark.asyncio
 async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tmp_path):
     question_id, _rows, mappings, scope = _prediction_fixture()
     wiring = load("wiring")
