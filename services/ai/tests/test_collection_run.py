@@ -106,6 +106,77 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
 
 
 @pytest.mark.asyncio
+async def test_cleanup_failure_does_not_mask_the_collection_error(tmp_path):
+    dataset = ROOT / "evaluation/data/seed-v1"
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+    output = tmp_path / "predictions.json"
+    cleanup = []
+
+    async def java_transport(request):
+        if request.method == "DELETE":
+            cleanup.append(request.url.path)
+            return httpx.Response(500)
+        if request.url.path == "/api/v1/knowledge-bases":
+            return httpx.Response(201, json={"id": "kb"})
+        if request.url.path.endswith("/documents"):
+            return httpx.Response(500)
+        raise AssertionError("unexpected " + request.url.path)
+
+    async def unused_ai(*_args, **_kwargs):
+        raise AssertionError("ai must not run when upload fails")
+
+    async def unused_fetch(*_args, **_kwargs):
+        raise AssertionError("fetch_row must not run when upload fails")
+
+    async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
+        with pytest.raises(ValueError, match="EVALUATION_UPLOAD_FAILED"):
+            await run.collect_dataset(
+                java=java, ai=object(), dataset=dataset, split="development", output=output,
+                run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                              "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                fetch_row=unused_fetch, ledger=ledger)
+
+    assert cleanup == ["/api/v1/knowledge-bases/kb"]
+    status = json.loads(output.with_suffix(".status.json").read_text())
+    assert status["complete"] is False
+    assert status["failures"] == [{"code": "EVALUATION_CLEANUP_FAILED"}]
+
+
+@pytest.mark.asyncio
+async def test_collect_dataset_stops_when_shared_ledger_records_a_budget_stop(tmp_path):
+    dataset = ROOT / "evaluation/data/seed-v1"
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+    now = datetime.now(timezone.utc)
+    quote = {"provider": "synthetic", "model": "fake", "input_cny_per_million": "1",
+             "output_cny_per_million": "1", "source_url": "https://example.test/prices",
+             "verified_by": "test", "verified_at": (now - timedelta(hours=1)).isoformat(),
+             "valid_until": (now + timedelta(hours=1)).isoformat()}
+    ledger.reserve("spent", provider="synthetic", model="fake",
+                   input_tokens_upper=7_000_000, output_tokens_upper=0, quote=quote)
+    with pytest.raises(ValueError, match="BUDGET_SOFT_STOP"):
+        ledger.reserve("crosses-soft-stop", provider="synthetic", model="fake",
+                       input_tokens_upper=2_000_000, output_tokens_upper=0, quote=quote)
+    assert ledger.summary()["reserved_microyuan"] == 7_000_000
+    assert ledger.stop_reason() == "BUDGET_SOFT_STOP"
+
+    async def java_transport(request):
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        if request.url.path == "/api/v1/knowledge-bases":
+            return httpx.Response(201, json={"id": "kb"})
+        raise AssertionError("upload must not start after a recorded budget stop")
+
+    output = tmp_path / "predictions.json"
+    async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
+        with pytest.raises(ValueError, match="BUDGET_SOFT_STOP"):
+            await run.collect_dataset(
+                java=java, ai=object(), dataset=dataset, split="development", output=output,
+                run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                              "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                fetch_row=lambda *_args, **_kwargs: None, ledger=ledger)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("bad_limit", [0, -1, 1.5, "2", True])
 async def test_collect_dataset_rejects_invalid_limit(tmp_path, bad_limit):
     dataset = ROOT / "evaluation/data/seed-v1"

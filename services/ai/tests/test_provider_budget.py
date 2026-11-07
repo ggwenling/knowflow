@@ -96,6 +96,7 @@ async def test_provider_thresholds_stop_before_http(monkeypatch, caplog, spent, 
     assert reason in caplog.text
     assert calls == []
     assert ledger.summary()["paid_reservations"] == 1
+    assert ledger.stop_reason() == reason
 
 
 @pytest.mark.asyncio

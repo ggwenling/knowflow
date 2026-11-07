@@ -81,6 +81,11 @@ def _claim(answer, start, end):
     before = max((position for position in separators if position < start), default=-1)
     following = [position for position in separators if position >= end]
     stop = min(following) + 1 if following else len(answer)
+    if not answer[before + 1:start].strip():
+        # The marker directly follows a sentence boundary (e.g. "句。[id]").
+        # Keep the sentence it annotates instead of returning a marker-only claim.
+        before = max((position for position in separators if position < before), default=-1)
+        stop = end
     result = answer[before + 1:stop].strip()
     return result or answer[start:end]
 

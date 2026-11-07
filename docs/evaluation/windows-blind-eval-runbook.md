@@ -67,6 +67,10 @@ cd D:\konwflow\knowflow
 ## 2. 启动本机 Java + 真实评测 AI
 
 ```powershell
+# Java 侧索引调度默认关闭；启动 Java API 前必须显式开启，否则索引任务停在 QUEUED，
+# 采集会在每篇 180 秒等待后以 EVALUATION_INDEX_NOT_READY 失败：
+$env:KNOWFLOW_INDEXING_SCHEDULER_ENABLED = "true"
+
 # 先起 PG / MinIO / Java（习惯端口 55432 / 59000 / 8080），确认：
 # Invoke-WebRequest http://127.0.0.1:8080/actuator/health
 .\services\ai\.venv\Scripts\python.exe evaluation\collector\real_service.py

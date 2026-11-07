@@ -285,14 +285,17 @@ def create_real_app():
         ledger = wiring.BudgetLedger(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
     except Exception:
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
+    stop_reason = None
     try:
         snapshot = ledger.summary()
+        stop_reason = ledger.stop_reason()
     except Exception:
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
     if (not isinstance(snapshot, dict)
             or type(snapshot.get("reserved_microyuan")) is not int
             or snapshot["reserved_microyuan"] < 0
-            or snapshot["reserved_microyuan"] >= SOFT_STOP_MICROYUAN):
+            or snapshot["reserved_microyuan"] >= SOFT_STOP_MICROYUAN
+            or stop_reason in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED")):
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
     _assert_shared_ledger_ready(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
     try:

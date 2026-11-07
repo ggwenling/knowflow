@@ -53,6 +53,7 @@ class BudgetLedger:
             db.execute("CREATE TABLE IF NOT EXISTS budget (id INTEGER PRIMARY KEY CHECK(id = 1), limit_microyuan INTEGER NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS reservations (request_id TEXT PRIMARY KEY, microyuan INTEGER NOT NULL CHECK(microyuan > 0), input_tokens_upper INTEGER NOT NULL, output_tokens_upper INTEGER NOT NULL, price_quote TEXT NOT NULL)")
             db.execute("CREATE TABLE IF NOT EXISTS zero_price_reservations (request_id TEXT PRIMARY KEY, input_tokens_upper INTEGER NOT NULL, output_tokens_upper INTEGER NOT NULL CHECK(output_tokens_upper = 0), price_quote TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS budget_stops (id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL, reason TEXT NOT NULL, reserved_microyuan INTEGER NOT NULL, created_at TEXT NOT NULL)")
             db.execute("INSERT OR IGNORE INTO budget VALUES (1, ?)", (limit_microyuan,))
             if db.execute("SELECT limit_microyuan FROM budget WHERE id = 1").fetchone()[0] != limit_microyuan:
                 raise ValueError("BUDGET_LIMIT_MISMATCH")
@@ -109,30 +110,59 @@ class BudgetLedger:
         if zero_price and not allow_zero_price_embedding:
             raise ValueError("UNVERIFIED_PRICE")
         if amount > self.limit:
+            self._record_stop(request_id, "BUDGET_EXCEEDED")
             raise ValueError("BUDGET_EXCEEDED")
-        with closing(sqlite3.connect(self.path, timeout=30, isolation_level=None)) as db, db:
+        reason = None
+        with closing(sqlite3.connect(self.path, timeout=30, isolation_level=None)) as db:
             db.execute("BEGIN IMMEDIATE")
             spent = db.execute("SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0]
             if (db.execute("SELECT 1 FROM reservations WHERE request_id = ?", (request_id,)).fetchone()
                     or db.execute("SELECT 1 FROM zero_price_reservations WHERE request_id = ?", (request_id,)).fetchone()):
+                db.rollback()
                 raise ValueError("DUPLICATE_REQUEST_ID")
             if spent >= SOFT_STOP_MICROYUAN:
-                raise ValueError("BUDGET_SOFT_STOP")
-            if spent + amount > self.limit:
-                raise ValueError("BUDGET_EXCEEDED")
-            if spent + amount > SOFT_STOP_MICROYUAN:
-                raise ValueError("BUDGET_SOFT_STOP")
-            if zero_price:
-                db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
-                           (request_id, input_tokens_upper, output_tokens_upper,
-                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                reason = "BUDGET_SOFT_STOP"
+            elif spent + amount > self.limit:
+                reason = "BUDGET_EXCEEDED"
+            elif spent + amount > SOFT_STOP_MICROYUAN:
+                reason = "BUDGET_SOFT_STOP"
+            if reason is None:
+                if zero_price:
+                    db.execute("INSERT INTO zero_price_reservations VALUES (?, ?, ?, ?)",
+                               (request_id, input_tokens_upper, output_tokens_upper,
+                                json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                else:
+                    db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
+                               (request_id, amount, input_tokens_upper, output_tokens_upper,
+                                json.dumps(quote, sort_keys=True, separators=(",", ":"))))
+                db.commit()
             else:
-                db.execute("INSERT INTO reservations VALUES (?, ?, ?, ?, ?)",
-                           (request_id, amount, input_tokens_upper, output_tokens_upper,
-                            json.dumps(quote, sort_keys=True, separators=(",", ":"))))
-            db.commit()
+                db.rollback()
+        if reason is not None:
+            self._record_stop(request_id, reason, spent)
+            raise ValueError(reason)
         return {"reserved_microyuan": amount, "total_reserved_microyuan": spent + amount,
                 "remaining_microyuan": self.limit - spent - amount}
+
+    def _record_stop(self, request_id, reason, reserved_microyuan=None):
+        """Persist a rejected reservation so every ledger reader can see the stop."""
+        if reserved_microyuan is None:
+            with closing(sqlite3.connect(self.path, timeout=30)) as db:
+                reserved_microyuan = db.execute(
+                    "SELECT COALESCE(SUM(microyuan), 0) FROM reservations").fetchone()[0]
+        try:
+            with closing(sqlite3.connect(self.path, timeout=30)) as db, db:
+                db.execute("INSERT INTO budget_stops (request_id, reason, reserved_microyuan, created_at) "
+                           "VALUES (?, ?, ?, ?)",
+                           (request_id, reason, reserved_microyuan, datetime.now(timezone.utc).isoformat()))
+        except sqlite3.Error:
+            pass
+
+    def stop_reason(self):
+        """Return the most recent rejected budget call, if any."""
+        with closing(sqlite3.connect(self.path, timeout=30)) as db:
+            row = db.execute("SELECT reason FROM budget_stops ORDER BY id DESC LIMIT 1").fetchone()
+        return row[0] if row else None
 
     def summary(self):
         """Read a consistent reservation snapshot without holding the connection open."""

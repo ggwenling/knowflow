@@ -782,6 +782,19 @@ def test_collector_claim_keeps_decimal_numbers_inside_the_claim():
     assert prediction._claim(answer, marker.start(), marker.end()) == answer
 
 
+@pytest.mark.parametrize("answer, expected", [
+    ("甲公司2023年净利润为18亿元。[src-a.v1]", "甲公司2023年净利润为18亿元。[src-a.v1]"),
+    ("甲公司2023年净利润为18亿元。 [src-a.v1]", "甲公司2023年净利润为18亿元。 [src-a.v1]"),
+    ("第一句。第二句。[src-a.v1]", "第二句。[src-a.v1]"),
+    ("第一句。[src-a.v1]第二句。", "第一句。[src-a.v1]"),
+])
+def test_collector_claim_keeps_annotated_sentence_when_marker_follows_boundary(answer, expected):
+    marker = prediction._MARKER.search(answer)
+
+    assert marker is not None
+    assert prediction._claim(answer, marker.start(), marker.end()) == expected
+
+
 @pytest.mark.parametrize("answer", [
     "请访问 https://docs.example.test/start[src-a.v1]。",
     "联系 help@example.test[src-a.v1]。",

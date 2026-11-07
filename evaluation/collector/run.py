@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 import httpx
 import psycopg
 from psycopg.rows import dict_row
-from knowflow_ai.budget import BudgetLedger
+from knowflow_ai.budget import BudgetLedger, SOFT_STOP_MICROYUAN
 from knowflow_ai.protocol import CONTRACT_VERSION
 
 
@@ -35,6 +35,32 @@ def write_json(path, value):
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
+
+
+async def _cleanup_knowledge_base(java, knowledge_base_id, output, status):
+    """Delete the temporary knowledge base without masking an earlier failure."""
+    try:
+        deleted = await java.delete("/api/v1/knowledge-bases/" + knowledge_base_id)
+        failed = deleted.status_code != 204
+    except httpx.HTTPError:
+        failed = True
+    if failed:
+        status["complete"] = False
+        status["failures"].append({"code": "EVALUATION_CLEANUP_FAILED"})
+        try:
+            write_json(output.with_suffix(".status.json"), status)
+        except OSError:
+            pass
+    return failed
+
+
+def _budget_stop_reason(ledger):
+    reason = ledger.stop_reason()
+    if reason in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED"):
+        return reason
+    if ledger.summary()["reserved_microyuan"] >= SOFT_STOP_MICROYUAN:
+        return "BUDGET_SOFT_STOP"
+    return None
 
 
 async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger,
@@ -69,12 +95,14 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
     if created.status_code != 201:
         raise ValueError("EVALUATION_KNOWLEDGE_BASE_CREATE_FAILED")
     knowledge_base_id = created.json()["id"]
+    cleanup_failed = False
     try:
         write_json(output.with_suffix(".status.json"), status)
         mappings = {}
         for document in manifest["documents"]:
-            if ledger.summary()["reserved_microyuan"] >= 8_000_000:
-                raise ValueError("BUDGET_SOFT_STOP")
+            stop = _budget_stop_reason(ledger)
+            if stop is not None:
+                raise ValueError(stop)
             raw = (Path(dataset) / document["path"]).read_bytes()
             if sha256(raw).hexdigest() != document["sha256"]:
                 raise ValueError("DATASET_CHANGED_DURING_COLLECTION")
@@ -114,8 +142,9 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             return {name: str(value) if name == "id" else value for name, value in row.items()} if row else None
 
         for question_index, question in enumerate(selected):
-            if ledger.summary()["reserved_microyuan"] >= 8_000_000:
-                raise ValueError("BUDGET_SOFT_STOP")
+            stop = _budget_stop_reason(ledger)
+            if stop is not None:
+                raise ValueError(stop)
             diagnostics = {}
             try:
                 row = await collector.collect_question(
@@ -137,21 +166,19 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             write_json(output, payload)
             write_json(diagnostics_path, diagnostics_payload)
             write_json(output.with_suffix(".status.json"), status)
-            if (question_index + 1 < len(selected)
-                    and ledger.summary()["reserved_microyuan"] >= 8_000_000):
-                raise ValueError("BUDGET_SOFT_STOP")
+            if question_index + 1 < len(selected):
+                stop = _budget_stop_reason(ledger)
+                if stop is not None:
+                    raise ValueError(stop)
         status["complete"] = not status["failures"]
         write_json(output.with_suffix(".status.json"), status)
         if not status["complete"]:
             raise ValueError("COLLECTION_INCOMPLETE")
         return payload
     finally:
-        deleted = await java.delete("/api/v1/knowledge-bases/" + knowledge_base_id)
-        if deleted.status_code != 204:
-            status["complete"] = False
-            status["failures"].append({"code": "EVALUATION_CLEANUP_FAILED"})
-            write_json(output.with_suffix(".status.json"), status)
-            raise ValueError("EVALUATION_CLEANUP_FAILED")
+        cleanup_failed = await _cleanup_knowledge_base(java, knowledge_base_id, output, status)
+    if cleanup_failed:
+        raise ValueError("EVALUATION_CLEANUP_FAILED")
 
 
 async def main_async(args):
