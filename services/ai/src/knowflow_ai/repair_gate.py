@@ -61,6 +61,7 @@ _RELATION_ANCHORS = {
 }
 _MISSING_VALUE_HINTS = re.compile(r"未披露|未知|暂无数据|没有数据|未提供|未说明")
 _AMOUNT_VALUE = re.compile(r"净利润为[ \t]*-?[0-9]+(?:\.[0-9]+)?[ \t]*(?:亿元|万元|元)", re.ASCII)
+_QUESTION_MARK = re.compile(r"[?？]")
 
 
 @dataclass(frozen=True)
@@ -117,8 +118,21 @@ def _constraints(year: str | None, condition: str | None = None) -> tuple[tuple[
     return tuple(values)
 
 
+def compound_question(question: str) -> bool:
+    """True only when the request genuinely asks more than one question.
+
+    Repeated or trailing question marks (``？？``) are punctuation rather than a
+    second request, so they never make a question compound by themselves.
+    """
+    if not isinstance(question, str):
+        return False
+    segments = (segment.strip() for segment in _QUESTION_MARK.split(question))
+    return len([segment for segment in segments if segment]) > 1
+
+
 def _ambiguous_question(question: str) -> bool:
-    if question.count("?") + question.count("？") > 1 or _AMBIGUITY_HINTS.search(question):
+    """Detect conflicting requests, never punctuation alone."""
+    if _AMBIGUITY_HINTS.search(question):
         return True
     years = re.findall(r"(?<![0-9])[0-9]{4}(?![0-9])", question, re.ASCII)
     if len(set(years)) > 1:

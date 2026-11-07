@@ -3,6 +3,7 @@ from knowflow_ai.repair_gate import (
     RepairGateRejection,
     RepairTarget,
     check_repair_candidate,
+    compound_question,
     parse_repair_target,
 )
 
@@ -78,6 +79,22 @@ def test_parse_repair_target_rejects_unknown_names_modifiers_and_ambiguous_reque
 
     assert isinstance(parse_repair_target("公司 2027 年净利润是多少？"), RepairTarget)
     assert parse_repair_target("公司 2027 年净利润是多少？缓存默认关闭吗？").reason == "ambiguous_question"
+
+
+def test_question_mark_count_alone_never_makes_a_question_ambiguous():
+    compound = parse_repair_target("失败重试上限是什么？任务超时是否会改变已删除文档状态？")
+    assert isinstance(compound, RepairGateRejection)
+    assert compound.reason == "unsupported_question"
+    assert parse_repair_target("索引何时可检索？？").reason == "unsupported_question"
+    # Distinct requested relations still cannot be bound to one closed target.
+    assert parse_repair_target("公司 2027 年净利润是多少？缓存默认关闭吗？").reason == "ambiguous_question"
+
+
+def test_compound_question_ignores_repeated_question_marks():
+    assert compound_question("失败重试上限是什么？任务超时是否会改变已删除文档状态？") is True
+    assert compound_question("索引何时可检索？") is False
+    assert compound_question("索引何时可检索？？") is False
+    assert compound_question(None) is False
 
 
 def test_search_gate_fact_is_accepted_only_as_one_complete_direct_fact():

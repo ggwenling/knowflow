@@ -18,7 +18,7 @@ import psycopg
 
 from .adapters import ProcessingError, within_deadline
 from .config import ConfigurationError
-from .citation_verify import MAX_ANSWER_CODEPOINTS, prune_claims
+from .citation_verify import MAX_ANSWER_CODEPOINTS, claims_are_verbatim, prune_claims
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
 from .protocol import CONTRACT_VERSION, InvalidMessage
@@ -26,6 +26,7 @@ from .repair_gate import (
     REPAIR_GATE_REASONS,
     RepairGateRejection,
     check_repair_candidate,
+    compound_question,
     parse_repair_target,
 )
 
@@ -583,17 +584,25 @@ class AnswerService:
         """Validate one generation and conditionally make one bounded re-ask."""
         response, diagnostics = self._evaluate_generated(request, evidence, generated)
         attempt, outcome = 0, "not_attempted"
+        generic_repair = False
         if self._repair_enabled and diagnostics["repairable"]:
             parsed_target = parse_repair_target(request["question"])
             if isinstance(parsed_target, RepairGateRejection):
-                # _evaluate_generated applies the same parser when deriving
-                # repairable; keep this defensive branch fail closed.
-                diagnostics["repairable"] = False
-                diagnostics["repair_gate_reason"] = parsed_target.reason
-                parsed_target = None
+                if (parsed_target.reason == "unsupported_question"
+                        and compound_question(request["question"])):
+                    # The closed grammar cannot bind a compound request; the
+                    # re-ask still runs, but every claim must be verbatim.
+                    parsed_target = None
+                    generic_repair = True
+                else:
+                    # _evaluate_generated applies the same parser when deriving
+                    # repairable; keep this defensive branch fail closed.
+                    diagnostics["repairable"] = False
+                    diagnostics["repair_gate_reason"] = parsed_target.reason
+                    parsed_target = None
         else:
             parsed_target = None
-        if self._repair_enabled and parsed_target is not None:
+        if self._repair_enabled and (parsed_target is not None or generic_repair):
             # A pending cancellation must win before we record or enter a
             # provider attempt. Cancellation during the await below propagates.
             task = asyncio.current_task()
@@ -626,19 +635,35 @@ class AnswerService:
                         outcome = "failed_contract_validation"
                     else:
                         if repaired_diagnostics["decision"] == "answered":
-                            gate = check_repair_candidate(
-                                parsed_target, repaired, repaired_response,
-                                repaired_diagnostics, evidence)
-                            diagnostics["repair_gate_reason"] = gate.reason
-                            if gate.accepted:
-                                response = repaired_response
-                                diagnostics = {
-                                    **repaired_diagnostics,
-                                    "repair_gate_reason": "passed",
-                                }
-                                outcome = "answered"
+                            if generic_repair:
+                                evidence_by_id = {
+                                    item["source_id"]: item["text_content"]
+                                    for item in evidence}
+                                if claims_are_verbatim(repaired_response["answer"],
+                                                       evidence_by_id):
+                                    response = repaired_response
+                                    diagnostics = {
+                                        **repaired_diagnostics,
+                                        "repair_gate_reason": "passed",
+                                    }
+                                    outcome = "answered"
+                                else:
+                                    diagnostics["repair_gate_reason"] = "no_verbatim_fact"
+                                    outcome = "failed_unrelated"
                             else:
-                                outcome = "failed_unrelated"
+                                gate = check_repair_candidate(
+                                    parsed_target, repaired, repaired_response,
+                                    repaired_diagnostics, evidence)
+                                diagnostics["repair_gate_reason"] = gate.reason
+                                if gate.accepted:
+                                    response = repaired_response
+                                    diagnostics = {
+                                        **repaired_diagnostics,
+                                        "repair_gate_reason": "passed",
+                                    }
+                                    outcome = "answered"
+                                else:
+                                    outcome = "failed_unrelated"
                         elif repaired_diagnostics["reason"] == "model_declined":
                             outcome = "declined"
                         else:
@@ -745,6 +770,11 @@ class AnswerService:
                 target = parse_repair_target(request["question"])
                 if isinstance(target, RepairGateRejection):
                     diagnostics["repair_gate_reason"] = target.reason
+                    # A compound request outside the closed grammar still
+                    # earns the same single re-ask; its claims must be verbatim.
+                    diagnostics["repairable"] = (
+                        target.reason == "unsupported_question"
+                        and compound_question(request["question"]))
                 else:
                     diagnostics["repairable"] = True
         response = {"contract_version": CONTRACT_VERSION,

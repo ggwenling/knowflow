@@ -251,6 +251,23 @@ def _verbatim_source(normalized_claim, declared_ids, evidence_by_id):
     return None
 
 
+def claims_are_verbatim(answer, evidence_by_id):
+    """Require every cited claim in an answer to appear verbatim in a cited source."""
+    claims = _claim_groups(answer)
+    if not claims:
+        return False
+    for claim in claims:
+        normalized_claim = _normalized(claim["text"])
+        if not normalized_claim or not claim["markers"]:
+            return False
+        if not any(
+                isinstance(evidence_by_id.get(marker.group(1)), str)
+                and normalized_claim in _normalized(evidence_by_id[marker.group(1)])
+                for marker in claim["markers"]):
+            return False
+    return True
+
+
 def prune_claims(answer, evidence_by_id):
     """Remove unsupported claim units and report why an answer kept or lost all.
 

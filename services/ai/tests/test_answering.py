@@ -1763,6 +1763,56 @@ async def test_answer_service_does_not_ask_for_unsupported_or_ambiguous_question
 
 
 @pytest.mark.asyncio
+async def test_compound_question_with_sufficient_evidence_is_repaired(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    question = "失败重试上限是什么？任务超时是否会改变已删除文档状态？"
+    source = {**_evidence()[0],
+              "text_content": "失败重试上限为 3 次。任务超时不会改变已删除文档状态。"}
+    repaired = {"answer": "失败重试上限为 3 次[src-evidence-1]。"
+                          "任务超时不会改变已删除文档状态[src-evidence-1]。",
+                "has_answer": True, "source_ids": ["src-evidence-1"]}
+    model = RepairLlm({"answer": "", "has_answer": False, "source_ids": []}, repaired)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever([source]))
+    request = _request()
+    request["question"] = question
+
+    response = await service.answer(request)
+
+    assert response["has_answer"] is True
+    assert "失败重试上限为 3 次" in response["answer"]
+    assert "任务超时不会改变已删除文档状态" in response["answer"]
+    assert [item["source_id"] for item in response["sources"]] == ["src-evidence-1"]
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "answered"
+    assert service.last_diagnostics["repair_gate_reason"] == "passed"
+
+
+@pytest.mark.asyncio
+async def test_compound_question_with_insufficient_evidence_is_still_refused(monkeypatch):
+    monkeypatch.setenv("KNOWFLOW_ANSWER_REPAIR", "on")
+    question = "失败重试上限是什么？任务超时是否会改变已删除文档状态？"
+    repaired = {"answer": "失败重试上限为 3 次[src-evidence-1]。", "has_answer": True,
+                "source_ids": ["src-evidence-1"]}
+    model = RepairLlm({"answer": "", "has_answer": False, "source_ids": []}, repaired)
+    service = AnswerService("unused", _contract(), llm_factory=lambda: model,
+                            retriever=FakeRetriever(_evidence()))
+    request = _request()
+    request["question"] = question
+
+    response = await service.answer(request)
+
+    assert response["answer"] == "没有足够的资料证据回答这个问题。"
+    assert response["has_answer"] is False
+    assert response["sources"] == []
+    assert model.repair_calls == 1
+    assert service.last_diagnostics["repair_attempt"] == 1
+    assert service.last_diagnostics["repair_outcome"] == "failed_unrelated"
+    assert service.last_diagnostics["repair_gate_reason"] == "no_verbatim_fact"
+
+
+@pytest.mark.asyncio
 async def test_answer_service_does_not_repair_a_zero_claim_marker_only_answer(monkeypatch):
     monkeypatch.delenv("KNOWFLOW_ANSWER_REPAIR", raising=False)
     marker_only = {"answer": "[src-evidence-1]", "has_answer": True,
