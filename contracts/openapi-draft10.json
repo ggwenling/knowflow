@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "KnowFlow draft.10 candidate API",
-    "version": "0.2.0-draft.10",
-    "description": "开发候选，未冻结或 Q/M 签收。共享 schema SHA-256 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。正常 TXT/PDF 问答的 SSE 帧已由浏览器 E2E 对共享 schema 校验；错误/取消等未覆盖事件和完整消费语义仍待复核。DocumentApiIntegrationTest 以 MVC wire 响应验证了部分 null 规则：Document/Task 可选字段省略，问答历史 nullable 字段和过期来源字段为 JSON null；其他公开响应仍待核验。不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
+    "title": "KnowFlow 0.2.0 API",
+    "version": "0.2.0",
+    "description": "冻结版本 0.2.0（2026-11-07）。共享 schema SHA-256 a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。正常 TXT/PDF 问答的 SSE 帧已由浏览器 E2E 对共享 schema 校验；错误/取消等未覆盖事件和完整消费语义仍待复核。DocumentApiIntegrationTest 以 MVC wire 响应验证了部分 null 规则：Document/Task 可选字段省略，问答历史 nullable 字段和过期来源字段为 JSON null；其他公开响应仍待核验。不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
   },
   "security": [
     {

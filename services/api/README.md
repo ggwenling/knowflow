@@ -56,7 +56,7 @@ MinIO 使用锁定的 `bitnamilegacy/minio:2025.4.22` 镜像摘要 `sha256:50cec
 
 对象存储每个请求（包括完整响应正文）的总时限由 `KNOWFLOW_STORAGE_REQUEST_TIMEOUT` 控制，默认 `10s`，允许范围为大于 0 且不超过 `2m`。请求超时后会取消未完成读取；源文件代理和内部索引源读取也不会在访问对象存储期间持有数据库事务。
 
-应用进程连接数据库前，设置 `KNOWFLOW_DATABASE_URL`、`KNOWFLOW_DATABASE_USERNAME=knowflow_app`、`KNOWFLOW_DATABASE_PASSWORD`，并启用 profile：`SPRING_PROFILES_ACTIVE=database ./mvnw spring-boot:run`。当前外部路由包括注册/登录/登出、当前用户、个人知识库、上传/文档列表/文档与任务查询、文档删除、单轮提问、问答历史、引用查询和原文件代理读取。内部路由包括任务派发所需的健康调用、受控源文件读取、heartbeat、索引批次和 completion；数据库租约与 `fencing` 是唯一写入授权依据。JSON 使用候选契约版本 `0.2.0-draft.10`。不要将迁移角色凭据用于应用连接。
+应用进程连接数据库前，设置 `KNOWFLOW_DATABASE_URL`、`KNOWFLOW_DATABASE_USERNAME=knowflow_app`、`KNOWFLOW_DATABASE_PASSWORD`，并启用 profile：`SPRING_PROFILES_ACTIVE=database ./mvnw spring-boot:run`。当前外部路由包括注册/登录/登出、当前用户、个人知识库、上传/文档列表/文档与任务查询、文档删除、单轮提问、问答历史、引用查询和原文件代理读取。内部路由包括任务派发所需的健康调用、受控源文件读取、heartbeat、索引批次和 completion；数据库租约与 `fencing` 是唯一写入授权依据。JSON 使用冻结契约版本 `0.2.0`。不要将迁移角色凭据用于应用连接。
 
 启用 `database,storage` profile 后，上传只接受经签名/解析检查的 TXT、MD 与 PDF，最大 8 MiB；PDF 最多 200 页，文本最多 200,000 Unicode 码点。上传返回 202 并创建 `QUEUED` 任务。索引 Worker 必须通过 Java source/batch/heartbeat/completion 接口工作；Java 验证 1024 维向量、批次 SHA、租约及数据库事实后才切换 READY 活动索引。`POST /api/v1/knowledge-bases/{id}/questions` 只收 question 字段；Java 构建 READY 索引快照并复核 Python 返回引用，删除后来源和文件代理立即不可见。删除通过数据库 outbox 传播取消并重试物理清理。
 

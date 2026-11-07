@@ -3,7 +3,7 @@
     "name": "accept-draft9",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.10",
+      "contract_version": "0.2.0",
       "request_id": "java-health-draft9"
     },
     "valid": true
@@ -39,7 +39,7 @@
     "name": "reject-extra",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.10",
+      "contract_version": "0.2.0",
       "request_id": "java-health-draft9",
       "extra": "unsupported"
     },
@@ -49,7 +49,7 @@
     "name": "reject-missing-request-id",
     "payload": {
       "status": "UP",
-      "contract_version": "0.2.0-draft.10"
+      "contract_version": "0.2.0"
     },
     "valid": false
   },

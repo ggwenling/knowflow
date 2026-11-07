@@ -151,5 +151,5 @@ JP-I1 的开发双进程门槛已通过；draft.4 仍待 Q 审阅和 M 消费确
 - Python 全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告），含新增 `test_http_client.py` 6 项与 `test_recovery_e2e.py` 3 项；Schema **85 structural cases**；离线模型回归 **16 passed**。
 - 用修复后的 Compose 归属 harness 重跑 4 场景真实恢复 E2E，全通过：单 worker 重启后 fencing 1→2 且旧 batch/completion 均 `LEASE_REJECTED`；三次 worker 丢失终态 `WORKER_LOST` 且旧活动索引仍可查询；Java 重启后问题恢复为 `FAILED/PROCESSING_TIMEOUT` 且无答案/来源；worker 离线时删除后文档、来源文件、检索与内部来源读取全部拒绝，清理队列排空。报告 `services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json`。
 - 收尾核对：隔离库 `knowflow_recovery_772a89955a5e` 已删除；运行前 PostgreSQL/MinIO 均未运行，运行后两者均停止（只停本轮启动集合）；端口 8000/8080 释放；进程日志无 secret；外部模型调用 0。修复前的 `recovery-e2e-draft10.json` 保留为历史证据。
-- 新增 `knowflow_ai/http_client.py` 解决宿主机畸形代理环境令适配器构造抛异常、绕过 fail-closed 的问题；provider 适配器保留环境代理，内部 Java 网关不使用代理。两端源码未改共享契约，契约版本仍为 `0.2.0-draft.10`、SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。
+- 新增 `knowflow_ai/http_client.py` 解决宿主机畸形代理环境令适配器构造抛异常、绕过 fail-closed 的问题；provider 适配器保留环境代理，内部 Java 网关不使用代理。两端源码未改共享契约，契约版本仍为 `0.2.0`、SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`。
 - 仍未完成：60 道候选题人工复核与 blind holdout、真实 provider 质量/费用测量、独立 Q 审阅与 M 消费确认。全部改动仍在 `local` 未提交工作树。

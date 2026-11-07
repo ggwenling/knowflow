@@ -14,7 +14,7 @@ cd "$REPO_ROOT" || exit 1
 
 ENV_FILE="${1:-deploy/.env.production}"
 MIN_DISK_GB="${MIN_DISK_GB:-20}"
-EXPECTED_SCHEMA="20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f"
+EXPECTED_SCHEMA="a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1"
 
 pass=0; warn=0; fail=0
 row() { # area check status detail
@@ -45,7 +45,7 @@ if [ -f "$schema" ]; then
     actual="$(shasum -a 256 "$schema" | cut -d' ' -f1)"
   fi
   if [ "$actual" = "$EXPECTED_SCHEMA" ]; then
-    row contract schema-sha256 PASS "draft.10 登记值匹配"
+    row contract schema-sha256 PASS "0.2.0 登记值匹配"
   else
     row contract schema-sha256 FAIL "实际 ${actual:0:12}… 与登记值不符"
   fi

@@ -14,7 +14,7 @@ import SourceViewer from "./source-viewer";
 
 type Task = { task_id: string; status: string; failure_code: string | null };
 type Page<T> = { items: T[]; has_more: boolean };
-const contractVersion = "0.2.0-draft.10";
+const contractVersion = "0.2.0";
 const terminal = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 const labels: Record<string, string> = {
   QUEUED: "等待处理", RUNNING: "正在建立索引", SUCCEEDED: "已就绪", READY: "已就绪",

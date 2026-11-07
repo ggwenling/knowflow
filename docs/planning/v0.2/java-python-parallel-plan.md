@@ -263,7 +263,7 @@ Python `c6bfb1a282181e5ac43aca4ea73d9d601d78866c` 已合入集成分支，merge 
 - 用修复后按服务跟踪 Compose 启动集合的 harness 重跑 4 个真实本地恢复/删除场景，全部通过：`single_worker_restart`、`three_worker_losses`、`java_restart_question_recovery`、`delete_while_worker_offline`。报告 `services/ai/docs/evidence/recovery-e2e-draft10-compose-scope.json`；修复前的 `recovery-e2e-draft10.json` 保留为历史证据。
 - 收尾核对：隔离库已删除；运行前 PostgreSQL/MinIO 均未运行，运行后均停止且只停本轮启动集合；端口 8000/8080 释放；日志无 secret；外部模型调用 0。
 - 新增 `knowflow_ai/http_client.py`：宿主机 `NO_PROXY` 含不可解析条目或 `socks://` 缺 socksio 时，适配器构造不再抛异常绕过 fail-closed；外部 provider 保留可用环境代理，内部 Java 网关不使用代理。新增 `test_http_client.py` 6 项与测试期代理环境规范化 `conftest.py`。
-- 契约未变（`0.2.0-draft.10`，SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。仍未完成：60 题人工复核与 blind holdout、真实 provider 质量/费用、独立 Q 审阅与 M 消费确认。改动仍在 `local` 未提交工作树。
+- 契约未变（`0.2.0`，SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。仍未完成：60 题人工复核与 blind holdout、真实 provider 质量/费用、独立 Q 审阅与 M 消费确认。改动仍在 `local` 未提交工作树。
 
 ## 2026-11-01：JP-03 V1 收尾增量实施
 

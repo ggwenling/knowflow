@@ -32,7 +32,7 @@ class JavaPythonHealthIntegrationTest {
             .retrieve().toEntity(Map.class).block(Duration.ofSeconds(5));
         assertEquals(200, response.getStatusCode().value());
         assertEquals("UP", response.getBody().get("status"));
-        assertEquals("0.2.0-draft.10", response.getBody().get("contract_version"));
+        assertEquals("0.2.0", response.getBody().get("contract_version"));
         assertEquals("java-python-jp01-trace", response.getBody().get("request_id"));
         assertEquals("java-python-jp01-trace", response.getHeaders().getFirst("X-Request-ID"));
     }
@@ -64,7 +64,7 @@ class JavaPythonHealthIntegrationTest {
 
     @Test void actualJavaHealthClientAcceptsRealDraftEightPython() {
         var health = healthClient.check("java-strict-draft8").block(Duration.ofSeconds(6));
-        assertEquals("0.2.0-draft.10", health.contract_version());
+        assertEquals("0.2.0", health.contract_version());
         assertEquals("UP", health.status());
         assertEquals("java-strict-draft8", health.request_id());
     }

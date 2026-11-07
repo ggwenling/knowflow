@@ -1,6 +1,6 @@
-# KF2-004 后端开发候选 API 目录
+# KF2-004 后端 API 目录（0.2.0 冻结）
 
-状态：`DRAFT 0.2.0-draft.10`；Schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。draft.10 延续 draft.9 的 SSE 与内容版本语义，新增非秘密模型配置身份、请求级问答幂等键、问答历史响应和清理后的来源标识。模型档案标识允许 provider/model 名称中的 `/`。所有共享报文的 `contract_version` 升至 draft.10；消费者须同步更新版本与 Schema 哈希。本候选不表示 KF2-004 冻结或生产 API。
+状态：`FROZEN 0.2.0`（2026-11-07）；Schema SHA-256 `a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`。0.2.0 延续 draft.9 的 SSE 与内容版本语义，新增非秘密模型配置身份、请求级问答幂等键、问答历史响应、清理后的来源标识，以及 `KNOWLEDGE_BASE_NOT_READY` 错误码（知识库无 READY 索引时 409）。模型档案标识允许 provider/model 名称中的 `/`。所有共享报文的 `contract_version` 为 `0.2.0`；消费者须同步更新版本与 Schema 哈希。
 
 ## 公开入口：浏览器 → Java
 
@@ -120,7 +120,7 @@ B 线 KF2-003 的 [运行记录](../docs/architecture/runtime-profile.md)确认�
 
 `POST /internal/v1/answers/stream` 使用现有 `TrustedAnswerRequest`，响应为 `text/event-stream`。每条 SSE data 是一个通过 `AnswerStreamEvent` 校验的 JSON 对象：`started → delta* → sources → completed`，或以唯一 `error` / `cancelled` 终止。所有事件带契约版本、原 `request_id` 和从 1 递增的 `sequence`。`delta` 仅含答案文本；`sources` 带经范围与引用核验的 `has_answer` 和来源；`completed` 不重复答案，消费者拼接 delta。拒答发标准拒答文本与空来源。
 
-## draft.10 历史与幂等问答
+## 0.2.0 历史与幂等问答
 
 `GET /api/v1/questions?limit=50&offset=0`、`GET /api/v1/questions/{question_id}` 和 `DELETE /api/v1/questions/{question_id}` 均由 Java 按当前所有者过滤。处理中问题不能删除（409 `QUESTION_IN_PROGRESS`）；终态删除返回 204。详情保留问题、答案和模型配置身份；来源为 `AVAILABLE` 时返回 quote/locator，来源失效时只返回标识、版本和 `DOCUMENT_DELETED` / `VERSION_EXPIRED` 状态。
 

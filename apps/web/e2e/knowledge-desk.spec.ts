@@ -36,7 +36,7 @@ function expectStream(events: ReturnType<typeof parseSseEvents>, terminal: strin
   expect(events.at(-1)?.name).toBe(terminal);
   expect(events.filter(({ name }) => ["completed", "error", "cancelled"].includes(name ?? ""))).toHaveLength(1);
   events.forEach(({ name, data }, index) => {
-    expect(data).toMatchObject({ contract_version: "0.2.0-draft.10",
+    expect(data).toMatchObject({ contract_version: "0.2.0",
       request_id: events[0].data.request_id, sequence: index + 1, event: name });
   });
 }
@@ -143,7 +143,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   expect(streamEvents.at(-1)?.name).toBe("completed");
   const requestId = streamEvents[0].data.request_id;
   streamEvents.forEach(({ name, data }, index) => {
-    expect(data).toMatchObject({ contract_version: "0.2.0-draft.10", request_id: requestId, sequence: index + 1, event: name });
+    expect(data).toMatchObject({ contract_version: "0.2.0", request_id: requestId, sequence: index + 1, event: name });
   });
   const sourceEvent = streamEvents.find(({ name }) => name === "sources");
   expect(sourceEvent).toBeTruthy();

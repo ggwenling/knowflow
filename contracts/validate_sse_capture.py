@@ -1,4 +1,4 @@
-"""Validate captured Java SSE frames against the draft.10 shared schema."""
+"""Validate captured Java SSE frames against the 0.2.0 shared schema."""
 import json
 from pathlib import Path
 import sys

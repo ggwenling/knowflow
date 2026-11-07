@@ -25,7 +25,7 @@ from knowflow_ai.protocol import CONTRACT_VERSION
 AI_ROOT = Path(__file__).resolve().parents[1]
 REPO = AI_ROOT.parents[1]
 VERSION = CONTRACT_VERSION
-DEFAULT_OUTPUT = AI_ROOT / f"docs/evidence/local-backend-e2e-draft{VERSION.rsplit('.', 1)[1]}-replay.json"
+DEFAULT_OUTPUT = AI_ROOT / f"docs/evidence/local-backend-e2e-{VERSION}-replay.json"
 INTEGRATION_BRANCH_PREFIX = "codex/integration-"
 BLOCK_MARKER = "KNOWFLOW_SYNTHETIC_BLOCK_FOR_CANCELLATION"
 

@@ -21,7 +21,7 @@ import httpx
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / "infra/compose.yml"
-CONTRACT = "0.2.0-draft.10"
+CONTRACT = "0.2.0"
 BUILD_INPUTS = ("infra", "services/api", "services/ai/src", "services/ai/Dockerfile",
                 "services/ai/pyproject.toml", "services/ai/uv.lock", "services/ai/tools/local_backend_e2e.py",
                 "services/ai/tools/browser_e2e_server.py", "contracts/schemas")

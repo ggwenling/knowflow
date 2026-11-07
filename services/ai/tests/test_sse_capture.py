@@ -26,7 +26,7 @@ def captures():
         else:
             events = [("started", {}), ("cancelled", {})]
         result[kind] = [{"name": name, "data": {
-            "contract_version": "0.2.0-draft.10", "request_id": "request-" + kind,
+            "contract_version": "0.2.0", "request_id": "request-" + kind,
             "sequence": index, "event": name, **fields,
         }} for index, (name, fields) in enumerate(events, 1)]
     return result

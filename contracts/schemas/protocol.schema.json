@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "KnowFlow proposed messages 0.2.0-draft.10",
-  "$comment": "DRAFT: structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. Draft.10 adds model profile reporting, idempotent question submission errors, and latest indexing task details on documents for client recovery.",
+  "title": "KnowFlow messages 0.2.0",
+  "$comment": "FROZEN 0.2.0 (2026-11-07): structural definitions only; runtime authorization, lease validation, profile resolution, and database transitions are enforced by Java and Python implementations. Batch body limits and canonical digest rules are specified in contracts/api-draft.md. 0.2.0 adds model profile reporting, idempotent question submission errors, latest indexing task details on documents for client recovery, and the KNOWLEDGE_BASE_NOT_READY public error code.",
   "$defs": {
     "ContractVersion": {
-      "const": "0.2.0-draft.10"
+      "const": "0.2.0"
     },
     "Identifier": {
       "type": "string",
@@ -350,6 +350,7 @@
             "RESOURCE_NOT_FOUND",
             "LEASE_REJECTED",
             "DOCUMENT_UNAVAILABLE",
+            "KNOWLEDGE_BASE_NOT_READY",
             "COMPLETION_CONFLICT",
             "AI_PROCESSING_FAILED",
             "PROCESSING_TIMEOUT",
@@ -1511,7 +1512,7 @@
             "request_id": {"$ref": "#/$defs/Identifier"},
             "sequence": {"type": "integer", "minimum": 1},
             "event": {"const": "error"},
-            "code": {"enum": ["INVALID_REQUEST", "UNAUTHENTICATED", "SCOPE_DENIED", "RESOURCE_NOT_FOUND", "LEASE_REJECTED", "DOCUMENT_UNAVAILABLE", "COMPLETION_CONFLICT", "AI_PROCESSING_FAILED", "PROCESSING_TIMEOUT", "ENDPOINT_UNAVAILABLE", "ACCOUNT_CREATE_REJECTED", "INTERNAL_ERROR", "BATCH_CONFLICT", "INDEX_INTEGRITY_FAILED", "SOURCE_UNAVAILABLE", "UNSUPPORTED_CONTENT", "RESOURCE_LIMIT", "STORAGE_UNAVAILABLE", "QUESTION_REQUEST_CONFLICT", "QUESTION_IN_PROGRESS"]},
+            "code": {"enum": ["INVALID_REQUEST", "UNAUTHENTICATED", "SCOPE_DENIED", "RESOURCE_NOT_FOUND", "LEASE_REJECTED", "DOCUMENT_UNAVAILABLE", "KNOWLEDGE_BASE_NOT_READY", "COMPLETION_CONFLICT", "AI_PROCESSING_FAILED", "PROCESSING_TIMEOUT", "ENDPOINT_UNAVAILABLE", "ACCOUNT_CREATE_REJECTED", "INTERNAL_ERROR", "BATCH_CONFLICT", "INDEX_INTEGRITY_FAILED", "SOURCE_UNAVAILABLE", "UNSUPPORTED_CONTENT", "RESOURCE_LIMIT", "STORAGE_UNAVAILABLE", "QUESTION_REQUEST_CONFLICT", "QUESTION_IN_PROGRESS"]},
             "message": {"type": "string", "minLength": 1, "maxLength": 512},
             "retryable": {"type": "boolean"}
           }

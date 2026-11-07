@@ -1394,12 +1394,12 @@ def main():
     parser.add_argument("--isolated-outages", action="store_true",
                         help="Run database and object-storage outages in an owned Compose project")
     parser.add_argument("--output", type=Path,
-                        default=AI_ROOT / f"docs/evidence/recovery-e2e-draft{CONTRACT_VERSION.rsplit('.', 1)[1]}.json")
+                        default=AI_ROOT / f"docs/evidence/recovery-e2e-{CONTRACT_VERSION}.json")
     args = parser.parse_args()
     if args.serve:
         serve_python()
     elif args.isolated_outages:
-        default_output = AI_ROOT / f"docs/evidence/recovery-e2e-draft{CONTRACT_VERSION.rsplit('.', 1)[1]}.json"
+        default_output = AI_ROOT / f"docs/evidence/recovery-e2e-{CONTRACT_VERSION}.json"
         if args.output == default_output or args.output.exists():
             parser.error("--isolated-outages requires a new, explicit --output path")
         run_isolated_outages(args)

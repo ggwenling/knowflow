@@ -33,7 +33,7 @@ class RealPythonHealthSmokeTest {
                 .check("java-python-real-health-smoke").block(Duration.ofSeconds(7));
 
         assertThat(response).isNotNull();
-        assertThat(response.contract_version()).isEqualTo("0.2.0-draft.10");
+        assertThat(response.contract_version()).isEqualTo("0.2.0");
         assertThat(response.status()).isEqualTo("UP");
         assertThat(response.request_id()).isEqualTo("java-python-real-health-smoke");
     }

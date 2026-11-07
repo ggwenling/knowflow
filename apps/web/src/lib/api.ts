@@ -101,7 +101,7 @@ export async function streamQuestion(
       throw new Error("问答请求标识异常，请查看历史记录。");
     }
     requestId = payload.request_id;
-    if (completed || payload.contract_version !== "0.2.0-draft.10" || payload.event !== event
+    if (completed || payload.contract_version !== "0.2.0" || payload.event !== event
         || !["started", "delta", "sources", "completed", "error", "cancelled"].includes(event)
         || event === "started" && started
         || !started && event !== "started" && event !== "error"

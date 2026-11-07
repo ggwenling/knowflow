@@ -62,9 +62,9 @@ commit: de830a80e49eb1840f5a20ec7c1b72ac7fdbe668
 
 - 2026-11-02 最新：local 和 origin/local 均为 7661e44f5861c1e592e7ad282636c03d220ff1f0；origin/main 为 4bada0b。唯一未提交文件为本交接。CI 和构建上下文修复及计划已提交推送。Python 263、Java 83（1 skip）、Web 36、离线 16 和 schema 85 项通过；宿主 Web 构建通过。Docker 引擎已启动，但 Docker Desktop 代理 127.0.0.1:7890 拒绝连接，无法拉取 node:24-alpine，镜像构建与浏览器 E2E 未执行完成。请启动代理或调整 Docker Desktop 代理，然后运行 node scripts/e2e-web.mjs 并检查远端 CI；Q/M、人工评测及计划其余事项未完成。
 
-- 2026-11-02 基线复核：local@4bada0b，工作树无可见变更；origin/main 同 SHA，origin/local 尚不存在。下方旧 SHA 和未提交状态均为历史记录。当前 schema SHA-256 为 20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f。Docker 引擎未运行。
+- 2026-11-02 基线复核：local@4bada0b，工作树无可见变更；origin/main 同 SHA，origin/local 尚不存在。下方旧 SHA 和未提交状态均为历史记录。当前 schema SHA-256 为 a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1。Docker 引擎未运行。
 
-- **基线与契约**：分支 `local`，当前 HEAD `553d2892bd43f72502bd757b5eba589d8b1043d1`。契约 `0.2.0-draft.10` SHA-256 `d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`；Java/Python 消费端和样例已同步。JP-03 本轮代码和测试仍未提交，按其记录继续推进。
+- **基线与契约**：分支 `local`，当前 HEAD `553d2892bd43f72502bd757b5eba589d8b1043d1`。契约 `0.2.0`（2026-11-07 冻结）SHA-256 `a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`；Java/Python/Web 消费端和样例已同步。JP-03 本轮代码和测试仍未提交，按其记录继续推进。
 - **Java**：V7/V8 历史、幂等、deadline、profile 与来源 tombstone 约束已验证。SSE `PROCESSING_TIMEOUT` error event 与异常 timeout 统一记录为 `timeout`。Maven 全量 **81 项，0 failure、0 error、1 opt-in skip**，其中含该分类回归；运行时日志实测 `terminal_status=timeout error_code=PROCESSING_TIMEOUT`。
 - **Python/评测**：profile/tombstone 消费、`top_k=1..10`、Recall@5/MRR@10 与分类汇总已实现。全量 **252 passed**（1 条既有 Starlette/httpx 弃用警告），含新增 `test_http_client.py` 6 项与 `test_recovery_e2e.py` 3 项。Schema **85 structural cases**，offline smoke **16 passed**。候选/待审标注在 runner 被拒绝计分。
 - **HTTP 客户端与代理环境**：新增 `knowflow_ai/http_client.py`。宿主机 `NO_PROXY` 含不可解析条目（本机为 `[::1]`）或 `socks://` 缺少 socksio 时，原先在适配器构造阶段抛 `httpx.InvalidURL`/`ImportError`，绕过 fail-closed 响应；现在降级构造并只记录固定告警 token（不写环境值）。外部 provider 适配器保留可用环境代理，内部 Java 网关不采用代理。测试期用 `services/ai/tests/conftest.py` 规范化代理环境，避免宿主机配置影响套件结果。
@@ -122,7 +122,7 @@ commit: de830a80e49eb1840f5a20ec7c1b72ac7fdbe668
 - `docs/evaluation/2026-11-04-rag-real-public-seed-v2.md`（assets `docs/evaluation/assets-real-20261104-*.json`）— 公开合成集 development+holdout 真实采集、质量门与预算账本摘要；非盲测。
 - `NOTICE` — 第三方弱 copyleft／需署名组件初版摘要；非法律意见，项目自身许可证仍待权利人声明。
 - `docs/planning/v0.2/p0-p1-closeout-plan-2026-11-02.md` — P0/P1/P2 计划、阈值与证据；`65774c4` 中 PR run #16 的“运行中”是历史快照，实际已成功。
-- `contracts/consumer-draft10-checklist.md`、`contracts/openapi-draft10.json`、`contracts/schemas/protocol.schema.json` — 三端验收与候选契约；共享 schema SHA-256 `20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。
+- `contracts/consumer-draft10-checklist.md`、`contracts/openapi-draft10.json`、`contracts/schemas/protocol.schema.json` — 三端验收与候选契约；共享 schema SHA-256 `a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`。
 - `docs/evaluation/real-collection-design.md`、`docs/evaluation/blind-holdout-protocol.md` — 采集、预算和盲测边界；`evaluation/collector/` 为尚未贯通的原型。
 - `services/ai/docs/evidence/recovery-e2e-draft10-2026-11-03-final-bb25dc1-attempt2.json`、`infra/evidence/backup-restore-20261103-final-bb25dc1.json`、`evaluation/performance/evidence/baseline-cap8-final-20261103-9c9b4a0.json` — 隔离恢复、备份和合成负载证据。
 - 全栈 E2E：`node scripts/e2e-web.mjs`；Java：在 `services/api` 运行 `.\mvnw.cmd -B test`；AI：`uv run --project services/ai --frozen pytest services/ai/tests -q`；契约：`uv run --project services/ai --frozen python contracts/validate.py` 与 `python -m unittest contracts.test_openapi_draft10 -v`。按需运行，避免重复无关测试。

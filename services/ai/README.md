@@ -1,6 +1,6 @@
 # Python AI 服务（Codex-B 所有）
 
-Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0-draft.10`（Schema SHA-256：`d34b174e080226a6ac85387cccb1c084ccd19098b4db482caca1ecd63deec38c`）。回答与 SSE `started` 会报告非秘密模型配置身份；契约仍是候选版本，Q 独立审阅、M 页面消费确认和正式冻结未完成。
+Python 3.12 / FastAPI 内部服务，当前使用共享契约 `0.2.0`（Schema SHA-256：`a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`）。回答与 SSE `started` 会报告非秘密模型配置身份；契约已于 2026-11-07 冻结为 `0.2.0`，负责人人工消费签收项见 `contracts/consumer-draft10-checklist.md`。
 
 ## 当前能力
 
@@ -44,7 +44,7 @@ The offline runner reports evidence Recall@5, MRR@10, answerability and latency,
 
 2026-10-30 的本机合成 E2E 使用真实 Java/Python 进程、PostgreSQL/pgvector 和 MinIO，验证上传、索引 READY、只读检索、问答来源校验与持久化；新增 Python 快照范围 guard 后再次通过。另在活动合成 embedding 阻塞期间删除文档，真实验证 Java cancellation outbox 到 Python HTTP cancel、worker 子任务中断、adapter 收尾、清理队列排空及无迟到 Chunk/向量写入。修复记录与报告见 `docs/evidence/cancellation-e2e-local-draft6-verified.json`。Embedding/LLM 使用本地替身，外部模型调用为 0。问答证据见 `docs/evidence/local-backend-e2e-draft6-verified.json`；当前 Compose 权限见 `docs/evidence/local-db-role-audit-draft6.json`；12 道开发题与 3 道留出题的来源证据 Chunk 覆盖见 `docs/evidence/seed-chunk-coverage-local-draft6.json`。这些不代表真实模型质量或向量排名通过。Windows 默认 Proactor 事件循环不支持 psycopg 异步连接，因此只读 SQL 通过 `asyncio.to_thread` 调用同步 psycopg；连接与语句均有 5 秒上限，事务保持只读。
 
-可从仓库根在 `local` 或 `codex/integration-*` 分支（且 `main` 为祖先）运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --output services/ai/docs/evidence/local-backend-e2e-draft10-replay.json` 重放该合成闭环；其他分支（包括 `main` 和作者分支）会被拒绝，分支与祖先检查通过后才读取本机 `services/api/.env`。先按 API README 启动健康的本地 Compose PostgreSQL/MinIO，并将目标数据库迁移到当前版本；隔离验证可用 `--database-name knowflow_e2e_local` 指定已创建并迁移的本地数据库。8000/8080 必须空闲，目标数据库不能有未完成的索引任务或待处理清理队列。脚本会创建合成账户及知识库，删除知识库、等待相应存储/索引/取消清理完成并退出会话；合成账户记录保留在目标开发数据库中。测试使用合成 adapter，不发起外部模型调用；新报告使用 draft.10 路径 `docs/evidence/local-backend-e2e-draft10-replay.json`。现存 `*-draft6-*`、`*-draft8-*` 报告是历史记录，不代表当前契约。
+可从仓库根在 `local` 或 `codex/integration-*` 分支（且 `main` 为祖先）运行 `uv run --project services/ai --frozen python services/ai/tools/local_backend_e2e.py --output services/ai/docs/evidence/local-backend-e2e-0.2.0-replay.json` 重放该合成闭环；其他分支（包括 `main` 和作者分支）会被拒绝，分支与祖先检查通过后才读取本机 `services/api/.env`。先按 API README 启动健康的本地 Compose PostgreSQL/MinIO，并将目标数据库迁移到当前版本；隔离验证可用 `--database-name knowflow_e2e_local` 指定已创建并迁移的本地数据库。8000/8080 必须空闲，目标数据库不能有未完成的索引任务或待处理清理队列。脚本会创建合成账户及知识库，删除知识库、等待相应存储/索引/取消清理完成并退出会话；合成账户记录保留在目标开发数据库中。测试使用合成 adapter，不发起外部模型调用；新报告使用 0.2.0 路径 `docs/evidence/local-backend-e2e-0.2.0-replay.json`。现存 `*-draft6-*`、`*-draft8-*` 报告是历史记录，不代表当前契约。
 
 2026-11-01 在临时隔离数据库上完成 draft.10 真实 Java/Python/PostgreSQL/MinIO 合成 E2E，随后删除该隔离数据库并停止 Compose 容器（保留数据卷）。报告见 [draft.10 E2E](docs/evidence/local-backend-e2e-draft10-replay.json)；原本地 `knowflow` 库为旧表结构，未对其执行迁移。
 

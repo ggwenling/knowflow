@@ -47,7 +47,7 @@ class ApiSecurityIntegrationTest {
     private static final AtomicReference<String> RECEIVED_AUTHORIZATION = new AtomicReference<>();
     private static final AtomicReference<String> RECEIVED_REQUEST_ID = new AtomicReference<>();
     private static final AtomicReference<String> HEALTH_RESPONSE_VERSION =
-            new AtomicReference<>("0.2.0-draft.10");
+            new AtomicReference<>("0.2.0");
     private static final HttpServer AI_STUB = startAiStub();
 
     @Autowired
@@ -90,7 +90,7 @@ class ApiSecurityIntegrationTest {
         var response = mockMvc.perform(get("/internal/test-auth")
                         .header(RequestIdFilter.HEADER, "caller controlled id"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.10"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0"))
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
                 .andReturn();
 
@@ -137,7 +137,7 @@ class ApiSecurityIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + INTERNAL_SECRET))
                 .andExpect(status().isNotFound())
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.10"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0"))
                 .andExpect(jsonPath("$.code").value("ENDPOINT_UNAVAILABLE"))
                 .andExpect(jsonPath("$.message").value("The requested endpoint is not available."));
     }
@@ -149,7 +149,7 @@ class ApiSecurityIntegrationTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(header().string(HttpHeaders.ALLOW, org.hamcrest.Matchers.containsString("GET")))
                 .andExpect(header().exists(RequestIdFilter.HEADER))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.10"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message")
                         .value("The HTTP method is not supported for this endpoint."));
@@ -165,7 +165,7 @@ class ApiSecurityIntegrationTest {
                         org.hamcrest.Matchers.containsString(MediaType.APPLICATION_JSON_VALUE)))
                 .andExpect(header().exists(RequestIdFilter.HEADER))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.contract_version").value("0.2.0-draft.10"))
+                .andExpect(jsonPath("$.contract_version").value("0.2.0"))
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
                 .andExpect(jsonPath("$.message").value("The requested response media type is not acceptable."));
     }
@@ -206,7 +206,7 @@ class ApiSecurityIntegrationTest {
                 .block(Duration.ofSeconds(3));
 
         assertThat(response).isNotNull();
-        assertThat(response.contract_version()).isEqualTo("0.2.0-draft.10");
+        assertThat(response.contract_version()).isEqualTo("0.2.0");
         assertThat(response.status()).isEqualTo("UP");
         assertThat(response.request_id()).isEqualTo("request-health-integration");
         assertThat(RECEIVED_AUTHORIZATION.get()).isEqualTo("Bearer " + INTERNAL_SECRET);
@@ -222,7 +222,7 @@ class ApiSecurityIntegrationTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("does not match the contract");
         } finally {
-            HEALTH_RESPONSE_VERSION.set("0.2.0-draft.10");
+            HEALTH_RESPONSE_VERSION.set("0.2.0");
         }
     }
 

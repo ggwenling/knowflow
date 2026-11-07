@@ -145,7 +145,7 @@ def image_id(container_id):
 
 
 def owner(client):
-    response = client.post("/api/v1/auth/register", json={"contract_version": "0.2.0-draft.10",
+    response = client.post("/api/v1/auth/register", json={"contract_version": "0.2.0",
                            "email": f"restore-{uuid.uuid4().hex}@example.test", "password": "Restore-" + secrets.token_hex(16)})
     response.raise_for_status()
     return {"Authorization": "Bearer " + response.json()["access_token"]}
@@ -213,7 +213,7 @@ def run(output):
             with httpx.Client(base_url=f"http://127.0.0.1:{ports[0]}", timeout=40, trust_env=False) as client:
                 user = owner(client)
                 other = owner(client)
-                response = client.post("/api/v1/knowledge-bases", headers=user, json={"contract_version": "0.2.0-draft.10", "name": "Restore evidence"})
+                response = client.post("/api/v1/knowledge-bases", headers=user, json={"contract_version": "0.2.0", "name": "Restore evidence"})
                 response.raise_for_status(); base = response.json()["id"]
                 response = client.post(f"/api/v1/knowledge-bases/{base}/documents", headers=user,
                                        files={"file": ("restore.txt", BODY, "text/plain")})

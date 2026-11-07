@@ -1,8 +1,8 @@
-# KnowFlow 公共契约（V0.2 重建基线；后端开发候选）
+# KnowFlow 公共契约（V0.2 重建基线；0.2.0 冻结）
 
-**状态：DRAFT 0.2.0-draft.10，未冻结、未发布；不能用于生产兼容性验收。** Schema SHA-256：`20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f`。本版本保留更新/重建、版本留存及 SSE 行为，新增模型配置身份、问答历史与幂等提交。Q 审阅和 M 消费确认未完成。
+**状态：FROZEN 0.2.0（2026-11-07）。** Schema SHA-256：`a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`。本版本保留更新/重建、版本留存及 SSE 行为，新增模型配置身份、问答历史与幂等提交。工程消费已核对；负责人人工签收项见[消费清单](./consumer-draft10-checklist.md)。
 
-`0.2.0-draft.5` 补齐上传/任务状态报文、精确源文件读取、Java 受控批量写入、取消代次、摘要算法、租约和原子发布语义。`0.2.0-draft.6` 放宽模型配置标识，允许供应商模型名包含 `/`；`draft.7` 固定索引派发运行配置；`draft.8` 定义内容更新及同内容重建；`draft.9` 增加流式回答和版本保留；`draft.10` 增加问答历史、幂等提交、来源 tombstone 和非秘密模型配置身份。生产兼容性验收、Q 审阅、M 页面消费确认和 KF2-004 正式冻结仍未完成。
+`0.2.0-draft.5` 补齐上传/任务状态报文、精确源文件读取、Java 受控批量写入、取消代次、摘要算法、租约和原子发布语义。`0.2.0-draft.6` 放宽模型配置标识，允许供应商模型名包含 `/`；`draft.7` 固定索引派发运行配置；`draft.8` 定义内容更新及同内容重建；`draft.9` 增加流式回答和版本保留；`draft.10` 增加问答历史、幂等提交、来源 tombstone 和非秘密模型配置身份。0.2.0 于 2026-11-07 冻结，版本常量与 Schema 哈希已同步 Java、Python 与 Web 消费方，并补齐 `KNOWLEDGE_BASE_NOT_READY` 公开错误码。
 
 此前的 `0.2.0-draft.4` 包含 KF2-012/013 的注册、登录、8 小时 opaque Bearer session、logout/current-user 与个人知识库结构；密码使用 PBKDF2 哈希，数据库只存 token SHA-256，知识库 owner 只由认证身份派生。注册冲突返回通用错误，但 409 状态仍可能暴露邮箱冲突，须由 M/Q 评估验证邮箱或限速方案。
 
@@ -13,9 +13,9 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 - [状态与权限 ADR](../docs/architecture/ADR-001-state-and-contract-draft.md)
 - [索引写入边界提案](../docs/architecture/ADR-002-index-write-boundary-proposal.md)
 - [认证与 owner 隔离 ADR](../docs/architecture/ADR-003-auth-and-owner-boundary.md)
-- [候选 API 与边界](./api-draft.md)
+- [API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
-- [OpenAPI draft.10 候选](./openapi-draft10.json)：描述 Java/Python 现有路由；`DocumentApiIntegrationTest` 运行时覆盖 Document/Task 可选字段省略，以及问答历史和过期来源的 nullable 字段序列化。正常 TXT/PDF SSE 帧已由浏览器 E2E 校验；错误/取消等未覆盖帧和完整消费语义仍待核验、Q/M 签收，尚未冻结。
+- [OpenAPI 0.2.0](./openapi-draft10.json)：描述 Java/Python 现有路由；`DocumentApiIntegrationTest` 运行时覆盖 Document/Task 可选字段省略，以及问答历史和过期来源的 nullable 字段序列化。正常 TXT/PDF SSE 帧已由浏览器 E2E 校验；错误/取消等未覆盖帧和完整消费语义仍待核验、负责人签收。契约已于 2026-11-07 冻结为 `0.2.0`。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
 - [批次摘要算法](./index_batch_hash.py)：与 Schema 中 `index-batch` 样例配对，固定摘要序列化规则。
 - [A 线执行记录](../docs/tasks/agent-a.md)记录 V0.2 基线决策、KF2-001/004/006 进度和各提交 SHA。
@@ -53,4 +53,4 @@ git diff --check
 3. A 运行结构校验并提交版本化契约和 OpenAPI。Q 按具体 base/target SHA 审查越权、过期/重复 Worker、删除/发布并发及历史引用。
 4. 处理阻断项、获得 Q 的具体 SHA 结论，并完成必要的 A/B Schema 对照后，A 更新冻结状态。不得用模型冒烟或结构校验代替三方消费确认与安全审阅。
 
-本次合并只把契约从占位升级为审阅候选；本文件不表示 B 的待审任务已批准，也不表示 KF2-004 已冻结。
+0.2.0 已冻结；本文件不表示负责人人工消费签收与真实模型质量门已完成。

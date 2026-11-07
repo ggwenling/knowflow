@@ -50,12 +50,12 @@ try {
 }
 
 # ── 2. 契约 schema 指纹 ────────────────────────────────────────────────
-$expectedSchema = "20121f69098c9fb0c8de59a813a398782070e9f6b9aa5a59e80d30568524883f"
+$expectedSchema = "a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1"
 $schemaPath = Join-Path $repo "contracts/schemas/protocol.schema.json"
 if (Test-Path $schemaPath) {
     $actual = (Get-FileHash $schemaPath -Algorithm SHA256).Hash.ToLower()
     if ($actual -eq $expectedSchema) {
-        Add-Result "contract" "schema-sha256" "PASS" "draft.10 登记值匹配"
+        Add-Result "contract" "schema-sha256" "PASS" "0.2.0 登记值匹配"
     } else {
         Add-Result "contract" "schema-sha256" "FAIL" "期望 $($expectedSchema.Substring(0,12))…，实际 $($actual.Substring(0,12))…；契约已变更，需重新登记"
     }

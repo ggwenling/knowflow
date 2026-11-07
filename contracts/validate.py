@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
+from error_code_inventory import check as check_error_codes
 from index_batch_hash import batch_sha256
 
 
@@ -41,7 +42,10 @@ def main():
             failures.append("index-batch-digest-vector")
     if failures:
         raise SystemExit("FAIL: " + ", ".join(failures))
-    print(f"PASS: schema and {len(cases)} structural cases")
+    code_problems = check_error_codes(schema)
+    if code_problems:
+        raise SystemExit("FAIL: " + "; ".join(code_problems))
+    print(f"PASS: schema, {len(cases)} structural cases, and error-code inventory")
     print("Authorization, lease validity and database transitions: NOT EXECUTED")
 
 
