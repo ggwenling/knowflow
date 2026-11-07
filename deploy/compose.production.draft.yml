@@ -10,7 +10,8 @@
 #   3. 全部服务有 restart 策略、日志上限、停止宽限期
 #   4. 只有 edge 暴露宿主端口（HTTPS），且默认绑 127.0.0.1
 #   5. ai 的 provider 预算门禁三件套为必需配置，缺失即 fail-closed
-#   6. ai 通过独立 provider-egress 网络出网，其余服务仍只在 internal 网络
+#   6. ai 只能经 egress-proxy（域名白名单）出网，其余服务仍只在 internal 网络；
+#      镜像名统一为 <registry>/<repo>:<immutable-tag>（见 deploy/scripts/release.ps1）
 #
 # 用法：
 #   cp deploy/env/production.env.example deploy/.env.production   # 填写后再用
@@ -69,17 +70,36 @@ services:
     mem_limit: 1g
     networks: [knowflow]
 
+  # 出网白名单代理：只放行 api.deepseek.com 与 api.siliconflow.cn（见 deploy/egress/squid.conf）。
+  # 它同时接 internal 的 egress-internal（供 ai 使用）与有外网出口的 provider-egress。
+  egress-proxy:
+    image: ubuntu/squid@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029
+    restart: unless-stopped
+    stop_grace_period: 10s
+    volumes:
+      - ./egress/squid.conf:/etc/squid/squid.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "squid -k check -f /etc/squid/squid.conf"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *default-logging
+    mem_limit: 256m
+    networks: [egress-internal, provider-egress]
+
   migrate:
     build:
       context: ../services/api
       dockerfile: Dockerfile
-    image: knowflow-api:${KNOWFLOW_RELEASE:-local}
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/api:${KNOWFLOW_RELEASE:-local}
     command: ["--migrate-only"]
     restart: "no"
     environment:
       KNOWFLOW_MIGRATION_DATABASE_URL: ${KNOWFLOW_MIGRATION_DATABASE_URL:?set KNOWFLOW_MIGRATION_DATABASE_URL}
       KNOWFLOW_MIGRATION_DATABASE_USERNAME: ${KNOWFLOW_MIGRATION_DATABASE_USERNAME:?set KNOWFLOW_MIGRATION_DATABASE_USERNAME}
       KNOWFLOW_MIGRATION_DATABASE_PASSWORD: ${KNOWFLOW_MIGRATION_DATABASE_PASSWORD:?set KNOWFLOW_MIGRATION_DATABASE_PASSWORD}
+      # 可选：只迁移到指定版本，用于演练“迁移前”备份与恢复；留空=迁移到最新。
+      KNOWFLOW_MIGRATION_TARGET: ${KNOWFLOW_MIGRATION_TARGET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,7 +110,7 @@ services:
     build:
       context: ..
       dockerfile: services/ai/Dockerfile
-    image: knowflow-ai:${KNOWFLOW_RELEASE:-local}
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/ai:${KNOWFLOW_RELEASE:-local}
     restart: unless-stopped
     stop_grace_period: 30s
     command: ["uvicorn", "knowflow_ai.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
@@ -120,8 +140,10 @@ services:
       KNOWFLOW_BUDGET_LEDGER_PATH: ${KNOWFLOW_BUDGET_LEDGER_PATH:?set KNOWFLOW_BUDGET_LEDGER_PATH}
       KNOWFLOW_BUDGET_PRICE_FILE: ${KNOWFLOW_BUDGET_PRICE_FILE:?set KNOWFLOW_BUDGET_PRICE_FILE}
       KNOWFLOW_BUDGET_POLICY_FILE: ${KNOWFLOW_BUDGET_POLICY_FILE:?set KNOWFLOW_BUDGET_POLICY_FILE}
-      # 可选：受控 egress 代理。为空时 httpx 忽略；设置后仅外网 provider 调用走代理。
-      HTTPS_PROXY: ${KNOWFLOW_EGRESS_HTTPS_PROXY:-}
+      # 受控出网：provider 调用只能经白名单代理；ai 不再直连 provider-egress。
+      HTTPS_PROXY: ${KNOWFLOW_EGRESS_HTTPS_PROXY:-http://egress-proxy:3128}
+      HTTP_PROXY: ${KNOWFLOW_EGRESS_HTTPS_PROXY:-http://egress-proxy:3128}
+      NO_PROXY: ${KNOWFLOW_EGRESS_NO_PROXY:-api,postgres,minio,edge,localhost,127.0.0.1}
       # 有界重试与就绪探针（默认值即生产建议值）。
       KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS: ${KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS:-3}
       KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS: ${KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS:-0.5}
@@ -148,13 +170,13 @@ services:
         source: ${KNOWFLOW_BUDGET_DIR:?set KNOWFLOW_BUDGET_DIR to the directory holding PRICE_FILE.json and POLICY_FILE.json}
         target: /etc/knowflow-budget
         read_only: true
-    # 只有 ai 同时接入 internal 知识网络与受控 egress；其余服务没有外网出口。
+    # ai 只接入 internal 知识网络与 egress-proxy 的前置 internal 网络，没有直连外网。
     # 额外接入 web-edge 仅供 edge 转发 /health/ready（只读状态，无密钥）。
-    networks: [knowflow, provider-egress, web-edge]
+    networks: [knowflow, egress-internal, web-edge]
 
   # 一次性修正预算账本卷属主；ai 以 10001 运行，卷默认属主是 root。
   budget-init:
-    image: knowflow-ai:${KNOWFLOW_RELEASE:-local}
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/ai:${KNOWFLOW_RELEASE:-local}
     user: "0:0"
     command: ["chown", "-R", "10001:10001", "/var/lib/knowflow-budget"]
     restart: "no"
@@ -167,7 +189,7 @@ services:
     build:
       context: ../services/api
       dockerfile: Dockerfile
-    image: knowflow-api:${KNOWFLOW_RELEASE:-local}
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/api:${KNOWFLOW_RELEASE:-local}
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -205,7 +227,7 @@ services:
     build:
       context: ../apps/web
       dockerfile: Dockerfile
-    image: knowflow-web:${KNOWFLOW_RELEASE:-local}
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/web:${KNOWFLOW_RELEASE:-local}
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -258,5 +280,8 @@ networks:
   knowflow:
     internal: true
   web-edge:
-  # 受控出网：仅 ai 接入。生产应在宿主机防火墙/代理上只放行 provider 域名。
+  # ai → egress-proxy 的 internal 前置网络，无外网出口。
+  egress-internal:
+    internal: true
+  # 唯一有外网出口的网络，只接 egress-proxy；白名单在代理配置中强制执行。
   provider-egress:

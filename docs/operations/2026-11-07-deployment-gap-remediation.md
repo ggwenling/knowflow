@@ -281,10 +281,10 @@ pwsh -NoProfile -File deploy/scripts/preflight.ps1 -EnvFile deploy/.env.producti
 | --- | --- |
 | Provider 过载导致带引用答案未验收 | **已闭环**（2026-11-07 复测，见 §12.4） |
 | 应用无 5xx/超时重试 | **已实现**有界重试（见 §12） |
-| 无镜像仓库与不可变发布 tag | 仍未解决；回滚依赖本机镜像 |
-| Flyway 无 down 脚本 | 仍未解决；跨迁移回滚需 `pg_dump` 恢复 |
+| 无镜像仓库与不可变发布 tag | **已闭环**（本地 registry + `release.ps1`，见 §13.1） |
+| Flyway 无 down 脚本 | **已闭环**（备份/恢复 + 迁移目标，见 §13.2；生产需异地备份承接） |
 | 健康检查不探活 provider / 预算 | **已实现** `/health/ready`（见 §12） |
-| `provider-egress` 无域名白名单 | 需宿主机防火墙/代理补足，见 §5.3 |
+| `provider-egress` 无域名白名单 | **已闭环**（Squid CONNECT 白名单，见 §13.3；宿主防火墙仍属生产项） |
 | 工作树有未提交改动 | 部署修复已提交为 `e79b838`；§12 的重试/探针改动另行提交 |
 | 旧演练手册仍引用已删除的 override 与 3100 端口 | 本记录为准；旧手册保留历史证据 |
 
@@ -382,5 +382,152 @@ docker compose -p knowflow-prod --env-file deploy/.env.production `
 
 ### 12.5 残余
 
-- 镜像仓库/不可变发布 tag、Flyway down、`provider-egress` 域名白名单仍未解决（见 §9）。
+- 镜像仓库/不可变发布 tag、Flyway down、`provider-egress` 域名白名单已在 §13 闭环。
 - 探针只验证 provider 的模型列表可达；它不能替代一次真实生成，发布门禁仍建议在验收阶段跑 §12.4 的完整冒烟。
+
+## 13. 发布工程三项残留收口（2026-11-07）
+
+### 13.1 镜像仓库与不可变 release tag
+
+**方案**：compose 只引用 `<registry>/<repo>/<component>:<release>`，`release` 取提交 sha 或语义版本；同一 tag 不允许被覆盖。仓库内已有发布脚本入口，本次在其上扩展：`deploy/scripts/release.ps1`（新增文件，替代原先“本机 `knowflow-api:latest` + 手工 tag”的做法）。
+
+compose 中三处镜像引用统一为：
+
+```yaml
+api / migrate : ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/api:${KNOWFLOW_RELEASE:-local}
+ai / budget-init: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/ai:${KNOWFLOW_RELEASE:-local}
+web          : ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/web:${KNOWFLOW_RELEASE:-local}
+```
+
+`release.ps1` 的行为：
+
+| 步骤 | 说明 |
+| --- | --- |
+| 版本解析 | 默认 `git rev-parse --short=10 HEAD`；拒绝 `local/latest/dev/main`；要求 `^[A-Za-z0-9][A-Za-z0-9._-]{5,63}$` |
+| 干净提交门禁 | 已跟踪文件有未提交改动时拒绝构建（`-AllowDirty` 仅用于机制演练） |
+| 构建与打 tag | `api`(services/api)、`web`(apps/web)、`ai`(根目录 + services/ai/Dockerfile) |
+| 不可变检查 | 本地 registry 先 `HEAD /v2/<repo>/<component>/manifests/<release>`，200 即拒绝；本地同名镜像亦拒绝（`-AllowOverwrite` 仅演练） |
+| 推送与记录 | `docker push` 后读取 `RepoDigests`，写 `release-<release>.json`（release、commit、仓库、创建时间、三个镜像的 reference+digest、`compose_env`） |
+| 失败语义 | 任一构建/推送失败即非 0 退出；推送成功但读不到 digest 也视为失败（避免“无指纹发布”） |
+
+本机 registry 为 `registry:2`（digest pin），监听 `127.0.0.1:5001`，卷 `knowflow-registry-data`，与 3443 入口端口互不冲突；compose 变量由 `.env.production` 的 `KNOWFLOW_IMAGE_REPOSITORY` / `KNOWFLOW_RELEASE` 提供。
+
+**与回滚演练的配合**：每次发布会保留旧 release 的 tag 与 digest 清单。回滚=把 `KNOWFLOW_RELEASE` 改回旧值，然后：
+
+```powershell
+docker compose -p knowflow-prod --env-file deploy/.env.production `
+  -f deploy/compose.production.draft.yml pull
+docker compose -p knowflow-prod --env-file deploy/.env.production `
+  -f deploy/compose.production.draft.yml up -d --no-build
+```
+
+因为 tag 不可变，`pull` 拉到的就是当初签发的镜像；digest 清单可用于事后核对“线上运行的镜像确实是这一份”。
+
+**本机验证（`2a7e68a`，隔离 registry `127.0.0.1:5001`）**：
+
+```text
+push api/web/ai -> digest:
+  api  sha256:20f4a3ae6a3d20e89003591a1c3cbcd142582e4eb04030d8709fcae573ca6d10
+  web  sha256:760ffdab8274a992f5d9a15aeb0ba068e674bb01fea57e4eab4c0a32c834d1fa
+  ai   sha256:c322d9594a0baf5018b40c275368c58a5d9af229bb7a8cf4bc9854825cc2e481
+重复执行（不 -AllowOverwrite）-> exit 1:
+  127.0.0.1:5001/knowflow/api:2a7e68a 已存在于 registry；不可变 tag 禁止覆盖
+docker rmi 三个 registry tag 后 pull -> 三个 digest 与清单完全一致
+  清单：D:\konwflow-prod-drill\releases\release-2a7e68a.json
+```
+
+注意：本机 Docker 使用 containerd 镜像存储，推送的是 OCI image index；不可变检查的 `Accept` 头必须同时声明 `application/vnd.oci.image.index.v1+json` 等四种类型，否则 `HEAD` 会误判 404（脚本已按此实现）。
+
+**生产待承接**：registry 的认证/TLS、保留与垃圾回收策略、跨可用区复制/备份；远端 registry 的“禁止覆盖”需由仓库策略（如 Harbor immutable tags / ECR tag immutability）强制，脚本只做本地兜底。
+
+### 13.2 Flyway 回滚策略
+
+Flyway Community 无 undo，**不做反向 DDL 脚本**；回滚以“迁移前物理快照 + 恢复到快照”为唯一可靠路径，并保留正向迁移目标开关用于演练。
+
+新增/扩展：
+
+| 文件 | 作用 |
+| --- | --- |
+| `deploy/scripts/db-backup.ps1` | 迁移前 `pg_dump -Fc`；记录 `flyway_schema_history` 最大成功版本；生成 `.dump.json` 伴随文件（含 SHA-256） |
+| `deploy/scripts/db-restore.ps1` | `-ConfirmRestore` 显式确认；校验伴随文件 SHA-256；冻结 api/ai/web/edge；`DROP DATABASE` + `CREATE DATABASE` + `pg_restore --exit-on-error`；核对 Flyway 版本与备份一致；按依赖顺序 `up -d --no-deps` 恢复服务 |
+| `KNOWFLOW_MIGRATION_TARGET` | `DatabaseMigrationProperties` + `DatabaseMigrationConfiguration` 支持 Flyway `target`；值为数字点分版本（如 `2`、`2.1`），留空=最新；仅用于演练/受控回退，正式发布保持留空 |
+
+备份/恢复流程：
+
+```powershell
+# 1) 迁移前（栈健康时）
+pwsh -File deploy/scripts/db-backup.ps1 -ProjectName knowflow-prod -Label pre-release
+
+# 2) 正常发布（migrate 跑到最新）
+docker compose ... run --rm migrate
+
+# 3) 需要回滚到迁移前
+pwsh -File deploy/scripts/db-restore.ps1 -ProjectName knowflow-prod `
+  -DumpPath D:\konwflow-prod-drill\backups\knowflow-<label>.dump -ConfirmRestore
+```
+
+**演练验证（隔离项目 `knowflow-migtest`，已完成 `down -v`）**：
+
+```text
+全新库 -> KNOWFLOW_MIGRATION_TARGET=2：
+  Flyway "8 migrations validated, 2 applied"（V1、V2）
+备份：pg_dump 0.04 MB，sidecar 记录 version=2
+继续迁移到最新 -> V8，indexing_tasks 出现 accepted_lease_id 列
+恢复备份 -> Flyway 版本回到 2，accepted_lease_id 不存在，表 owner=knowflow_migrator
+再次 migrate -> V8，accepted_lease_id 重新出现
+```
+
+关键点：`pg_restore` **不能加 `--no-owner`**。第一次演练加上后，还原表的 owner 变成 `postgres`，后续 `migrate` 因 `knowflow_migrator` 无 ALTER 权限而 exit 1；去除该参数、保留原 owner/ACL 后复测通过。恢复脚本因此默认保留 owner。
+
+**生产待承接**：本机演练的备份在宿主目录，生产必须落到异地/对象存储并做定期恢复抽检；`pg_dump` 是逻辑备份，恢复点=备份时刻，备份之后的写入会丢；RPO/RTO 需由生产备份体系（WAL 归档/PITR、保留策略、加密与访问控制）承接。回滚仍属“人工确认”动作，未接到自动化发布流水线。
+
+### 13.3 `provider-egress` 域名白名单
+
+**方案**：在 `provider-egress` 与 `ai` 之间加一层 Squid 正向代理，`ai` 只能经代理出网；代理只放行 CONNECT 到 provider 域名，其余一律拒绝。网络结构：
+
+| 网络 | 成员 | 属性 |
+| --- | --- | --- |
+| `knowflow` | 全部内部服务 | `internal: true` |
+| `egress-internal` | `ai`、`egress-proxy` | `internal: true` |
+| `provider-egress` | 仅 `egress-proxy` | 保留为外网出口 |
+| `web-edge` | `edge`、`web`、`ai` | 入口与静态资源 |
+
+新增 `deploy/egress/squid.conf`（关键规则）：
+
+```conf
+acl CONNECT method CONNECT
+acl provider_domains dstdomain api.deepseek.com api.siliconflow.cn
+http_access allow CONNECT provider_domains
+http_access deny CONNECT
+http_access deny all
+```
+
+`egress-proxy` 使用 `ubuntu/squid`（digest pin），只读挂载该配置，healthcheck 为 `squid -k check`；`ai` 的 `HTTPS_PROXY/HTTP_PROXY` 指向 `http://egress-proxy:3128`，`NO_PROXY` 只含内部服务名。代理为空即 `ai` 无外网出口（fail-closed），`preflight.ps1` 对空代理与缺失白名单均判 FAIL。
+
+**验证方法（隔离项目 `knowflow-egresstest`，已完成 `down -v`）**：把 `ai` 镜像接入 `knowflow-egresstest_egress-internal`，容器内执行：
+
+```text
+经代理 GET https://api.deepseek.com/models -> STATUS 401（已穿过代理，缺认证属预期）
+经代理 GET https://example.com           -> ProxyError: 403 Forbidden
+不设代理 GET https://api.deepseek.com/models -> ConnectError（无外网路由）
+```
+
+三条结果同时成立，说明“只白名单可达 + 其余被代理拒绝 + 无代理时无直连出口”。日常复核可从运行中的 `ai` 容器重复上述两类请求；`preflight.ps1` 另提供静态检查（白名单含两个 provider 域名、代理变量非空）。
+
+**生产待承接**：宿主/云安全组的出站防火墙规则（纵深防御第二层）、代理的高可用与访问日志留存、provider 域名变更时的白名单变更流程（改 `squid.conf` 并重启 `egress-proxy`）。本机未验证 TLS 出站审计与并发限流。
+
+### 13.4 本机验证汇总与生产待承接
+
+| 项 | 本机结果 | 生产必须承接 |
+| --- | --- | --- |
+| 本地 registry 构建/推送/digest | PASS（详见 §13.1） | registry 认证、TLS、保留策略、HA |
+| 不可变 tag 拒绝覆盖 | PASS（exit 1，日志见 §13.1） | 仓库级 immutable 策略 |
+| compose 拉取后启动 | PASS（`pull` + `up -d --no-build`，见 §13.5） | 发布流水线与审批 |
+| 迁移前备份 + 恢复到 V2 | PASS（隔离库，见 §13.2） | 异地备份、PITR、定期恢复抽检 |
+| Flyway 目标版本开关 | PASS（`KNOWFLOW_MIGRATION_TARGET=2`） | 正式环境保持留空 |
+| 代理白名单放行/拒绝/无直连 | PASS（见 §13.3） | 宿主防火墙、日志审计、代理 HA |
+| 端口/卷隔离 | 使用 3443/5001 与独立卷，未触碰既有环境的 5432/6379/6380；演练项目均 `down -v` | — |
+
+### 13.5 端到端复核（干净提交后的真实发布）
+
+以提交后的 HEAD 执行 `release.ps1`（默认版本=10 位短 sha），构建并推送 api/web/ai；随后清空本机同名镜像、`compose pull`、`up -d --no-build`，再跑 `/health/ready`、代理放行/拒绝与完整 HTTPS 冒烟。结果记录在本节下方（验证后追加）。

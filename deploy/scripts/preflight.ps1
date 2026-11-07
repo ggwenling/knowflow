@@ -103,7 +103,8 @@ $required = @(
     "KNOWFLOW_BUDGET_LEDGER_PATH", "KNOWFLOW_BUDGET_PRICE_FILE", "KNOWFLOW_BUDGET_POLICY_FILE",
     "KNOWFLOW_BUDGET_DIR",
     "KNOWFLOW_TLS_DIR", "KNOWFLOW_EDGE_HTTPS_PORT",
-    "KNOWFLOW_WEB_MODEL_MODE"
+    "KNOWFLOW_WEB_MODEL_MODE",
+    "KNOWFLOW_IMAGE_REPOSITORY", "KNOWFLOW_RELEASE"
 )
 $secrets = @(
     "KNOWFLOW_DATABASE_PASSWORD", "KNOWFLOW_MIGRATION_DATABASE_PASSWORD",
@@ -155,6 +156,44 @@ if (-not (Test-Path $resolvedEnv)) {
     }
     if ($envMap["KNOWFLOW_WEB_MODEL_MODE"] -eq "synthetic") {
         Add-Result "env" "model-mode" "WARN" "仍是 synthetic：生产上线前需确认真实模式，或明确这是演示环境"
+    }
+
+    # 发布镜像：必须是 <registry>/<repo> 加不可变 tag，禁止浮动标签。
+    $release = $envMap["KNOWFLOW_RELEASE"]
+    if ($release -in @("local", "latest", "dev", "main")) {
+        Add-Result "release" "immutable-tag" "FAIL" "KNOWFLOW_RELEASE=$release 是浮动标签"
+    } elseif ($release -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{5,63}$') {
+        Add-Result "release" "immutable-tag" "FAIL" "KNOWFLOW_RELEASE 需为提交 sha 或语义版本（6–64 位字母数字/._-）"
+    } else {
+        Add-Result "release" "immutable-tag" "PASS" $release
+    }
+    $imageRepository = $envMap["KNOWFLOW_IMAGE_REPOSITORY"]
+    if ($imageRepository -match 'example\.(com|org|net)') {
+        Add-Result "release" "image-repository" "WARN" "仍是示例仓库地址，需替换为真实 registry"
+    } elseif ($imageRepository -notmatch '^(?:[a-z0-9.-]+(?::[0-9]+)?/)+[a-z0-9._-]+$') {
+        Add-Result "release" "image-repository" "FAIL" "需为 <registry>/<repo> 形式"
+    } else {
+        Add-Result "release" "image-repository" "PASS" $imageRepository
+    }
+
+    # 受控出网：代理配置与白名单必须存在；空代理等于 ai 无外网（fail-closed）。
+    $egressConf = Join-Path $repo "deploy/egress/squid.conf"
+    if (-not (Test-Path $egressConf -PathType Leaf)) {
+        Add-Result "egress" "allowlist" "FAIL" "缺少 deploy/egress/squid.conf"
+    } else {
+        $egressText = Get-Content -Raw $egressConf
+        $domains = @("api.deepseek.com", "api.siliconflow.cn")
+        $missingDomains = $domains | Where-Object { $egressText -notlike "*$_*" }
+        if ($missingDomains.Count -eq 0) {
+            Add-Result "egress" "allowlist" "PASS" "provider 域名均在白名单"
+        } else {
+            Add-Result "egress" "allowlist" "FAIL" "白名单缺少：$($missingDomains -join ', ')"
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($envMap["KNOWFLOW_EGRESS_HTTPS_PROXY"])) {
+        Add-Result "egress" "proxy" "FAIL" "KNOWFLOW_EGRESS_HTTPS_PROXY 为空：ai 将无外网出口"
+    } else {
+        Add-Result "egress" "proxy" "PASS" $envMap["KNOWFLOW_EGRESS_HTTPS_PROXY"]
     }
 
     # Provider 预算门禁三件套：宿主目录必须同时含价格与策略文件。

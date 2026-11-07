@@ -7,6 +7,7 @@ public class DatabaseMigrationProperties {
     private String url;
     private String username;
     private String password;
+    private String target;
 
     public String getUrl() {
         return url;
@@ -32,6 +33,14 @@ public class DatabaseMigrationProperties {
         this.password = password;
     }
 
+    public String getTarget() {
+        return target;
+    }
+
+    public void setTarget(String target) {
+        this.target = target;
+    }
+
     public void requireValid() {
         if (url == null || !url.startsWith("jdbc:postgresql://")
                 || !url.chars().allMatch(character -> character >= 0x21 && character <= 0x7e)
@@ -44,6 +53,11 @@ public class DatabaseMigrationProperties {
         }
         if (password == null || password.isBlank()) {
             throw new IllegalStateException("KNOWFLOW_MIGRATION_DATABASE_PASSWORD is required");
+        }
+        if (target != null && !target.isBlank()
+                && !target.matches("^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))*$")) {
+            throw new IllegalStateException(
+                    "KNOWFLOW_MIGRATION_TARGET must be a numeric dotted version such as 2 or 2.1");
         }
     }
 
