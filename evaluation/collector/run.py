@@ -158,6 +158,10 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                        "answer_sha256": sha256(b"").hexdigest(), "retrieved_evidence": [], "citations": [],
                        "latency_ms": 0, "error_code": "COLLECTION_INCOMPLETE"}
                 diagnostics = {}
+            else:
+                if row["outcome"] == "error":
+                    status["failures"].append({"question_id": question["id"],
+                                               "error_code": row["error_code"]})
             payload["predictions"].append(row)
             diagnostics_payload["diagnostics"].append(
                 {"question_id": question["id"], "outcome": row["outcome"],

@@ -143,6 +143,75 @@ async def test_cleanup_failure_does_not_mask_the_collection_error(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_error_rows_are_recorded_as_failures_and_mark_collection_incomplete(tmp_path):
+    dataset = ROOT / "evaluation/data/seed-v1"
+    manifest, questions, _documents, sources, _digest = run.scorer._load_dataset(dataset)
+    uploaded, captures, runtime_rows = [], {}, {}
+    cleanup = []
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+
+    async def java_transport(request):
+        path = request.url.path
+        if request.method == "DELETE":
+            cleanup.append(path)
+            return httpx.Response(204)
+        if path == "/api/v1/knowledge-bases":
+            return httpx.Response(201, json={"id": "kb"})
+        if path.endswith("/documents"):
+            index = len(uploaded)
+            uploaded.append(manifest["documents"][index])
+            return httpx.Response(202, json={"document_id": str(index), "task_id": str(index)})
+        if path.startswith("/api/v1/tasks/"):
+            return httpx.Response(200, json={"status": "SUCCEEDED"})
+        if path.startswith("/api/v1/documents/"):
+            index = int(path.rsplit("/", 1)[1])
+            return httpx.Response(200, json={"status": "READY", "source_sha256": uploaded[index]["sha256"],
+                                           "active_index_version_id": str(index)})
+        assert path.endswith("/questions")
+        key = request.headers["Idempotency-Key"]
+        request_id = "req-" + str(len(runtime_rows))
+        runtime_rows[key] = {"id": str(UUID(int=len(runtime_rows) + 1)), "request_id": request_id,
+                             "failure_code": "AI_PROCESSING_FAILED"}
+        trace = []
+        for index, document in enumerate(uploaded):
+            text = sources[document["id"]]
+            trace.append({"document_id": str(index), "content_version_id": "content-" + str(index),
+                          "index_version_id": str(index), "source_id": "src-" + str(index),
+                          "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                      "start": 0, "end": len(text)},
+                          "text_sha256": sha256(text.encode("utf-8")).hexdigest()})
+        captures[request_id] = {"request_id": request_id, "response": None,
+                                "error_code": "AI_PROCESSING_FAILED", "trace": trace, "citation": None}
+        return httpx.Response(500, json={"code": "AI_PROCESSING_FAILED"})
+
+    async def ai_transport(request):
+        return httpx.Response(200, json=captures.pop(request.url.path.rsplit("/", 1)[1]))
+
+    async def fetch(sql, params):
+        if "index_versions" in sql:
+            return {"content_version_id": "content-" + params[0]}
+        return runtime_rows[params[0]]
+
+    output = tmp_path / "predictions.json"
+    async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
+        async with httpx.AsyncClient(base_url="http://ai.test", transport=httpx.MockTransport(ai_transport)) as ai:
+            with pytest.raises(ValueError, match="COLLECTION_INCOMPLETE"):
+                await run.collect_dataset(
+                    java=java, ai=ai, dataset=dataset, split="development", output=output,
+                    run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                                  "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                    fetch_row=fetch, ledger=ledger)
+
+    expected = sum(question["split"] == "development" for question in questions)
+    status = json.loads(output.with_suffix(".status.json").read_text())
+    assert status["complete"] is False
+    assert len(status["failures"]) == expected
+    assert {failure["error_code"] for failure in status["failures"]} == {"AI_PROCESSING_FAILED"}
+    assert all(failure["question_id"] for failure in status["failures"])
+    assert cleanup == ["/api/v1/knowledge-bases/kb"]
+
+
+@pytest.mark.asyncio
 async def test_collect_dataset_stops_when_shared_ledger_records_a_budget_stop(tmp_path):
     dataset = ROOT / "evaluation/data/seed-v1"
     ledger = BudgetLedger(tmp_path / "budget.sqlite3")
