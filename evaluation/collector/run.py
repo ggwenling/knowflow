@@ -89,6 +89,9 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
     diagnostics_payload = {"prediction_version": 2, "dataset_id": manifest["dataset_id"],
                            "dataset_sha256": fingerprint, "diagnostics": []}
     diagnostics_path = output.with_suffix(".diagnostics.json")
+    public_sources_payload = {"sidecar_version": 1, "dataset_id": manifest["dataset_id"],
+                              "dataset_sha256": fingerprint, "split": split, "questions": []}
+    public_sources_path = output.with_suffix(".public-sources.json")
     status = {"complete": False, "failures": [], "budget_steps": []}
     created = await java.post("/api/v1/knowledge-bases",
                               json={"contract_version": CONTRACT_VERSION, "name": "Evaluation collection"})
@@ -146,12 +149,13 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             if stop is not None:
                 raise ValueError(stop)
             diagnostics = {}
+            public_sources = []
             try:
                 row = await collector.collect_question(
                     java=java, ai=ai, knowledge_base_id=knowledge_base_id,
                     question=question["question"], question_id=question["id"],
                     mappings=mappings, lookup_question=lookup,
-                    diagnostics_out=diagnostics)
+                    diagnostics_out=diagnostics, public_sources_out=public_sources)
             except (ValueError, httpx.HTTPError):
                 status["failures"].append({"question_id": question["id"], "code": "COLLECTION_INCOMPLETE"})
                 row = {"question_id": question["id"], "outcome": "error", "answer": "",
@@ -166,9 +170,11 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             diagnostics_payload["diagnostics"].append(
                 {"question_id": question["id"], "outcome": row["outcome"],
                  "citation": diagnostics or None})
+            public_sources_payload["questions"].extend(public_sources)
             status["budget_steps"].append({"stage": "question", **ledger.summary()})
             write_json(output, payload)
             write_json(diagnostics_path, diagnostics_payload)
+            write_json(public_sources_path, public_sources_payload)
             write_json(output.with_suffix(".status.json"), status)
             if question_index + 1 < len(selected):
                 stop = _budget_stop_reason(ledger)

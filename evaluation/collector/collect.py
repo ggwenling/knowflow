@@ -10,12 +10,17 @@ _spec.loader.exec_module(prediction)
 
 
 async def collect_question(*, java, ai, knowledge_base_id, question, question_id,
-                           mappings, lookup_question, diagnostics_out=None):
+                           mappings, lookup_question, diagnostics_out=None,
+                           public_sources_out=None):
     """Clients own credentials; lookup uses the unique idempotency key to read Java's row.
 
     ``diagnostics_out``, when given, receives that question's citation reason
     codes. It stays separate from the runner row so the frozen prediction schema
     is unchanged. Missing or absent diagnostics leave it untouched.
+
+    ``public_sources_out``, when given, receives the Java answer's ``sources[]``
+    verbatim (locator and quote included) as an audit sidecar entry. Like
+    diagnostics it never enters the prediction row.
     """
     key = str(uuid4())
     started = time.monotonic()
@@ -53,4 +58,11 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
             or public.get("has_answer") != internal["has_answer"]
             or len(set(public_ids)) != len(public_ids) or set(public_ids) != expected_ids):
         raise ValueError("JAVA_PUBLIC_ANSWER_MISMATCH")
+    if public_sources_out is not None:
+        public_sources_out.append({
+            "question_id": question_id,
+            "runtime_question_id": runtime["id"],
+            "request_id": request_id,
+            "sources": [dict(source) for source in public.get("sources", [])],
+        })
     return row

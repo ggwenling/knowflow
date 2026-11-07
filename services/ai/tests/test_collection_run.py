@@ -103,6 +103,13 @@ async def test_public_seed_upload_index_question_capture_and_cleanup_with_fake_h
                for entry in diagnostics["diagnostics"])
     assert all(entry["citation"]["repair_gate_reason"] == "ineligible_reason"
                for entry in diagnostics["diagnostics"])
+    sidecar = json.loads(output.with_suffix(".public-sources.json").read_text())
+    assert sidecar["sidecar_version"] == 1
+    assert sidecar["split"] == "development"
+    assert sidecar["dataset_sha256"] == payload["dataset_sha256"]
+    assert [entry["question_id"] for entry in sidecar["questions"]] == [
+        row["question_id"] for row in payload["predictions"]]
+    assert all(entry["sources"] == [] for entry in sidecar["questions"])
 
 
 @pytest.mark.asyncio
@@ -323,3 +330,61 @@ async def test_collect_dataset_limit_slices_selected_questions(tmp_path):
     assert len(payload["predictions"]) == 1
     assert cleanup == ["/api/v1/knowledge-bases/kb"]
     assert json.loads(output.with_suffix(".status.json").read_text())["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_collect_dataset_records_public_source_locator_in_sidecar(tmp_path):
+    dataset = ROOT / "evaluation/data/seed-v1"
+    ledger = BudgetLedger(tmp_path / "budget.sqlite3")
+    output = tmp_path / "predictions.json"
+    runtime_id = str(UUID(int=7))
+    request_id = "req-locator"
+    source_text = "0123456789"
+    trace = [{"document_id": "doc-1", "content_version_id": "cv-1", "index_version_id": "iv-1",
+              "source_id": "runtime-src", "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                                     "start": 0, "end": len(source_text)},
+              "text_sha256": sha256(source_text.encode("utf-8")).hexdigest()}]
+    public_id = run.collector.prediction._mapping.public_source_id(runtime_id, "runtime-src")
+    internal = {"request_id": request_id, "answer": "答案句 [runtime-src]。", "has_answer": True,
+                "sources": [{"source_id": "runtime-src", "document_id": "doc-1",
+                             "content_version_id": "cv-1", "index_version_id": "iv-1",
+                             "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                         "start": 0, "end": len(source_text)}, "quote": source_text}]}
+    response = {"request_id": request_id, "answer": f"答案句 [{public_id}]。", "has_answer": True,
+                "sources": [{"source_id": public_id, "document_id": "doc-1",
+                             "content_version_id": "cv-1", "index_version_id": "iv-1",
+                             "locator": {"kind": "text_range", "unit": "unicode_code_point",
+                                         "start": 2, "end": 5}, "quote": "234"}]}
+    capture = {"request_id": request_id, "response": internal, "error_code": None, "trace": trace,
+               "citation": {"decision": "supported", "reason": None}}
+
+    async def java_transport(request):
+        assert request.url.path.endswith("/questions")
+        return httpx.Response(200, json=response)
+
+    async def ai_transport(request):
+        assert request.url.path.endswith(request_id)
+        return httpx.Response(200, json=capture)
+
+    async def lookup(_key):
+        return {"id": runtime_id, "request_id": request_id, "failure_code": None}
+
+    mappings = {("doc-1", "cv-1", "iv-1"): {"source_bytes": source_text.encode("utf-8"),
+                                            "source_sha256": sha256(source_text.encode("utf-8")).hexdigest(),
+                                            "dataset_document_id": "d1",
+                                            "dataset_content_version_id": "c1"}}
+    sidecar = []
+    async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
+        async with httpx.AsyncClient(base_url="http://ai.test", transport=httpx.MockTransport(ai_transport)) as ai:
+            row = await run.collector.collect_question(
+                java=java, ai=ai, knowledge_base_id="kb", question="q", question_id="candidate-01",
+                mappings=mappings, lookup_question=lookup, public_sources_out=sidecar)
+    assert row["outcome"] == "answered"
+    assert set(row) == {"question_id", "outcome", "answer", "answer_sha256", "retrieved_evidence",
+                        "citations", "latency_ms", "error_code"}
+    assert "sources" not in row and "locator" not in row
+    assert sidecar == [{"question_id": "candidate-01", "runtime_question_id": runtime_id,
+                        "request_id": request_id, "sources": response["sources"]}]
+    assert sidecar[0]["sources"][0]["locator"] == {"kind": "text_range", "unit": "unicode_code_point",
+                                                  "start": 2, "end": 5}
+    assert sidecar[0]["sources"][0]["quote"] == "234"
