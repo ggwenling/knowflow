@@ -1,47 +1,60 @@
-# NOTICE — 第三方弱 copyleft 与需署名组件摘要（初版）
+# NOTICE
 
-本文件汇总 KnowFlow 仓库发行物中已知的第三方弱 copyleft 及需署名组件，供分发时保留声明与履行相应义务。依据 `docs/reviews/2026-11-03-dependency-inventory.json` 与 `docs/reviews/2026-11-03-license-log-redaction-audit.md` 的只读清单整理；**不是法律意见，也不构成发行合规批准**。
+KnowFlow
+Copyright 2026 KnowFlow contributors（版权主体待确认）
 
-## Python 运行时
+本项目以 **Apache License 2.0** 授权，许可证全文见仓库根目录 [LICENSE](LICENSE)。
 
-| 组件 | 版本 | SPDX 许可证 | 说明 |
+本文件汇总发行物中实际使用的第三方依赖及其许可证义务。完整逐条清单（依赖名、版本、许可证、来源）见 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)：共 **704** 条记录（Python 39、Java 130、Node 535），其中本项目自身 1 条，第三方依赖 **703** 条。
+
+## 1. 运行时路径中需要声明或署名的组件
+
+| 组件 | 版本 | 许可证 | 发行时需履行的义务 |
 |---|---|---|---|
-| `psycopg` / `psycopg-binary` | 3.3.6 | `LGPL-3.0-only` | 作为独立包使用；分发时保留版权与许可证声明，并说明库可被替换及对应源码的获取方式。 |
-| `certifi` | 2026.10.23 | `MPL-2.0` | 文件级 copyleft；未修改时保留许可证与来源声明。 |
+| `psycopg` / `psycopg-binary` | 3.3.6 | LGPL-3.0-only | 保留版权与许可证声明；说明该库可被替换；提供对应源码获取方式。 |
+| `@img/sharp-libvips-*`（libvips 各平台变体） | 1.3.4 | LGPL-3.0-or-later | 以独立动态库加载；保留声明，保持可替换，提供源码获取方式。 |
+| `@img/sharp-win32-*`（arm64 / ia32 / x64） | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later | 与 sharp 平台二进制同包分发；保留 Apache-2.0 与 LGPL 声明及许可证文本。 |
+| `@img/sharp-wasm32` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later AND MIT | 同上，另需保留 MIT 声明。 |
+| `caniuse-lite` | 1.0.30001820 | CC-BY-4.0 | **必须署名**：数据来自 caniuse.com（`caniuse-lite`，CC-BY-4.0），并保留许可证文本。 |
+| `@fontsource/dm-sans` | 5.3.0 | OFL-1.1 | 保留字体版权声明与 OFL 1.1 全文；不得使用保留字体名发布修改版。 |
+| `@fontsource/dm-serif-display` | 5.3.0 | OFL-1.1 | 同上。 |
+| `certifi` | 2026.10.23 | MPL-2.0 | 未修改时保留声明与许可证文本；若修改其文件，需公开被修改文件源码。 |
+| `logback-classic` / `logback-core` | 1.5.34 | EPL-2.0 或 LGPL-2.1-only（双许可） | 本项目按 **EPL-2.0** 使用：保留声明与许可证全文，无源码开放义务。 |
+| `jakarta.annotation-api` | 2.1.1 | EPL-2.0 或 GPL-2.0-CPE（双许可） | 本项目按 **EPL-2.0** 使用，不启用 GPL 选项。 |
+| `org.postgresql:postgresql` | 42.7.11 | BSD-2-Clause | 保留版权与免责声明。 |
+| `HdrHistogram` / `LatencyUtils` | 2.2.2 / 2.0.3 | CC0-1.0 / Public Domain | 无强制署名义务。 |
+| `reactive-streams` | 1.0.4 | MIT-0 | 无署名义务。 |
 
-## Node / Web
+其余运行时组件为 MIT、Apache-2.0、BSD-2-Clause、BSD-3-Clause、ISC、0BSD、BlueOak-1.0.0、PSF-2.0 等宽松许可证，随发行物保留其版权声明与许可证文本即可。
 
-| 组件 | 版本 | SPDX 许可证 | 说明 |
-|---|---|---|---|
-| `@img/sharp-libvips-*`（libvips 各平台变体） | 1.3.4 | `LGPL-3.0-or-later` | 以独立动态库方式加载；保留声明并说明可替换方式与源码获取方式。仅覆盖 libvips 1.3.4 变体；sharp 本体中带 LGPL 条款的平台变体见下两行。 |
-| `@img/sharp-wasm32` | 0.35.5 | `Apache-2.0 AND LGPL-3.0-or-later AND MIT` | 平台特定 sharp 二进制（wasm32）；与上方 libvips 1.3.4 变体分开记录，保留声明与许可证文本。 |
-| `@img/sharp-win32-*`（arm64 / ia32 / x64） | 0.35.5 | `Apache-2.0 AND LGPL-3.0-or-later` | 平台特定 sharp 二进制（Windows）；与上方 libvips 1.3.4 变体分开记录，保留声明与许可证文本。 |
-| `axe-core` | 4.14.0 | `MPL-2.0` | 开发／构建期依赖；如分发修改后的源文件，需按 MPL-2.0 提供该文件源码。 |
-| `lightningcss` / `lightningcss-*`（含各平台 binary 变体） | 1.33.0 | `MPL-2.0` | 开发／构建期依赖；义务同上。 |
-| `caniuse-lite` | 1.0.30001820 | `CC-BY-4.0` | 需署名（数据来源）；随发行物保留本 NOTICE 作为署名入口，具体署名文本以发行清单为准。 |
+## 2. 仅开发 / 测试作用域
 
-## Java / API
+以下弱 copyleft 组件只出现在开发或测试路径，不随运行时镜像分发：`axe-core`（MPL-2.0）、`lightningcss` 及平台变体（MPL-2.0）、`junit` / `junit-jupiter` / `junit-platform`（EPL-1.0 / EPL-2.0）、`jakarta.activation-api` 与 `jakarta.xml.bind-api`（EDL-1.0）、`jna`（Apache-2.0 / LGPL-2.1-or-later 双许可，按 Apache-2.0 使用）。若将来交付包含测试依赖的镜像或制品，需重新评估。
 
-| 组件 | 版本 | SPDX 许可证 | 说明 |
-|---|---|---|---|
-| `ch.qos.logback:logback-classic` / `logback-core` | 1.5.34 | `EPL-2.0` 或 `LGPL-2.1-only`（双许可） | 本仓库按 `EPL-2.0` 使用；保留声明，无源码开放义务。 |
-| `jakarta.annotation:jakarta.annotation-api` | 2.1.1 | `EPL-2.0` 或 `GPL-2.0-only WITH Classpath-exception-2.0`（双许可） | 按 `EPL-2.0` 使用；保留声明。 |
-| `org.junit.jupiter:*` / `org.junit.platform:*` | 5.12.2 / 1.12.2 | `EPL-2.0` | 仅测试作用域，不随运行时镜像分发。 |
-| `junit:junit` | 4.13.2 | `EPL-1.0` | 仅测试作用域。 |
-| `net.java.dev.jna:jna` | 5.13.0 | `LGPL-2.1-or-later` / `Apache-2.0`（双许可） | 仅测试作用域，通常不随 Linux 运行时镜像分发；本仓库及典型用法按 `Apache-2.0` 使用。 |
-| `jakarta.activation:jakarta.activation-api` / `jakarta.xml.bind:jakarta.xml.bind-api` | 2.1.4 / 4.0.5 | `EDL-1.0`（BSD-3-Clause 类） | 保留版权与免责声明。 |
+## 3. 强 copyleft 检查结论
 
-清单未发现必须按 GPL / AGPL / SSPL 强 copyleft 条款履行的运行时组件（`jakarta.annotation-api` 虽带 GPL2 w/ CPE 选项，本仓库按 `EPL-2.0` 使用）。Java 的 EPL 组按 inventory summary 归纳；更完整的传递依赖与作用域以清单为准。
+对全部 703 条第三方依赖（含测试作用域）核查后：**未发现 GPL-2.0-only、GPL-3.0-only、AGPL、SSPL 等强 copyleft 条目**。唯一带 GPL 选项的 `jakarta.annotation-api` 为双许可，本项目按 EPL-2.0 使用。LGPL 组件（`psycopg`、libvips、sharp 平台二进制）均以独立分发的库或动态加载的原生模块方式使用，不要求本项目源码改用 LGPL。
 
-## 许可证原文与获取方式
+## 4. 取证基线
 
-- 完整许可证原文见各上游软件包内附带的 `LICENSE` / `NOTICE` / `COPYING` 文件。
-- 本仓库已留存的部分 Python 上游许可证原文位于 `services/ai/docs/evidence/license-texts/`。
-- 本文件只引用 SPDX 标识与上游位置，**不粘贴 GPL/LGPL 等许可证全文**。
+- 生成日期：2026-11-07；代码基线：`local` 分支 HEAD `f2b5c67`。
+- Python：`services/ai/uv.lock`（SHA-256 `a9bc533d8a029a6d6c10297bddeaf83cea11420d80427fb824ee790894d357c2`）。
+- Java：`services/api/pom.xml`（SHA-256 `c6a640e24fe76b28c14f6e3b4c088ef179de32855bd4998dadef047d4afbc60e`）与离线 `mvnw dependency:list` 解析结果（130 条）。
+- Node：`apps/web/package-lock.json`（SHA-256 `cb7bddb85868dd475eee91dbec1c7e9e10609e3a8d1f62b636c66a7589e0b8fe`）。
+- 采集方式：`scripts/audit-dependencies.py`（只读，无网络调用）。
 
-## 范围与未完成事项
+## 5. 许可证原文获取
 
-- 本文件**不是法律意见**；具体发行场景下的通知、源码提供与再分发义务应由权利人结合实际情况确认。
-- `knowflow-ai` 项目自身的许可证仍待权利人声明（inventory 中记为 `UNKNOWN`），本文件不为项目选择或主张任何许可证。
-- Maven / npm 的全量 SBOM、完整传递依赖许可证原文、容器镜像层与 Linux native 捆绑依赖的证据**尚未完成**；本 NOTICE 首版先覆盖 Python / Node 运行时弱 copyleft，并纳入 Java EPL 组概要。
-- 本初版仍待独立审阅及负责人发行签收。
+- 本项目自身的 Apache-2.0 全文见根目录 `LICENSE`。
+- 第三方许可证原文随各上游软件包分发（`node_modules/*/LICENSE`、Python `dist-info/licenses/`、Java artifact POM/JAR 内声明）；Python 侧部分原文另存于 `services/ai/docs/evidence/license-texts/`。
+- 本文件只记录 SPDX 标识与义务，不粘贴 LGPL / EPL / MPL 等许可证全文；发行包应按 `THIRD-PARTY-LICENSES.md` 列出的许可证集合随附全文。
+
+## 6. 未覆盖范围与待核实
+
+- 操作系统与基础镜像层（`python:3.12-slim`、`eclipse-temurin:21-jre-jammy`、Node 基础镜像内的发行版软件包）的许可证与声明尚未采集：**待核实**。
+- Apache-2.0 依赖自带的上游 `NOTICE` 文本尚未逐份汇总：**待核实**。
+- 容器镜像内实际安装的平台变体（`@img/sharp-*`）与 Linux 原生依赖需在构建产物上复核：**待核实**。
+- `colorama`、`reportlab` 的上游元数据为 `OSI Approved / BSD License`，未标注 BSD 版本号：**待核实**。
+- 版权主体：仓库内未发现明确的组织或法人版权声明，`LICENSE` 暂以 “KnowFlow contributors” 署名并标注待确认。
+
+本文件是事实性声明汇总，不构成法律意见，也不替代法务与负责人的发行签收。
