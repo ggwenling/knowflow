@@ -15,7 +15,7 @@ A 单写共享 API、错误码、身份与资源范围、任务租约、索引�
 - [认证与 owner 隔离 ADR](../docs/architecture/ADR-003-auth-and-owner-boundary.md)
 - [API 与边界](./api-draft.md)
 - [JSON Schema](./schemas/protocol.schema.json)：JSON Schema Draft 2020-12，引用局限于仓库。
-- [OpenAPI 0.2.0](./openapi-draft10.json)：描述 Java/Python 现有路由；`DocumentApiIntegrationTest` 运行时覆盖 Document/Task 可选字段省略，以及问答历史和过期来源的 nullable 字段序列化。正常 TXT/PDF SSE 帧已由浏览器 E2E 校验；错误/取消等未覆盖帧和完整消费语义仍待核验、负责人签收。契约已于 2026-11-07 冻结为 `0.2.0`。
+- [OpenAPI 0.2.0](./openapi-draft10.json)：描述 Java/Python 现有路由；`DocumentApiIntegrationTest` 运行时覆盖 Document/Task 可选字段省略，以及问答历史和过期来源的 nullable 字段序列化。正常 TXT/PDF SSE 帧已由浏览器 E2E 校验；错误/取消等未覆盖帧和完整消费语义仍待核验、负责人签收。契约已于 2026-11-07 冻结为 `0.2.0`。2026-11-07 补齐已上线并由 nginx 转发的 `GET /health/ready` 路由声明（Python 就绪探针）及其内联响应结构；共享 Schema、`contract_version` 与报文语义均未变，Schema SHA-256 保持 `a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1`，故不升版本号。
 - [结构校验样例](./examples/protocol-cases.json)：覆盖正常、失败、失权、旧租约、删除、重复完成及拒绝负例。
 - [批次摘要算法](./index_batch_hash.py)：与 Schema 中 `index-batch` 样例配对，固定摘要序列化规则。
 - [A 线执行记录](../docs/tasks/agent-a.md)记录 V0.2 基线决策、KF2-001/004/006 进度和各提交 SHA。

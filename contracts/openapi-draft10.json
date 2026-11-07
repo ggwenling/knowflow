@@ -3,7 +3,7 @@
   "info": {
     "title": "KnowFlow 0.2.0 API",
     "version": "0.2.0",
-    "description": "冻结版本 0.2.0（2026-11-07）。共享 schema SHA-256 a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1 和 /health/live 在 Python。正常 TXT/PDF 问答的 SSE 帧已由浏览器 E2E 对共享 schema 校验；错误/取消等未覆盖事件和完整消费语义仍待复核。DocumentApiIntegrationTest 以 MVC wire 响应验证了部分 null 规则：Document/Task 可选字段省略，问答历史 nullable 字段和过期来源字段为 JSON null；其他公开响应仍待核验。不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
+    "description": "冻结版本 0.2.0（2026-11-07）。共享 schema SHA-256 a206d3aa00f4a932b4ea0d871e73350d9000b51cffcdba90008ac0da5999b4b1。/api/v1 及 /internal/v1/tasks 在 Java；其他 /internal/v1、/health/live 和 /health/ready 在 Python。正常 TXT/PDF 问答的 SSE 帧已由浏览器 E2E 对共享 schema 校验；错误/取消等未覆盖事件和完整消费语义仍待复核。DocumentApiIntegrationTest 以 MVC wire 响应验证了部分 null 规则：Document/Task 可选字段省略，问答历史 nullable 字段和过期来源字段为 JSON null；其他公开响应仍待核验。不包括 Spring Boot 管理端点及框架自动处理的 HEAD/OPTIONS；此文描述 Java 公开 API 而非 Next 同源代理。"
   },
   "security": [
     {
@@ -1151,6 +1151,44 @@
         ]
       }
     },
+    "/health/ready": {
+      "get": {
+        "summary": "Python 就绪探针",
+        "responses": {
+          "200": {
+            "description": "模型供应商与预算配置均可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderReadiness"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "至少一项依赖不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderReadiness"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "description": "仅 Python 服务；探测 LLM、Embedding 与预算配置，结果短时缓存且不消耗模型额度。",
+        "servers": [
+          {
+            "url": "http://localhost:8000",
+            "description": "Python AI 服务；仅供内部调用，存活探针除外"
+          }
+        ]
+      }
+    },
     "/internal/v1/health": {
       "get": {
         "summary": "Python 内部健康",
@@ -1418,6 +1456,65 @@
       }
     },
     "schemas": {
+      "ProviderReadiness": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "checks"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "UP",
+              "UNAVAILABLE"
+            ]
+          },
+          "checks": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "budget",
+              "llm",
+              "embedding"
+            ],
+            "properties": {
+              "budget": {
+                "$ref": "#/components/schemas/ProviderCheck"
+              },
+              "llm": {
+                "$ref": "#/components/schemas/ProviderCheck"
+              },
+              "embedding": {
+                "$ref": "#/components/schemas/ProviderCheck"
+              }
+            }
+          }
+        }
+      },
+      "ProviderCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "UP",
+              "DOWN"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "provider_status": {
+            "type": "integer"
+          }
+        }
+      },
       "PublicSource": {
         "type": "object",
         "required": [
