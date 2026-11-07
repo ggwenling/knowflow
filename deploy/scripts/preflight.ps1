@@ -13,8 +13,16 @@
 .PARAMETER MinDiskGb
     目标盘最少剩余空间，默认 20。
 
+.PARAMETER SkipPortCheck
+    跳过入口端口占用检查。用于对已部署环境重复预检，避免运行中的栈把端口
+    检查判为 FAIL（误报）。跳过时只输出一条 INFO。
+
 .EXAMPLE
     pwsh -File deploy/scripts/preflight.ps1 -EnvFile deploy/.env.production
+
+.EXAMPLE
+    # 栈已运行时重复预检
+    pwsh -File deploy/scripts/preflight.ps1 -EnvFile deploy/.env.production -SkipPortCheck
 
 .EXITCODE
     0 = 全部 PASS 或有 WARN；1 = 存在 FAIL。
@@ -22,7 +30,8 @@
 [CmdletBinding()]
 param(
     [string]$EnvFile = "deploy/.env.production",
-    [int]$MinDiskGb = 20
+    [int]$MinDiskGb = 20,
+    [switch]$SkipPortCheck
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,6 +100,9 @@ $required = @(
     "KNOWFLOW_RUNTIME_PROFILE_ID", "KNOWFLOW_INDEXING_RUNTIME_PROFILE_ID",
     "KNOWFLOW_EMBEDDING_BASE_URL", "KNOWFLOW_EMBEDDING_MODEL", "KNOWFLOW_EMBEDDING_DIMENSIONS", "KNOWFLOW_EMBEDDING_KEY_ENV",
     "KNOWFLOW_LLM_BASE_URL", "KNOWFLOW_LLM_MODEL", "KNOWFLOW_LLM_KEY_ENV",
+    "KNOWFLOW_BUDGET_LEDGER_PATH", "KNOWFLOW_BUDGET_PRICE_FILE", "KNOWFLOW_BUDGET_POLICY_FILE",
+    "KNOWFLOW_BUDGET_DIR",
+    "KNOWFLOW_TLS_DIR", "KNOWFLOW_EDGE_HTTPS_PORT",
     "KNOWFLOW_WEB_MODEL_MODE"
 )
 $secrets = @(
@@ -144,6 +156,40 @@ if (-not (Test-Path $resolvedEnv)) {
     if ($envMap["KNOWFLOW_WEB_MODEL_MODE"] -eq "synthetic") {
         Add-Result "env" "model-mode" "WARN" "仍是 synthetic：生产上线前需确认真实模式，或明确这是演示环境"
     }
+
+    # Provider 预算门禁三件套：宿主目录必须同时含价格与策略文件。
+    if ($envMap["KNOWFLOW_BUDGET_DIR"]) {
+        $budgetDirRaw = $envMap["KNOWFLOW_BUDGET_DIR"]
+        $budgetDir = if ([System.IO.Path]::IsPathRooted($budgetDirRaw)) { $budgetDirRaw } else { Join-Path $repo $budgetDirRaw }
+        if (-not (Test-Path $budgetDir -PathType Container)) {
+            Add-Result "budget" "dir" "FAIL" "找不到 KNOWFLOW_BUDGET_DIR：$budgetDirRaw"
+        } else {
+            $missingBudget = @()
+            foreach ($name in @("PRICE_FILE.json", "POLICY_FILE.json")) {
+                if (-not (Test-Path (Join-Path $budgetDir $name) -PathType Leaf)) { $missingBudget += $name }
+            }
+            if ($missingBudget.Count -eq 0) {
+                Add-Result "budget" "files" "PASS" "PRICE_FILE.json / POLICY_FILE.json 均存在（只读挂载）"
+            } else {
+                Add-Result "budget" "files" "FAIL" "预算目录缺少：$($missingBudget -join ', ')"
+            }
+        }
+    }
+
+    # 入口 TLS：edge 需要固定的两个证书文件名。
+    if ($envMap["KNOWFLOW_TLS_DIR"]) {
+        $tlsRaw = $envMap["KNOWFLOW_TLS_DIR"]
+        $tlsDir = if ([System.IO.Path]::IsPathRooted($tlsRaw)) { $tlsRaw } else { Join-Path (Join-Path $repo "deploy") $tlsRaw }
+        $missingTls = @()
+        foreach ($name in @("fullchain.pem", "privkey.pem")) {
+            if (-not (Test-Path (Join-Path $tlsDir $name) -PathType Leaf)) { $missingTls += $name }
+        }
+        if ($missingTls.Count -eq 0) {
+            Add-Result "tls" "cert-files" "PASS" "fullchain.pem / privkey.pem 均存在"
+        } else {
+            Add-Result "tls" "cert-files" "FAIL" "证书目录缺少：$($missingTls -join ', ')；先运行 deploy/scripts/generate-self-signed-cert.ps1 或放置正式证书"
+        }
+    }
 }
 
 # ── 5. 密钥未落入版本控制 ──────────────────────────────────────────────
@@ -185,14 +231,18 @@ if ($freeGb -ge $MinDiskGb) {
     Add-Result "host" "disk-free" "FAIL" "$freeGb GB 可用，低于阈值 $MinDiskGb GB"
 }
 
-$webPort = if ($envMap["KNOWFLOW_WEB_PORT"]) { [int]$envMap["KNOWFLOW_WEB_PORT"] } else { 3000 }
-try {
-    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $webPort)
-    $listener.Start()
-    $listener.Stop()
-    Add-Result "host" "port-$webPort" "PASS" "空闲"
-} catch {
-    Add-Result "host" "port-$webPort" "FAIL" "已被占用"
+$edgePort = if ($envMap["KNOWFLOW_EDGE_HTTPS_PORT"]) { [int]$envMap["KNOWFLOW_EDGE_HTTPS_PORT"] } else { 3443 }
+if ($SkipPortCheck) {
+    Add-Result "host" "port-$edgePort" "INFO" "已按 -SkipPortCheck 跳过（用于已部署环境重复预检）"
+} else {
+    try {
+        $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $edgePort)
+        $listener.Start()
+        $listener.Stop()
+        Add-Result "host" "port-$edgePort" "PASS" "空闲"
+    } catch {
+        Add-Result "host" "port-$edgePort" "FAIL" "已被占用；若栈已部署属预期，请加 -SkipPortCheck"
+    }
 }
 
 # ── 8. 输出 ────────────────────────────────────────────────────────────

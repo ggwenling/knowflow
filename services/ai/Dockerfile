@@ -1,5 +1,5 @@
-FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
-FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:0.11.6@sha256:b1e699368d24c57cda93c338a57a8c5a119009ba809305cc8e86986d4a006754 AS uv
+FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
 COPY --from=uv /uv /uvx /bin/
 WORKDIR /workspace
 ENV UV_COMPILE_BYTECODE=1 PYTHONUNBUFFERED=1 UV_LINK_MODE=copy
