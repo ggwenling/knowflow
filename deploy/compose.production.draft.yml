@@ -171,8 +171,8 @@ services:
         target: /etc/knowflow-budget
         read_only: true
     # ai 只接入 internal 知识网络与 egress-proxy 的前置 internal 网络，没有直连外网。
-    # 额外接入 web-edge 仅供 edge 转发 /health/ready（只读状态，无密钥）。
-    networks: [knowflow, egress-internal, web-edge]
+    # 额外接入 edge-ai（internal）仅供 edge 转发 /health/ready。
+    networks: [knowflow, egress-internal, edge-ai]
 
   # 一次性修正预算账本卷属主；ai 以 10001 运行，卷默认属主是 root。
   budget-init:
@@ -269,7 +269,7 @@ services:
       retries: 30
     logging: *default-logging
     mem_limit: 512m
-    networks: [web-edge]
+    networks: [web-edge, edge-ai]
 
 volumes:
   postgres-data:
@@ -282,6 +282,9 @@ networks:
   web-edge:
   # ai → egress-proxy 的 internal 前置网络，无外网出口。
   egress-internal:
+    internal: true
+  # edge ↔ ai 专用 internal 网络：edge 转发 /health/ready，同时避免 ai 接入有外网出口的网络。
+  edge-ai:
     internal: true
   # 唯一有外网出口的网络，只接 egress-proxy；白名单在代理配置中强制执行。
   provider-egress:

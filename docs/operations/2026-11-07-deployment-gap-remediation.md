@@ -490,7 +490,8 @@ pwsh -File deploy/scripts/db-restore.ps1 -ProjectName knowflow-prod `
 | `knowflow` | 全部内部服务 | `internal: true` |
 | `egress-internal` | `ai`、`egress-proxy` | `internal: true` |
 | `provider-egress` | 仅 `egress-proxy` | 保留为外网出口 |
-| `web-edge` | `edge`、`web`、`ai` | 入口与静态资源 |
+| `web-edge` | `edge`、`web` | 入口与静态资源（非 internal，有外网出口） |
+| `edge-ai` | `edge`、`ai` | `internal: true`；仅供 edge 转发 `/health/ready` |
 
 新增 `deploy/egress/squid.conf`（关键规则）：
 
@@ -514,6 +515,16 @@ http_access deny all
 
 三条结果同时成立，说明“只白名单可达 + 其余被代理拒绝 + 无代理时无直连出口”。日常复核可从运行中的 `ai` 容器重复上述两类请求；`preflight.ps1` 另提供静态检查（白名单含两个 provider 域名、代理变量非空）。
 
+**生产形态栈复测时发现并修复的缺口**：`ai` 原本还挂在非 internal 的 `web-edge` 上（为了让 edge 转发 `/health/ready`），因此容器内**绕过代理直连** `api.deepseek.com` 得到 401——白名单可被绕过。修复：新增 internal 网络 `edge-ai`，只允许 `edge` 与 `ai` 加入；`ai` 的 `web-edge` 成员资格移除。复测：
+
+```text
+经代理 https://api.deepseek.com/models -> 401（可达）
+经代理 https://example.com             -> ProxyError 403 Forbidden（拒绝）
+直连（清除代理变量）api.deepseek.com    -> ConnectError: Temporary failure in name resolution
+```
+
+修复后 `edge-ai` 成员为 `ai`+`edge`，`web-edge` 仅 `edge`+`web`；`/health/ready` 仍经 edge 返回 200。
+
 **生产待承接**：宿主/云安全组的出站防火墙规则（纵深防御第二层）、代理的高可用与访问日志留存、provider 域名变更时的白名单变更流程（改 `squid.conf` 并重启 `egress-proxy`）。本机未验证 TLS 出站审计与并发限流。
 
 ### 13.4 本机验证汇总与生产待承接
@@ -530,4 +541,54 @@ http_access deny all
 
 ### 13.5 端到端复核（干净提交后的真实发布）
 
-以提交后的 HEAD 执行 `release.ps1`（默认版本=10 位短 sha），构建并推送 api/web/ai；随后清空本机同名镜像、`compose pull`、`up -d --no-build`，再跑 `/health/ready`、代理放行/拒绝与完整 HTTPS 冒烟。结果记录在本节下方（验证后追加）。
+**发布**：`05fbd6e`（`feat(release): immutable image tags, ...`）。发布时工作树干净（`release.ps1` 的脏工作树门禁通过），release 名为 10 位短 sha `05fbd6e51e`，清单 `D:\konwflow-prod-drill\releases\release-05fbd6e51e.json`。
+
+| 组件 | tag | digest |
+| --- | --- | --- |
+| api | `127.0.0.1:5001/knowflow/api:05fbd6e51e` | `sha256:9d223327773477ec00b6f0ed5f9672d2129aec8791f540875458100dc3e45a54` |
+| web | `127.0.0.1:5001/knowflow/web:05fbd6e51e` | `sha256:b934fdcc5ef53d915bde4618ee706d78fafc5e7b6243be6c2499b139ed3c02b1` |
+| ai | `127.0.0.1:5001/knowflow/ai:05fbd6e51e` | `sha256:4ba1b73baedc476dd456f39d038fbc41134462c49929b845d89ecf356013c5db` |
+
+**镜像拉取**：先 `docker rmi` 本机三个 release tag，再 `docker compose pull`，三个镜像均由 `127.0.0.1:5001` 拉取成功（layers 已缓存，manifest 从 registry 解析）。随后 `up -d --no-build --wait` 在 **58s** 内全部 healthy（migrate 一次性退出码 0）。
+
+**就绪与冒烟**（`release-05fbd6e51e`）：
+
+```text
+/health/ready -> 200 {"status":"UP","checks":{"budget":"UP","llm":"UP","embedding":"UP"}} 0.57s
+/api/mode     -> 200 {"mode":"external"}
+```
+
+完整 HTTPS 冒烟（未使用 `-AllowProviderBlocked`）：**PASS**，5.2s，证据 `D:\konwflow-prod-drill\evidence\smoke-release-05fbd6e51e-final.json`。
+
+| 步骤 | 状态 | 结果 |
+| --- | --- | --- |
+| register / login / `/me` / 建知识库 | 201 / 200 / 200 / 201 | token 不落输出 |
+| 上传文档 | 202 | `document_id=9a86f7ca-…` |
+| 索引完成 | 200 | `SUCCEEDED` / `READY`，约 2.0s |
+| 可答问题 | 200 | `has_answer=True`，**sources=1**，答案 `青岚项目的代号是QL-2026[0047257b-…]` |
+| 不可答问题 | 200 | `has_answer=False`，`sources=0`，固定拒答文案 |
+
+**Egress 实际拦截**（运行中的 `knowflow-prod-ai-1` 容器内）：
+
+```text
+经代理 https://api.deepseek.com/models -> ALLOWED_STATUS 401（可达）
+经代理 https://example.com             -> ProxyError 403 Forbidden（非白名单拒绝）
+清除代理变量直连 api.deepseek.com       -> ConnectError: Temporary failure in name resolution（无外网路由）
+```
+
+结论：非白名单域名**确实不通**，且 ai 无直连旁路（含 §13.3 的 `edge-ai` 修复）。
+
+**Flyway 迁移前备份与恢复（隔离项目 `knowflow-migtest`，验证后 `down -v`）**：
+
+```text
+KNOWFLOW_MIGRATION_TARGET=2 -> validated 8 / applied 2，版本 v2
+db-backup.ps1              -> 0.04 MB，sidecar flyway_version=2，SHA-256 d7c9a611…
+migrate 到最新             -> applied 6，版本 v8，accepted_lease_id 存在（count=1）
+db-restore.ps1             -> 版本回到 2，accepted_lease_id 不存在（count=0）
+                             表 owner 仍为 knowflow_migrator
+再次 migrate               -> applied 6，版本 v8，accepted_lease_id 重新出现（count=1）
+```
+
+**清理**：`knowflow-prod` 执行 `stop`（保留 `postgres-data` / `object-data` / `budget-ledger` 卷），`egress-proxy` 与入口随之停止，3443 释放；本机 registry 容器停止，5001 释放，`knowflow-registry-data` 卷保留。`knowflow-migtest`、`knowflow-egresstest` 已 `down -v`。
+
+**遗留（本轮未处理，非本次范围）**：工作树中 `scripts/e2e-web.mjs` 有一处与本任务无关的本地改动（web-v2 试验），未纳入本次提交，也未参与 `05fbd6e` 构建。
