@@ -37,7 +37,7 @@ $env:KNOWFLOW_ACCEPTANCE_PASSWORD = "<密码>"
 node scripts/acceptance.mjs
 ```
 
-产物写入 `eval-out/acceptance-20261108/`，包括 `manifest.json` 与 1440/768/390 截图。流程与签字表见 `docs/acceptance/2026-11-08-web-v2-manual-acceptance.md`。
+产物写入 `eval-out/acceptance-20261108/`，包括 `manifest.json` 与 1440/768/390 截图。流程与签字表见 [人工验收说明](../../docs/acceptance/2026-11-08-web-v2-manual-acceptance.md)。
 
 ## 交互约定
 
@@ -45,6 +45,14 @@ node scripts/acceptance.mjs
 - 知识库搜索 `?q=`、详情筛选 `?status=`、对话历史搜索 `?history=` 写入 URL，可深链与刷新恢复。
 - 首页与登录页保留唯一高光动效；其余页面尊重 `prefers-reduced-motion`。
 - Tab 首站为“跳到主要内容”，所有输入与按钮有可见焦点。
+
+## 性能验证
+
+性能门禁与可重复样本见 [performance/README.md](./performance/README.md)：`npm test`、`npm run perf:budget`、`npm run perf:sample`、`npm run perf:memory`、`npm run perf:containers`。构建首载包体、完整浏览器资源、JS 堆、RSS 和镜像体积分开记录；结果不等同于线上 P75。
+
+工作区按领域订阅状态，只以会话与账户切换重置作为全页门禁；知识库首批先显示，远程列表局部加载。上传提示区分文件接受与索引终态，后台任务按作用域取消、限并发并合并终态刷新。
+
+性能事件默认不外发；需要接入同源接收端时，在构建时设置 `NEXT_PUBLIC_PERFORMANCE_ENDPOINT`，详见性能说明。
 
 ## 回退
 

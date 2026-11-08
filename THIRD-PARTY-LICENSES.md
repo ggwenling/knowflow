@@ -2,6 +2,7 @@
 
 - 生成日期：2026-11-07（Asia/Shanghai）
 - 代码基线：`local` 分支 HEAD `f2b5c67`；采集时三份依赖清单（`uv.lock`、`pom.xml`、`package-lock.json`）均无未提交改动
+- Web v2 增补（2026-11-08）：`apps/web-v2/package-lock.json`（SHA-256 `24f6022bbf2e2e3794a5215596ab06cffb03103cff85b7c49efa88c487cd61be`）的 221 条生产依赖，追加在 §4 末尾；未与旧版 Node 清单去重。
 - 性质：面向对外交付的**发行证据清单**，记录仓库实际声明/解析到的第三方依赖及其许可证元数据；不构成法律意见。
 
 ## 1. 取证来源与方法
@@ -11,6 +12,7 @@
 | Python | `services/ai/uv.lock` | `a9bc533d8a029a6d6c10297bddeaf83cea11420d80427fb824ee790894d357c2` | 本机 `services/ai/.venv` 中各发行包 `dist-info/METADATA` 的 `License-Expression` / `License` / `Classifier` |
 | Java | `services/api/pom.xml` + `./mvnw -o dependency:list` | `c6a640e24fe76b28c14f6e3b4c088ef179de32855bd4998dadef047d4afbc60e` | 各 artifact POM 的 `<licenses>` 声明（缺失时沿 `parent` 链上溯） |
 | Node / Web | `apps/web/package-lock.json`（lockfileVersion 3） | `cb7bddb85868dd475eee91dbec1c7e9e10609e3a8d1f62b636c66a7589e0b8fe` | lockfile 条目的 `license` 字段 |
+| Node / Web v2 | `apps/web-v2/package-lock.json` | `24f6022bbf2e2e3794a5215596ab06cffb03103cff85b7c49efa88c487cd61be` | 运行时闭包（`npm ls --omit=dev --all`）与 `node_modules/*/package.json` 的 `license` |
 
 采集使用仓库内只读脚本 `scripts/audit-dependencies.py`；Java 依赖图由本机离线 Maven 仓库解析（`-o`，不访问网络）。
 
@@ -26,6 +28,7 @@
 - 总条目 **704** 条：Python **39**、Java **130**、Node **535**。
 - 其中本项目自身 1 条（`knowflow-ai 0.1.0`，许可证未声明），第三方依赖 **703** 条。
 - 运行时/开发划分：Java `compile`+`runtime` **87** 条、`test` **43** 条；Node 运行时 **63** 条、开发/构建 **472** 条；Python 运行时 **28** 条、开发/测试 **10** 条、本项目自身 1 条。
+- **Web v2 增补**：独立运行时另有 **221** 条生产依赖（见 §4 末尾），上表与总数 **未合并** 这 221 条；发行 SBOM 应统一重算总量，且两版 Web 可并存回退，未按包名去重。
 
 | 许可证 / 声明 | Python | Java | Node | 合计 |
 |---|---|---|---|---|
@@ -815,6 +818,238 @@
 | `yocto-queue` | 0.1.0 | 开发/构建 | MIT | npm |
 | `zod` | 4.6.7 | 开发/构建 | MIT | npm |
 | `zod-validation-error` | 4.0.2 | 开发/构建 | MIT | npm |
+
+<!-- WEB_V2_LICENSES_START -->
+
+### Node / Web v2（221 条，运行时）
+
+> `apps/web-v2` 是 Compose 默认工作台，与旧版 `apps/web` 可并存回退。以下依赖来自 `npm ls --omit=dev --all`，**未与旧版 Node 清单去重**；完整仓库字段见 `apps/web-v2/THIRD-PARTY-LICENSES.md`。发行 SBOM 应统一重算总量。
+
+| 包 | 版本 | 作用域 | 许可证 | 来源 |
+|---|---|---|---|---|
+| `@floating-ui/core` | 1.8.0 | 运行时 | MIT | npm |
+| `@floating-ui/dom` | 1.8.0 | 运行时 | MIT | npm |
+| `@floating-ui/react-dom` | 2.1.9 | 运行时 | MIT | npm |
+| `@floating-ui/utils` | 0.2.12 | 运行时 | MIT | npm |
+| `@fontsource/dm-sans` | 5.3.0 | 运行时 | OFL-1.1 | npm |
+| `@fontsource/dm-serif-display` | 5.3.0 | 运行时 | OFL-1.1 | npm |
+| `@img/colour` | 1.1.0 | 运行时 | MIT | npm |
+| `@img/sharp-win32-x64` | 0.35.5 | 运行时 | Apache-2.0 AND LGPL-3.0-or-later | npm |
+| `@next/env` | 16.4.3 | 运行时 | MIT | npm |
+| `@next/swc-win32-x64-msvc` | 16.4.3 | 运行时 | MIT | npm |
+| `@playwright/test` | 1.64.1 | 运行时 | Apache-2.0 | npm |
+| `@radix-ui/number` | 1.1.3 | 运行时 | MIT | npm |
+| `@radix-ui/primitive` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-accessible-icon` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-accordion` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-alert-dialog` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-arrow` | 1.1.17 | 运行时 | MIT | npm |
+| `@radix-ui/react-aspect-ratio` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-avatar` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-checkbox` | 1.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-collapsible` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-collection` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-compose-refs` | 1.1.5 | 运行时 | MIT | npm |
+| `@radix-ui/react-context` | 1.3.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-context-menu` | 2.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-dialog` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-direction` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-dismissable-layer` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-dropdown-menu` | 2.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-focus-guards` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-focus-scope` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-form` | 0.3.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-hover-card` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-id` | 1.1.4 | 运行时 | MIT | npm |
+| `@radix-ui/react-label` | 2.1.17 | 运行时 | MIT | npm |
+| `@radix-ui/react-menu` | 2.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-menubar` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-navigation-menu` | 1.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-one-time-password-field` | 0.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-password-toggle-field` | 0.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-popover` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-popper` | 1.4.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-portal` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-presence` | 1.1.11 | 运行时 | MIT | npm |
+| `@radix-ui/react-primitive` | 2.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-progress` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-radio-group` | 1.5.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-roving-focus` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-scroll-area` | 1.4.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-select` | 2.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-separator` | 1.2.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-slider` | 1.6.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-slot` | 1.5.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-switch` | 1.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-tabs` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-toast` | 1.3.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-toggle` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-toggle-group` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-toolbar` | 1.2.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-tooltip` | 1.4.1 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-callback-ref` | 1.1.5 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-controllable-state` | 1.3.0 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-effect-event` | 0.0.5 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-escape-keydown` | 1.1.6 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-is-hydrated` | 0.1.3 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-layout-effect` | 1.1.4 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-previous` | 1.1.4 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-rect` | 1.1.4 | 运行时 | MIT | npm |
+| `@radix-ui/react-use-size` | 1.1.5 | 运行时 | MIT | npm |
+| `@radix-ui/react-visually-hidden` | 1.2.13 | 运行时 | MIT | npm |
+| `@radix-ui/rect` | 1.1.3 | 运行时 | MIT | npm |
+| `@reduxjs/toolkit` | 2.14.0 | 运行时 | MIT | npm |
+| `@standard-schema/spec` | 1.1.0 | 运行时 | MIT | npm |
+| `@standard-schema/utils` | 0.3.0 | 运行时 | MIT | npm |
+| `@swc/helpers` | 0.5.23 | 运行时 | Apache-2.0 | npm |
+| `@types/debug` | 4.1.13 | 运行时 | MIT | npm |
+| `@types/estree` | 1.0.10 | 运行时 | MIT | npm |
+| `@types/estree-jsx` | 1.0.5 | 运行时 | MIT | npm |
+| `@types/hast` | 3.0.5 | 运行时 | MIT | npm |
+| `@types/mdast` | 4.0.4 | 运行时 | MIT | npm |
+| `@types/ms` | 2.1.0 | 运行时 | MIT | npm |
+| `@types/react` | 19.3.0 | 运行时 | MIT | npm |
+| `@types/react-dom` | 19.3.0 | 运行时 | MIT | npm |
+| `@types/unist` | 3.0.3 | 运行时 | MIT | npm |
+| `@types/unist` | 2.0.11 | 运行时 | MIT | npm |
+| `@types/use-sync-external-store` | 0.0.6 | 运行时 | MIT | npm |
+| `@ungap/structured-clone` | 1.4.0 | 运行时 | ISC | npm |
+| `aria-hidden` | 1.2.6 | 运行时 | MIT | npm |
+| `bail` | 2.0.2 | 运行时 | MIT | npm |
+| `baseline-browser-mapping` | 2.11.35 | 运行时 | Apache-2.0 | npm |
+| `caniuse-lite` | 1.0.30001823 | 运行时 | CC-BY-4.0 | npm |
+| `ccount` | 2.0.1 | 运行时 | MIT | npm |
+| `character-entities` | 2.0.2 | 运行时 | MIT | npm |
+| `character-entities-html4` | 2.1.0 | 运行时 | MIT | npm |
+| `character-entities-legacy` | 3.0.0 | 运行时 | MIT | npm |
+| `character-reference-invalid` | 2.0.1 | 运行时 | MIT | npm |
+| `client-only` | 0.0.1 | 运行时 | MIT | npm |
+| `clsx` | 2.1.1 | 运行时 | MIT | npm |
+| `comma-separated-tokens` | 2.0.3 | 运行时 | MIT | npm |
+| `csstype` | 3.2.3 | 运行时 | MIT | npm |
+| `debug` | 4.4.3 | 运行时 | MIT | npm |
+| `decode-named-character-reference` | 1.3.0 | 运行时 | MIT | npm |
+| `dequal` | 2.0.3 | 运行时 | MIT | npm |
+| `detect-libc` | 2.1.2 | 运行时 | Apache-2.0 | npm |
+| `detect-node-es` | 1.1.0 | 运行时 | MIT | npm |
+| `devlop` | 1.1.0 | 运行时 | MIT | npm |
+| `escape-string-regexp` | 5.0.0 | 运行时 | MIT | npm |
+| `estree-util-is-identifier-name` | 3.0.0 | 运行时 | MIT | npm |
+| `extend` | 3.0.2 | 运行时 | MIT | npm |
+| `framer-motion` | 12.43.0 | 运行时 | MIT | npm |
+| `get-nonce` | 1.0.1 | 运行时 | MIT | npm |
+| `hast-util-to-jsx-runtime` | 2.3.7 | 运行时 | MIT | npm |
+| `hast-util-whitespace` | 3.0.0 | 运行时 | MIT | npm |
+| `html-url-attributes` | 3.0.1 | 运行时 | MIT | npm |
+| `immer` | 11.2.9 | 运行时 | MIT | npm |
+| `inline-style-parser` | 0.2.9 | 运行时 | MIT | npm |
+| `is-alphabetical` | 2.0.1 | 运行时 | MIT | npm |
+| `is-alphanumerical` | 2.0.1 | 运行时 | MIT | npm |
+| `is-decimal` | 2.0.1 | 运行时 | MIT | npm |
+| `is-hexadecimal` | 2.0.1 | 运行时 | MIT | npm |
+| `is-plain-obj` | 4.1.0 | 运行时 | MIT | npm |
+| `longest-streak` | 3.1.0 | 运行时 | MIT | npm |
+| `lucide-react` | 1.70.0 | 运行时 | ISC | npm |
+| `markdown-table` | 3.1.0 | 运行时 | MIT | npm |
+| `mdast-util-find-and-replace` | 3.0.4 | 运行时 | MIT | npm |
+| `mdast-util-from-markdown` | 2.1.0 | 运行时 | MIT | npm |
+| `mdast-util-gfm` | 3.1.0 | 运行时 | MIT | npm |
+| `mdast-util-gfm-autolink-literal` | 2.1.0 | 运行时 | MIT | npm |
+| `mdast-util-gfm-footnote` | 2.1.0 | 运行时 | MIT | npm |
+| `mdast-util-gfm-strikethrough` | 2.0.1 | 运行时 | MIT | npm |
+| `mdast-util-gfm-table` | 2.0.1 | 运行时 | MIT | npm |
+| `mdast-util-gfm-task-list-item` | 2.0.1 | 运行时 | MIT | npm |
+| `mdast-util-mdx-expression` | 2.0.1 | 运行时 | MIT | npm |
+| `mdast-util-mdx-jsx` | 3.2.1 | 运行时 | MIT | npm |
+| `mdast-util-mdxjs-esm` | 2.0.1 | 运行时 | MIT | npm |
+| `mdast-util-phrasing` | 4.1.0 | 运行时 | MIT | npm |
+| `mdast-util-to-hast` | 13.2.1 | 运行时 | MIT | npm |
+| `mdast-util-to-markdown` | 2.2.3 | 运行时 | MIT | npm |
+| `mdast-util-to-string` | 4.0.0 | 运行时 | MIT | npm |
+| `micromark` | 4.0.3 | 运行时 | MIT | npm |
+| `micromark-core-commonmark` | 2.0.4 | 运行时 | MIT | npm |
+| `micromark-extension-gfm` | 3.0.0 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-autolink-literal` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-footnote` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-strikethrough` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-table` | 2.1.2 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-tagfilter` | 2.0.0 | 运行时 | MIT | npm |
+| `micromark-extension-gfm-task-list-item` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-factory-destination` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-factory-label` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-factory-space` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-factory-title` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-factory-whitespace` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-character` | 2.1.1 | 运行时 | MIT | npm |
+| `micromark-util-chunked` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-classify-character` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-combine-extensions` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-decode-numeric-character-reference` | 2.0.2 | 运行时 | MIT | npm |
+| `micromark-util-decode-string` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-edit-map` | 1.0.0 | 运行时 | MIT | npm |
+| `micromark-util-encode` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-html-tag-name` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-normalize-identifier` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-resolve-all` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-sanitize-uri` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-subtokenize` | 2.1.0 | 运行时 | MIT | npm |
+| `micromark-util-symbol` | 2.0.1 | 运行时 | MIT | npm |
+| `micromark-util-types` | 2.0.3 | 运行时 | MIT | npm |
+| `motion` | 12.43.0 | 运行时 | MIT | npm |
+| `motion-dom` | 12.43.0 | 运行时 | MIT | npm |
+| `motion-utils` | 12.39.0 | 运行时 | MIT | npm |
+| `ms` | 2.1.3 | 运行时 | MIT | npm |
+| `nanoid` | 3.3.20 | 运行时 | MIT | npm |
+| `next` | 16.4.3 | 运行时 | MIT | npm |
+| `parse-entities` | 4.0.2 | 运行时 | MIT | npm |
+| `picocolors` | 1.1.1 | 运行时 | ISC | npm |
+| `playwright` | 1.64.1 | 运行时 | Apache-2.0 | npm |
+| `playwright-core` | 1.64.1 | 运行时 | Apache-2.0 | npm |
+| `postcss` | 8.5.23 | 运行时 | MIT | npm |
+| `property-information` | 7.2.0 | 运行时 | MIT | npm |
+| `radix-ui` | 1.8.1 | 运行时 | MIT | npm |
+| `react` | 19.2.4 | 运行时 | MIT | npm |
+| `react-dom` | 19.2.4 | 运行时 | MIT | npm |
+| `react-markdown` | 10.1.0 | 运行时 | MIT | npm |
+| `react-redux` | 9.3.1 | 运行时 | MIT | npm |
+| `react-remove-scroll` | 2.7.2 | 运行时 | MIT | npm |
+| `react-remove-scroll-bar` | 2.3.8 | 运行时 | MIT | npm |
+| `react-style-singleton` | 2.2.3 | 运行时 | MIT | npm |
+| `redux` | 5.0.1 | 运行时 | MIT | npm |
+| `redux-thunk` | 3.1.0 | 运行时 | MIT | npm |
+| `remark-gfm` | 4.0.1 | 运行时 | MIT | npm |
+| `remark-parse` | 11.0.0 | 运行时 | MIT | npm |
+| `remark-rehype` | 11.1.2 | 运行时 | MIT | npm |
+| `remark-stringify` | 11.0.0 | 运行时 | MIT | npm |
+| `reselect` | 5.3.0 | 运行时 | MIT | npm |
+| `scheduler` | 0.27.0 | 运行时 | MIT | npm |
+| `semver` | 7.8.6 | 运行时 | ISC | npm |
+| `sharp` | 0.35.5 | 运行时 | Apache-2.0 | npm |
+| `sonner` | 2.0.8 | 运行时 | MIT | npm |
+| `source-map-js` | 1.2.2 | 运行时 | BSD-3-Clause | npm |
+| `space-separated-tokens` | 2.0.2 | 运行时 | MIT | npm |
+| `stringify-entities` | 4.0.4 | 运行时 | MIT | npm |
+| `style-to-object` | 2.0.2 | 运行时 | MIT | npm |
+| `styled-jsx` | 5.1.6 | 运行时 | MIT | npm |
+| `tailwind-merge` | 3.7.0 | 运行时 | MIT | npm |
+| `three` | 0.187.0 | 运行时 | MIT | npm |
+| `trim-lines` | 3.0.1 | 运行时 | MIT | npm |
+| `trough` | 2.2.0 | 运行时 | MIT | npm |
+| `tslib` | 2.9.1 | 运行时 | 0BSD | npm |
+| `unified` | 11.0.5 | 运行时 | MIT | npm |
+| `unist-util-is` | 6.0.1 | 运行时 | MIT | npm |
+| `unist-util-position` | 5.0.0 | 运行时 | MIT | npm |
+| `unist-util-stringify-position` | 4.0.0 | 运行时 | MIT | npm |
+| `unist-util-visit` | 5.2.0 | 运行时 | MIT | npm |
+| `unist-util-visit-parents` | 6.1.0 | 运行时 | MIT | npm |
+| `use-callback-ref` | 1.3.3 | 运行时 | MIT | npm |
+| `use-sidecar` | 1.1.3 | 运行时 | MIT | npm |
+| `use-sync-external-store` | 1.7.0 | 运行时 | MIT | npm |
+| `vfile` | 6.0.3 | 运行时 | MIT | npm |
+| `vfile-message` | 4.0.4 | 运行时 | MIT | npm |
+| `zwitch` | 2.0.4 | 运行时 | MIT | npm |
+
+<!-- WEB_V2_LICENSES_END -->
 
 ## 5. 未覆盖范围与待核实
 
