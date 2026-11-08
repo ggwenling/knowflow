@@ -10,7 +10,11 @@ const temp = await mkdtemp(resolve(tmpdir(), "knowflow-e2e-"));
 const envFile = resolve(temp, ".env");
 const streamCapture = resolve(temp, "answer-stream-events.json");
 const project = `knowflow-e2e-${randomBytes(5).toString("hex")}`;
-const compose = ["compose", "--project-name", project, "-f", "infra/compose.yml", "--env-file", envFile];
+const candidate = process.argv.includes("--v2");
+const rollbackState = resolve(temp, "rollback-session.json");
+const webApp = candidate ? "apps/web-v2" : "apps/web";
+const override = candidate ? [] : ["-f", "infra/compose.legacy-web.yml"];
+const compose = ["compose", "--project-name", project, "-f", "infra/compose.yml", ...override, "--env-file", envFile];
 
 async function availablePort() {
   const server = createServer();
@@ -59,13 +63,23 @@ try {
   run("docker", [...compose, "up", "--build", "--quiet-build", "--wait", "--wait-timeout", "240"]);
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForWeb(baseUrl);
-  run(process.execPath, [resolve(root, "apps/web/node_modules/@playwright/test/cli.js"), "test"], {
-    cwd: resolve(root, "apps/web"),
+  const cli = resolve(root, webApp, "node_modules/@playwright/test/cli.js");
+  const testOptions = {
+    cwd: resolve(root, webApp),
     env: { ...process.env, KNOWFLOW_E2E_BASE_URL: baseUrl,
-      KNOWFLOW_E2E_STREAM_CAPTURE: streamCapture },
-  });
+      KNOWFLOW_E2E_STREAM_CAPTURE: streamCapture,
+      ...(candidate ? { KNOWFLOW_E2E_ROLLBACK_STATE: rollbackState } : {}) },
+  };
+  run(process.execPath, [cli, "test", ...(candidate ? ["--grep-invert", "旧版回退"] : [])], testOptions);
   run("uv", ["run", "--project", "services/ai", "--frozen", "python",
     "contracts/validate_sse_capture.py", streamCapture]);
+  if (candidate) {
+    const fallback = ["compose", "--project-name", project, "-f", "infra/compose.yml",
+      "-f", "infra/compose.legacy-web.yml", "--env-file", envFile];
+    run("docker", [...fallback, "up", "--no-deps", "--build", "--quiet-build", "--wait", "web"]);
+    await waitForWeb(baseUrl);
+    run(process.execPath, [cli, "test", "rollback.spec.ts"], testOptions);
+  }
 } finally {
   try { run("docker", [...compose, "down", "--volumes", "--remove-orphans"]); }
   finally { await rm(temp, { recursive: true, force: true }); }

@@ -10,7 +10,8 @@ Java API 已实现认证、知识库/文档状态、租约与 fencing、受控�
 
 ## 仓库布局
 
-- `apps/web`：M 主线 Next.js 前端、同源会话代理与浏览器 E2E。
+- `apps/web-v2`：Compose 默认的 Next.js 工作台、同源会话代理与浏览器 E2E。参见 [启动与回退](apps/web-v2/README.md)。
+- `apps/web`：旧版工作台，作为回退路径。
 - `services/api`：Codex-A / Java Spring API、业务状态与唯一索引写入/发布方。
 - `services/ai`：Codex-B / Python FastAPI 解析、索引执行、受限检索与生成方。
 - `contracts`：共享契约由 A 发布，B 提交消费与字段提议。

@@ -9,7 +9,7 @@ Copy-Item infra/.env.example infra/.env
 docker compose --project-name knowflow-local -f infra/compose.yml --env-file infra/.env up --build --wait
 ```
 
-先为 `.env` 中的密码和内部共享凭证生成不同的随机值。默认页面为 `http://localhost:3000`。停止服务并保留本地数据：
+先为 `.env` 中的密码和内部共享凭证生成不同的随机值。默认页面为 `http://localhost:3000`，使用 `apps/web-v2`。旧版回退命令见 [Web v2 说明](../apps/web-v2/README.md#回退)。停止服务并保留本地数据：
 
 ```powershell
 docker compose --project-name knowflow-local -f infra/compose.yml --env-file infra/.env down

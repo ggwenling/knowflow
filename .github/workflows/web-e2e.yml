@@ -57,26 +57,30 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/web-v2/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v6
-      - name: Install Web dependencies
+      - name: Check legacy proxy and workspace
         working-directory: apps/web
+        run: npm ci && npm test
+      - name: Install Web v2 dependencies
+        working-directory: apps/web-v2
         run: npm ci
-      - name: Check Web
-        working-directory: apps/web
+      - name: Check Web v2
+        working-directory: apps/web-v2
         run: |
           npm run typecheck
           npm run lint
-          npm test
           npm run build
       - name: Install browser
-        working-directory: apps/web
+        working-directory: apps/web-v2
         run: npx playwright install --with-deps chromium
       - name: Run isolated full stack
-        run: node scripts/e2e-web.mjs
+        run: node scripts/e2e-web.mjs --v2
       - name: Report service state after failure
         if: failure()
         run: docker ps -a --format "table {{.Names}}\t{{.Status}}"
@@ -84,5 +88,5 @@ jobs:
         if: failure()
         with:
           name: web-e2e-results
-          path: apps/web/test-results/
+          path: apps/web-v2/test-results/
           if-no-files-found: ignore

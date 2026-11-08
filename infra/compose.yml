@@ -108,7 +108,7 @@ services:
 
   web:
     build:
-      context: ../apps/web
+      context: ../apps/web-v2
       dockerfile: Dockerfile
     environment:
       KNOWFLOW_API_BASE_URL: http://api:8080
