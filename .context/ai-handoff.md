@@ -45,15 +45,15 @@ commit: e744f99d3b6826f10e14e7c9ce1899495ececf0f
 
 ### 仓库与运行环境
 
-- `origin/local` 仍在 `8a80835`；本地 HEAD `e744f99`，领先 5 个提交。
+- 代码基线 `0b5f6e7` 已推送到 `origin/local`；CI run `42495124396` 成功（7m53s，evaluation-e2e/python-contract/java/web 均完成）。
+- 本地 HEAD 另有本文件更新提交；后续普通推送即可，不改变代码基线。
 - 本机 Compose `knowflow-local` 已用当前代码重建，3000 端口 healthy；隔离 E2E 项目已由脚本清理。
 - `gh` 仍不可用，环境无 `GITHUB_TOKEN`/`GH_TOKEN`；PR 未创建。
 - 演示账号可用，但凭据不写入交接；`infra/.env` 本地忽略。
 
 ### 阻塞
 
-- **PR 未创建**：打开 `https://github.com/ggwenling/knowflow/compare/main...local?expand=1`，或安装/登录 `gh` 后 `gh pr create --base main --head local`。
-- **新 SHA CI 未运行**：5 个本地提交尚未推送；旧 run `42456844122` 只覆盖 `8a80835`，不能当成本轮证据。
+- **PR 未创建**：打开 `https://github.com/ggwenling/knowflow/compare/main...local?expand=1`，或安装/登录 `gh` 后 `gh pr create --base main --head local`。PR #3 已于 2026-11-07 合并，不能复用。
 - 人工/项目门禁：M1/M2/M3、真人引用审阅、PRICE/POLICY、私有盲测、生产承接、真实用户试用、发行合规仍未签。
 
 ## Acceptance criteria
@@ -63,7 +63,7 @@ commit: e744f99d3b6826f10e14e7c9ce1899495ececf0f
 - [x] 验收脚本 6 步与 390/768/1440 截图通过。
 - [x] web-v2 221 条许可进入根清单增补。
 - [x] 代码/构建/性能/文档拆分提交（5 个）。
-- [ ] 推送 `origin/local` 并在新 SHA 上跑 CI。
+- [x] 推送 `origin/local` 并在 `0b5f6e7` 上跑 CI（run 42495124396 success）。
 - [ ] 创建 PR、记录审批与分支保护证据；不合并 main、不强推。
 - [ ] 质量门禁工作由独立负责人复核后再决定提交。
 - [ ] M1/M2/M3 与项目级签核由负责人执行，AI 不代签。
@@ -71,8 +71,8 @@ commit: e744f99d3b6826f10e14e7c9ce1899495ececf0f
 ## Start here
 
 1. `cd d:/konwflow`，核对 `git log -6`、`git status --short` 与本文件一致；确认 5 个提交是最新基线。
-2. `git push origin local`；记录 push 输出与 GitHub Actions run。
-3. 等待 `web`、`java`、`python-contract`、`evaluation-e2e` 四个 job；失败则按日志修复并重新验证。
+2. 代码已推送；核对 CI run `42495124396`（7m53s，四个 job 完成）。
+3. 若推送了新的代码提交，重新等待四个 job；失败则按日志修复并重新验证。
 4. 打开 compare URL 创建 PR，记录 PR、审批人、分支保护/例外证据；不要合并。
 5. 单独审阅未提交的质量门禁改动；在确认归属、测试与替换关系前不要提交或丢弃。
 6. 人工门禁按 `docs/acceptance/2026-11-08-web-v2-manual-acceptance.md` 等材料执行。
@@ -114,8 +114,8 @@ commit: e744f99d3b6826f10e14e7c9ce1899495ececf0f
 
 | 项 | 状态 | 下一步 |
 |---|---|---|
-| 5 个提交推送 | 未开始 | `git push origin local` |
-| 新 SHA CI | 未开始 | push 后等待四个 job |
+| 5 个提交推送 | 已完成 `0b5f6e7` | — |
+| 新 SHA CI | 已完成 run 42495124396 | — |
 | PR `local → main` | 阻塞 | compare URL / 登录 gh |
 | 质量门禁工作 | 未审阅 | 独立复核归属、测试、替换关系 |
 
@@ -143,4 +143,5 @@ commit: e744f99d3b6826f10e14e7c9ce1899495ececf0f
 ## Handoff log
 
 - `2026-11-08T15:29:42Z` — `codebuddy` set status to `blocked`：完成 P0 验证（45 E2E + SSE + 回退 + 28 单元 + 构建/预算 + 验收截图 + 许可增补）与 5 个提交；本地 HEAD `e744f99`，`origin/local` 仍为 `8a80835`；PR 因无 gh/token 未创建；质量门禁改动未纳入。
+- `2026-11-08T15:55:00Z` — `codebuddy` 补充：推送 `8a80835..0b5f6e7`；CI run `42495124396` success（7m53s）；PR 仍因无 gh/token 阻塞，PR #3 已于 11-07 合并不可复用。
 - 上一版 Codex 交接快照已提交为 `e744f99`；更早历史见 `git show 8a80835:.context/ai-handoff.md`。
