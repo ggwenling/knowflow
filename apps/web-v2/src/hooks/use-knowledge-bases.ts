@@ -16,10 +16,25 @@ export function useKnowledgeBases(userId?: string) {
   const selectedRef = useRef("");
   const ownerRef = useRef<string | undefined>(undefined);
   const generation = useRef(0);
+  const workToken = useRef<symbol | null>(null);
 
   const selectBase = useCallback((id: string) => {
     selectedRef.current = id;
     setSelectedBase(id);
+  }, []);
+
+  const beginWork = useCallback(() => {
+    const token = Symbol("knowledge-base-work");
+    workToken.current = token;
+    setWorking(true);
+    return token;
+  }, []);
+
+  // Only the operation that currently owns the workspace may clear the busy flag.
+  const endWork = useCallback((token: symbol) => {
+    if (workToken.current !== token) return;
+    workToken.current = null;
+    setWorking(false);
   }, []);
 
   const resetFor = useCallback(() => {
@@ -27,6 +42,7 @@ export function useKnowledgeBases(userId?: string) {
     selectBase("");
     setError("");
     setReadyFor(null);
+    workToken.current = null;
     setWorking(false);
     setLoading(false);
   }, [selectBase]);
@@ -79,7 +95,7 @@ export function useKnowledgeBases(userId?: string) {
     { status: "ok"; base: KnowledgeBase } | { status: "failed" } | { status: "stale" }
   > => {
     const gen = generation.current;
-    setWorking(true);
+    const token = beginWork();
     setError("");
     try {
       const created = await api<KnowledgeBase>("knowledge-bases", {
@@ -96,13 +112,13 @@ export function useKnowledgeBases(userId?: string) {
       setError(messageOf(reason));
       return { status: "failed" };
     } finally {
-      setWorking(false);
+      endWork(token);
     }
-  }, [selectBase]);
+  }, [beginWork, endWork, selectBase]);
 
   const remove = useCallback(async (id: string): Promise<"ok" | "failed" | "stale"> => {
     const gen = generation.current;
-    setWorking(true);
+    const token = beginWork();
     setError("");
     try {
       await deleteKnowledgeBase(id);
@@ -118,9 +134,9 @@ export function useKnowledgeBases(userId?: string) {
       setError(messageOf(reason));
       return "failed";
     } finally {
-      setWorking(false);
+      endWork(token);
     }
-  }, [bases, selectBase]);
+  }, [bases, beginWork, endWork, selectBase]);
 
   const clearError = useCallback(() => setError(""), []);
 

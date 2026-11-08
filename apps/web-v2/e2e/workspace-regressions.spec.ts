@@ -296,3 +296,105 @@ test("a failed document delete reports the failure instead of success", async ({
   await expect(page.getByText("已删除「无法删除.pdf」")).toHaveCount(0);
   await expect(page.getByText("无法删除.pdf")).toBeVisible();
 });
+
+test("an upload that outlives the account switch reports nothing to the next account", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  let current: Account | null = accountA;
+
+  await page.route("**/api/v1/**", async (route) => {
+    const path = pagePath(route);
+    const method = route.request().method();
+    if (path === "me") {
+      if (!current) return route.fulfill({ status: 401, json: { code: "UNAUTHENTICATED", message: "登录状态已失效" } });
+      return json(route, current);
+    }
+    if (path === "auth/logout") {
+      current = null;
+      return route.fulfill({ status: 204 });
+    }
+    if (path === "auth/login") {
+      current = accountB;
+      return json(route, {});
+    }
+    if (path === "knowledge-bases" && method === "GET") {
+      const owner = current ?? accountB;
+      return json(route, {
+        items: [{
+          id: owner === accountA ? "base-a" : "base-b",
+          name: owner === accountA ? "账户 A 的知识库" : "账户 B 的知识库",
+          status: "ACTIVE",
+        }],
+        has_more: false,
+      });
+    }
+    if (path === "knowledge-bases/base-a" && method === "GET") {
+      return json(route, { id: "base-a", name: "账户 A 的知识库", status: "ACTIVE" });
+    }
+    if (path === "knowledge-bases/base-a/documents" && method === "POST") {
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      return json(route, { document_id: "doc-a", task_id: "task-a" });
+    }
+    if (path.endsWith("/documents") && method === "GET") return json(route, { items: [], has_more: false });
+    if (path === "documents/doc-a") {
+      return json(route, {
+        id: "doc-a",
+        original_name: "切换中.txt",
+        status: "READY",
+        format: "TXT",
+        byte_size: 5,
+        active_index_version_id: "index-a",
+      });
+    }
+    if (path === "tasks/task-a") return json(route, { task_id: "task-a", status: "SUCCEEDED", failure_code: null });
+    if (path === "questions") return json(route, { items: [], has_more: false });
+    throw new Error(`Unexpected workspace API: ${method} ${path}`);
+  });
+
+  await page.goto("/knowledge-bases/base-a");
+  await expect(page.getByText("还没有资料")).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "切换中.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("race"),
+  });
+  await page.waitForTimeout(300);
+
+  // Leave the workspace while the upload is still open.
+  await page.getByRole("button", { name: "退出", exact: true }).click();
+  await page.waitForURL("**/login");
+  await signIn(page, accountB.email);
+  await expect(page.getByRole("link", { name: "账户 B 的知识库", exact: true })).toBeVisible();
+
+  await page.waitForTimeout(2200);
+  await expect(page.getByText("上传未能完成，请检查文件后重试。")).toHaveCount(0);
+  await expect(page.getByText("已上传，正在建立索引")).toHaveCount(0);
+});
+
+test("a rejected upload still reports failure", async ({ page }) => {
+  await page.route("**/api/v1/**", async (route) => {
+    const path = pagePath(route);
+    const method = route.request().method();
+    if (path === "me") return json(route, accountA);
+    if (path === "knowledge-bases" && method === "GET") {
+      return json(route, { items: [{ id: "base-a", name: "账户 A 的知识库", status: "ACTIVE" }], has_more: false });
+    }
+    if (path === "knowledge-bases/base-a" && method === "GET") {
+      return json(route, { id: "base-a", name: "账户 A 的知识库", status: "ACTIVE" });
+    }
+    if (path === "knowledge-bases/base-a/documents" && method === "POST") {
+      return route.fulfill({ status: 500, json: { code: "UPLOAD_FAILED", message: "文件解析失败" } });
+    }
+    if (path.endsWith("/documents") && method === "GET") return json(route, { items: [], has_more: false });
+    if (path === "questions") return json(route, { items: [], has_more: false });
+    throw new Error(`Unexpected workspace API: ${method} ${path}`);
+  });
+
+  await page.goto("/knowledge-bases/base-a");
+  await expect(page.getByText("还没有资料")).toBeVisible();
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "失败.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("reject"),
+  });
+  await expect(page.getByText("上传未能完成，请检查文件后重试。")).toBeVisible();
+});

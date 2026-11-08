@@ -149,11 +149,11 @@ export function useDocuments(baseId: string, ownerId?: string) {
     }
   }
 
-  async function upload(file: File | undefined, updateTarget?: Document) {
-    if (!file || !baseRef.current) return false;
+  async function upload(file: File | undefined, updateTarget?: Document): Promise<"ok" | "failed" | "stale"> {
+    if (!file || !baseRef.current) return "failed";
     if (file.size > maxUploadBytes) {
       setNotice("文件大小不能超过 8 MiB。");
-      return false;
+      return "failed";
     }
     const id = baseRef.current;
     const gen = generation.current;
@@ -166,7 +166,7 @@ export function useDocuments(baseId: string, ownerId?: string) {
         ? `documents/${updateTarget.id}/contents`
         : `knowledge-bases/${id}/documents`;
       const accepted = await api<{ document_id: string; task_id: string }>(path, { method: "POST", body: form });
-      if (gen !== generation.current || baseRef.current !== id) return false;
+      if (gen !== generation.current || baseRef.current !== id) return "stale";
       const optimistic: Document = {
         ...(updateTarget ?? {
           id: accepted.document_id,
@@ -183,10 +183,12 @@ export function useDocuments(baseId: string, ownerId?: string) {
         return [optimistic, ...previous];
       });
       await poll(optimistic, gen, id);
-      return true;
+      if (gen !== generation.current || baseRef.current !== id) return "stale";
+      return "ok";
     } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
-      return false;
+      if (gen !== generation.current) return "stale";
+      setNotice(messageOf(reason));
+      return "failed";
     } finally {
       endWork(token);
     }

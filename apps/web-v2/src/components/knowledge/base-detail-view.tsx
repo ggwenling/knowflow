@@ -73,8 +73,9 @@ export function BaseDetailView() {
 
   async function upload(file: File | undefined, target?: Document) {
     if (!file) return;
-    const accepted = await documents.upload(file, target);
-    if (accepted) {
+    const outcome = await documents.upload(file, target);
+    if (outcome === "stale") return;
+    if (outcome === "ok") {
       toast.success(target ? "已提交更新，索引完成后生效" : "已上传，正在建立索引");
     } else {
       toast.error("上传未能完成，请检查文件后重试。");
