@@ -36,9 +36,10 @@ export function BasesView() {
 
   async function remove() {
     if (!pending) return;
-    const removed = await knowledge.remove(pending.id);
+    const outcome = await knowledge.remove(pending.id);
     setPending(null);
-    if (removed) {
+    if (outcome === "stale") return;
+    if (outcome === "ok") {
       toast.success(`已删除「${pending.name}」`);
       router.push("/knowledge-bases");
     } else {

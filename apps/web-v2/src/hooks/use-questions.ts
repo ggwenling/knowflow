@@ -37,6 +37,7 @@ export function useQuestions(userId?: string) {
     await Promise.resolve();
     if (gen !== generation.current) return;
     setLoading(true);
+    setNotice("");
     try {
       const page = await api<Page<QuestionHistory>>("questions?limit=50&offset=0");
       if (gen !== generation.current) return;
@@ -46,7 +47,7 @@ export function useQuestions(userId?: string) {
       setReadyFor(owner);
     } catch (reason) {
       if (gen === generation.current) {
-        setNotice(messageOf(reason));
+        setNotice(`问答历史加载失败：${messageOf(reason)}`);
         // Settle the gate so the page can surface the failure instead of waiting forever.
         setReadyFor(owner);
       }
@@ -77,7 +78,7 @@ export function useQuestions(userId?: string) {
       ]);
       setHasMore(Boolean(page.has_more));
     } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
+      if (gen === generation.current) setNotice(`加载更多问答失败：${messageOf(reason)}`);
     } finally {
       loadingRef.current = false;
       if (gen === generation.current) setLoading(false);

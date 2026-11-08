@@ -75,7 +75,9 @@ export function useKnowledgeBases(userId?: string) {
     queueMicrotask(() => { void load(); });
   }, [load]);
 
-  const create = useCallback(async (name: string) => {
+  const create = useCallback(async (name: string): Promise<
+    { status: "ok"; base: KnowledgeBase } | { status: "failed" } | { status: "stale" }
+  > => {
     const gen = generation.current;
     setWorking(true);
     setError("");
@@ -84,36 +86,37 @@ export function useKnowledgeBases(userId?: string) {
         method: "POST",
         body: JSON.stringify({ contract_version: contractVersion, name }),
       });
-      if (gen === generation.current) {
-        setBases((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
-        selectBase(created.id);
-      }
-      return created;
+      // Another account owns the workspace now: never report this as its own result.
+      if (gen !== generation.current) return { status: "stale" };
+      setBases((previous) => [created, ...previous.filter((item) => item.id !== created.id)]);
+      selectBase(created.id);
+      return { status: "ok", base: created };
     } catch (reason) {
-      if (gen === generation.current) setError(messageOf(reason));
-      return null;
+      if (gen !== generation.current) return { status: "stale" };
+      setError(messageOf(reason));
+      return { status: "failed" };
     } finally {
       setWorking(false);
     }
   }, [selectBase]);
 
-  const remove = useCallback(async (id: string) => {
+  const remove = useCallback(async (id: string): Promise<"ok" | "failed" | "stale"> => {
     const gen = generation.current;
     setWorking(true);
     setError("");
     try {
       await deleteKnowledgeBase(id);
-      if (gen === generation.current) {
-        setBases((previous) => previous.filter((item) => item.id !== id));
-        if (selectedRef.current === id) {
-          const next = bases.find((item) => item.id !== id)?.id ?? "";
-          selectBase(next);
-        }
+      if (gen !== generation.current) return "stale";
+      setBases((previous) => previous.filter((item) => item.id !== id));
+      if (selectedRef.current === id) {
+        const next = bases.find((item) => item.id !== id)?.id ?? "";
+        selectBase(next);
       }
-      return true;
+      return "ok";
     } catch (reason) {
-      if (gen === generation.current) setError(messageOf(reason));
-      return false;
+      if (gen !== generation.current) return "stale";
+      setError(messageOf(reason));
+      return "failed";
     } finally {
       setWorking(false);
     }

@@ -36,14 +36,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed || knowledge.working || knowledge.loading) return;
-    const created = await knowledge.create(trimmed);
-    if (!created) {
+    const outcome = await knowledge.create(trimmed);
+    if (outcome.status === "stale") return;
+    if (outcome.status === "failed") {
       toast.error("知识库未能创建，请稍后重试。");
       return;
     }
     setName("");
-    toast.success(`已创建「${created.name}」`);
-    router.push(`/knowledge-bases/${created.id}`);
+    toast.success(`已创建「${outcome.base.name}」`);
+    router.push(`/knowledge-bases/${outcome.base.id}`);
   }
 
   function signOut() {
@@ -185,10 +186,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main id="main-content" tabIndex={-1} className={styles.content}>{children}</main>
       </div>
 
-      {knowledge.error && (
-        <div className={styles.errorToast} role="status">
-          <span>{knowledge.error}</span>
-          <button onClick={knowledge.clearError}>关闭</button>
+      {(knowledge.error || questions.notice) && (
+        <div className={styles.toasts}>
+          {knowledge.error && (
+            <div className={styles.errorToast} role="status">
+              <span>{knowledge.error}</span>
+              <button onClick={knowledge.clearError}>关闭</button>
+            </div>
+          )}
+          {questions.notice && (
+            <div className={styles.errorToast} role="alert">
+              <span>{questions.notice}</span>
+              <button onClick={() => void questions.load()} disabled={questions.loading}>重试</button>
+              <button onClick={questions.clearNotice}>关闭</button>
+            </div>
+          )}
         </div>
       )}
     </div>

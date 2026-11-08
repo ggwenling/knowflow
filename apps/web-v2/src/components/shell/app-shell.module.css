@@ -462,13 +462,20 @@
   padding: 34px clamp(24px, 3.6vw, 52px) 64px;
 }
 
-.errorToast {
+.toasts {
   position: fixed;
   right: 24px;
   bottom: 24px;
   z-index: 60;
   display: flex;
   max-width: min(420px, calc(100vw - 48px));
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.errorToast {
+  display: flex;
   align-items: center;
   gap: 14px;
   border: 1px solid #e8d3cd;

@@ -192,9 +192,9 @@ export function useDocuments(baseId: string, ownerId?: string) {
     }
   }
 
-  async function rebuild(document: Document) {
+  async function rebuild(document: Document): Promise<"ok" | "failed" | "stale"> {
     const id = baseRef.current;
-    if (!id) return false;
+    if (!id) return "failed";
     const gen = generation.current;
     const token = beginWork();
     setNotice("");
@@ -203,34 +203,35 @@ export function useDocuments(baseId: string, ownerId?: string) {
         method: "POST",
         body: "{}",
       });
+      // Another account or knowledge base owns the workspace now: drop the result silently.
+      if (gen !== generation.current || baseRef.current !== id) return "stale";
       // Indexing continues in the background; the row status and polling reflect progress.
-      if (gen === generation.current && baseRef.current === id) {
-        void poll({ ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" }, gen, id);
-      }
-      return true;
+      void poll({ ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" }, gen, id);
+      return "ok";
     } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
-      return false;
+      if (gen !== generation.current) return "stale";
+      setNotice(messageOf(reason));
+      return "failed";
     } finally {
       endWork(token);
     }
   }
 
-  async function remove(document: Document) {
+  async function remove(document: Document): Promise<"ok" | "failed" | "stale"> {
     const id = baseRef.current;
     const gen = generation.current;
     const token = beginWork();
     setNotice("");
     try {
       await api(`documents/${document.id}`, { method: "DELETE" });
-      if (gen === generation.current) {
-        setDocuments((previous) => previous.filter((item) => item.id !== document.id));
-        void refresh(id);
-      }
-      return true;
+      if (gen !== generation.current) return "stale";
+      setDocuments((previous) => previous.filter((item) => item.id !== document.id));
+      void refresh(id);
+      return "ok";
     } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
-      return false;
+      if (gen !== generation.current) return "stale";
+      setNotice(messageOf(reason));
+      return "failed";
     } finally {
       endWork(token);
     }
