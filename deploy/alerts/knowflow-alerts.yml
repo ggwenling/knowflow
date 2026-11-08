@@ -1,0 +1,56 @@
+groups:
+  - name: knowflow-api
+    rules:
+      - alert: KnowFlowApiHigh5xx
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.001) > 0.02
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "API 5xx 比例超过 2%"
+          runbook: "docs/operations/2026-11-08-rate-limit-and-resource-boundaries.md"
+
+      - alert: KnowFlowApiP95Slow
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[10m])) by (le)) > 3
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "API p95 超过 3s"
+
+  - name: knowflow-ai
+    rules:
+      - alert: KnowFlowAiProcessingFailures
+        expr: sum(rate(knowflow_ai_processing_total{status="failed"}[10m])) > 0.1
+        for: 10m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "AI 处理失败速率异常"
+
+      - alert: KnowFlowIndexQueueBacklog
+        expr: knowflow_index_queue_depth > 100
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "索引队列积压超过 100"
+
+  - name: knowflow-infra
+    rules:
+      - alert: KnowFlowDiskPressure
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.2
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: "磁盘可用空间低于 20%"
+
+      - alert: KnowFlowBudgetSoftLimit
+        expr: knowflow_budget_reserved_microyuan > 1800000
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "预算预留接近 2 CNY 软目标"
+          runbook: "docs/acceptance/2026-11-08-price-policy-signoff.md"

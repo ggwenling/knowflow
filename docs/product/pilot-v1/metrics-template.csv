@@ -1,0 +1,8 @@
+participant_id,session_date,method_order,task_id,method,success,time_seconds,timed_out,citation_checked,confidence_1_5,notes
+P01,,,1,search,,,,,,
+P01,,,1,knowflow,,,,,,
+P01,,,2,search,,,,,,
+P01,,,2,knowflow,,,,,,
+P01,,,3,search,,,,,,
+P01,,,3,knowflow,,,,,,
+P01,,,,,,,,,reuse_days,reuse_tasks
