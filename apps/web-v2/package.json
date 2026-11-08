@@ -7,6 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs",
+    "perf:budget": "node scripts/performance/budget.mjs",
+    "perf:sample": "node scripts/performance/sample.mjs",
+    "perf:retention": "node scripts/performance/retention.mjs",
+    "perf:heap": "node --max-old-space-size=4096 scripts/performance/heap-summary.mjs",
+    "perf:memory": "node --expose-gc scripts/performance/memory.mjs",
+    "perf:containers": "node scripts/performance/containers.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "e2e": "node ../../scripts/e2e-web.mjs --v2"
   },

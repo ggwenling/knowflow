@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "baseline": "2026-11-08 audit, Next 16.4.3, per-chunk gzip level 9; excludes later dynamic assets",
+  "maxGrowthRatio": 1.05,
+  "routes": {
+    "/": 226759,
+    "/conversations": 245077,
+    "/conversations/[questionId]": 245077,
+    "/knowledge-bases": 238233,
+    "/knowledge-bases/[baseId]": 239868,
+    "/settings": 222829,
+    "/workflow": 222810,
+    "/login": 208211,
+    "/register": 208211
+  }
+}

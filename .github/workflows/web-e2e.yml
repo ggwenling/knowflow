@@ -75,7 +75,16 @@ jobs:
         run: |
           npm run typecheck
           npm run lint
+          npm test
           npm run build
+          npm run perf:budget
+      - name: Upload Web v2 bundle comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-v2-bundle-budget
+          path: apps/web-v2/performance-results/bundle.json
+          if-no-files-found: ignore
       - name: Install browser
         working-directory: apps/web-v2
         run: npx playwright install --with-deps chromium

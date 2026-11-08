@@ -31,15 +31,19 @@ function run(command, args, options = {}) {
 }
 
 async function waitForWeb(url) {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 60_000;
+  let lastProbe = "no response";
   while (Date.now() < deadline) {
     try {
       const response = await fetch(`${url}/api/mode`, { signal: AbortSignal.timeout(1_000) });
       if (response.ok) return;
-    } catch {}
+      lastProbe = `HTTP ${response.status}`;
+    } catch (error) {
+      lastProbe = error.cause?.code ?? error.message;
+    }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`Web service did not become reachable at ${url}`);
+  throw new Error(`Web service did not become reachable at ${url}; last probe: ${lastProbe}`);
 }
 
 function hex(bytes = 32) { return randomBytes(bytes).toString("hex"); }
@@ -78,7 +82,10 @@ try {
       "-f", "infra/compose.legacy-web.yml", "--env-file", envFile];
     run("docker", [...fallback, "up", "--no-deps", "--build", "--quiet-build", "--wait", "web"]);
     await waitForWeb(baseUrl);
-    run(process.execPath, [cli, "test", "rollback.spec.ts"], testOptions);
+    // Keep the main suite's artifacts for CI, but give the rollback run its own
+    // output directory so Playwright does not try to clear thousands of files
+    // from the previous run (and so both runs stay independently inspectable).
+    run(process.execPath, [cli, "test", "rollback.spec.ts", "--output", resolve(temp, "playwright-rollback")], testOptions);
   }
 } finally {
   try { run("docker", [...compose, "down", "--volumes", "--remove-orphans"]); }
