@@ -1,0 +1,38 @@
+.skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: #f1f1f1;
+}
+
+.skeleton::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  content: "";
+  transform: translateX(-100%);
+  animation: shimmer 1.4s var(--ease) infinite;
+}
+
+.rows {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lines {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}

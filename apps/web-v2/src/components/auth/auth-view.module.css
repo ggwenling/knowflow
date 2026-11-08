@@ -1,0 +1,257 @@
+.page {
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  grid-template-columns: minmax(0, 1fr);
+  isolation: isolate;
+  overflow: clip;
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.ribbon {
+  position: absolute;
+  inset: 0 0 0 max(42%, min(43.9vw, calc(5.9vw + 450px)));
+  z-index: -1;
+  pointer-events: none;
+}
+
+.content {
+  width: min(450px, 38vw);
+  margin-left: 5.9vw;
+  padding: 10.4vh 0 9vh;
+}
+
+.brand {
+  margin-bottom: 7.2vh;
+  font-family: var(--font-serif);
+  font-size: 42px;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+  line-height: 1;
+}
+
+.content h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(52px, 6.15vw, 90px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.lead {
+  margin: 28px 0 40px;
+  color: var(--ink-2);
+  font-size: 23px;
+  line-height: 1.38;
+}
+
+.form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.form input {
+  display: block;
+  width: 100%;
+  height: 58px;
+  padding: 0 18px;
+  border: 1px solid #d1d1d1;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.form input::placeholder {
+  color: #666;
+  opacity: 1;
+}
+
+.form input:focus {
+  border-color: var(--ink);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06);
+}
+
+.form > input {
+  margin-bottom: 24px;
+}
+
+.passwordField {
+  position: relative;
+}
+
+.passwordField input {
+  padding-right: 56px;
+}
+
+.passwordField button {
+  position: absolute;
+  inset: 0 10px 0 auto;
+  display: grid;
+  width: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-2);
+}
+
+.passwordField button:hover {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.submit {
+  display: inline-flex;
+  width: 100%;
+  min-height: 64px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.submit:hover:not(:disabled) {
+  background: #333;
+}
+
+.submit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 28px;
+  font-size: 14px;
+}
+
+.links button,
+.links a {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #333;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.resetHelp {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.footnote {
+  position: absolute;
+  bottom: 26px;
+  left: 5.9vw;
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@media (max-height: 820px) and (min-width: 701px) {
+  .content {
+    padding-top: 6vh;
+  }
+
+  .brand {
+    margin-bottom: 5vh;
+  }
+
+  .content h1 {
+    font-size: clamp(52px, 5.5vw, 72px);
+  }
+
+  .lead {
+    margin: 20px 0 26px;
+  }
+
+  .submit {
+    margin-top: 24px;
+  }
+}
+
+@media (max-width: 700px) {
+  .content {
+    width: min(450px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 36px 0 64px;
+  }
+
+  .brand {
+    margin-bottom: clamp(88px, 19svh, 150px);
+    font-size: 32px;
+  }
+
+  .content h1 {
+    font-size: clamp(46px, 13vw, 62px);
+  }
+
+  .lead {
+    margin: 16px 0 26px;
+    font-size: 17px;
+  }
+
+  .break {
+    display: none;
+  }
+
+  .ribbon {
+    inset: 28px 0 auto 18%;
+    height: 26svh;
+  }
+
+  .footnote {
+    display: none;
+  }
+}

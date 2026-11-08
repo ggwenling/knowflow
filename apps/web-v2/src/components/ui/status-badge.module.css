@@ -1,0 +1,37 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ready {
+  color: var(--success);
+}
+
+.working {
+  color: var(--warning);
+}
+
+.failed {
+  color: var(--danger);
+}
+
+.cancelled {
+  color: var(--ink-3);
+}
+
+.neutral {
+  color: var(--ink-3);
+}

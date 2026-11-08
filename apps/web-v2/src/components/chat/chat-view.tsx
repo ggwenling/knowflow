@@ -1,0 +1,240 @@
+"use client";
+
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { CircleHelp, FileText, FolderOpen, Layers, PanelLeft, PanelRight, Plus } from "lucide-react";
+import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { formatBytes, formatLabel } from "@/lib/format";
+import type { Source } from "@/services/api";
+import { HistoryRail } from "./history-rail";
+import { AnswerPanel } from "./answer-panel";
+import { Composer } from "./composer";
+import { SourceDialog } from "./source-dialog";
+import styles from "./chat.module.css";
+
+function DocumentsPanel() {
+  const { documents, knowledge } = useWorkspaceDataContext();
+  const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
+
+  return (
+    <div className={styles.docs}>
+      <div className={styles.docsHead}>
+        <div>
+          <p className={styles.eyebrow}>Documents</p>
+          <h2>资料 <span>{documents.documents.length}</span></h2>
+        </div>
+        <label className={styles.uploadChip} aria-label="上传资料">
+          <Plus size={15} aria-hidden="true" />
+          <input
+            type="file"
+            accept=".txt,.md,.pdf"
+            disabled={!knowledge.selectedBase || documents.working}
+            onChange={(event) => {
+              void documents.upload(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      <p className={styles.docsHint}>
+        {selected ? `${selected.name} · ${documents.documents.filter((item) => item.status === "READY").length} 份可用于问答` : "先选择一个知识库"}
+      </p>
+
+      {documents.documents.length ? (
+        <div className={styles.docList}>
+          {documents.documents.map((document) => (
+            <div className={styles.docRow} key={document.id}>
+              <span className={styles.docBadge}>{formatLabel(document.format)}</span>
+              <span className={styles.docText}>
+                <strong title={document.original_name}>{document.original_name}</strong>
+                <small>{formatBytes(document.byte_size)}</small>
+              </span>
+              <StatusBadge status={document.status} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.docsEmpty}>
+          <FileText size={22} strokeWidth={1.4} aria-hidden="true" />
+          <p>还没有资料</p>
+          <span>支持 TXT、Markdown 与可读取文本的 PDF，最大 8 MiB。</span>
+        </div>
+      )}
+
+      {documents.hasMore && (
+        <button className={styles.loadMore} onClick={() => void documents.loadMore()} disabled={documents.loadingMore}>
+          加载更多资料
+        </button>
+      )}
+
+      <div className={styles.privacy}>
+        <CircleHelp size={14} aria-hidden="true" />
+        <p>资料只对当前账户可见。索引显示“已就绪”后才会参与问答。</p>
+      </div>
+
+      {selected && (
+        <Link className={styles.docsLink} href={`/knowledge-bases/${selected.id}`}>
+          <FolderOpen size={14} aria-hidden="true" /> 打开知识库管理
+        </Link>
+      )}
+    </div>
+  );
+}
+
+export function ChatView() {
+  const router = useRouter();
+  const reduce = useReducedMotion();
+  const params = useParams<{ questionId?: string }>();
+  const questionId = params?.questionId;
+  const { knowledge, documents, questions, stream, readyDocuments, clearDraft, setDraft } = useWorkspaceDataContext();
+  const [viewing, setViewing] = useState<{ source: Source; documentName: string } | null>(null);
+  const [sourceTrigger, setSourceTrigger] = useState<HTMLElement | null>(null);
+  const [panel, setPanel] = useState<"history" | "docs" | null>(null);
+  const loaded = useRef("");
+
+  useEffect(() => {
+    if (!questionId) {
+      loaded.current = "";
+      return;
+    }
+    if (loaded.current === questionId) return;
+    loaded.current = questionId;
+    void stream.load(questionId).then((detail) => {
+      if (detail) knowledge.selectBase(detail.knowledge_base_id);
+    });
+  }, [questionId, knowledge, stream]);
+
+  function ask(question: string) {
+    if (!knowledge.selectedBase) return;
+    if (questionId) router.replace("/conversations");
+    clearDraft();
+    void stream.ask(question, knowledge.selectedBase);
+  }
+
+  function newChat() {
+    stream.reset();
+    clearDraft();
+    router.push("/conversations");
+  }
+
+  const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
+
+  return (
+    <motion.div
+      className={styles.page}
+      initial={reduce ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      <header className={styles.chatHeader}>
+        <div className={styles.chatTitle}>
+          <p className={styles.eyebrow}>Conversations</p>
+          <h1>对话</h1>
+          <p className={styles.chatMeta}>
+            {selected ? selected.name : "选择一个知识库开始"} · {readyDocuments.length} 份资料可用于问答
+          </p>
+        </div>
+        <div className={styles.chatActions}>
+          {knowledge.bases.length > 1 && (
+            <label className={styles.baseSelect}>
+              <Layers size={14} aria-hidden="true" />
+              <select
+                aria-label="切换知识库"
+                value={knowledge.selectedBase}
+                onChange={(event) => knowledge.selectBase(event.target.value)}
+              >
+                {knowledge.bases.map((base) => <option key={base.id} value={base.id}>{base.name}</option>)}
+              </select>
+            </label>
+          )}
+          <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("history")}>
+            <PanelLeft size={14} aria-hidden="true" /> 历史记录
+          </Button>
+          <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("docs")}>
+            <PanelRight size={14} aria-hidden="true" /> 资料
+          </Button>
+          <Button variant="secondary" size="sm" onClick={newChat}>
+            <Plus size={14} aria-hidden="true" /> 新对话
+          </Button>
+        </div>
+      </header>
+
+      {documents.notice && (
+        <div className={styles.chatNotice} role="status">
+          <span>{documents.notice}</span>
+          <button onClick={documents.clearNotice}>关闭</button>
+        </div>
+      )}
+
+      <div className={styles.layout}>
+        <aside className={styles.railColumn}>
+          <HistoryRail
+            items={questions.history}
+            loading={questions.loading}
+            hasMore={questions.hasMore}
+            activeId={questionId}
+            onLoadMore={() => void questions.loadMore()}
+            onNew={newChat}
+          />
+        </aside>
+
+        <section className={styles.chatMain} aria-label="问答">
+          <div className={styles.answerScroll}>
+            <AnswerPanel
+              onOpenSource={(source, documentName) => {
+                setSourceTrigger(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+                setViewing({ source, documentName });
+              }}
+              onEditQuestion={(question) => {
+                setDraft(question);
+                requestAnimationFrame(() => document.getElementById("desk-question")?.focus());
+              }}
+            />
+          </div>
+          <Composer onAsk={ask} />
+        </section>
+
+        <aside className={styles.docsColumn}>
+          <DocumentsPanel />
+        </aside>
+      </div>
+
+      <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) setPanel(null); }}>
+        <DialogContent size="lg" className={styles.sheet}>
+          <DialogTitle className={styles.sheetTitle}>
+            {panel === "history" ? "对话历史" : "资料"}
+          </DialogTitle>
+          <DialogDescription className={styles.srOnly}>
+            {panel === "history" ? "选择一条历史问答查看答案与来源。" : "当前知识库中的资料与索引状态。"}
+          </DialogDescription>
+          {panel === "history" ? (
+            <HistoryRail
+              items={questions.history}
+              loading={questions.loading}
+              hasMore={questions.hasMore}
+              activeId={questionId}
+              onLoadMore={() => void questions.loadMore()}
+              onNew={() => { setPanel(null); newChat(); }}
+              onNavigate={() => setPanel(null)}
+            />
+          ) : <DocumentsPanel />}
+        </DialogContent>
+      </Dialog>
+
+      <SourceDialog
+        source={viewing?.source ?? null}
+        documentName={viewing?.documentName ?? ""}
+        open={viewing !== null}
+        onOpenChange={(open) => { if (!open) setViewing(null); }}
+        returnFocus={sourceTrigger}
+      />
+
+    </motion.div>
+  );
+}

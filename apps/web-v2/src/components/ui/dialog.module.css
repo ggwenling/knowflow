@@ -1,0 +1,128 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(17, 17, 17, 0.34);
+  animation: overlayIn var(--dur) var(--ease);
+}
+
+.content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  display: grid;
+  gap: 14px;
+  width: min(92vw, 520px);
+  max-height: 88svh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-pop);
+  transform: translate(-50%, -50%);
+  animation: contentIn var(--dur) var(--ease);
+}
+
+.content:focus {
+  outline: none;
+}
+
+.sm {
+  width: min(92vw, 400px);
+  padding: 24px;
+}
+
+.lg {
+  width: min(92vw, 760px);
+}
+
+.wide {
+  width: min(94vw, 920px);
+  padding: 0;
+}
+
+.close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-2);
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.close:hover {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes contentIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 8px)) scale(0.985);
+  }
+}
+
+@media (max-width: 640px) {
+  .content,
+  .sm,
+  .lg,
+  .wide {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 90svh;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: none;
+    animation: sheetIn var(--dur) var(--ease);
+  }
+
+  @keyframes sheetIn {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+  }
+}

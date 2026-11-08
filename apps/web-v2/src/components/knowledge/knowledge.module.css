@@ -1,0 +1,577 @@
+.page {
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0 0 7px;
+  color: var(--ink-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.pageHead,
+.detailHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.pageHead h1,
+.detailHead h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 3.2vw, 38px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.pageLead {
+  max-width: 600px;
+  margin: 8px 0 0;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+  padding: 10px 0;
+}
+
+.search {
+  display: flex;
+  width: min(300px, 100%);
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+}
+
+.search input {
+  min-width: 0;
+  flex: 1;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  outline: none;
+}
+
+.search input:focus-visible {
+  outline: 2px solid #555;
+  outline-offset: 1px;
+}
+
+.search input::placeholder {
+  color: #9d9d9d;
+}
+
+.toolbarMeta {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.baseGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  gap: 12px;
+}
+
+.baseCard {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.baseCard:hover {
+  border-color: #c9c9c9;
+  background: #fdfdfd;
+}
+
+.baseCardLink {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 17px 44px 17px 16px;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.baseCardIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--bg-muted);
+  color: var(--ink-2);
+}
+
+.baseCardText {
+  min-width: 0;
+  flex: 1;
+}
+
+.baseCardText strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.baseCardText small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.baseCardArrow {
+  flex: none;
+  color: #bdbdbd;
+  transition: transform var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.baseCard:hover .baseCardArrow {
+  color: var(--ink);
+  transform: translateX(2px);
+}
+
+.baseCardDelete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: transparent;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.baseCard:hover .baseCardDelete,
+.baseCardDelete:focus-visible {
+  color: var(--ink-3);
+}
+
+.baseCardDelete:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  margin-bottom: 14px;
+  padding: 2px 0;
+  color: var(--ink-2);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--ink);
+}
+
+.detailBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  padding: 5px 11px;
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.uploadZone {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: #fcfcfc;
+  padding: 15px 16px;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.uploadDragging {
+  border-color: var(--ink);
+  background: #f6f6f6;
+}
+
+.uploadIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink-2);
+}
+
+.uploadText {
+  min-width: 0;
+  flex: 1;
+}
+
+.uploadText strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.uploadText span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+.uploadAction,
+.emptyUpload {
+  display: inline-flex;
+  min-height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 0 13px;
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uploadAction:hover,
+.emptyUpload:hover {
+  border-color: var(--ink-3);
+}
+
+.uploadAction input,
+.emptyUpload input {
+  display: none;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin: 18px 0 12px;
+  padding-bottom: 8px;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  padding: 5px 8px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+
+.filter span {
+  color: var(--ink-3);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.filter:hover {
+  background: var(--bg-muted);
+}
+
+.filterActive {
+  background: var(--bg-muted);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.filterActive span {
+  color: var(--ink-2);
+}
+
+.filterSpacer {
+  flex: 1;
+}
+
+.syncing {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.statusMessage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  border: 1px solid #ecd9c4;
+  border-radius: var(--radius-sm);
+  background: #fffaf3;
+  padding: 9px 12px;
+  color: #7d5a32;
+  font-size: 12px;
+}
+
+.statusMessage button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 11px;
+  text-decoration: underline;
+}
+
+.docList {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.docCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #f4f4f4;
+  padding: 11px 13px;
+}
+
+.docCard:last-child {
+  border-bottom: 0;
+}
+
+.docFormat {
+  display: grid;
+  width: 34px;
+  height: 38px;
+  flex: none;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--bg-muted);
+  color: var(--ink-2);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.docName {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.docName strong {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docName small {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+
+.docStatus {
+  display: grid;
+  flex: none;
+  justify-items: end;
+  gap: 2px;
+}
+
+.docStatus small {
+  max-width: 140px;
+  color: var(--ink-3);
+  font-size: 9.5px;
+  text-align: right;
+}
+
+.docMenu {
+  position: relative;
+  flex: none;
+}
+
+.docMenu > button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.docMenu > button:hover,
+.docMenu > button[aria-expanded="true"] {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.docMenuPanel {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  z-index: 12;
+  display: grid;
+  min-width: 132px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 4px;
+  box-shadow: var(--shadow-pop);
+}
+
+.docMenuPanel button {
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  padding: 7px 8px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  text-align: left;
+}
+
+.docMenuPanel button:hover {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.dangerItem {
+  color: var(--danger) !important;
+}
+
+.docEmptyRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px 16px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+
+.loadMore {
+  display: block;
+  margin: 14px auto 0;
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--ink-2);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .pageHead,
+  .detailHead {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .pageHead h1,
+  .detailHead h1 {
+    font-size: clamp(26px, 8vw, 32px);
+  }
+
+  .pageLead {
+    font-size: 11.5px;
+  }
+
+  .toolbar {
+    gap: 10px;
+  }
+
+  .search {
+    width: 100%;
+  }
+
+  .baseGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .baseCardDelete {
+    color: var(--ink-3);
+  }
+
+  .uploadZone {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 13px;
+  }
+
+  .uploadText span {
+    font-size: 9.5px;
+  }
+
+  .uploadAction {
+    width: 100%;
+  }
+
+  .filterRow {
+    overflow-x: auto;
+  }
+
+  .filter {
+    flex: none;
+  }
+
+  .docCard {
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px;
+  }
+
+  .docStatus {
+    align-self: center;
+  }
+
+  .docName strong {
+    font-size: 11.5px;
+  }
+}

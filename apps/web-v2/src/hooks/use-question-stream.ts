@@ -1,0 +1,160 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, apiFetch, streamQuestion, type QuestionDetail, type Source } from "@/services/api";
+import { messageOf } from "@/lib/format";
+
+export function useQuestionStream(onSettled: () => void) {
+  const [answer, setAnswer] = useState<QuestionDetail | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const controller = useRef<AbortController | null>(null);
+  const view = useRef(0);
+  const buffer = useRef("");
+  const flushTimer = useRef<number | null>(null);
+  const settled = useRef(onSettled);
+
+  useEffect(() => {
+    settled.current = onSettled;
+  }, [onSettled]);
+
+  const flush = useCallback(() => {
+    if (flushTimer.current !== null) {
+      window.clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+    }
+    const pending = buffer.current;
+    buffer.current = "";
+    if (!pending) return;
+    setAnswer((old) => (old ? { ...old, answer: (old.answer ?? "") + pending } : old));
+  }, []);
+
+  useEffect(() => () => {
+    controller.current?.abort();
+    if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
+  }, []);
+
+  const ask = useCallback(async (question: string, knowledgeBaseId: string) => {
+    const text = question.trim();
+    if (!text || !knowledgeBaseId) return false;
+    const viewId = ++view.current;
+    const isCurrent = () => view.current === viewId;
+    const abort = new AbortController();
+    controller.current?.abort();
+    controller.current = abort;
+    buffer.current = "";
+    setNotice("");
+    setBusy(true);
+    setAnswer({
+      question_id: "",
+      knowledge_base_id: knowledgeBaseId,
+      question: text,
+      status: "PROCESSING",
+      finished_at: null,
+      answer: "",
+      has_answer: null,
+      failure_code: null,
+      sources: [],
+    });
+
+    try {
+      const response = await apiFetch(`knowledge-bases/${knowledgeBaseId}/questions/stream`, {
+        method: "POST",
+        signal: abort.signal,
+        headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
+        body: JSON.stringify({ question: text }),
+      });
+      if (!isCurrent()) return false;
+      await streamQuestion(
+        response,
+        (delta) => {
+          if (!isCurrent()) return;
+          buffer.current += delta;
+          if (flushTimer.current === null) {
+            flushTimer.current = window.setTimeout(() => {
+              flushTimer.current = null;
+              flush();
+            }, 50);
+          }
+        },
+        (sources: Source[], hasAnswer: boolean) => {
+          if (!isCurrent()) return;
+          flush();
+          setAnswer((old) => (old ? { ...old, sources, has_answer: hasAnswer } : old));
+        },
+      );
+      if (!isCurrent()) return false;
+      flush();
+      setAnswer((old) => (old ? { ...old, status: "SUCCEEDED", finished_at: new Date().toISOString() } : old));
+      settled.current();
+      return true;
+    } catch (reason) {
+      if (!isCurrent()) return false;
+      flush();
+      const cancelled = abort.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError");
+      setAnswer((old) => (old ? {
+        ...old,
+        status: cancelled ? "CANCELLED" : "FAILED",
+        failure_code: cancelled ? "用户停止生成" : messageOf(reason),
+        has_answer: null,
+        sources: [],
+      } : old));
+      if (!cancelled) setNotice(messageOf(reason));
+      settled.current();
+      return false;
+    } finally {
+      if (view.current === viewId) {
+        controller.current = null;
+        setBusy(false);
+      }
+    }
+  }, [flush]);
+
+  const cancel = useCallback(() => {
+    controller.current?.abort();
+    setNotice("正在停止请求。若生成已经开始，请在历史记录里确认状态，不会自动重发。");
+  }, []);
+
+  const load = useCallback(async (questionId: string) => {
+    const viewId = ++view.current;
+    setNotice("");
+    try {
+      const detail = await api<QuestionDetail>(`questions/${encodeURIComponent(questionId)}`);
+      if (view.current !== viewId) return null;
+      setAnswer(detail);
+      return detail;
+    } catch (reason) {
+      if (view.current === viewId) {
+        setAnswer(null);
+        setNotice(messageOf(reason));
+      }
+      return null;
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    view.current += 1;
+    controller.current?.abort();
+    controller.current = null;
+    flush();
+    setAnswer(null);
+    setBusy(false);
+    setNotice("");
+  }, [flush]);
+
+  const remove = useCallback(async (questionId: string) => {
+    try {
+      await api(`questions/${questionId}`, { method: "DELETE" });
+      setAnswer((old) => (old?.question_id === questionId ? null : old));
+      settled.current();
+      return true;
+    } catch (reason) {
+      setNotice(messageOf(reason));
+      return false;
+    }
+  }, []);
+
+  const clearNotice = useCallback(() => setNotice(""), []);
+
+  return { answer, busy, notice, ask, cancel, load, reset, remove, clearNotice };
+}
