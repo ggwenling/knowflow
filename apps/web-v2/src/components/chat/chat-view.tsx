@@ -195,6 +195,10 @@ export function ChatView() {
                 setDraft(question);
                 requestAnimationFrame(() => document.getElementById("desk-question")?.focus());
               }}
+              onDeleted={(deletedId) => {
+                loaded.current = "";
+                if (questionId === deletedId) router.replace("/conversations");
+              }}
             />
           </div>
           <Composer onAsk={ask} />

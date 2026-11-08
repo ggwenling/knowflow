@@ -9,14 +9,33 @@ export function useQuestions(userId?: string) {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
+  const [readyFor, setReadyFor] = useState<string | null>(null);
   const offsetRef = useRef(0);
+  const ownerRef = useRef<string | undefined>(undefined);
   const loadingRef = useRef(false);
   const generation = useRef(0);
 
+  const resetFor = useCallback(() => {
+    setHistory([]);
+    setHasMore(false);
+    setNotice("");
+    setReadyFor(null);
+    setLoading(false);
+    offsetRef.current = 0;
+    loadingRef.current = false;
+  }, []);
+
   const load = useCallback(async () => {
-    if (!userId) return;
-    await Promise.resolve();
+    const owner = userId;
     const gen = ++generation.current;
+    if (ownerRef.current !== owner) {
+      // A different account owns the workspace now: drop the old history and cursor.
+      ownerRef.current = owner;
+      resetFor();
+    }
+    if (!owner) return;
+    await Promise.resolve();
+    if (gen !== generation.current) return;
     setLoading(true);
     try {
       const page = await api<Page<QuestionHistory>>("questions?limit=50&offset=0");
@@ -24,19 +43,26 @@ export function useQuestions(userId?: string) {
       setHistory(page.items);
       offsetRef.current = page.items.length;
       setHasMore(Boolean(page.has_more));
+      setReadyFor(owner);
     } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
+      if (gen === generation.current) {
+        setNotice(messageOf(reason));
+        // Settle the gate so the page can surface the failure instead of waiting forever.
+        setReadyFor(owner);
+      }
     } finally {
       if (gen === generation.current) setLoading(false);
     }
-  }, [userId]);
+  }, [userId, resetFor]);
 
   useEffect(() => {
+    // Invalidate in-flight work; load() clears the previous account's history off-render.
+    generation.current += 1;
     queueMicrotask(() => { void load(); });
   }, [load]);
 
   async function loadMore() {
-    if (loadingRef.current || !hasMore) return;
+    if (!userId || loadingRef.current || !hasMore) return;
     loadingRef.current = true;
     setLoading(true);
     const gen = generation.current;
@@ -54,7 +80,7 @@ export function useQuestions(userId?: string) {
       if (gen === generation.current) setNotice(messageOf(reason));
     } finally {
       loadingRef.current = false;
-      setLoading(false);
+      if (gen === generation.current) setLoading(false);
     }
   }
 
@@ -71,5 +97,7 @@ export function useQuestions(userId?: string) {
 
   const clearNotice = useCallback(() => setNotice(""), []);
 
-  return { history, hasMore, loading, notice, load, loadMore, remove, clearNotice };
+  const ready = Boolean(userId) && readyFor === userId;
+
+  return { history, hasMore, loading, notice, ready, load, loadMore, remove, clearNotice };
 }

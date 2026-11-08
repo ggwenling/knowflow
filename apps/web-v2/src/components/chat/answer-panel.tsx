@@ -19,9 +19,11 @@ const Markdown = dynamic(() => import("./markdown-answer"), {
 export function AnswerPanel({
   onOpenSource,
   onEditQuestion,
+  onDeleted,
 }: {
   onOpenSource: (source: import("@/services/api").Source, documentName: string) => void;
   onEditQuestion: (question: string) => void;
+  onDeleted: (questionId: string) => void;
 }) {
   const { stream, documents, knowledge } = useWorkspaceDataContext();
   const answer = stream.answer;
@@ -61,11 +63,13 @@ export function AnswerPanel({
 
   async function remove() {
     if (!answer?.question_id) return;
-    const removed = await stream.remove(answer.question_id);
+    const questionId = answer.question_id;
+    const removed = await stream.remove(questionId);
     setConfirmDelete(false);
     if (removed) {
       toast.success("问答记录已删除");
       onEditQuestion("");
+      onDeleted(questionId);
     }
   }
 

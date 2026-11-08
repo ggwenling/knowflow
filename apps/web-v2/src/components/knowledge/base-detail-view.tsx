@@ -82,8 +82,9 @@ export function BaseDetailView() {
   }
 
   async function remove(document: Document) {
-    await documents.remove(document);
-    toast.success(`已删除「${document.original_name}」`);
+    const removed = await documents.remove(document);
+    if (removed) toast.success(`已删除「${document.original_name}」`);
+    else toast.error("资料未能删除，请稍后重试。");
   }
 
   return (
@@ -155,8 +156,10 @@ export function BaseDetailView() {
               busy={documents.working}
               onUpdate={(file, document) => void upload(file, document)}
               onRebuild={(document) => {
-                void documents.rebuild(document);
-                toast.success("已开始重建索引");
+                void documents.rebuild(document).then((started) => {
+                  if (started) toast.success("已开始重建索引");
+                  else toast.error("重建未能开始，请稍后重试。");
+                });
               }}
               onDelete={remove}
             />

@@ -17,9 +17,10 @@ function useWorkspaceData() {
   const dispatch = useWorkspaceDispatch();
   const draft = useWorkspace((state) => state.draft);
   const session = useSession();
-  const knowledge = useKnowledgeBases(session.user?.user_id);
-  const documents = useDocuments(knowledge.selectedBase);
-  const questions = useQuestions(session.user?.user_id);
+  const userId = session.user?.user_id;
+  const knowledge = useKnowledgeBases(userId);
+  const documents = useDocuments(knowledge.selectedBase, userId);
+  const questions = useQuestions(userId);
 
   const settle = useCallback(() => {
     void documents.refresh(knowledge.selectedBase);
@@ -27,6 +28,13 @@ function useWorkspaceData() {
   }, [documents, knowledge.selectedBase, questions]);
 
   const stream = useQuestionStream(settle);
+  const resetStream = stream.reset;
+
+  // Account switch: never keep the previous account's answer or draft around.
+  useEffect(() => {
+    resetStream();
+    dispatch(actions.clearDraft());
+  }, [userId, resetStream, dispatch]);
 
   useEffect(() => {
     if (!session.loading && !session.error && !session.user) {
@@ -94,6 +102,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   if (!session.user) {
     return <main className={styles.gate} role="status">正在前往登录…</main>;
+  }
+
+  if (!value.knowledge.ready || !value.questions.ready) {
+    return <main className={styles.gate} role="status">正在准备你的工作区…</main>;
   }
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

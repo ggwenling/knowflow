@@ -13,10 +13,15 @@ export function useQuestionStream(onSettled: () => void) {
   const buffer = useRef("");
   const flushTimer = useRef<number | null>(null);
   const settled = useRef(onSettled);
+  const answerId = useRef<string | null>(null);
 
   useEffect(() => {
     settled.current = onSettled;
   }, [onSettled]);
+
+  useEffect(() => {
+    answerId.current = answer?.question_id || null;
+  }, [answer?.question_id]);
 
   const flush = useCallback(() => {
     if (flushTimer.current !== null) {
@@ -29,6 +34,18 @@ export function useQuestionStream(onSettled: () => void) {
     setAnswer((old) => (old ? { ...old, answer: (old.answer ?? "") + pending } : old));
   }, []);
 
+  // Abort the running stream and release everything that keeps the composer busy.
+  const stop = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    if (flushTimer.current !== null) {
+      window.clearTimeout(flushTimer.current);
+      flushTimer.current = null;
+    }
+    buffer.current = "";
+    setBusy(false);
+  }, []);
+
   useEffect(() => () => {
     controller.current?.abort();
     if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
@@ -39,10 +56,9 @@ export function useQuestionStream(onSettled: () => void) {
     if (!text || !knowledgeBaseId) return false;
     const viewId = ++view.current;
     const isCurrent = () => view.current === viewId;
+    stop();
     const abort = new AbortController();
-    controller.current?.abort();
     controller.current = abort;
-    buffer.current = "";
     setNotice("");
     setBusy(true);
     setAnswer({
@@ -108,7 +124,7 @@ export function useQuestionStream(onSettled: () => void) {
         setBusy(false);
       }
     }
-  }, [flush]);
+  }, [flush, stop]);
 
   const cancel = useCallback(() => {
     controller.current?.abort();
@@ -117,6 +133,8 @@ export function useQuestionStream(onSettled: () => void) {
 
   const load = useCallback(async (questionId: string) => {
     const viewId = ++view.current;
+    // Switching to a stored question ends any in-flight generation and clears busy.
+    stop();
     setNotice("");
     try {
       const detail = await api<QuestionDetail>(`questions/${encodeURIComponent(questionId)}`);
@@ -130,21 +148,19 @@ export function useQuestionStream(onSettled: () => void) {
       }
       return null;
     }
-  }, []);
+  }, [stop]);
 
   const reset = useCallback(() => {
     view.current += 1;
-    controller.current?.abort();
-    controller.current = null;
-    flush();
+    stop();
     setAnswer(null);
-    setBusy(false);
     setNotice("");
-  }, [flush]);
+  }, [stop]);
 
   const remove = useCallback(async (questionId: string) => {
     try {
       await api(`questions/${questionId}`, { method: "DELETE" });
+      if (answerId.current === questionId) stop();
       setAnswer((old) => (old?.question_id === questionId ? null : old));
       settled.current();
       return true;
@@ -152,7 +168,7 @@ export function useQuestionStream(onSettled: () => void) {
       setNotice(messageOf(reason));
       return false;
     }
-  }, []);
+  }, [stop]);
 
   const clearNotice = useCallback(() => setNotice(""), []);
 

@@ -7,7 +7,7 @@ import { messageOf } from "@/lib/format";
 const terminal = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 const maxUploadBytes = 8 * 1024 * 1024;
 
-export function useDocuments(baseId: string) {
+export function useDocuments(baseId: string, ownerId?: string) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -16,12 +16,29 @@ export function useDocuments(baseId: string) {
   const [notice, setNotice] = useState("");
   const generation = useRef(0);
   const baseRef = useRef(baseId);
+  const ownerRef = useRef(ownerId);
   const offsetRef = useRef(0);
   const refreshSeq = useRef(0);
   const loadingMoreRef = useRef(false);
   const polling = useRef(new Set<string>());
+  const workToken = useRef<symbol | null>(null);
 
   const clearNotice = useCallback(() => setNotice(""), []);
+
+  // Only the newest operation may clear the shared busy flag, so a request left
+  // over from another knowledge base can never re-enable controls mid-operation.
+  const beginWork = useCallback(() => {
+    const token = Symbol("documents-work");
+    workToken.current = token;
+    setWorking(true);
+    return token;
+  }, []);
+
+  const endWork = useCallback((token: symbol) => {
+    if (workToken.current !== token) return;
+    workToken.current = null;
+    setWorking(false);
+  }, []);
 
   async function refresh(id = baseRef.current) {
     if (!id) {
@@ -82,20 +99,29 @@ export function useDocuments(baseId: string) {
   }
 
   useEffect(() => {
+    const ownerChanged = ownerRef.current !== ownerId;
+    ownerRef.current = ownerId;
     baseRef.current = baseId;
     generation.current += 1;
     refreshSeq.current += 1;
     offsetRef.current = 0;
+    loadingMoreRef.current = false;
+    polling.current.clear();
+    workToken.current = null;
     void (async () => {
       await Promise.resolve();
       setDocuments([]);
       setHasMore(false);
       setNotice("");
-      if (baseId) await refresh(baseId);
+      setLoadingMore(false);
+      setRefreshing(false);
+      setWorking(false);
+      // The still-selected base belongs to the previous account; never query it as the new one.
+      if (baseId && !ownerChanged) await refresh(baseId);
     })();
     // The refresh function reads current refs; rerunning on identity change would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseId]);
+  }, [baseId, ownerId]);
 
   async function loadMore() {
     if (loadingMoreRef.current || refreshing || !baseRef.current) return;
@@ -131,7 +157,7 @@ export function useDocuments(baseId: string) {
     }
     const id = baseRef.current;
     const gen = generation.current;
-    setWorking(true);
+    const token = beginWork();
     setNotice("");
     try {
       const form = new FormData();
@@ -162,43 +188,51 @@ export function useDocuments(baseId: string) {
       if (gen === generation.current) setNotice(messageOf(reason));
       return false;
     } finally {
-      if (gen === generation.current) setWorking(false);
+      endWork(token);
     }
   }
 
   async function rebuild(document: Document) {
     const id = baseRef.current;
+    if (!id) return false;
     const gen = generation.current;
-    setWorking(true);
+    const token = beginWork();
     setNotice("");
     try {
       const accepted = await api<{ task_id: string }>(`documents/${document.id}/rebuilds`, {
         method: "POST",
         body: "{}",
       });
-      if (gen !== generation.current) return;
-      await poll({ ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" }, gen, id);
+      // Indexing continues in the background; the row status and polling reflect progress.
+      if (gen === generation.current && baseRef.current === id) {
+        void poll({ ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" }, gen, id);
+      }
+      return true;
     } catch (reason) {
       if (gen === generation.current) setNotice(messageOf(reason));
+      return false;
     } finally {
-      if (gen === generation.current) setWorking(false);
+      endWork(token);
     }
   }
 
   async function remove(document: Document) {
     const id = baseRef.current;
     const gen = generation.current;
-    setWorking(true);
+    const token = beginWork();
     setNotice("");
     try {
       await api(`documents/${document.id}`, { method: "DELETE" });
-      if (gen !== generation.current) return;
-      setDocuments((previous) => previous.filter((item) => item.id !== document.id));
-      await refresh(id);
+      if (gen === generation.current) {
+        setDocuments((previous) => previous.filter((item) => item.id !== document.id));
+        void refresh(id);
+      }
+      return true;
     } catch (reason) {
       if (gen === generation.current) setNotice(messageOf(reason));
+      return false;
     } finally {
-      if (gen === generation.current) setWorking(false);
+      endWork(token);
     }
   }
 
