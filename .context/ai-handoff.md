@@ -43,14 +43,17 @@ commit: 8a80835181145ae3c70802dcef760f8498fc86b2
 
 ### 仓库与运行环境
 
-- `origin/local == HEAD == 8a80835`；工作树仅本交接修改，未跟踪 `eval-out/` 与 `.codebuddy/`。
-- Compose 全栈 `knowflow-local` 在 `127.0.0.1:3000` 运行且 healthy；`infra/.env` 本地忽略，不提交。
+- 代码基线：`origin/local == 8a80835`（四个代码/文档提交已推送，CI run 42456844122 全绿）。
+- 本地 `HEAD == 359b293`（本交接提交）；GitHub `github.com:443` 在收尾时不可达，交接提交尚未推送，恢复后执行 `git push origin local`。
+- 工作树仅剩未跟踪 `eval-out/` 与 `.codebuddy/`（均不入库）；`infra/.env` 本地忽略，不提交。
+- Compose 全栈 `knowflow-local` 在 `127.0.0.1:3000` 运行且 healthy。
 - 旧版交接历史见 `git show 6da4675:.context/ai-handoff.md`。
 
 ### 阻塞
 
 - **PR 未创建**：本机没有 `gh` CLI，环境也没有 `GITHUB_TOKEN`/`GH_TOKEN`。代码已推送，创建 PR 需要：
   `https://github.com/ggwenling/knowflow/compare/main...local?expand=1`
+- **交接提交未推送**：`github.com:443` 在收尾时不可达（`api.github.com` 可用）；恢复后推送 `359b293`。代码基线 `8a80835` 已在远端。
 - M 人工验收、真人引用审阅、PRICE/POLICY、私有盲测、生产承接、真实用户试用仍待负责人执行；不得代签。
 
 ## Acceptance criteria
@@ -107,7 +110,7 @@ commit: 8a80835181145ae3c70802dcef760f8498fc86b2
 ## Working tree
 
 - 已提交：`apps/web-v2/`、5 个跟踪文件修改、`infra/compose.legacy-web.yml`、`docs/*`、`deploy/*`、`scripts/*`。
-- 未提交：本交接（`.context/ai-handoff.md`）。
+- 已提交但未推送：本交接 `359b293`（GitHub 443 暂不可达）。
 - 未跟踪且不入库：`eval-out/`（评测/截图/审计产物）、`.codebuddy/`（工具数据）。
 - 运行中的 Compose 栈保留给人工验收；停止用 `docker compose --project-name knowflow-local -f infra/compose.yml --env-file infra/.env down`（不要加 `--volumes`）。
 
@@ -151,4 +154,5 @@ commit: 8a80835181145ae3c70802dcef760f8498fc86b2
 ## Handoff log
 
 - `2026-11-08T07:07:20Z` — `codebuddy` set status to `blocked`：完成 UI 规范修复、16/17 e2e、四个提交推送、CI 全绿（42456844122）、验收/引用/预算/盲测/消费/运维/试用材料；PR 因无 `gh`/token 未创建；人工签核与项目级阻断保持未完成。
+- `2026-11-08T07:20:00Z` — `codebuddy` 补充：代码基线 `8a80835` 已推送；交接提交 `359b293` 因 `github.com:443` 不可达暂留本地，恢复后普通推送。
 - 上一版完整日志（2026-10-30 至 2026-11-04）保留在 `git show 6da4675:.context/ai-handoff.md`。
