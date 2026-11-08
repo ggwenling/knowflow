@@ -1,104 +1,91 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Page, type QuestionHistory } from "@/services/api";
 import { messageOf } from "@/lib/format";
 
+const empty: QuestionHistory[] = [];
 export function useQuestions(userId?: string) {
-  const [history, setHistory] = useState<QuestionHistory[]>([]);
+  const [history, setHistory] = useState<QuestionHistory[]>(empty);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const [readyFor, setReadyFor] = useState<string | null>(null);
-  const offsetRef = useRef(0);
-  const ownerRef = useRef<string | undefined>(undefined);
-  const loadingRef = useRef(false);
-  const generation = useRef(0);
-
-  const resetFor = useCallback(() => {
-    setHistory([]);
-    setHasMore(false);
-    setNotice("");
-    setReadyFor(null);
-    setLoading(false);
-    offsetRef.current = 0;
-    loadingRef.current = false;
-  }, []);
+  const scope = useRef<{ owner: string; controller: AbortController; generation: number; offset: number; pages: number; more: boolean; loading: boolean; paginating: boolean } | null>(null);
 
   const load = useCallback(async () => {
-    const owner = userId;
-    const gen = ++generation.current;
-    if (ownerRef.current !== owner) {
-      // A different account owns the workspace now: drop the old history and cursor.
-      ownerRef.current = owner;
-      resetFor();
-    }
-    if (!owner) return;
-    await Promise.resolve();
-    if (gen !== generation.current) return;
+    const current = scope.current;
+    if (!current || current.controller.signal.aborted) return;
+    const gen = ++current.generation;
+    current.loading = true;
     setLoading(true);
     setNotice("");
     try {
-      const page = await api<Page<QuestionHistory>>("questions?limit=50&offset=0");
-      if (gen !== generation.current) return;
-      setHistory(page.items);
-      offsetRef.current = page.items.length;
-      setHasMore(Boolean(page.has_more));
-      setReadyFor(owner);
+      let offset = 0;
+      let more = false;
+      const items: QuestionHistory[] = [];
+      for (let i = 0; i < current.pages; i++) {
+        if (current !== scope.current || gen !== current.generation) return;
+        const page = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${offset}`, { signal: current.controller.signal });
+        if (current !== scope.current || gen !== current.generation) return;
+        items.push(...page.items);
+        offset += page.items.length;
+        more = Boolean(page.has_more && page.items.length);
+        if (!more) break;
+      }
+      current.offset = offset;
+      current.more = more;
+      setHistory(items);
+      setHasMore(more);
+      setReadyFor(current.owner);
     } catch (reason) {
-      if (gen === generation.current) {
+      if (current === scope.current && gen === current.generation && !current.controller.signal.aborted) {
         setNotice(`问答历史加载失败：${messageOf(reason)}`);
-        // Settle the gate so the page can surface the failure instead of waiting forever.
-        setReadyFor(owner);
+        setReadyFor(current.owner);
       }
     } finally {
-      if (gen === generation.current) setLoading(false);
+      if (current === scope.current && gen === current.generation) { current.loading = false; setLoading(current.paginating); }
     }
-  }, [userId, resetFor]);
+  }, []);
 
   useEffect(() => {
-    // Invalidate in-flight work; load() clears the previous account's history off-render.
-    generation.current += 1;
-    queueMicrotask(() => { void load(); });
-  }, [load]);
+    const current = { owner: userId ?? "", controller: new AbortController(), generation: 0, offset: 0, pages: 1, more: false, loading: false, paginating: false };
+    scope.current = current;
+    queueMicrotask(() => {
+      if (current.controller.signal.aborted) return;
+      setHistory(empty); setHasMore(false); setNotice(""); setReadyFor(null); setLoading(false);
+      if (current.owner) void load();
+    });
+    return () => { current.controller.abort(); current.generation++; if (scope.current === current) scope.current = null; };
+  }, [userId, load]);
 
-  async function loadMore() {
-    if (!userId || loadingRef.current || !hasMore) return;
-    loadingRef.current = true;
+  const loadMore = useCallback(async () => {
+    const current = scope.current;
+    if (!current || current.loading || current.paginating || !current.more) return;
+    current.paginating = true;
     setLoading(true);
-    const gen = generation.current;
-    const offset = offsetRef.current;
+    const gen = current.generation;
+    const offset = current.offset;
     try {
-      const page = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${offset}`);
-      if (gen !== generation.current || offsetRef.current !== offset) return;
-      offsetRef.current += page.items.length;
-      setHistory((previous) => [
-        ...previous,
-        ...page.items.filter((item) => !previous.some((old) => old.question_id === item.question_id)),
-      ]);
-      setHasMore(Boolean(page.has_more));
+      const page = await api<Page<QuestionHistory>>(`questions?limit=50&offset=${offset}`, { signal: current.controller.signal });
+      if (current !== scope.current || gen !== current.generation || current.offset !== offset) return;
+      current.offset += page.items.length;
+      current.pages++;
+      current.more = Boolean(page.has_more && page.items.length);
+      setHistory((previous) => {
+        const ids = new Set(previous.map((item) => item.question_id));
+        return [...previous, ...page.items.filter((item) => !ids.has(item.question_id))];
+      });
+      setHasMore(current.more);
     } catch (reason) {
-      if (gen === generation.current) setNotice(`加载更多问答失败：${messageOf(reason)}`);
+      if (current === scope.current && !current.controller.signal.aborted) setNotice(`加载更多问答失败：${messageOf(reason)}`);
     } finally {
-      loadingRef.current = false;
-      if (gen === generation.current) setLoading(false);
-    }
-  }
-
-  const remove = useCallback(async (questionId: string) => {
-    try {
-      await api(`questions/${questionId}`, { method: "DELETE" });
-      setHistory((previous) => previous.filter((item) => item.question_id !== questionId));
-      return true;
-    } catch (reason) {
-      setNotice(messageOf(reason));
-      return false;
+      current.paginating = false;
+      if (current === scope.current) setLoading(current.loading);
     }
   }, []);
 
   const clearNotice = useCallback(() => setNotice(""), []);
-
   const ready = Boolean(userId) && readyFor === userId;
-
-  return { history, hasMore, loading, notice, ready, load, loadMore, remove, clearNotice };
+  return useMemo(() => ({ history: ready ? history : empty, hasMore: ready && hasMore, loading: Boolean(userId) && (!ready || loading), notice: ready ? notice : "", ready, load, loadMore, clearNotice }), [history, hasMore, loading, notice, ready, userId, load, loadMore, clearNotice]);
 }

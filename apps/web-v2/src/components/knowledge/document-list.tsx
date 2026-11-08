@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { FileText, MoreHorizontal } from "lucide-react";
+import { useRef, useState } from "react";
+import { DocumentActions } from "./document-actions";
+import { acceptedFileTypes } from "@/lib/upload-rules";
+import { FileText } from "lucide-react";
 import type { Document } from "@/services/api";
 import { formatBytes, formatLabel } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -21,34 +23,21 @@ export function DocumentList({
   onRebuild: (document: Document) => void;
   onDelete: (document: Document) => Promise<void>;
 }) {
-  const [openMenu, setOpenMenu] = useState("");
   const [pending, setPending] = useState<Document | null>(null);
   const [working, setWorking] = useState(false);
   const target = useRef<Document | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!openMenu) return;
-    const close = (event: MouseEvent) => {
-      const element = event.target as HTMLElement;
-      if (!element.closest("[data-doc-menu]")) setOpenMenu("");
-    };
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [openMenu]);
-
   function pickUpdate(document: Document) {
-    setOpenMenu("");
     target.current = document;
     fileInput.current?.click();
   }
 
   async function confirmDelete() {
     if (!pending) return;
+    if (working || busy) return;
     setWorking(true);
-    await onDelete(pending);
-    setWorking(false);
-    setPending(null);
+    try { await onDelete(pending); setPending(null); } finally { setWorking(false); }
   }
 
   return (
@@ -65,24 +54,7 @@ export function DocumentList({
               <StatusBadge status={document.status} />
               {document.status === "FAILED" && <small>可尝试重建索引</small>}
             </span>
-            <div className={styles.docMenu} data-doc-menu>
-              <button
-                aria-label={`${document.original_name} 操作`}
-                aria-expanded={openMenu === document.id}
-                onClick={() => setOpenMenu(openMenu === document.id ? "" : document.id)}
-              >
-                <MoreHorizontal size={17} />
-              </button>
-              {openMenu === document.id && (
-                <div role="menu" className={styles.docMenuPanel}>
-                  <button role="menuitem" onClick={() => pickUpdate(document)}>更新资料</button>
-                  <button role="menuitem" onClick={() => { setOpenMenu(""); onRebuild(document); }}>重建索引</button>
-                  <button role="menuitem" className={styles.dangerItem} onClick={() => { setOpenMenu(""); setPending(document); }}>
-                    删除资料
-                  </button>
-                </div>
-              )}
-            </div>
+            <DocumentActions document={document} busy={busy} onUpdate={pickUpdate} onRebuild={onRebuild} onDelete={setPending} />
           </article>
         ))}
         {!documents.length && (
@@ -96,10 +68,11 @@ export function DocumentList({
       <input
         ref={fileInput}
         type="file"
-        accept=".txt,.md,.pdf"
+        accept={acceptedFileTypes}
+        aria-label="选择更新资料"
         hidden
         onChange={(event) => {
-          onUpdate(event.target.files?.[0], target.current as Document);
+          if (target.current && event.target.files?.[0]) onUpdate(event.target.files[0], target.current);
           event.currentTarget.value = "";
         }}
       />

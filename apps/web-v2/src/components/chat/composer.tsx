@@ -2,11 +2,15 @@
 
 import type { FormEvent, KeyboardEvent } from "react";
 import { ArrowUp, Square } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useDocumentsContext, useKnowledgeContext, useStreamControls } from "@/components/workspace/workspace-provider";
+import { useDraft } from "@/components/store";
 import styles from "./chat.module.css";
 
 export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
-  const { draft, setDraft, stream, readyDocuments, knowledge } = useWorkspaceDataContext();
+  const { draft, setDraft } = useDraft();
+  const stream = useStreamControls();
+  const knowledge = useKnowledgeContext();
+  const { readyDocuments } = useDocumentsContext();
   const ready = readyDocuments.length > 0 && Boolean(knowledge.selectedBase);
   const placeholder = ready
     ? "例如：这个接口有哪些必填字段？"

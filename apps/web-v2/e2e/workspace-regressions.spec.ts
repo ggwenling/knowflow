@@ -77,10 +77,11 @@ test("switching accounts never shows the previous account's knowledge bases", as
     state.__watchLeaks = true;
   });
 
-  // Delay account B's payload so the loading gate has to cover the whole switch.
+  // The shell may render before B's lists, but must never expose A's payload.
   baseDelay = 1200;
   await signIn(page, accountB.email);
-  await expect(page.getByText("正在准备你的工作区…")).toBeVisible();
+  await expect(page.locator("main#main-content")).toBeVisible();
+  await expect(page.getByText("账户 A 的知识库")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "账户 B 的知识库", exact: true })).toBeVisible();
   await expect(page.getByText("账户 A 的知识库")).toHaveCount(0);
   const leaks = await page.evaluate(() => (window as Window & { __leakCount?: number }).__leakCount ?? 0);

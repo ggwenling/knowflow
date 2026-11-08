@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ArrowRight, Folder, Home, Layers, MessageSquare, Settings, Workflow } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useSessionContext, useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
 import { questionStatusLabel } from "@/lib/format";
 import styles from "./app-shell.module.css";
 
@@ -20,8 +20,11 @@ const navItems = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, knowledge, questions } = useWorkspaceDataContext();
+  const session = useSessionContext();
+  const knowledge = useKnowledgeContext();
+  const questions = useQuestionsContext();
   const [name, setName] = useState("");
+  const [recentLimit, setRecentLimit] = useState(5);
   const inputRef = useRef<HTMLInputElement>(null);
   const accountRef = useRef<HTMLDetailsElement>(null);
   const isChat = pathname.startsWith("/conversations");
@@ -52,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     void session.signOut();
   }
 
-  const recent = questions.history.slice(0, 5);
+  const recent = questions.history.slice(0, recentLimit);
 
   return (
     <div className={styles.shell}>
@@ -115,6 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={base.id}
                 className={knowledge.selectedBase === base.id ? `${styles.baseItem} ${styles.baseActive}` : styles.baseItem}
                 href={`/knowledge-bases/${base.id}`}
+                prefetch={false}
               >
                 <Folder size={15} strokeWidth={1.6} aria-hidden="true" />
                 <span>{base.name}</span>
@@ -156,14 +160,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                     key={item.question_id}
                     className={styles.historyItem}
                     href={`/conversations/${item.question_id}`}
+                    prefetch={false}
                   >
                     <span>{item.question}</span>
                     <small>{questionStatusLabel(item.status)}</small>
                   </Link>
                 ))}
                 {!recent.length && <p className={styles.emptyHint}>还没有问答记录。</p>}
-                {questions.hasMore && (
-                  <button className={styles.moreButton} onClick={() => void questions.loadMore()} disabled={questions.loading}>
+                {(questions.hasMore || recentLimit < questions.history.length) && (
+                  <button className={styles.moreButton} onClick={() => { setRecentLimit((limit) => limit + 50); if (recentLimit + 50 > questions.history.length) void questions.loadMore(); }} disabled={questions.loading}>
                     加载更多问答
                   </button>
                 )}

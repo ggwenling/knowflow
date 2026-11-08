@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import styles from "./chat.module.css";
+import { sliceCodePoints } from "@/lib/text-range";
 
 type SourceWithState = Source & { state?: "AVAILABLE" | "DOCUMENT_DELETED" | "VERSION_EXPIRED" };
 type Preview =
@@ -51,6 +52,7 @@ export function SourceDialog({
     if (!open || !source) return;
     const controller = new AbortController();
     let active = true;
+    let objectUrl: string | undefined;
 
     (async () => {
       await Promise.resolve();
@@ -69,25 +71,32 @@ export function SourceDialog({
           setPreview({ kind: "unavailable", message: "来源版本已失效，请返回历史记录确认。" });
           return;
         }
+        const filePath = `documents/${encodeURIComponent(source.document_id)}/contents/${encodeURIComponent(source.content_version_id)}/file`;
+        // The frozen source locator identifies the historical version's format.
+        // PDF goes straight to the native viewer, preserving its Range requests.
+        if (source.locator?.kind === "pdf_page" || current.locator?.kind === "pdf_page") {
+          setPreview({ kind: "pdf", url: `/api/v1/${filePath}#page=${page}` });
+          return;
+        }
         const response = await apiFetch(
-          `documents/${source.document_id}/contents/${source.content_version_id}/file`,
+          filePath,
           { credentials: "same-origin", cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) throw Object.assign(new Error(), { status: response.status });
         const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
         if (contentType === "application/pdf") {
+          // Legacy/missing locators still use the one response already fetched.
+          const blob = await response.blob();
           if (!active) return;
-          setPreview({
-            kind: "pdf",
-            url: `/api/v1/documents/${source.document_id}/contents/${source.content_version_id}/file#page=${page}`,
-          });
+          objectUrl = URL.createObjectURL(blob);
+          setPreview({ kind: "pdf", url: `${objectUrl}#page=${page}` });
           return;
         }
         const text = await response.text();
         if (!active) return;
         const start = source.locator?.start;
         const end = source.locator?.end;
-        const excerpt = start != null && end != null ? Array.from(text).slice(start, end).join("") : source.quote;
+        const excerpt = start != null && end != null ? sliceCodePoints(text, start, end) : source.quote;
         setPreview({ kind: "text", text: excerpt || source.quote || "未提供定位内容。" });
       } catch (error) {
         if (active) setPreview({ kind: "error", message: errorMessage(error) });
@@ -97,6 +106,7 @@ export function SourceDialog({
     return () => {
       active = false;
       controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [open, source, page, sourceKey]);
 
@@ -127,7 +137,10 @@ export function SourceDialog({
         {preview.kind === "error" && <p className={styles.sourceFeedback} role="alert">{preview.message}</p>}
         {preview.kind === "text" && <pre className={styles.sourcePre}>{preview.text}</pre>}
         {preview.kind === "pdf" && (
-          <iframe className={styles.sourceFrame} tabIndex={-1} title={`${documentName} PDF 原文`} src={preview.url} />
+          <>
+            <a className={styles.docsLink} href={preview.url} target="_blank" rel="noopener noreferrer">在新窗口打开 PDF 原文</a>
+            <iframe className={styles.sourceFrame} title={`${documentName} PDF 原文`} src={preview.url} />
+          </>
         )}
       </DialogContent>
     </Dialog>

@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useSessionContext, useKnowledgeContext } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import styles from "./settings.module.css";
 
 export function SettingsView() {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const { session, knowledge } = useWorkspaceDataContext();
+  const session = useSessionContext();
+  const knowledge = useKnowledgeContext();
   const [mode, setMode] = useState("unknown");
 
   useEffect(() => {

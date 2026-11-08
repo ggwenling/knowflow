@@ -8,6 +8,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import styles from "./auth-view.module.css";
+import { DeferredVisual } from "@/components/ui/deferred-visual";
 
 const Ribbon = dynamic(() => import("@/components/login-ribbon"), { ssr: false });
 
@@ -46,7 +47,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   return (
     <main className={styles.page} lang="en">
       <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
-        <Ribbon />
+        <DeferredVisual><Ribbon /></DeferredVisual>
       </div>
       <motion.section
         className={styles.content}

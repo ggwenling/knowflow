@@ -17,12 +17,16 @@
 }
 
 .ready {
-  color: var(--success);
+  color: var(--success-ink);
 }
 
+.ready .dot { background: var(--success); }
+
 .working {
-  color: var(--warning);
+  color: var(--warning-ink);
 }
+
+.working .dot { background: var(--warning); }
 
 .failed {
   color: var(--danger);

@@ -3,9 +3,11 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowRight, Bell, Sparkles } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useEffect, useRef, useState } from "react";
+import { Bell } from "lucide-react";
+import { HomeComposer } from "./home-composer";
+import { DeferredVisual } from "@/components/ui/deferred-visual";
+import { useSessionContext, useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { ShortcutGrid } from "./shortcut-grid";
 import { RecentPanels } from "./recent-panels";
@@ -34,22 +36,17 @@ function ModelNotice() {
 export function HomeView() {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const { session, knowledge, documents, questions, stream, readyDocuments, draft, setDraft, clearDraft } = useWorkspaceDataContext();
+  const session = useSessionContext();
+  const knowledge = useKnowledgeContext();
+  const documents = useDocumentsContext();
+  const questions = useQuestionsContext();
+  const stream = useStreamControls();
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState("");
 
   const docCount = knowledge.selectedBase && !documents.refreshing && !documents.hasMore
     ? documents.documents.length
     : undefined;
-
-  function ask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const question = draft.trim();
-    if (!question || !knowledge.selectedBase || !readyDocuments.length || stream.busy) return;
-    clearDraft();
-    router.push("/conversations");
-    void stream.ask(question, knowledge.selectedBase);
-  }
 
   const uploadHref = knowledge.selectedBase
     ? `/knowledge-bases/${knowledge.selectedBase}`
@@ -70,7 +67,7 @@ export function HomeView() {
     >
       <div className={styles.wave} aria-hidden="true">
         <div className={`home-art ${styles.art}`}>
-          <Wave />
+          <DeferredVisual><Wave /></DeferredVisual>
         </div>
       </div>
 
@@ -88,26 +85,7 @@ export function HomeView() {
         <p className={styles.eyebrow}>Retrieval-augmented workspace</p>
         <h1 id="home-title">KnowFlow</h1>
         <p className={styles.lead}>基于 RAG 的智能知识管理与问答系统</p>
-        <form className={styles.ask} onSubmit={ask}>
-          <Sparkles size={22} strokeWidth={1.5} aria-hidden="true" />
-          <input
-            ref={inputRef}
-            name="question"
-            aria-label="向知识库提问"
-            autoComplete="off"
-            value={draft}
-            maxLength={4000}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="向你的知识库提问…"
-          />
-          <button
-            aria-label="提问"
-            disabled={!draft.trim() || !readyDocuments.length || stream.busy}
-            title={stream.busy ? "正在生成回答" : !readyDocuments.length ? "请先上传文档，等待索引就绪后提问" : "发送问题"}
-          >
-            <ArrowRight size={21} strokeWidth={1.8} />
-          </button>
-        </form>
+        <HomeComposer inputRef={inputRef} />
         {knowledge.bases.length > 1 && (
           <label className={styles.scope}>
             提问知识库

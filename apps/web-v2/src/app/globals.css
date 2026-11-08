@@ -6,13 +6,15 @@
   --bg-muted: #f5f5f5;
   --ink: #111111;
   --ink-2: #666666;
-  --ink-3: #8c8c8c;
+  --ink-3: #737373;
   --line: #eaeaea;
   --line-strong: #d5d5d5;
   --accent: #5c7a8f;
   --accent-soft: #f2f6f8;
   --success: #5f8a73;
   --warning: #b0804a;
+  --success-ink: #476a56;
+  --warning-ink: #806039;
   --danger: #a05a50;
   --danger-soft: #fbf4f2;
 
@@ -33,13 +35,12 @@
   --sidebar: 248px;
   --content-max: 1280px;
 
-  --font-sans: "DM Sans", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
-  --font-serif: "DM Serif Display", Georgia, "Songti SC", serif;
+  --font-sans: var(--font-dm-sans, "DM Sans"), "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  --font-serif: var(--font-dm-serif, "DM Serif Display"), Georgia, "Songti SC", serif;
 
   --background: #ffffff;
   --foreground: #111111;
   --border: #eaeaea;
-  --radius: 0.875rem;
 }
 
 @theme inline {

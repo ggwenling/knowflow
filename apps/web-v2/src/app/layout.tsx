@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource/dm-sans/latin-400.css";
-import "@fontsource/dm-sans/latin-700.css";
-import "@fontsource/dm-serif-display/latin-400.css";
+import { sans, serif } from "./fonts";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
@@ -34,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className={`${sans.variable} ${serif.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>

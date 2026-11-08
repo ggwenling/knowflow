@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, apiFetch, streamQuestion, type QuestionDetail, type Source } from "@/services/api";
 import { messageOf } from "@/lib/format";
+import { preloadMarkdown } from "@/components/chat/load-markdown";
+import { reportPerformance } from "@/lib/performance";
 
 export function useQuestionStream(onSettled: () => void) {
   const [answer, setAnswer] = useState<QuestionDetail | null>(null);
@@ -47,6 +49,7 @@ export function useQuestionStream(onSettled: () => void) {
   }, []);
 
   useEffect(() => () => {
+    view.current++;
     controller.current?.abort();
     if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
   }, []);
@@ -55,6 +58,8 @@ export function useQuestionStream(onSettled: () => void) {
     const text = question.trim();
     if (!text || !knowledgeBaseId) return false;
     const viewId = ++view.current;
+    const startedAt = performance.now();
+    let firstDelta = true;
     const isCurrent = () => view.current === viewId;
     stop();
     const abort = new AbortController();
@@ -81,10 +86,12 @@ export function useQuestionStream(onSettled: () => void) {
         body: JSON.stringify({ question: text }),
       });
       if (!isCurrent()) return false;
+      if (response.ok) preloadMarkdown();
       await streamQuestion(
         response,
         (delta) => {
           if (!isCurrent()) return;
+          if (firstDelta) { reportPerformance("question_first_delta_ms", performance.now() - startedAt); firstDelta = false; }
           buffer.current += delta;
           if (flushTimer.current === null) {
             flushTimer.current = window.setTimeout(() => {
@@ -102,6 +109,7 @@ export function useQuestionStream(onSettled: () => void) {
       if (!isCurrent()) return false;
       flush();
       setAnswer((old) => (old ? { ...old, status: "SUCCEEDED", finished_at: new Date().toISOString() } : old));
+      reportPerformance("question_duration_ms", performance.now() - startedAt, "ms", "ok");
       settled.current();
       return true;
     } catch (reason) {
@@ -116,6 +124,7 @@ export function useQuestionStream(onSettled: () => void) {
         sources: [],
       } : old));
       if (!cancelled) setNotice(messageOf(reason));
+      reportPerformance("question_duration_ms", performance.now() - startedAt, "ms", cancelled ? "cancelled" : "failed");
       settled.current();
       return false;
     } finally {
@@ -135,9 +144,13 @@ export function useQuestionStream(onSettled: () => void) {
     const viewId = ++view.current;
     // Switching to a stored question ends any in-flight generation and clears busy.
     stop();
+    const abort = new AbortController();
+    controller.current = abort;
+    setAnswer(null);
     setNotice("");
+    preloadMarkdown();
     try {
-      const detail = await api<QuestionDetail>(`questions/${encodeURIComponent(questionId)}`);
+      const detail = await api<QuestionDetail>(`questions/${encodeURIComponent(questionId)}`, { signal: abort.signal });
       if (view.current !== viewId) return null;
       setAnswer(detail);
       return detail;
@@ -158,19 +171,22 @@ export function useQuestionStream(onSettled: () => void) {
   }, [stop]);
 
   const remove = useCallback(async (questionId: string) => {
+    const viewId = view.current;
     try {
-      await api(`questions/${questionId}`, { method: "DELETE" });
+      await api(`questions/${encodeURIComponent(questionId)}`, { method: "DELETE" });
+      if (view.current !== viewId) return false;
       if (answerId.current === questionId) stop();
       setAnswer((old) => (old?.question_id === questionId ? null : old));
       settled.current();
       return true;
     } catch (reason) {
-      setNotice(messageOf(reason));
+      if (view.current === viewId) setNotice(messageOf(reason));
       return false;
     }
   }, [stop]);
 
   const clearNotice = useCallback(() => setNotice(""), []);
 
-  return { answer, busy, notice, ask, cancel, load, reset, remove, clearNotice };
+  const controls = useMemo(() => ({ busy, notice, ask, cancel, load, reset, remove, clearNotice }), [busy, notice, ask, cancel, load, reset, remove, clearNotice]);
+  return useMemo(() => ({ answer, ...controls, controls }), [answer, controls]);
 }

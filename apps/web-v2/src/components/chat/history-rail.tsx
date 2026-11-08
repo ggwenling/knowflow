@@ -65,6 +65,7 @@ export function HistoryRail({ items, loading, hasMore, activeId, onLoadMore, onN
                 key={item.question_id}
                 className={activeId === item.question_id ? `${styles.historyButton} ${styles.historyActive}` : styles.historyButton}
                 href={`/conversations/${item.question_id}`}
+                prefetch={false}
                 onClick={onNavigate}
               >
                 <span>{item.question}</span>
@@ -73,7 +74,8 @@ export function HistoryRail({ items, loading, hasMore, activeId, onLoadMore, onN
             ))}
           </Fragment>
         ))}
-        {hasMore && !query ? (
+        {hasMore && query ? <p className={styles.railEmpty} role="status">正在搜索已加载的记录，可加载更多继续查找。</p> : null}
+        {hasMore ? (
           <button className={styles.loadMore} onClick={onLoadMore} disabled={loading}>
             加载更多问答
           </button>

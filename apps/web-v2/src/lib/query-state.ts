@@ -16,13 +16,18 @@ export function useQueryState(key: string, fallback = "", debounce = 0) {
   const timer = useRef<number | null>(null);
 
   useEffect(() => {
-    queueMicrotask(() => setValue(urlValue));
-  }, [urlValue]);
+    // Back/forward and external URL changes invalidate an uncommitted edit.
+    if (timer.current !== null) { window.clearTimeout(timer.current); timer.current = null; }
+    let active = true;
+    queueMicrotask(() => { if (active) setValue(urlValue); });
+    return () => { active = false; };
+  }, [urlValue, pathname]);
 
   const update = useCallback((next: string) => {
     setValue(next);
     if (timer.current !== null) window.clearTimeout(timer.current);
     const commit = () => {
+      timer.current = null;
       const search = new URLSearchParams(window.location.search);
       if (next) search.set(key, next);
       else search.delete(key);

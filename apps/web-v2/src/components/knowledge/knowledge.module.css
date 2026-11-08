@@ -91,6 +91,8 @@
 }
 
 .baseCard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
   position: relative;
   display: flex;
   min-width: 0;
@@ -370,6 +372,8 @@
 }
 
 .docCard {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -452,9 +456,6 @@
 }
 
 .docMenuPanel {
-  position: absolute;
-  top: 28px;
-  right: 0;
   z-index: 12;
   display: grid;
   min-width: 132px;
@@ -475,7 +476,8 @@
   text-align: left;
 }
 
-.docMenuPanel button:hover {
+.docMenuPanel button:hover,
+.docMenuPanel button[data-highlighted] {
   background: var(--bg-muted);
   color: var(--ink);
 }

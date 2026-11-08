@@ -9,10 +9,11 @@ import { ArrowLeft, FileText, Layers } from "lucide-react";
 import { api, type Document, type KnowledgeBase } from "@/services/api";
 import { messageOf } from "@/lib/format";
 import { useQueryState } from "@/lib/query-state";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useKnowledgeContext, useDocumentsContext } from "@/components/workspace/workspace-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { UploadZone } from "./upload-zone";
+import { FilePicker } from "@/components/ui/file-picker";
 import { DocumentList } from "./document-list";
 import styles from "./knowledge.module.css";
 
@@ -36,25 +37,29 @@ export function BaseDetailView() {
   const params = useParams<{ baseId: string }>();
   const baseId = params?.baseId ?? "";
   const reduce = useReducedMotion();
-  const { knowledge, documents } = useWorkspaceDataContext();
+  const knowledge = useKnowledgeContext();
+  const documents = useDocumentsContext();
   const [remote, setRemote] = useState<KnowledgeBase | null>(null);
   const [error, setError] = useState("");
   const [statusParam, setStatus] = useQueryState("status", "all");
   const filter: Filter = filters.some((item) => item.key === statusParam) ? statusParam as Filter : "all";
   const selected = useRef("");
+  const selectBase = knowledge.selectBase;
 
   useEffect(() => {
     if (!baseId) return;
     if (selected.current !== baseId) {
       selected.current = baseId;
-      knowledge.selectBase(baseId);
+      selectBase(baseId);
     }
     let active = true;
+    const controller = new AbortController();
     void (async () => {
       await Promise.resolve();
+      if (!active) return;
       setError("");
       try {
-        const base = await api<KnowledgeBase>(`knowledge-bases/${encodeURIComponent(baseId)}`);
+        const base = await api<KnowledgeBase>(`knowledge-bases/${encodeURIComponent(baseId)}`, { signal: controller.signal });
         if (active) setRemote(base);
       } catch (reason) {
         if (active) setError(messageOf(reason));
@@ -62,12 +67,11 @@ export function BaseDetailView() {
     })();
     return () => {
       active = false;
+      controller.abort();
     };
-    // knowledge.selectBase is stable; re-running on the whole context would refetch on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseId]);
+  }, [baseId, selectBase]);
 
-  const base = knowledge.bases.find((item) => item.id === baseId) ?? remote;
+  const base = knowledge.bases.find((item) => item.id === baseId) ?? (remote?.id === baseId ? remote : null);
   const readyCount = documents.documents.filter((document) => document.status === "READY").length;
   const visible = useMemo(() => documents.documents.filter((document) => matches(document, filter)), [documents.documents, filter]);
 
@@ -75,8 +79,8 @@ export function BaseDetailView() {
     if (!file) return;
     const outcome = await documents.upload(file, target);
     if (outcome === "stale") return;
-    if (outcome === "ok") {
-      toast.success(target ? "已提交更新，索引完成后生效" : "已上传，正在建立索引");
+    if (outcome === "accepted") {
+      toast.success(target ? "已接受更新，索引状态见资料列表" : "文件已接受，索引状态见资料列表");
     } else {
       toast.error("上传未能完成，请检查文件后重试。");
     }
@@ -175,7 +179,7 @@ export function BaseDetailView() {
                 : "上传第一份资料，等待索引显示“已就绪”后即可提问。支持 TXT、Markdown 与可读取文本的 PDF。"}
               action={documents.documents.length
                 ? undefined
-                : <label className={styles.emptyUpload}>选择文件<input type="file" accept=".txt,.md,.pdf" disabled={!baseId || documents.working} onChange={(event) => { void upload(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>}
+                : <FilePicker label="选择文件" className={styles.emptyUpload} disabled={!baseId || documents.working} onPick={(file) => void upload(file)} /> }
             />
           )}
 

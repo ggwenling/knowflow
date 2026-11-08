@@ -36,7 +36,7 @@ export function ConfirmDialog({
             </Primitive.Cancel>
             <Primitive.Action
               className={`${buttonStyles.button} ${buttonStyles.danger} ${buttonStyles.sm}`}
-              onClick={onConfirm}
+              onClick={(event) => { event.preventDefault(); if (!busy) onConfirm(); }}
               disabled={busy}
             >
               {confirmLabel}

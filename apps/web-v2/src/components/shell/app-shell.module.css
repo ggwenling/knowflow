@@ -183,6 +183,8 @@
 }
 
 .baseItem {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 33px;
   display: flex;
   min-width: 0;
   min-height: 33px;

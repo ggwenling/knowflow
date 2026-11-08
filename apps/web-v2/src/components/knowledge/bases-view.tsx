@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowRight, Folder, Plus, Search, Trash2 } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -19,7 +19,8 @@ import styles from "./knowledge.module.css";
 export function BasesView() {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const { knowledge, questions } = useWorkspaceDataContext();
+  const knowledge = useKnowledgeContext();
+  const questions = useQuestionsContext();
   const [query, setQuery] = useQueryState("q", "", 200);
   const [pending, setPending] = useState<KnowledgeBase | null>(null);
 
@@ -91,7 +92,7 @@ export function BasesView() {
         <div className={styles.baseGrid}>
           {filtered.map((base) => (
             <article className={styles.baseCard} key={base.id}>
-              <Link className={styles.baseCardLink} href={`/knowledge-bases/${base.id}`}>
+              <Link className={styles.baseCardLink} href={`/knowledge-bases/${base.id}`} prefetch={false}>
                 <span className={styles.baseCardIcon}>
                   <Folder size={19} strokeWidth={1.5} aria-hidden="true" />
                 </span>

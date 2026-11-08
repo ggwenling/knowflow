@@ -1,256 +1,251 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type Document, type Page, type Task } from "@/services/api";
 import { messageOf } from "@/lib/format";
+import { uploadError } from "@/lib/upload-rules";
+import { RequestScope, abortableDelay, waitUntilVisible } from "@/lib/request-scope";
+import { reportPerformance } from "@/lib/performance";
 
 const terminal = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
-const maxUploadBytes = 8 * 1024 * 1024;
+const emptyDocuments: Document[] = [];
+type Outcome = "ok" | "failed" | "stale";
+type State = { identity: string; documents: Document[]; hasMore: boolean; refreshing: boolean; loadingMore: boolean; working: boolean; notice: string };
+type Scope = {
+  identity: string; base: string; requests: RequestScope; offset: number; pages: number; sequence: number;
+  refreshing: boolean; morePending: boolean; work: symbol | null; refreshTimer: ReturnType<typeof setTimeout> | null;
+  polls: Map<string, { documentId: string; controller: AbortController }>; finished: Set<string>; indexStarts: Map<string, number>;
+};
+const initial: State = { identity: "", documents: emptyDocuments, hasMore: false, refreshing: false, loadingMore: false, working: false, notice: "" };
+
+function reconcile(previous: Document[], next: Document[]) {
+  const old = new Map(previous.map((item) => [item.id, item]));
+  const result = next.map((item) => {
+    const before = old.get(item.id);
+    return before && Object.keys({ ...before, ...item }).every((key) => before[key as keyof Document] === item[key as keyof Document]) ? before : item;
+  });
+  return result.length === previous.length && result.every((item, i) => item === previous[i]) ? previous : result;
+}
 
 export function useDocuments(baseId: string, ownerId?: string) {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [working, setWorking] = useState(false);
-  const [notice, setNotice] = useState("");
-  const generation = useRef(0);
-  const baseRef = useRef(baseId);
-  const ownerRef = useRef(ownerId);
-  const offsetRef = useRef(0);
-  const refreshSeq = useRef(0);
-  const loadingMoreRef = useRef(false);
-  const polling = useRef(new Set<string>());
-  const workToken = useRef<symbol | null>(null);
+  const identity = ownerId && baseId ? `${ownerId}:${baseId}` : "";
+  const [state, setState] = useState<State>(initial);
+  const active = useRef<Scope | null>(null);
+  const current = useCallback((scope: Scope) => active.current === scope && !scope.requests.signal.aborted, []);
+  const patch = useCallback((scope: Scope, update: Partial<State> | ((old: State) => Partial<State>)) => {
+    if (!current(scope)) return;
+    setState((old) => {
+      if (old.identity !== scope.identity) return old;
+      const changes = typeof update === "function" ? update(old) : update;
+      if ((Object.keys(changes) as Array<keyof State>).every((key) => Object.is(old[key], changes[key]))) return old;
+      return { ...old, ...changes };
+    });
+  }, [current]);
 
-  const clearNotice = useCallback(() => setNotice(""), []);
-
-  // Only the newest operation may clear the shared busy flag, so a request left
-  // over from another knowledge base can never re-enable controls mid-operation.
-  const beginWork = useCallback(() => {
-    const token = Symbol("documents-work");
-    workToken.current = token;
-    setWorking(true);
-    return token;
-  }, []);
-
-  const endWork = useCallback((token: symbol) => {
-    if (workToken.current !== token) return;
-    workToken.current = null;
-    setWorking(false);
-  }, []);
-
-  async function refresh(id = baseRef.current) {
-    if (!id) {
-      setDocuments([]);
-      setHasMore(false);
-      return [];
-    }
-    const gen = generation.current;
-    const seq = ++refreshSeq.current;
-    setRefreshing(true);
+  const refresh = useCallback(async (id?: string): Promise<Document[]> => {
+    const scope = active.current;
+    if (!scope || !current(scope) || id && id !== scope.base) return [];
+    const sequence = ++scope.sequence;
+    scope.refreshing = true;
+    patch(scope, { refreshing: true });
     try {
-      const page = await api<Page<Document>>(`knowledge-bases/${id}/documents?limit=50&offset=0`);
-      if (gen !== generation.current || seq !== refreshSeq.current || baseRef.current !== id) return [];
-      setDocuments(page.items);
-      offsetRef.current = page.items.length;
-      setHasMore(Boolean(page.has_more));
-      for (const document of page.items) void poll(document, gen, id);
-      return page.items;
-    } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
-      return [];
-    } finally {
-      if (seq === refreshSeq.current) setRefreshing(false);
-    }
-  }
-
-  async function poll(document: Document, gen: number, ownerBase: string) {
-    const taskId = document.latest_task_id;
-    if (!taskId || terminal.has((document.latest_task_status ?? "").toUpperCase())) return;
-    const key = `${gen}:${taskId}`;
-    if (polling.current.has(key)) return;
-    polling.current.add(key);
-    let wait = 1500;
-    try {
-      for (;;) {
-        if (gen !== generation.current || baseRef.current !== ownerBase) return;
-        const [next, task] = await Promise.all([
-          api<Document>(`documents/${document.id}`),
-          api<Task>(`tasks/${taskId}`),
-        ]);
-        if (gen !== generation.current || baseRef.current !== ownerBase) return;
-        setDocuments((previous) => previous.map((item) => (item.id === next.id ? next : item)));
-        if (terminal.has(task.status.toUpperCase())) {
-          await refresh(ownerBase);
-          if (task.status.toUpperCase() !== "SUCCEEDED") {
-            setNotice(task.failure_code ?? "索引未能完成；可以检查状态后重建。");
-          }
-          return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, wait));
-        wait = Math.min(Math.round(wait * 1.35), 4000);
+      const items: Document[] = [];
+      let offset = 0;
+      let more = false;
+      // Revalidate the loaded range, not just page one. Preserve the user's pagination.
+      for (let pageNumber = 0; pageNumber < scope.pages; pageNumber++) {
+        if (!current(scope) || sequence !== scope.sequence) return [];
+        const page = await scope.requests.run(() => api<Page<Document>>(`knowledge-bases/${encodeURIComponent(scope.base)}/documents?limit=50&offset=${offset}`, { signal: scope.requests.signal }));
+        if (!current(scope) || sequence !== scope.sequence) return [];
+        items.push(...page.items);
+        offset += page.items.length;
+        more = Boolean(page.has_more && page.items.length);
+        if (!more) break;
       }
+      scope.offset = offset;
+      patch(scope, (old) => ({ documents: reconcile(old.documents, items), hasMore: more }));
+      for (const document of items) startPoll(scope, document);
+      return items;
     } catch (reason) {
-      if (gen === generation.current && baseRef.current === ownerBase) setNotice(messageOf(reason));
+      if (sequence === scope.sequence && !scope.requests.signal.aborted) patch(scope, { notice: messageOf(reason) });
+      return [];
     } finally {
-      polling.current.delete(key);
+      if (current(scope) && sequence === scope.sequence) { scope.refreshing = false; patch(scope, { refreshing: false }); }
     }
+  // Polling only closes over the stable scope helpers and refresh itself.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, patch]);
+
+  function startPoll(scope: Scope, document: Document): void {
+    const taskId = document.latest_task_id;
+    if (!taskId || terminal.has((document.latest_task_status ?? "").toUpperCase()) || scope.finished.has(taskId) || scope.polls.has(taskId) || !current(scope)) return;
+    const controller = new AbortController();
+    const signal = AbortSignal.any([scope.requests.signal, controller.signal]);
+    scope.polls.set(taskId, { documentId: document.id, controller });
+    void (async () => {
+      let wait = 1500;
+      let failures = 0;
+      try {
+        while (!signal.aborted && current(scope)) {
+          await waitUntilVisible(signal);
+          try {
+            const results: [Document, Task] = await Promise.all([
+              scope.requests.run<Document>(async (): Promise<Document> => { await waitUntilVisible(signal); return api<Document>(`documents/${encodeURIComponent(document.id)}`, { signal }); }, signal),
+              scope.requests.run<Task>(async (): Promise<Task> => { await waitUntilVisible(signal); return api<Task>(`tasks/${encodeURIComponent(taskId)}`, { signal }); }, signal),
+            ]);
+            const next: Document = results[0];
+            const task: Task = results[1];
+            if (signal.aborted || !current(scope)) return;
+            failures = 0;
+            patch(scope, (old) => ({ documents: reconcile(old.documents, old.documents.map((item) => item.id === next.id ? next : item)) }));
+            if (next.latest_task_id && next.latest_task_id !== taskId) { startPoll(scope, next); return; }
+            if (terminal.has(task.status.toUpperCase())) {
+              scope.finished.add(taskId);
+              const acceptedAt = scope.indexStarts.get(taskId);
+              if (acceptedAt !== undefined) { reportPerformance("index_wait_ms", performance.now() - acceptedAt, "ms", task.status.toUpperCase() === "SUCCEEDED" ? "ok" : "failed"); scope.indexStarts.delete(taskId); }
+              if (task.status.toUpperCase() !== "SUCCEEDED") patch(scope, { notice: `索引未能完成：${task.failure_code ?? "请检查资料后重建。"}` });
+              // Many tasks finishing together trigger one revalidation of the loaded range.
+              if (scope.refreshTimer === null) scope.refreshTimer = setTimeout(() => {
+                scope.refreshTimer = null;
+                if (current(scope)) void refresh(scope.base);
+              }, 100);
+              return;
+            }
+          } catch (reason) {
+            if (signal.aborted) return;
+            failures++;
+            if (failures >= 3) { patch(scope, { notice: `状态同步失败：${messageOf(reason)} 请刷新后重试。` }); return; }
+          }
+          await abortableDelay(Math.round(wait * (.9 + Math.random() * .2)), signal);
+          wait = Math.min(Math.round(wait * 1.35), 4000);
+        }
+      } catch (reason) { if (!signal.aborted) patch(scope, { notice: messageOf(reason) }); }
+      finally { scope.polls.delete(taskId); }
+    })();
   }
 
   useEffect(() => {
-    const ownerChanged = ownerRef.current !== ownerId;
-    ownerRef.current = ownerId;
-    baseRef.current = baseId;
-    generation.current += 1;
-    refreshSeq.current += 1;
-    offsetRef.current = 0;
-    loadingMoreRef.current = false;
-    polling.current.clear();
-    workToken.current = null;
-    void (async () => {
-      await Promise.resolve();
-      setDocuments([]);
-      setHasMore(false);
-      setNotice("");
-      setLoadingMore(false);
-      setRefreshing(false);
-      setWorking(false);
-      // The still-selected base belongs to the previous account; never query it as the new one.
-      if (baseId && !ownerChanged) await refresh(baseId);
-    })();
-    // The refresh function reads current refs; rerunning on identity change would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseId, ownerId]);
+    const scope: Scope = { identity, base: baseId, requests: new RequestScope(4), offset: 0, pages: 1, sequence: 0, refreshing: false, morePending: false, work: null, refreshTimer: null, polls: new Map(), finished: new Set(), indexStarts: new Map() };
+    active.current = scope;
+    queueMicrotask(() => {
+      if (!current(scope)) return;
+      setState({ ...initial, identity });
+      if (identity) void refresh(baseId);
+    });
+    return () => {
+      scope.requests.abort();
+      if (scope.refreshTimer !== null) clearTimeout(scope.refreshTimer);
+      scope.polls.clear();
+      if (active.current === scope) active.current = null;
+    };
+  }, [identity, baseId, current, refresh]);
 
-  async function loadMore() {
-    if (loadingMoreRef.current || refreshing || !baseRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadingMore(true);
-    const id = baseRef.current;
-    const gen = generation.current;
-    const seq = refreshSeq.current;
-    const offset = offsetRef.current;
+  const loadMore = useCallback(async () => {
+    const scope = active.current;
+    if (!scope || !scope.identity || !current(scope) || scope.morePending || scope.refreshing) return;
+    scope.morePending = true;
+    const sequence = scope.sequence;
+    const offset = scope.offset;
+    patch(scope, { loadingMore: true });
     try {
-      const page = await api<Page<Document>>(`knowledge-bases/${id}/documents?limit=50&offset=${offset}`);
-      if (gen !== generation.current || seq !== refreshSeq.current || offsetRef.current !== offset) return;
-      offsetRef.current += page.items.length;
-      setDocuments((previous) => [
-        ...previous,
-        ...page.items.filter((item) => !previous.some((old) => old.id === item.id)),
-      ]);
-      setHasMore(Boolean(page.has_more));
-      for (const document of page.items) void poll(document, gen, id);
-    } catch (reason) {
-      if (gen === generation.current) setNotice(messageOf(reason));
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadingMore(false);
-    }
-  }
+      const page = await scope.requests.run(() => api<Page<Document>>(`knowledge-bases/${encodeURIComponent(scope.base)}/documents?limit=50&offset=${offset}`, { signal: scope.requests.signal }));
+      if (!current(scope) || sequence !== scope.sequence) return;
+      scope.offset += page.items.length;
+      scope.pages++;
+      patch(scope, (old) => {
+        const ids = new Set(old.documents.map((item) => item.id));
+        return { documents: [...old.documents, ...page.items.filter((item) => !ids.has(item.id))], hasMore: Boolean(page.has_more && page.items.length) };
+      });
+      for (const document of page.items) startPoll(scope, document);
+    } catch (reason) { if (!scope.requests.signal.aborted) patch(scope, { notice: messageOf(reason) }); }
+    finally { scope.morePending = false; patch(scope, { loadingMore: false }); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, patch]);
 
-  async function upload(file: File | undefined, updateTarget?: Document): Promise<"ok" | "failed" | "stale"> {
-    if (!file || !baseRef.current) return "failed";
-    if (file.size > maxUploadBytes) {
-      setNotice("文件大小不能超过 8 MiB。");
-      return "failed";
-    }
-    const id = baseRef.current;
-    const gen = generation.current;
-    const token = beginWork();
-    setNotice("");
+  const beginWork = useCallback((scope: Scope) => {
+    if (!current(scope) || !scope.identity || scope.work) return null;
+    const token = Symbol("documents-work");
+    scope.work = token;
+    patch(scope, { working: true, notice: "" });
+    return token;
+  }, [current, patch]);
+  const endWork = useCallback((scope: Scope, token: symbol) => {
+    if (scope.work !== token) return;
+    scope.work = null;
+    patch(scope, { working: false });
+  }, [patch]);
+
+  const upload = useCallback(async (file: File | undefined, target?: Document): Promise<"accepted" | "failed" | "stale"> => {
+    const scope = active.current;
+    if (!file || !scope || !scope.identity) return "failed";
+    const error = uploadError(file);
+    if (error) { patch(scope, { notice: error }); return "failed"; }
+    const token = beginWork(scope);
+    if (!token) return "failed";
+    const startedAt = performance.now();
     try {
       const form = new FormData();
       form.set("file", file);
-      const path = updateTarget
-        ? `documents/${updateTarget.id}/contents`
-        : `knowledge-bases/${id}/documents`;
-      const accepted = await api<{ document_id: string; task_id: string }>(path, { method: "POST", body: form });
-      if (gen !== generation.current || baseRef.current !== id) return "stale";
-      const optimistic: Document = {
-        ...(updateTarget ?? {
-          id: accepted.document_id,
-          original_name: file.name,
-          format: file.name.split(".").pop() ?? "",
-          byte_size: file.size,
-        }),
-        status: "QUEUED",
-        latest_task_id: accepted.task_id,
-        latest_task_status: "QUEUED",
-      };
-      setDocuments((previous) => {
-        if (updateTarget) return previous.map((item) => (item.id === optimistic.id ? optimistic : item));
-        return [optimistic, ...previous];
-      });
-      await poll(optimistic, gen, id);
-      if (gen !== generation.current || baseRef.current !== id) return "stale";
-      return "ok";
+      const path = target ? `documents/${encodeURIComponent(target.id)}/contents` : `knowledge-bases/${encodeURIComponent(scope.base)}/documents`;
+      const accepted = await api<{ document_id: string; task_id: string }>(path, { method: "POST", body: form, signal: scope.requests.signal });
+      if (!current(scope)) return "stale";
+      reportPerformance("upload_accept_ms", performance.now() - startedAt, "ms", "ok");
+      scope.indexStarts.set(accepted.task_id, performance.now());
+      const optimistic: Document = { ...(target ?? { id: accepted.document_id, original_name: file.name, format: file.name.split(".").pop() ?? "", byte_size: file.size }), status: "QUEUED", latest_task_id: accepted.task_id, latest_task_status: "QUEUED" };
+      if (target?.latest_task_id) scope.polls.get(target.latest_task_id)?.controller.abort();
+      patch(scope, (old) => ({ documents: target ? old.documents.map((item) => item.id === target.id ? optimistic : item) : [optimistic, ...old.documents] }));
+      startPoll(scope, optimistic);
+      return "accepted";
     } catch (reason) {
-      if (gen !== generation.current) return "stale";
-      setNotice(messageOf(reason));
+      if (!current(scope)) return "stale";
+      patch(scope, { notice: messageOf(reason) });
       return "failed";
-    } finally {
-      endWork(token);
-    }
-  }
+    } finally { endWork(scope, token); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginWork, current, endWork, patch]);
 
-  async function rebuild(document: Document): Promise<"ok" | "failed" | "stale"> {
-    const id = baseRef.current;
-    if (!id) return "failed";
-    const gen = generation.current;
-    const token = beginWork();
-    setNotice("");
+  const rebuild = useCallback(async (document: Document): Promise<Outcome> => {
+    const scope = active.current;
+    if (!scope) return "failed";
+    const token = beginWork(scope);
+    if (!token) return "failed";
     try {
-      const accepted = await api<{ task_id: string }>(`documents/${document.id}/rebuilds`, {
-        method: "POST",
-        body: "{}",
-      });
-      // Another account or knowledge base owns the workspace now: drop the result silently.
-      if (gen !== generation.current || baseRef.current !== id) return "stale";
-      // Indexing continues in the background; the row status and polling reflect progress.
-      void poll({ ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" }, gen, id);
+      const accepted = await api<{ task_id: string }>(`documents/${encodeURIComponent(document.id)}/rebuilds`, { method: "POST", body: "{}", signal: scope.requests.signal });
+      if (!current(scope)) return "stale";
+      if (document.latest_task_id) scope.polls.get(document.latest_task_id)?.controller.abort();
+      const next = { ...document, latest_task_id: accepted.task_id, latest_task_status: "QUEUED" };
+      patch(scope, (old) => ({ documents: old.documents.map((item) => item.id === document.id ? next : item) }));
+      startPoll(scope, next);
       return "ok";
     } catch (reason) {
-      if (gen !== generation.current) return "stale";
-      setNotice(messageOf(reason));
+      if (!current(scope)) return "stale";
+      patch(scope, { notice: messageOf(reason) });
       return "failed";
-    } finally {
-      endWork(token);
-    }
-  }
+    } finally { endWork(scope, token); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beginWork, current, endWork, patch]);
 
-  async function remove(document: Document): Promise<"ok" | "failed" | "stale"> {
-    const id = baseRef.current;
-    const gen = generation.current;
-    const token = beginWork();
-    setNotice("");
+  const remove = useCallback(async (document: Document): Promise<Outcome> => {
+    const scope = active.current;
+    if (!scope) return "failed";
+    const token = beginWork(scope);
+    if (!token) return "failed";
     try {
-      await api(`documents/${document.id}`, { method: "DELETE" });
-      if (gen !== generation.current) return "stale";
-      setDocuments((previous) => previous.filter((item) => item.id !== document.id));
-      void refresh(id);
+      await api(`documents/${encodeURIComponent(document.id)}`, { method: "DELETE", signal: scope.requests.signal });
+      if (!current(scope)) return "stale";
+      for (const poll of scope.polls.values()) if (poll.documentId === document.id) poll.controller.abort();
+      patch(scope, (old) => ({ documents: old.documents.filter((item) => item.id !== document.id) }));
+      void refresh(scope.base);
       return "ok";
     } catch (reason) {
-      if (gen !== generation.current) return "stale";
-      setNotice(messageOf(reason));
+      if (!current(scope)) return "stale";
+      patch(scope, { notice: messageOf(reason) });
       return "failed";
-    } finally {
-      endWork(token);
-    }
-  }
+    } finally { endWork(scope, token); }
+  }, [beginWork, current, endWork, patch, refresh]);
 
-  return {
-    documents,
-    hasMore,
-    refreshing,
-    loadingMore,
-    working,
-    notice,
-    clearNotice,
-    refresh,
-    loadMore,
-    upload,
-    rebuild,
-    remove,
-  };
+  const clearNotice = useCallback(() => { const scope = active.current; if (scope) patch(scope, { notice: "" }); }, [patch]);
+  const visible = state.identity === identity ? state : initial;
+  const readyDocuments = useMemo(() => visible.documents.filter((document) => document.status === "READY" && document.active_index_version_id), [visible.documents]);
+  return useMemo(() => ({ ...visible, readyDocuments, clearNotice, refresh, loadMore, upload, rebuild, remove }), [visible, readyDocuments, clearNotice, refresh, loadMore, upload, rebuild, remove]);
 }

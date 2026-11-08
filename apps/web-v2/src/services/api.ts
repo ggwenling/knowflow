@@ -1,155 +1,45 @@
+import { reportPerformance } from "@/lib/performance";
+
 export type User = { user_id: string; email: string };
 export type KnowledgeBase = { id: string; name: string; status: string; updated_at?: string };
-export type Document = {
-  id: string;
-  original_name: string;
-  status: string;
-  format: string;
-  byte_size: number;
-  active_index_version_id?: string;
-  latest_task_id?: string;
-  latest_task_status?: string;
-  current_content_version_id?: string;
-};
-export type Source = {
-  source_id: string;
-  document_id: string;
-  content_version_id: string;
-  quote: string | null;
-  locator: { kind: string; page: number | null; start: number | null; end: number | null; unit: string | null } | null;
-};
-export type QuestionHistory = {
-  question_id: string;
-  knowledge_base_id: string;
-  question: string;
-  status: string;
-  finished_at: string | null;
-};
-export type QuestionDetail = QuestionHistory & {
-  answer: string | null;
-  has_answer: boolean | null;
-  failure_code: string | null;
-  sources: Source[];
-};
+export type Document = { id: string; original_name: string; status: string; format: string; byte_size: number; active_index_version_id?: string; latest_task_id?: string; latest_task_status?: string; current_content_version_id?: string };
+export type Source = { source_id: string; document_id: string; content_version_id: string; quote: string | null; locator: { kind: string; page: number | null; start: number | null; end: number | null; unit: string | null } | null };
+export type QuestionHistory = { question_id: string; knowledge_base_id: string; question: string; status: string; finished_at: string | null };
+export type QuestionDetail = QuestionHistory & { answer: string | null; has_answer: boolean | null; failure_code: string | null; sources: Source[] };
 export type Task = { task_id: string; status: string; failure_code: string | null };
 export type Page<T> = { items: T[]; has_more: boolean };
 export type ApiError = Error & { code?: string; status?: number };
 
+export { streamQuestion } from "./question-stream";
+
 export async function apiFetch(path: string, init: RequestInit = {}) {
-  const response = await fetch("/api/v1/" + path, { ...init, credentials: "same-origin", cache: "no-store" });
-  if (response.status === 401 && !path.startsWith("auth/") && path !== "me") {
-    window.dispatchEvent(new Event("knowflow-session-expired"));
+  const start = performance.now();
+  reportPerformance("api_request", 1, "count");
+  try {
+    const response = await fetch("/api/v1/" + path, { ...init, credentials: "same-origin", cache: "no-store" });
+    reportPerformance("api_headers_ms", performance.now() - start, "ms", response.ok ? "ok" : "failed");
+    if (response.status === 401 && !path.startsWith("auth/") && path !== "me") window.dispatchEvent(new Event("knowflow-session-expired"));
+    return response;
+  } catch (reason) {
+    reportPerformance("api_headers_ms", performance.now() - start, "ms", init.signal?.aborted ? "cancelled" : "failed");
+    throw reason;
   }
-  return response;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) {
-    headers.set("content-type", "application/json");
-  }
+  if (init.body && !(init.body instanceof FormData) && !headers.has("content-type")) headers.set("content-type", "application/json");
   const response = await apiFetch(path, { ...init, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { code?: string; message?: string } | null;
     const error = new Error(body?.message ?? `请求失败（${response.status}）`) as ApiError;
-    error.code = body?.code;
-    error.status = response.status;
+    error.code = body?.code; error.status = response.status;
     throw error;
   }
   if (response.status === 204) return undefined as T;
   return await response.json() as T;
 }
 
-export async function deleteKnowledgeBase(id: string) {
-  await api(`knowledge-bases/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-export async function streamQuestion(
-  response: Response,
-  onDelta: (value: string) => void,
-  onSources: (value: Source[], hasAnswer: boolean) => void,
-) {
-  if (!response.ok || !response.body) {
-    const error = await response.json().catch(() => null) as { code?: string; message?: string } | null;
-    throw new Error(error?.message ?? `问答请求失败（${response.status}）`);
-  }
-
-  const decoder = new TextDecoder();
-  const reader = response.body.getReader();
-  let buffered = "";
-  let sequence = 0;
-  let completed = false;
-  let started = false;
-  let sourcesReceived = false;
-  let requestId = response.headers.get("x-request-id");
-  const consume = (frame: string) => {
-    let event = "message";
-    const data: string[] = [];
-    for (const line of frame.split(/\r?\n/)) {
-      if (line.startsWith("event:")) event = line.slice(6).trim();
-      if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
-    }
-    if (!data.length) return;
-    const payload = JSON.parse(data.join("\n")) as {
-      sequence: number;
-      contract_version: string;
-      request_id: string;
-      event: string;
-      delta?: string;
-      has_answer?: boolean;
-      sources?: Source[];
-      code?: string;
-      message?: string;
-    };
-    if (!Number.isInteger(payload.sequence) || payload.sequence !== sequence + 1) {
-      throw new Error("问答事件顺序异常，请查看历史记录。");
-    }
-    sequence = payload.sequence;
-    if (typeof payload.request_id !== "string" || !payload.request_id
-        || requestId !== null && payload.request_id !== requestId) {
-      throw new Error("问答请求标识异常，请查看历史记录。");
-    }
-    requestId = payload.request_id;
-    if (completed || payload.contract_version !== "0.2.0" || payload.event !== event
-        || !["started", "delta", "sources", "completed", "error", "cancelled"].includes(event)
-        || event === "started" && started
-        || !started && event !== "started" && event !== "error"
-        || event === "delta" && (sourcesReceived || typeof payload.delta !== "string" || !payload.delta)
-        || event === "sources" && (sourcesReceived || !Array.isArray(payload.sources)
-          || typeof payload.has_answer !== "boolean" || payload.sources.length > 5
-          || payload.has_answer !== (payload.sources.length > 0))
-        || event === "completed" && !sourcesReceived) {
-      throw new Error("问答事件状态异常，请查看历史记录。");
-    }
-    if (event === "started") started = true;
-    if (event === "delta" && payload.delta) onDelta(payload.delta);
-    if (event === "sources") {
-      sourcesReceived = true;
-      onSources(payload.sources!, payload.has_answer!);
-    }
-    if (event === "cancelled") {
-      throw new DOMException(payload.message ?? "问答未能完成", "AbortError");
-    }
-    if (event === "error") {
-      throw new Error(payload.message ?? payload.code ?? "问答未能完成");
-    }
-    if (event === "completed") completed = true;
-  };
-
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      buffered += decoder.decode(value, { stream: !done });
-      const frames = buffered.split(/\r?\n\r?\n/);
-      buffered = frames.pop() ?? "";
-      for (const frame of frames) consume(frame);
-      if (done && buffered.trim()) consume(buffered);
-      if (done) buffered = "";
-      if (done || completed) break;
-    }
-    if (!completed) throw new Error("连接已中断，答案可能未完成。请查看历史记录，不会自动重发。");
-  } finally {
-    void reader.cancel().catch(() => {});
-    reader.releaseLock();
-  }
+export async function deleteKnowledgeBase(id: string, signal?: AbortSignal) {
+  await api(`knowledge-bases/${encodeURIComponent(id)}`, { method: "DELETE", signal });
 }

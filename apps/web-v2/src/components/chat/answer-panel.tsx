@@ -4,14 +4,15 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Clipboard, Sparkles, SquarePen } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useStreamContext, useDocumentsContext, useKnowledgeContext } from "@/components/workspace/workspace-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { questionStatusLabel } from "@/lib/format";
 import { CitationList } from "./citation-list";
+import { loadMarkdown } from "./load-markdown";
 import styles from "./chat.module.css";
 
-const Markdown = dynamic(() => import("./markdown-answer"), {
+const Markdown = dynamic(loadMarkdown, {
   ssr: false,
   loading: () => <span className={styles.answerLoading}>正在排版…</span>,
 });
@@ -25,9 +26,12 @@ export function AnswerPanel({
   onEditQuestion: (question: string) => void;
   onDeleted: (questionId: string) => void;
 }) {
-  const { stream, documents, knowledge } = useWorkspaceDataContext();
+  const stream = useStreamContext();
+  const documents = useDocumentsContext();
+  const knowledge = useKnowledgeContext();
   const answer = stream.answer;
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   if (!answer) {
     return (
@@ -62,9 +66,11 @@ export function AnswerPanel({
   }
 
   async function remove() {
-    if (!answer?.question_id) return;
+    if (!answer?.question_id || deleting) return;
     const questionId = answer.question_id;
+    setDeleting(true);
     const removed = await stream.remove(questionId);
+    setDeleting(false);
     setConfirmDelete(false);
     if (removed) {
       toast.success("问答记录已删除");
@@ -139,6 +145,7 @@ export function AnswerPanel({
         title="删除这条问答记录？"
         description="记录与来源快照会被移除，此操作无法撤销。原始资料不受影响。"
         onConfirm={() => void remove()}
+        busy={deleting}
       />
     </article>
   );

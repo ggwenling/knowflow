@@ -5,9 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { CircleHelp, FileText, FolderOpen, Layers, PanelLeft, PanelRight, Plus } from "lucide-react";
-import { useWorkspaceDataContext } from "@/components/workspace/workspace-provider";
+import { useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
+import { useDraftActions } from "@/components/store";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { FilePicker } from "@/components/ui/file-picker";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatBytes, formatLabel } from "@/lib/format";
 import type { Source } from "@/services/api";
@@ -18,7 +20,8 @@ import { SourceDialog } from "./source-dialog";
 import styles from "./chat.module.css";
 
 function DocumentsPanel() {
-  const { documents, knowledge } = useWorkspaceDataContext();
+  const documents = useDocumentsContext();
+  const knowledge = useKnowledgeContext();
   const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
 
   return (
@@ -28,18 +31,9 @@ function DocumentsPanel() {
           <p className={styles.eyebrow}>Documents</p>
           <h2>资料 <span>{documents.documents.length}</span></h2>
         </div>
-        <label className={styles.uploadChip} aria-label="上传资料">
+        <FilePicker label="上传资料" className={styles.uploadChip} disabled={!knowledge.selectedBase || documents.working} onPick={(file) => void documents.upload(file)}>
           <Plus size={15} aria-hidden="true" />
-          <input
-            type="file"
-            accept=".txt,.md,.pdf"
-            disabled={!knowledge.selectedBase || documents.working}
-            onChange={(event) => {
-              void documents.upload(event.target.files?.[0]);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
+        </FilePicker>
       </div>
 
       <p className={styles.docsHint}>
@@ -92,7 +86,14 @@ export function ChatView() {
   const reduce = useReducedMotion();
   const params = useParams<{ questionId?: string }>();
   const questionId = params?.questionId;
-  const { knowledge, documents, questions, stream, readyDocuments, clearDraft, setDraft } = useWorkspaceDataContext();
+  const knowledge = useKnowledgeContext();
+  const documents = useDocumentsContext();
+  const questions = useQuestionsContext();
+  const stream = useStreamControls();
+  const { readyDocuments } = documents;
+  const { clearDraft, setDraft } = useDraftActions();
+  const loadAnswer = stream.load;
+  const selectBase = knowledge.selectBase;
   const [viewing, setViewing] = useState<{ source: Source; documentName: string } | null>(null);
   const [sourceTrigger, setSourceTrigger] = useState<HTMLElement | null>(null);
   const [panel, setPanel] = useState<"history" | "docs" | null>(null);
@@ -105,10 +106,10 @@ export function ChatView() {
     }
     if (loaded.current === questionId) return;
     loaded.current = questionId;
-    void stream.load(questionId).then((detail) => {
-      if (detail) knowledge.selectBase(detail.knowledge_base_id);
+    void loadAnswer(questionId).then((detail) => {
+      if (detail) selectBase(detail.knowledge_base_id);
     });
-  }, [questionId, knowledge, stream]);
+  }, [questionId, selectBase, loadAnswer]);
 
   function ask(question: string) {
     if (!knowledge.selectedBase) return;
@@ -169,6 +170,12 @@ export function ChatView() {
         <div className={styles.chatNotice} role="status">
           <span>{documents.notice}</span>
           <button onClick={documents.clearNotice}>关闭</button>
+        </div>
+      )}
+      {stream.notice && (
+        <div className={styles.chatNotice} role="alert">
+          <span>{stream.notice}</span>
+          <button onClick={stream.clearNotice}>关闭</button>
         </div>
       )}
 

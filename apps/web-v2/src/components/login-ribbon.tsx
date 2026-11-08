@@ -77,8 +77,13 @@ export default function Flow() {
     const target = new THREE.Vector2();
     let frame = 0;
     let previous: number | undefined;
+    let visible = true;
+    let contextLost = false;
+    let disposed = false;
+    let bounds = el.getBoundingClientRect();
     const draw = (now: number) => {
       frame = 0;
+      if (disposed || contextLost || !visible || document.hidden) return;
       const dt = previous === undefined ? 0 : Math.min((now - previous) / 1000, .05);
       previous = now;
       if (reduce.matches) {
@@ -92,14 +97,19 @@ export default function Flow() {
       if (!reduce.matches) frame = requestAnimationFrame(draw);
     };
     const resize = () => {
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact.matches ? 1.5 : 2));
-      renderer.setSize(el.clientWidth, el.clientHeight, false);
+      if (disposed || contextLost) return;
+      bounds = el.getBoundingClientRect();
+      const width = el.clientWidth;
+      const height = el.clientHeight;
+      if (!width || !height) return;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, compact.matches ? 1.5 : 2));
+      renderer.setSize(width, height, false);
       geometry.setDrawRange(0, (compact.matches ? 42 : 84) * segments * 2);
-      if (reduce.matches) renderer.render(scene, camera);
+      restart();
     };
     const reset = () => target.set(0, 0);
     const move = (event: PointerEvent) => {
-      const rect = el.getBoundingClientRect();
+      const rect = bounds;
       if (event.pointerType !== 'mouse' || event.clientX < rect.left || event.clientX > rect.right ||
           event.clientY < rect.top || event.clientY > rect.bottom) {
         reset();
@@ -114,16 +124,31 @@ export default function Flow() {
       draw(performance.now());
     };
 
+    const canvas = renderer.domElement;
+    const lost = (event: Event) => { event.preventDefault(); contextLost = true; cancelAnimationFrame(frame); canvas.remove(); };
+    const restored = () => { contextLost = false; el.appendChild(canvas); resize(); };
+    const updateBounds = () => { bounds = el.getBoundingClientRect(); };
     const observer = new ResizeObserver(resize);
+    const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; restart(); });
     observer.observe(el);
+    intersection.observe(el);
+    canvas.addEventListener('webglcontextlost', lost);
+    canvas.addEventListener('webglcontextrestored', restored);
+    document.addEventListener('visibilitychange', restart);
+    window.addEventListener('scroll', updateBounds, { capture: true, passive: true });
     resize();
-    restart();
-    window.addEventListener('pointermove', move);
+    window.addEventListener('pointermove', move, { passive: true });
     document.documentElement.addEventListener('pointerleave', reset);
     reduce.addEventListener('change', restart);
     return () => {
+      disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      intersection.disconnect();
+      canvas.removeEventListener('webglcontextlost', lost);
+      canvas.removeEventListener('webglcontextrestored', restored);
+      document.removeEventListener('visibilitychange', restart);
+      window.removeEventListener('scroll', updateBounds, true);
       window.removeEventListener('pointermove', move);
       document.documentElement.removeEventListener('pointerleave', reset);
       reduce.removeEventListener('change', restart);

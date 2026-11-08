@@ -2,11 +2,12 @@
 
 import type { ReactNode } from "react";
 import { Toaster } from "sonner";
-import { StoreProvider } from "./store";
+import { PerformanceReporter } from "./performance-reporter";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <StoreProvider>
+    <>
+      <PerformanceReporter />
       {children}
       <Toaster
         position="bottom-center"
@@ -22,6 +23,6 @@ export function Providers({ children }: { children: ReactNode }) {
           },
         }}
       />
-    </StoreProvider>
+    </>
   );
 }

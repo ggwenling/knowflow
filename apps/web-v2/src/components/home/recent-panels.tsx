@@ -45,7 +45,7 @@ export function RecentPanels({
                 : "";
               return (
                 <div className={styles.baseRow} key={base.id}>
-                  <Link className={styles.baseLink} href={`/knowledge-bases/${base.id}`}>
+                  <Link className={styles.baseLink} href={`/knowledge-bases/${base.id}`} prefetch={false}>
                     <span className={styles.rowIcon}>
                       <Folder size={20} strokeWidth={1.5} aria-hidden="true" />
                     </span>
@@ -79,7 +79,7 @@ export function RecentPanels({
         {history.length ? (
           <div className={styles.historyList}>
             {history.slice(0, 3).map((item) => (
-              <Link className={styles.conversation} key={item.question_id} href={`/conversations/${item.question_id}`}>
+              <Link className={styles.conversation} key={item.question_id} href={`/conversations/${item.question_id}`} prefetch={false}>
                 <span className={styles.rowIcon}>
                   <MessageSquare size={19} strokeWidth={1.5} aria-hidden="true" />
                 </span>
