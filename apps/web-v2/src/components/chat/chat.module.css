@@ -511,6 +511,15 @@
   line-height: 1.7;
 }
 
+.imageNote {
+  display: inline-block;
+  border-radius: 4px;
+  background: var(--bg-muted);
+  padding: 1px 6px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
 .tableWrap {
   overflow-x: auto;
   margin: 12px 0;

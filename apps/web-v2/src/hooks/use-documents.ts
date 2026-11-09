@@ -193,7 +193,11 @@ export function useDocuments(baseId: string, ownerId?: string) {
       scope.indexStarts.set(accepted.task_id, performance.now());
       const optimistic: Document = { ...(target ?? { id: accepted.document_id, original_name: file.name, format: file.name.split(".").pop() ?? "", byte_size: file.size }), status: "QUEUED", latest_task_id: accepted.task_id, latest_task_status: "QUEUED" };
       if (target?.latest_task_id) scope.polls.get(target.latest_task_id)?.controller.abort();
-      patch(scope, (old) => ({ documents: target ? old.documents.map((item) => item.id === target.id ? optimistic : item) : [optimistic, ...old.documents] }));
+      // A list snapshot captured before this acceptance would reconcile the row away.
+      // Invalidate it (refresh() drops results whose sequence moved on) and release its spinner.
+      scope.sequence += 1;
+      scope.refreshing = false;
+      patch(scope, (old) => ({ refreshing: false, documents: target ? old.documents.map((item) => item.id === target.id ? optimistic : item) : [optimistic, ...old.documents] }));
       startPoll(scope, optimistic);
       return "accepted";
     } catch (reason) {
