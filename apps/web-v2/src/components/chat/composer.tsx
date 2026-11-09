@@ -23,7 +23,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   }
 
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
     event.preventDefault();
     event.currentTarget.form?.requestSubmit();
   }

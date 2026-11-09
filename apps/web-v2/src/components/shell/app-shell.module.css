@@ -232,6 +232,7 @@
 
 .createForm {
   display: flex;
+  min-width: 0;
   gap: 5px;
   padding: 2px 4px 12px;
   border-bottom: 1px solid var(--line);

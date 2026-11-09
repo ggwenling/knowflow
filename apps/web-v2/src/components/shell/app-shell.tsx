@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className={styles.shell}>
-      <a className={styles.skipLink} href="#main-content">跳到主要内容</a>
+      <a className={styles.skipLink} href="#main-content" tabIndex={0}>跳到主要内容</a>
 
       <aside className={`${styles.sidebar} ${pathname === "/" ? styles.homeSidebar : ""} ${isChat ? styles.chatSidebar : ""}`}>
         <div className={styles.brandRow}>

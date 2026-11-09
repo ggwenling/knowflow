@@ -1,0 +1,677 @@
+{
+  "base_head": "bc5ed5adc61f5b76cd42ef03486da6a963c44441",
+  "scope": "Real local Compose stack; synthetic business model; gpt-6.1-sol agent execution",
+  "session_id": "01a1bbaa-d9fd-70c3-a8c7-1ab8cc4cfd8f",
+  "binding": "Local execution used a dirty workspace; file hashes bind the tested P0 sources. CI must independently pass on the pushed commit.",
+  "source_sha256": {
+    "apps/web-v2/.dockerignore": "c05f7d2d60cd759a60cd73120f3b008519efc94dd3fe5bbc6ed118ae7ec1d9f7",
+    "apps/web-v2/eslint.config.mjs": "614aae53bca51c4923a6eb5ef3d29364ea2aef09e3fa2180cf845f6653d1a771",
+    "apps/web-v2/scripts/acceptance.mjs": "9cb9c9fae719c0b6aece6a7749ebb3a6087325046fe34764fdaf46e05418dbb1",
+    "apps/web-v2/scripts/run-agent-acceptance.mjs": "5fa2a711c6f3c8b49ceb5c970670514cdff1613d73fca5b69ed8cb61ba739fd2",
+    "apps/web-v2/e2e/agent-acceptance.spec.ts": "70bd56ebc24d6a611086f0d1d9100ba44df8452ba2605c747e6cc10178b8a083",
+    "scripts/e2e-web.mjs": "20ba0ce73156828303a57600db85d27c06677b98764c23ef008f115d8d54b2f8",
+    "apps/web-v2/src/components/auth/auth-view.module.css": "129cd268d7501e445fb1ab8e2ad2acbc3ccf7a7ba507ba69002cbbbbc6550390",
+    "apps/web-v2/src/components/auth/auth-view.tsx": "1bd3c83c77f6d2a995393a8acbc4bcc4d25ffb7c3b467b22ec0e6e9fbeebe061",
+    "apps/web-v2/src/components/chat/answer-panel.tsx": "60d599c9d426e3f322a63fa074e7eee8fd85a47be2ce1a69098081f9f30b9602",
+    "apps/web-v2/src/components/chat/chat-view.tsx": "8ab7d97a203fb079b5b674f21e302bd3a407da66e7a044ab4af691e641b75e30",
+    "apps/web-v2/src/components/chat/citation-list.tsx": "bcf9673d31986643d96d661ca19e6577e1e3890b0b1de6430948cf2f52dc7a59",
+    "apps/web-v2/src/components/chat/composer.tsx": "6b3c423fef66e58e700bba26d62d951d524bd725505a0cf51e9b51ed4703f946",
+    "apps/web-v2/src/components/chat/source-dialog.tsx": "b04353bae8506451a4fc614954c0e8ff52bf87508950b8e971e666964ee80c2f",
+    "apps/web-v2/src/components/home/home-view.module.css": "fe327d5ea3019c11d07396a5ea933e45512a2581134adbba387dbf57c8b2dcbe",
+    "apps/web-v2/src/components/shell/app-shell.module.css": "4acaa11a3696410f9f3411b4cec2a65a2ff0d6eb36569f87a1a0c48b4bb19ab3",
+    "apps/web-v2/src/components/shell/app-shell.tsx": "9c5d889e9342aee142f8ff5d261e93dd4668018ec7a441523f57767800e4e58c"
+  },
+  "smoke": {
+    "started_at": "2026-11-09T09:08:35.429Z",
+    "base_url": "http://127.0.0.1:3000",
+    "account": "agent-6f8e3987edaa3dbd4a09@example.test",
+    "steps": [
+      {
+        "name": "登录",
+        "status": "passed",
+        "detail": "",
+        "at": "2026-11-09T09:08:36.967Z"
+      },
+      {
+        "name": "创建知识库",
+        "status": "passed",
+        "detail": "fac05725-8646-47c0-ba7d-9e174b574bcf",
+        "at": "2026-11-09T09:08:37.171Z"
+      },
+      {
+        "name": "上传并等待 READY",
+        "status": "passed",
+        "detail": "",
+        "at": "2026-11-09T09:08:39.135Z"
+      },
+      {
+        "name": "流式问答与引用弹层",
+        "status": "passed",
+        "detail": "",
+        "at": "2026-11-09T09:08:41.350Z"
+      },
+      {
+        "name": "多尺寸截图",
+        "status": "passed",
+        "detail": "8 张",
+        "at": "2026-11-09T09:08:54.725Z"
+      },
+      {
+        "name": "清理验收数据",
+        "status": "passed",
+        "detail": "{\"question_deleted\":true,\"base_status\":204}",
+        "at": "2026-11-09T09:08:54.755Z"
+      }
+    ],
+    "screenshots": [
+      {
+        "name": "04-source-dialog-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\04-source-dialog-1440.png",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "name": "04b-chat-answer-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\04b-chat-answer-1440.png",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "name": "01-home-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\01-home-1440.png",
+        "width": 1440,
+        "height": 1000
+      },
+      {
+        "name": "02-bases-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\02-bases-1440.png",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "name": "03-base-detail-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\03-base-detail-1440.png",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "name": "05-settings-1440",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\05-settings-1440.png",
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "name": "06-home-390",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\06-home-390.png",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "07-bases-390",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\07-bases-390.png",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "08-base-detail-390",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\08-base-detail-390.png",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "09-chat-768",
+        "path": "D:\\konwflow\\apps\\web-v2\\test-results\\agent-acceptance-20261109-final\\09-chat-768.png",
+        "width": 768,
+        "height": 900
+      }
+    ],
+    "created": {
+      "knowledge_base": "fac05725-8646-47c0-ba7d-9e174b574bcf",
+      "question": "deleted"
+    },
+    "agent_execution": {
+      "model": "gpt-6.1-sol",
+      "scope": "smoke and responsive screenshots",
+      "browser": "Chromium 156.0.8078.4",
+      "environment": "win32/x64; v24.22.1; http://127.0.0.1:3000"
+    },
+    "finished_at": "2026-11-09T09:08:54.755Z"
+  },
+  "modules": {
+    "started_at": "2026-11-09T09:08:55.934Z",
+    "finished_at": "2026-11-09T09:09:46.829Z",
+    "status": "PASS",
+    "executor": {
+      "model": "gpt-6.1-sol",
+      "browser": "Chromium 156.0.8078.4",
+      "environment": "win32/x64; v24.22.1; http://127.0.0.1:3000"
+    },
+    "product_mode": "synthetic",
+    "cases": [
+      {
+        "id": "M1-01-register",
+        "status": "PASS",
+        "at": "2026-11-09T09:08:57.977Z",
+        "evidence": "M1-01-register.png",
+        "detail": {
+          "registered_via": "browser UI",
+          "empty_state": true,
+          "base": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3"
+        }
+      },
+      {
+        "id": "M1-02-upload-ready",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:00.029Z",
+        "evidence": "M1-02-upload-ready.png",
+        "detail": {
+          "contract_version": "0.2.0",
+          "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+          "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+          "original_name": "flow.md",
+          "status": "READY",
+          "format": "md",
+          "byte_size": 91,
+          "source_sha256": "78979e9f962074d6ebf2c3445337f5aab88a9876b62458dfea17e8497066fcc1",
+          "active_index_version_id": "16f21924-8c17-4d86-947c-bbb9e167e34b",
+          "latest_task_id": "06512951-d56f-44b0-a262-1a10625eaed8",
+          "latest_task_status": "SUCCEEDED",
+          "created_at": "2026-11-09T09:08:57.997955Z",
+          "updated_at": "2026-11-09T09:08:58.438033Z"
+        }
+      },
+      {
+        "id": "M1-03-pdf",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:02.076Z",
+        "evidence": "M1-03-pdf.png",
+        "detail": {
+          "document": "df464617-bec7-467a-946c-8a611e724bf7",
+          "base": "d57fa370-368e-4bde-b800-3031159fa6ca"
+        }
+      },
+      {
+        "id": "M1-04-update",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:03.810Z",
+        "evidence": "M1-04-update.png",
+        "detail": {
+          "before": {
+            "contract_version": "0.2.0",
+            "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+            "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+            "original_name": "flow.md",
+            "status": "READY",
+            "format": "md",
+            "byte_size": 91,
+            "source_sha256": "78979e9f962074d6ebf2c3445337f5aab88a9876b62458dfea17e8497066fcc1",
+            "active_index_version_id": "16f21924-8c17-4d86-947c-bbb9e167e34b",
+            "latest_task_id": "06512951-d56f-44b0-a262-1a10625eaed8",
+            "latest_task_status": "SUCCEEDED",
+            "created_at": "2026-11-09T09:08:57.997955Z",
+            "updated_at": "2026-11-09T09:08:58.438033Z"
+          },
+          "during": {
+            "contract_version": "0.2.0",
+            "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+            "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+            "original_name": "flow.md",
+            "status": "READY",
+            "format": "md",
+            "byte_size": 91,
+            "source_sha256": "78979e9f962074d6ebf2c3445337f5aab88a9876b62458dfea17e8497066fcc1",
+            "active_index_version_id": "16f21924-8c17-4d86-947c-bbb9e167e34b",
+            "latest_task_id": "fdd8f546-aeed-47ee-82e3-0ae23b238c25",
+            "latest_task_status": "QUEUED",
+            "created_at": "2026-11-09T09:08:57.997955Z",
+            "updated_at": "2026-11-09T09:09:03.302619Z"
+          },
+          "after": {
+            "contract_version": "0.2.0",
+            "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+            "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+            "original_name": "flow.md",
+            "status": "READY",
+            "format": "md",
+            "byte_size": 97,
+            "source_sha256": "d4c44474f64dfcc1e5d2055d45e5084f788ea7b50a9105d17300f4a9e129d362",
+            "active_index_version_id": "726e4827-e8d5-4d95-ba36-b6f31d32a3a0",
+            "latest_task_id": "fdd8f546-aeed-47ee-82e3-0ae23b238c25",
+            "latest_task_status": "SUCCEEDED",
+            "created_at": "2026-11-09T09:08:57.997955Z",
+            "updated_at": "2026-11-09T09:09:03.580911Z"
+          }
+        }
+      },
+      {
+        "id": "M1-05-rebuild",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:04.311Z",
+        "evidence": "M1-05-rebuild.png",
+        "detail": {
+          "before": {
+            "contract_version": "0.2.0",
+            "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+            "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+            "original_name": "flow.md",
+            "status": "READY",
+            "format": "md",
+            "byte_size": 97,
+            "source_sha256": "d4c44474f64dfcc1e5d2055d45e5084f788ea7b50a9105d17300f4a9e129d362",
+            "active_index_version_id": "726e4827-e8d5-4d95-ba36-b6f31d32a3a0",
+            "latest_task_id": "fdd8f546-aeed-47ee-82e3-0ae23b238c25",
+            "latest_task_status": "SUCCEEDED",
+            "created_at": "2026-11-09T09:08:57.997955Z",
+            "updated_at": "2026-11-09T09:09:03.580911Z"
+          },
+          "after": {
+            "contract_version": "0.2.0",
+            "id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+            "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+            "original_name": "flow.md",
+            "status": "READY",
+            "format": "md",
+            "byte_size": 97,
+            "source_sha256": "d4c44474f64dfcc1e5d2055d45e5084f788ea7b50a9105d17300f4a9e129d362",
+            "active_index_version_id": "6a7fe6b8-7e25-4ff4-bf9b-b4a2778a3574",
+            "latest_task_id": "a66725b6-a859-446f-b010-d49efef8f07f",
+            "latest_task_status": "SUCCEEDED",
+            "created_at": "2026-11-09T09:08:57.997955Z",
+            "updated_at": "2026-11-09T09:09:04.096096Z"
+          }
+        }
+      },
+      {
+        "id": "M1-06-pagination",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:05.581Z",
+        "evidence": "M1-06-pagination.png",
+        "detail": {
+          "seed_method": "same-origin real upload API",
+          "seeded_document_ids": [
+            "e24057a3-6659-441d-b798-43a08bb0b5a1",
+            "2bce4f99-77b8-4cb5-b594-3f371ee4f100",
+            "35875d04-2db6-4183-af89-6ff51a11e872",
+            "b36545ef-f874-4d54-8dcc-fcc369a3ea72",
+            "f638521b-3e2d-42a1-a839-10724227cc6a",
+            "2ef2a1f3-e29b-47b7-bec7-25cace71a54c",
+            "f3637180-9ea7-49b6-ac2a-9150a3a10e85",
+            "c536ec36-195c-4ae6-a3bd-87af0fa01917",
+            "0c045e64-cdf0-4dec-8695-7d01b7501baa",
+            "617404f1-b98c-4ca5-92a6-0bf6e4ef6343",
+            "ea567c08-d3fb-4814-8ee0-285f2144bc49",
+            "ed9dd970-e8de-407b-a177-cd5885117056",
+            "582c045c-2331-40a3-a6d1-39949dae6860",
+            "f15e5e08-2e36-42fb-ab6f-65b8c0706f8a",
+            "3b398953-e025-43eb-a34a-04aa33e7623d",
+            "c02ffcdc-ef4c-4a1a-9381-8204b38e5e5f",
+            "af6bf291-834c-4cd1-8b66-0d4efa3aaafa",
+            "75a76c4d-2070-4ec6-8da6-5c8dcd18697c",
+            "f455a328-33bd-49bd-8013-dde412dfbb35",
+            "26566de4-495b-4f24-bfbc-929000de91eb",
+            "6a894bde-5d13-4760-9662-83b4b9b9989a",
+            "33f94bfa-3f2f-43ec-8ab2-869113f599fd",
+            "57fb1d0c-1f73-4279-97c2-97fb55f80d12",
+            "ab2b7cee-c1f3-4bc3-aa16-6265f710ed3e",
+            "aa72e453-bcac-44c4-9713-81e26bd69e0b",
+            "6b69ef93-3ba3-4cf6-b85c-661207148730",
+            "85006b95-40eb-408e-91d0-7fdb79318378",
+            "ce4ce875-bb7b-4585-a785-8d0b495f7347",
+            "70e69994-ff5d-4740-91f6-6a5af71c57fc",
+            "ed1fc337-631e-4416-8f01-25dfed99fc49",
+            "34fec089-ccfc-4187-9e5d-97ef678e77ba",
+            "922b5cba-cf83-48cf-99c2-9ad727be9ab5",
+            "11686b8c-b073-4822-ac2e-1e740b28b308",
+            "1be748d4-865a-4906-a539-bf3a18e8361e",
+            "145828e0-72fb-42e4-a3d1-1d7a11cf2d82",
+            "12c3d7a8-facc-4adf-bc0d-d974690d8e4f",
+            "0d50b81a-2cd4-44de-90b3-e11c3b770f65",
+            "23395845-8c61-4767-99f4-5494e6efb76f",
+            "0281f1ed-76c4-466b-b4da-eadabc2b3c48",
+            "18c8a811-771b-4e81-a52c-084392bf205c",
+            "d3ff0546-5459-4d94-93c0-20a11de40f06",
+            "f0c32457-2e71-47ef-a8b9-e3c79ff369df",
+            "78a71280-3009-4ff4-9151-99f692367c6b",
+            "f1de27e4-dcc6-49b5-a74d-2addb702a3b1",
+            "faf7e852-96ba-4789-a76c-1a1fb6783f9b",
+            "69c3e350-463d-48be-b8a3-26f9127f91c2",
+            "b5bbe1fa-25ff-4ca1-a3a1-efd28b6b2e18",
+            "0e038dd4-f27f-47f2-80e8-f452f7be3255",
+            "4851887e-f409-4509-a04b-f190b7420eb6",
+            "b98df08a-4a84-4749-808a-c6d7f9fa4c12"
+          ],
+          "rendered": [
+            "page-49.md",
+            "page-48.md",
+            "page-47.md",
+            "page-46.md",
+            "page-45.md",
+            "page-44.md",
+            "page-43.md",
+            "page-42.md",
+            "page-41.md",
+            "page-40.md",
+            "page-39.md",
+            "page-38.md",
+            "page-37.md",
+            "page-36.md",
+            "page-35.md",
+            "page-34.md",
+            "page-33.md",
+            "page-32.md",
+            "page-31.md",
+            "page-30.md",
+            "page-29.md",
+            "page-28.md",
+            "page-27.md",
+            "page-26.md",
+            "page-25.md",
+            "page-24.md",
+            "page-23.md",
+            "page-22.md",
+            "page-21.md",
+            "page-20.md",
+            "page-19.md",
+            "page-18.md",
+            "page-17.md",
+            "page-16.md",
+            "page-15.md",
+            "page-14.md",
+            "page-13.md",
+            "page-12.md",
+            "page-11.md",
+            "page-10.md",
+            "page-09.md",
+            "page-08.md",
+            "page-07.md",
+            "page-06.md",
+            "page-05.md",
+            "page-04.md",
+            "page-03.md",
+            "page-02.md",
+            "page-01.md",
+            "page-00.md",
+            "flow.md"
+          ]
+        }
+      },
+      {
+        "id": "M1-07-isolation",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:07.178Z",
+        "evidence": "M1-07-isolation.png",
+        "detail": {
+          "account_b_page_denied": true,
+          "document_status": 404,
+          "list": "empty and identical to nonexistent base"
+        }
+      },
+      {
+        "id": "M2-01-stream",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:08.201Z",
+        "evidence": "M2-01-stream.png",
+        "detail": {
+          "events": [
+            {
+              "event": "started",
+              "data": {
+                "contract_version": "0.2.0",
+                "request_id": "0a9898ad-576c-497d-abaf-1003ad3f4267",
+                "sequence": 1,
+                "event": "started"
+              }
+            },
+            {
+              "event": "delta",
+              "data": {
+                "contract_version": "0.2.0",
+                "request_id": "0a9898ad-576c-497d-abaf-1003ad3f4267",
+                "sequence": 2,
+                "event": "delta",
+                "delta": "本地合成验证：主资料来源 610b893d-c4b5-48fd-93a8-06e2e2afec47 [e40dde75-a47b-3384-8685-55cc4777b96d]"
+              }
+            },
+            {
+              "event": "sources",
+              "data": {
+                "contract_version": "0.2.0",
+                "request_id": "0a9898ad-576c-497d-abaf-1003ad3f4267",
+                "sequence": 3,
+                "event": "sources",
+                "has_answer": true,
+                "sources": [
+                  {
+                    "source_id": "e40dde75-a47b-3384-8685-55cc4777b96d",
+                    "document_id": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+                    "content_version_id": "d41967d9-8fd2-484a-9798-b3fe31bf35e8",
+                    "index_version_id": "6a7fe6b8-7e25-4ff4-bf9b-b4a2778a3574",
+                    "chunk_id": "139c57dd-a177-547d-b745-a08f78225ba9",
+                    "locator": {
+                      "kind": "text_range",
+                      "start": 0,
+                      "end": 43,
+                      "unit": "unicode_code_point"
+                    },
+                    "quote": "Agent 验收事实。\n索引状态只有 READY 时才会参与问答。\n版本二更新原文。\n"
+                  }
+                ]
+              }
+            },
+            {
+              "event": "completed",
+              "data": {
+                "contract_version": "0.2.0",
+                "request_id": "0a9898ad-576c-497d-abaf-1003ad3f4267",
+                "sequence": 4,
+                "event": "completed"
+              }
+            }
+          ],
+          "question_id": "6d87b3a6-9af9-4b0d-9ee8-ff70f6052757"
+        }
+      },
+      {
+        "id": "M2-02-cancel",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:17.972Z",
+        "evidence": "M2-02-cancel.png",
+        "detail": {
+          "question_id": "d6768581-fc6f-40c0-9fd2-3bd0dc64d142",
+          "knowledge_base_id": "5c7ea412-b39f-42d5-90cf-ce4a157d04e3",
+          "question": "[e2e:slow] agent stop 37f73f25-283c-4472-b92a-4633d9c73e1a",
+          "status": "CANCELLED",
+          "created_at": "2026-11-09T09:09:08.24923Z",
+          "finished_at": "2026-11-09T09:09:12.407143Z"
+        }
+      },
+      {
+        "id": "M2-03-source",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:18.632Z",
+        "evidence": "M2-03-source.png",
+        "detail": {
+          "source": "e40dde75-a47b-3384-8685-55cc4777b96d",
+          "document": "f23f5bfa-96f5-43b4-a572-cfc11868e77d",
+          "content_version": "d41967d9-8fd2-484a-9798-b3fe31bf35e8"
+        }
+      },
+      {
+        "id": "M2-04-pdf",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:19.716Z",
+        "evidence": "M2-04-pdf.png",
+        "detail": {
+          "iframe_src": "/api/v1/documents/df464617-bec7-467a-946c-8a611e724bf7/contents/8b9b4e87-f7b2-4dfc-9141-59c10f7888bc/file#page=3",
+          "pdf_document": "df464617-bec7-467a-946c-8a611e724bf7"
+        }
+      },
+      {
+        "id": "M2-05-expired-source",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:21.657Z",
+        "evidence": "M2-05-expired-source.png",
+        "detail": {
+          "source_http": 404,
+          "cached_dialog_content_visible": false,
+          "historical_quotes": [
+            null
+          ]
+        }
+      },
+      {
+        "id": "M2-06-history",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:23.477Z",
+        "evidence": "M2-06-history.png",
+        "detail": {
+          "first_page": 50,
+          "loaded": 56,
+          "unique": 56,
+          "logout_visible": true
+        }
+      },
+      {
+        "id": "M2-07-switch-refresh",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:34.047Z",
+        "evidence": "M2-07-switch-refresh.png",
+        "detail": {
+          "switched": {
+            "question_id": "6cf8922f-2131-40e5-a42b-3973acb04592",
+            "knowledge_base_id": "d57fa370-368e-4bde-b800-3031159fa6ca",
+            "question": "[e2e:slow] Agent 切库 b85857e9-2c72-4593-ba1b-3aba7379e29f",
+            "status": "CANCELLED",
+            "created_at": "2026-11-09T09:09:23.81769Z",
+            "finished_at": "2026-11-09T09:09:27.953805Z"
+          },
+          "reloaded": "CANCELLED"
+        }
+      },
+      {
+        "id": "M2-08-responsive",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:36.999Z",
+        "evidence": "M2-08-responsive.png",
+        "detail": {
+          "widths": [
+            390,
+            768,
+            1440
+          ],
+          "no_horizontal_overflow": true,
+          "drawers_and_composer": true
+        }
+      },
+      {
+        "id": "M2-09-keyboard",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:39.285Z",
+        "evidence": "M2-09-keyboard.png",
+        "detail": {
+          "keyboard_submit": true,
+          "keyboard_source_and_return": true,
+          "focus_ring": true
+        }
+      },
+      {
+        "id": "M3-01-mode",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:39.333Z",
+        "evidence": "M3-01-mode.png",
+        "detail": {
+          "mode": "synthetic"
+        }
+      },
+      {
+        "id": "M3-02-settings",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:39.450Z",
+        "evidence": "M3-02-settings.png",
+        "detail": {
+          "mode": "synthetic",
+          "single_turn": true,
+          "outbound_scope_disclosed": true
+        }
+      },
+      {
+        "id": "M3-03-service-error",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:46.673Z",
+        "evidence": "M3-03-service-error.png",
+        "detail": {
+          "actual_api_container_stop": true,
+          "retry_restored_session": true,
+          "internal_error_redacted": true
+        }
+      },
+      {
+        "id": "M3-04-network",
+        "status": "PASS",
+        "at": "2026-11-09T09:09:46.718Z",
+        "evidence": "M3-04-network.png",
+        "detail": {
+          "requests": 1759,
+          "external_requests": 0,
+          "metadata_only": true
+        }
+      }
+    ],
+    "signature": "agent:gpt-6.1-sol; executed 2026-11-09T09:09:46.720Z; M1 7/7, M2 9/9, M3 4/4; synthetic business model only",
+    "cleanup": "PASS"
+  },
+  "artifacts": {
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/00-dedicated-account.png": "b62e51ad5eac6978005a960996c4513269b89acc22d78188abe946cab13f5074",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/01-home-1440.png": "17e3a78b7209d252aa4f1e33a84fbccbae2077b7d9a3f35d171e11199d1b7a5a",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/02-bases-1440.png": "41327d30b4a2ab474cab20014b77fb9e34cd4f8e3aabf2b47a3b183d6a93d0ec",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/03-base-detail-1440.png": "074b0f2c33ecf003eb00759f0f2d4e791523ae8187e0156efb1a65f1917bb510",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/04-source-dialog-1440.png": "8616ea94b4beb55dacac041641770861d6eef6b161e5b8ab7b2a7c053ef4b0eb",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/04b-chat-answer-1440.png": "288294db13bd67f090ad8ca55e29338e246b5adb158a0ec90714af16eeb9fc58",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/05-settings-1440.png": "d3e275e544f2c2d1266528492cab56ece842192bd7c91da4ae433dee4415df13",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/06-home-390.png": "995468353b6d46d492f174d5f0f82c8aaa4ad6dc2a41985603b643702f2b8d4d",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/07-bases-390.png": "073696594ceca77b43949f50a2db8a0b2b13116d64a21e61345577bb788af328",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/08-base-detail-390.png": "98b279bcf964aff7f44398faeca0fd9fdc646741bee969218b7bb8fa048f2bda",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/09-chat-768.png": "79514e11d847325098278c9c3bffeb9e756c19b137fe790c07013617a405a8c8",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/cleanup.json": "2e48656e2815bd44da34cc7fa38dd57f2d2db9bd45e9e1fd51733511f3b1ed6a",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-01-register.png": "27ff7c65fea71d2d86521c44ba7e62fc8b3285656756ee0c06da69c1dd62209e",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-02-upload-ready.png": "268a980e49add9edb55bcf5d8fa2be20d4013f7987ce0aa2c855cbb514980a44",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-03-pdf.png": "896cfa088af5d9aa747bfa09977968520cb0260cf48516c72793f1dbecc598e9",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-04-update.png": "8a19d82c1369381e3004d05390afe479ac812978fe594305f9ad341bbae42528",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-05-rebuild.png": "d9189889cf4864b765a8ef29e05f658dff3f52481c8af97b76ebf79368150cba",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-06-pagination.png": "0b8c6fbb91aeb9ee4c78fc9b51024a6d505921d5c41c96b6646c80be0ad275e8",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-07-isolation-account-b.png": "0b11c049bed0b7f0eae28455c106cf490c06d85c23a4e179f9b04c63bd1de977",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M1-07-isolation.png": "daa160e8c56ecccea883a875c84fe5a14304d2b4866c2f127d8b456b59014444",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-01-stream.png": "e7798db2e621a438ac5f63232c55dfd94fadfccb1989e1fa9c41e5a6e371e30a",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-02-cancel.png": "8792dafa22a164f858699f19b5c21c9444d79147e54207ee251c876066ae768a",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-03-source.png": "1bef18fca976d28fae0f33754048357e906c511d74172279a564c64b81a7b80a",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-03-text-dialog.png": "502d4789841690936f5db34aa7d04e126f767acead780e81544252fbe6404d54",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-04-pdf-dialog.png": "78416a8f5e8a83aa86b7671610d4f89ac5ee8e107f2b94e601fac343033c68a9",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-04-pdf.png": "a35bf16c3840db5bf0cea01f82e937e0f51ee371ff67c4af7e10538d09848f37",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-05-expired-source.png": "7720bf4c46a1e8897664086d00e49a7da6bd5d86c46ca1312cc9bcaafd7e484b",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-06-history.png": "f3a157df8be3ca0fed296c2c1e775697bfdc14c3c7da27354617f6b1d62cd35d",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-07-switch-refresh.png": "e78358c26801ec6ae11012dc51fdd9e2b85dab6f4de2c23d61e31f0962812cbb",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-chat-1440.png": "1be6531ff5b317004d30d5ab2f7c58c4a47a9743dfc7587552c2aca4f8b083c3",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-chat-390.png": "bb9176ab4304666fa0ac062d64d1e457dd867a0d487d8177a01c15332fded44e",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-chat-768.png": "881fc796563efe4b588e2c75b161135f49590d697aa4a32c22e5354569d021f0",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-home-1440.png": "62fb876ad05b361d58032684f6b0fa9ec3ead7bfb6fa8ce487baeb9d0dc287e2",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-home-390.png": "2f913e0665a5937588e07a61c493ef4797dece59fb8ddee0b9031edc8f10f284",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-home-768.png": "0871b52bacf15d2c20ce9d27a21ed12c8b99573a2d0a2cdaf784edfe2d60b876",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-08-responsive.png": "1be6531ff5b317004d30d5ab2f7c58c4a47a9743dfc7587552c2aca4f8b083c3",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M2-09-keyboard.png": "5ec1247c52a682d1b7f79c293b1720a9a77de72a20e4baa075069df731b96a60",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M3-01-mode.png": "5ec1247c52a682d1b7f79c293b1720a9a77de72a20e4baa075069df731b96a60",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M3-02-settings.png": "fb09d33e90b38a5e322586298621ac8f777fd50593c243ab46e52231e20cec41",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M3-03-api-stopped.png": "debe027056692713d6f23f2d1f9324634b5f259b45d04635c6ea3cee28fb00f3",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M3-03-service-error.png": "38bbe33cf8668b1cb55275f8d88783e0f355328fe8595b57eea06ac7ecf7f339",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/M3-04-network.png": "b75ebacd4570a485ee9766709c909d1a5d10a00a0e92a35bee648ec273a21217",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/manifest.json": "51772e4bc891dde1f5834aed474f0754d1f29e8e76250df891e42816dc114afc",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/modules-manifest.json": "6ac644eb150e15fa6a1799cd2420217965c78010ec71a864d2d5615f88edf1bd",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/modules.log": "d8df10d625db3dcd207d29d995b0fcf026b7329451255ea58db8b30088f52593",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/network-metadata.json": "e473ab4afde69efc4d343b146ed5cb7c34670ad9a66fa4766776912c2e715729",
+    "apps/web-v2/test-results/agent-acceptance-20261109-final/smoke.log": "5e173a9860a2c082e41b5c3963aa7b4c721ebbeb534c1e82e7cd4edadc1a769a"
+  },
+  "previous_failures": {
+    "d": "M2-05 reproduced cached quote after deletion; fixed by removing unvalidated duplicate quote.",
+    "f": "M2-07 reproduced old answer after base switch; fixed by reset and draft clear.",
+    "a_b_c_e_g_h": "Harness corrections: public contract fields, CSRF Origin, empty-list isolation semantics, async load/focus waits. Failed manifests retained locally."
+  }
+}

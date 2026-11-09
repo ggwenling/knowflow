@@ -22,7 +22,7 @@ export function AnswerPanel({
   onEditQuestion,
   onDeleted,
 }: {
-  onOpenSource: (source: import("@/services/api").Source, documentName: string) => void;
+  onOpenSource: (source: import("@/services/api").Source, documentName: string, trigger: HTMLButtonElement) => void;
   onEditQuestion: (question: string) => void;
   onDeleted: (questionId: string) => void;
 }) {

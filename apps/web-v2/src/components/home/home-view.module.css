@@ -95,6 +95,7 @@
 
 .hero h1 {
   margin: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-serif);
   font-size: clamp(54px, 5.6vw, 84px);
   font-weight: 400;

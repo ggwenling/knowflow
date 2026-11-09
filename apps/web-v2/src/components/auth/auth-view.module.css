@@ -33,6 +33,7 @@
 }
 
 .content h1 {
+  overflow-wrap: anywhere;
   margin: 0;
   font-family: var(--font-serif);
   font-size: clamp(52px, 6.15vw, 90px);

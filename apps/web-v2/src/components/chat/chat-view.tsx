@@ -148,7 +148,11 @@ export function ChatView() {
               <select
                 aria-label="切换知识库"
                 value={knowledge.selectedBase}
-                onChange={(event) => knowledge.selectBase(event.target.value)}
+                onChange={(event) => {
+                  stream.reset();
+                  clearDraft();
+                  knowledge.selectBase(event.target.value);
+                }}
               >
                 {knowledge.bases.map((base) => <option key={base.id} value={base.id}>{base.name}</option>)}
               </select>
@@ -194,8 +198,8 @@ export function ChatView() {
         <section className={styles.chatMain} aria-label="问答">
           <div className={styles.answerScroll}>
             <AnswerPanel
-              onOpenSource={(source, documentName) => {
-                setSourceTrigger(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+              onOpenSource={(source, documentName, trigger) => {
+                setSourceTrigger(trigger);
                 setViewing({ source, documentName });
               }}
               onEditQuestion={(question) => {

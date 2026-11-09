@@ -18,7 +18,7 @@ export function CitationList({
 }: {
   sources: Source[];
   documents: Document[];
-  onOpen: (source: Source, documentName: string) => void;
+  onOpen: (source: Source, documentName: string, trigger: HTMLButtonElement) => void;
 }) {
   if (!sources.length) return null;
   return (
@@ -32,7 +32,7 @@ export function CitationList({
           <button
             key={source.source_id}
             className={styles.citation}
-            onClick={() => onOpen(source, name)}
+            onClick={(event) => onOpen(source, name, event.currentTarget)}
           >
             <span className={styles.citationIndex}>{String(index + 1).padStart(2, "0")}</span>
             <span className={styles.citationBody}>

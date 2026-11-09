@@ -4,7 +4,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outDir = resolve(here, "../../../eval-out/acceptance-20261108");
+const outDir = process.env.KNOWFLOW_ACCEPTANCE_OUT_DIR
+  ? resolve(process.env.KNOWFLOW_ACCEPTANCE_OUT_DIR)
+  : resolve(here, "../../../eval-out/acceptance-20261108");
 const baseURL = process.env.KNOWFLOW_ACCEPTANCE_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.KNOWFLOW_ACCEPTANCE_EMAIL;
 const password = process.env.KNOWFLOW_ACCEPTANCE_PASSWORD;
@@ -21,7 +23,7 @@ const manifest = {
   steps: [],
   screenshots: [],
   created: { knowledge_base: "", question: "" },
-  human_signoff: { reviewer: "", executed_at: "", environment: "", signature: "", notes: "" },
+  agent_execution: { model: process.env.KNOWFLOW_ACCEPTANCE_MODEL ?? "unverified", scope: "smoke and responsive screenshots" },
 };
 
 await mkdir(outDir, { recursive: true });
@@ -37,6 +39,8 @@ async function save() {
 }
 
 const browser = await chromium.launch();
+manifest.agent_execution.browser = `Chromium ${browser.version()}`;
+manifest.agent_execution.environment = `${process.platform}/${process.arch}; ${process.version}; ${baseURL}`;
 let context;
 let page;
 let baseId = "";

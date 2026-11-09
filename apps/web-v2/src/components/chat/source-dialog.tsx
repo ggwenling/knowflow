@@ -130,8 +130,6 @@ export function SourceDialog({
           </DialogDescription>
         </header>
 
-        {source?.quote && <blockquote className={styles.sourceQuote}>{source.quote}</blockquote>}
-
         {preview.kind === "loading" && <p className={styles.sourceFeedback} role="status">正在载入原文…</p>}
         {preview.kind === "unavailable" && <p className={styles.sourceFeedback} role="status">{preview.message}</p>}
         {preview.kind === "error" && <p className={styles.sourceFeedback} role="alert">{preview.message}</p>}

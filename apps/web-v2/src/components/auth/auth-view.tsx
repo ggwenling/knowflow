@@ -75,6 +75,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
             autoComplete="email"
             spellCheck={false}
             required
+            disabled={session.loading || busy}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
           />
@@ -89,6 +90,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
               minLength={12}
               maxLength={128}
               required
+              disabled={session.loading || busy}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -103,7 +105,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
           </div>
           {mode === "register" && <small className={styles.hint}>Use 12–128 characters.</small>}
           {error && <p className={styles.error} lang="zh-CN" role="alert">{error}</p>}
-          <button className={styles.submit} disabled={busy} aria-busy={busy}>
+          <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
             {busy && <span className={styles.spinner} aria-hidden="true" />}
             {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
           </button>

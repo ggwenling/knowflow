@@ -71,7 +71,7 @@ try {
   const testOptions = {
     cwd: resolve(root, webApp),
     env: { ...process.env, KNOWFLOW_E2E_BASE_URL: baseUrl,
-      KNOWFLOW_E2E_STREAM_CAPTURE: streamCapture,
+      KNOWFLOW_E2E_STREAM_CAPTURE: streamCapture, KNOWFLOW_ACCEPTANCE_PROJECT: project,
       ...(candidate ? { KNOWFLOW_E2E_ROLLBACK_STATE: rollbackState } : {}) },
   };
   run(process.execPath, [cli, "test", ...(candidate ? ["--grep-invert", "旧版回退"] : [])], testOptions);
