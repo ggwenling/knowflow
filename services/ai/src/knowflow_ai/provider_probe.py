@@ -2,18 +2,20 @@
 
 The probe calls each provider's model-list endpoint (GET /models) with the
 provider key. It never calls chat/completions or embeddings, so it consumes no
-tokens and never touches the budget ledger. Results are cached briefly so a
-frequent readiness check cannot hammer the provider.
+tokens. A configured run also checks the shared ledger. Results are cached
+briefly so a frequent readiness check cannot hammer the provider.
 """
 import asyncio
 import logging
 import os
+import sqlite3
 import time
 from pathlib import Path
 
 import httpx
 
 from .answering import LlmSettings
+from .budget import BudgetLedger, RUN_BUDGET_ENVIRONMENT, SOFT_STOP_MICROYUAN
 from .config import ConfigurationError
 from .embedding import EmbeddingSettings
 from .http_client import build_async_client
@@ -47,6 +49,17 @@ def _budget_check(environ):
         return {"status": "DOWN", "reason": "BUDGET_LEDGER_DIR_MISSING"}
     if not Path(price).is_file() or not Path(policy).is_file():
         return {"status": "DOWN", "reason": "BUDGET_FILES_MISSING"}
+    if any(environ.get(name) for name in RUN_BUDGET_ENVIRONMENT):
+        try:
+            scoped = BudgetLedger.from_environment(environ)
+            reason = scoped.stop_reason()
+            if reason not in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED"):
+                if scoped.summary()["reserved_microyuan"] >= SOFT_STOP_MICROYUAN:
+                    reason = "BUDGET_SOFT_STOP"
+        except (ValueError, sqlite3.Error):
+            return {"status": "DOWN", "reason": "BUDGET_CONFIGURATION_REQUIRED"}
+        if reason is not None:
+            return {"status": "DOWN", "reason": reason}
     return {"status": "UP"}
 
 
@@ -117,7 +130,7 @@ class ProviderReadiness:
             return result
 
     async def _check(self):
-        checks = {"budget": _budget_check(self.environ)}
+        checks = {"budget": await asyncio.to_thread(_budget_check, self.environ)}
         try:
             llm_settings, embedding_settings = self._settings_loader(self.environ)
         except ConfigurationError:

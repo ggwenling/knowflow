@@ -290,6 +290,47 @@ def test_soft_stopped_shared_ledger_fails_closed(monkeypatch, tmp_path):
     assert str(error.value) == "EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"
 
 
+@pytest.mark.parametrize("run_id,limit", [
+    ("round", None),
+    (None, "1"),
+    ("round", "invalid"),
+    ("round", "2"),
+])
+def test_real_app_rejects_invalid_run_configuration(monkeypatch, tmp_path, run_id, limit):
+    configure_real_service(monkeypatch, tmp_path)
+    from knowflow_ai.budget import BudgetLedger
+    BudgetLedger(tmp_path / "ledger.sqlite3", run_id="round", run_limit_microyuan=1)
+    for name, value in (("KNOWFLOW_BUDGET_RUN_ID", run_id), ("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", limit)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    with pytest.raises(RuntimeError, match="EVALUATION_SERVICE_NOT_READY:"):
+        real_service.create_real_app()
+
+
+def test_real_app_initializes_scope_and_ignores_other_run_stops(monkeypatch, tmp_path):
+    prices, *_ = configure_real_service(monkeypatch, tmp_path)
+    from knowflow_ai.budget import BudgetLedger
+    path = tmp_path / "ledger.sqlite3"
+    prior = BudgetLedger(path, run_id="prior", run_limit_microyuan=1)
+    quote = prices["deepseek-flash"]
+    for request_id in ("prior", "current"):
+        if request_id == "prior":
+            writer = prior
+        else:
+            monkeypatch.setenv("KNOWFLOW_BUDGET_RUN_ID", "current")
+            monkeypatch.setenv("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", "1")
+            app = real_service.create_real_app()
+            assert app.state.evaluation_factories._ledger.run_id == "current"
+            writer = BudgetLedger(path, run_id="current", run_limit_microyuan=1)
+        with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+            writer.reserve(request_id, provider="deepseek", model="deepseek-flash",
+                           input_tokens_upper=2, output_tokens_upper=0, quote=quote)
+    with pytest.raises(RuntimeError, match="EVALUATION_SERVICE_NOT_READY: KNOWFLOW_BUDGET_LEDGER_PATH"):
+        real_service.create_real_app()
+
+
 def test_real_app_uses_product_adapters_with_mock_transport(monkeypatch, tmp_path):
     configure_real_service(monkeypatch, tmp_path)
     from knowflow_ai import answering, embedding

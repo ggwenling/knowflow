@@ -60,7 +60,7 @@ def _budget_stop_reason(ledger):
         return reason
     if ledger.summary()["reserved_microyuan"] >= SOFT_STOP_MICROYUAN:
         return "BUDGET_SOFT_STOP"
-    return None
+    return reason
 
 
 async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger,
@@ -93,6 +93,16 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                               "dataset_sha256": fingerprint, "split": split, "questions": []}
     public_sources_path = output.with_suffix(".public-sources.json")
     status = {"complete": False, "failures": [], "budget_steps": []}
+    status_path = output.with_suffix(".status.json")
+
+    def check_budget():
+        stop = _budget_stop_reason(ledger)
+        if stop is not None:
+            status["failures"].append({"code": stop})
+            write_json(status_path, status)
+            raise ValueError(stop)
+
+    check_budget()
     created = await java.post("/api/v1/knowledge-bases",
                               json={"contract_version": CONTRACT_VERSION, "name": "Evaluation collection"})
     if created.status_code != 201:
@@ -100,18 +110,17 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
     knowledge_base_id = created.json()["id"]
     cleanup_failed = False
     try:
-        write_json(output.with_suffix(".status.json"), status)
+        write_json(status_path, status)
         mappings = {}
         for document in manifest["documents"]:
-            stop = _budget_stop_reason(ledger)
-            if stop is not None:
-                raise ValueError(stop)
+            check_budget()
             raw = (Path(dataset) / document["path"]).read_bytes()
             if sha256(raw).hexdigest() != document["sha256"]:
                 raise ValueError("DATASET_CHANGED_DURING_COLLECTION")
             uploaded = await java.post(f"/api/v1/knowledge-bases/{knowledge_base_id}/documents",
                                        files={"file": (document["id"] + ".txt", raw, "text/plain")})
             if uploaded.status_code != 202:
+                check_budget()
                 raise ValueError("EVALUATION_UPLOAD_FAILED")
             accepted = uploaded.json()
             deadline = time.monotonic() + 180
@@ -121,6 +130,7 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                 task = task_response.json()
                 if task["status"] == "SUCCEEDED":
                     break
+                check_budget()
                 if task["status"] in ("FAILED", "CANCELLED") or time.monotonic() >= deadline:
                     raise ValueError("EVALUATION_INDEX_NOT_READY")
                 await asyncio.sleep(.2)
@@ -136,7 +146,7 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                              "dataset_document_id": document["id"],
                              "dataset_content_version_id": document["content_version_id"]}
             status["budget_steps"].append({"stage": "index", **ledger.summary()})
-            write_json(output.with_suffix(".status.json"), status)
+            write_json(status_path, status)
 
         async def lookup(key):
             row = await fetch_row("SELECT id, request_id, failure_code FROM knowflow.questions "
@@ -145,9 +155,7 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             return {name: str(value) if name == "id" else value for name, value in row.items()} if row else None
 
         for question_index, question in enumerate(selected):
-            stop = _budget_stop_reason(ledger)
-            if stop is not None:
-                raise ValueError(stop)
+            check_budget()
             diagnostics = {}
             public_sources = []
             try:
@@ -175,13 +183,11 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
             write_json(output, payload)
             write_json(diagnostics_path, diagnostics_payload)
             write_json(public_sources_path, public_sources_payload)
-            write_json(output.with_suffix(".status.json"), status)
-            if question_index + 1 < len(selected):
-                stop = _budget_stop_reason(ledger)
-                if stop is not None:
-                    raise ValueError(stop)
+            write_json(status_path, status)
+            if question_index + 1 < len(selected) or row["outcome"] == "error":
+                check_budget()
         status["complete"] = not status["failures"]
-        write_json(output.with_suffix(".status.json"), status)
+        write_json(status_path, status)
         if not status["complete"]:
             raise ValueError("COLLECTION_INCOMPLETE")
         return payload
@@ -210,7 +216,7 @@ async def main_async(args):
                 "X-Evaluation-Secret": os.environ["KNOWFLOW_EVALUATION_CONTROL_SECRET"]}) as ai:
             await collect_dataset(java=java, ai=ai, dataset=args.dataset, split=args.split, output=args.output,
                                   run_metadata=json.loads(args.run_metadata.read_text(encoding="utf-8")), fetch_row=fetch,
-                                  ledger=BudgetLedger(os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"]),
+                                  ledger=BudgetLedger.from_environment(os.environ),
                                   limit=args.limit)
 
 

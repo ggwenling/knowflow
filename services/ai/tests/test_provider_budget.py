@@ -73,6 +73,58 @@ async def test_raw_adapter_failed_attempts_are_reserved_individually(monkeypatch
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("run_id,limit,stored_limit,expected_calls,reason", [
+    ("synthetic-round", "204096", None, 2, "BUDGET_RUN_EXCEEDED"),
+    ("synthetic-round", "102047", None, 0, "BUDGET_RUN_EXCEEDED"),
+    ("synthetic-round", "204096", 204_095, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    (None, "204096", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("synthetic-round", None, None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("", "", None, 3, None),
+    (None, "", None, 3, None),
+    ("", "204096", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("synthetic-round", "", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("invalid round", "204096", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("synthetic-round", "4.0", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("synthetic-round", "0", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+    ("synthetic-round", "10000001", None, 0, "BUDGET_CONFIGURATION_REQUIRED"),
+])
+async def test_run_budget_stops_provider_attempts_before_http(
+        monkeypatch, caplog, run_id, limit, stored_limit, expected_calls, reason):
+    ledger_path = os.environ["KNOWFLOW_BUDGET_LEDGER_PATH"]
+    if stored_limit is not None:
+        BudgetLedger(ledger_path, run_id=run_id, run_limit_microyuan=stored_limit)
+    for name, value in (("KNOWFLOW_BUDGET_RUN_ID", run_id),
+                        ("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", limit)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    calls = []
+
+    async def transport(request):
+        calls.append(request)
+        return httpx.Response(503)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        adapter = DeepSeekAdapter(
+            LlmSettings(api_key="fake-key-" * 8), client,
+            retry_policy=ProviderRetryPolicy(max_attempts=3, base_seconds=0, total_seconds=5))
+        with pytest.raises(ProcessingError) as error:
+            await adapter.generate("synthetic", [], request_id="run-budget")
+
+    assert error.value.retryable is (reason is None)
+    assert len(calls) == expected_calls
+    if reason is not None:
+        assert reason in caplog.text
+    ledger = BudgetLedger(ledger_path)
+    assert ledger.summary()["reserved_microyuan"] == expected_calls * 102_048
+    if reason == "BUDGET_RUN_EXCEEDED":
+        assert ledger.stop_reason() is None
+        scoped = BudgetLedger(ledger_path, run_id=run_id, run_limit_microyuan=int(limit))
+        assert scoped.stop_reason() == reason
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("spent,input_upper,reason", [
     (8_000_000, 10_000, "BUDGET_SOFT_STOP"),
     (7_000_000, 2_000_000, "BUDGET_SOFT_STOP"),

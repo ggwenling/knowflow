@@ -33,6 +33,8 @@ def pytest_configure(config):
 @pytest.fixture(autouse=True)
 def synthetic_provider_budget(tmp_path_factory, monkeypatch):
     """Give existing mock-transport tests an explicit, isolated fake budget policy."""
+    monkeypatch.delenv("KNOWFLOW_BUDGET_RUN_ID", raising=False)
+    monkeypatch.delenv("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", raising=False)
     tmp_path = tmp_path_factory.mktemp("synthetic-provider-budget")
     now = datetime.now(timezone.utc)
     times = {"verified_at": (now - timedelta(hours=1)).isoformat(),
