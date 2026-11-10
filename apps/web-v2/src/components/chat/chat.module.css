@@ -1673,6 +1673,11 @@
   align-items: stretch;
 }
 
+/* Header and notices keep their natural height; only the layout absorbs the squeeze. */
+.page > :not(.layout) {
+  flex-shrink: 0;
+}
+
 .railColumn, .docsColumn {
   height: 100%;
   min-height: 0;
