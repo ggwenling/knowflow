@@ -6,13 +6,19 @@
 
 .wave {
   position: absolute;
-  top: 132px;
+  top: 12px;
   right: -24px;
   left: -24px;
   z-index: -1;
-  height: 268px;
+  height: 400px;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* Keep the existing fallback asset at its original position and proportions. */
+.wave:not(:has(canvas)) {
+  top: 132px;
+  height: 268px;
 }
 
 .art {
@@ -558,6 +564,10 @@
   }
 
   .wave {
+    height: 340px;
+  }
+
+  .wave:not(:has(canvas)) {
     height: 230px;
   }
 }
@@ -602,9 +612,14 @@
   }
 
   .wave {
-    top: 96px;
+    top: 0;
     right: -16px;
     left: -16px;
+    height: 216px;
+  }
+
+  .wave:not(:has(canvas)) {
+    top: 96px;
     height: 168px;
   }
 

@@ -132,6 +132,12 @@ summary {
   background: url("/home-wave.webp") center / 100% 100% no-repeat;
 }
 
+.home-wave {
+  overflow: hidden;
+  contain: layout paint;
+  pointer-events: none;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
