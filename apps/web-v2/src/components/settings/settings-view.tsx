@@ -23,11 +23,13 @@ export function SettingsView() {
   const modeLabel = mode === "synthetic" ? "合成模型（本地工程验证）" : mode === "external" ? "外部模型服务" : "尚未配置";
 
   return (
-    <div className={`${styles.page} page-enter`}>
-      <header className={styles.head}>
-        <p className={styles.eyebrow}>Settings</p>
-        <h1>设置</h1>
-        <p>管理当前账户与工作区。容量、计费与团队协作暂未开放。</p>
+    <div className={styles.page}>
+      <header className="workspace-header">
+        <div>
+          <p className={styles.eyebrow}>Settings</p>
+          <h1>设置</h1>
+          <p>管理当前账户与工作区。容量、计费与团队协作暂未开放。</p>
+        </div>
       </header>
 
       <div className={styles.settingsGrid}>

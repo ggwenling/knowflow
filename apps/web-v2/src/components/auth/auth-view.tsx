@@ -47,81 +47,85 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
       <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
         <DeferredVisual><Ribbon /></DeferredVisual>
       </div>
-      <section key={mode} className={`${styles.content} page-enter`}>
+      <section key={mode} className={styles.content}>
         <div className={styles.brand}>KnowFlow</div>
-        <h1>
-          {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
-        </h1>
-        <p className={styles.lead}>
-          {mode === "login"
-            ? <>Sign in to KnowFlow and keep your<br className={styles.break} /> knowledge in motion.</>
-            : "Create an account to start building your knowledge base."}
-        </p>
+        <div className={styles.intro}>
+          <h1>
+            {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
+          </h1>
+          <p className={styles.lead}>
+            {mode === "login"
+              ? <>Sign in to KnowFlow and keep your<br className={styles.break} /> knowledge in motion.</>
+              : "Create an account to start building your knowledge base."}
+          </p>
+        </div>
 
-        <form className={styles.form} onSubmit={submit} noValidate={false} aria-busy={busy}>
-          <label htmlFor="auth-email">Email</label>
-          <input
-            id="auth-email"
-            name="email"
-            type="email"
-            placeholder="name@example.com"
-            autoComplete="email"
-            spellCheck={false}
-            required
-            disabled={session.loading || busy}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <label htmlFor="auth-password">Password</label>
-          <div className={styles.passwordField}>
+        <div className={styles.formGroup}>
+          <form className={styles.form} onSubmit={submit} noValidate={false} aria-busy={busy}>
+            <label htmlFor="auth-email">Email</label>
             <input
-              id="auth-password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="At least 12 characters"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={12}
-              maxLength={128}
+              id="auth-email"
+              name="email"
+              type="email"
+              placeholder="name@example.com"
+              autoComplete="email"
+              spellCheck={false}
               required
               disabled={session.loading || busy}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            <button
-              type="button"
-              aria-controls="auth-password"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((value) => !value)}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            <label htmlFor="auth-password">Password</label>
+            <div className={styles.passwordField}>
+              <input
+                id="auth-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="At least 12 characters"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                minLength={12}
+                maxLength={128}
+                required
+                disabled={session.loading || busy}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                aria-controls="auth-password"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {mode === "register" && <small className={styles.hint}>Use 12–128 characters.</small>}
+            {error && <p className={styles.error} lang="zh-CN" role="alert">{error}</p>}
+            <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
+              {busy && <span className={styles.spinner} aria-hidden="true" />}
+              {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
             </button>
-          </div>
-          {mode === "register" && <small className={styles.hint}>Use 12–128 characters.</small>}
-          {error && <p className={styles.error} lang="zh-CN" role="alert">{error}</p>}
-          <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
-            {busy && <span className={styles.spinner} aria-hidden="true" />}
-            {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-          </button>
-        </form>
+          </form>
 
-        <div className={styles.links}>
-          {mode === "login" && (
-            <button type="button" onClick={() => setResetHelp((value) => !value)} aria-expanded={resetHelp}>
-              Forgot password?
-            </button>
+          <div className={styles.links}>
+            {mode === "login" && (
+              <button type="button" onClick={() => setResetHelp((value) => !value)} aria-expanded={resetHelp}>
+                Forgot password?
+              </button>
+            )}
+            <Link
+              href={mode === "login" ? "/register" : "/login"}
+              onClick={() => { setError(""); setPassword(""); setShowPassword(false); setResetHelp(false); }}
+            >
+              {mode === "login" ? "Create an account" : "Back to sign in"}
+            </Link>
+          </div>
+          {resetHelp && (
+            <p className={styles.resetHelp} role="status">
+              Self-service password reset is currently unavailable.
+            </p>
           )}
-          <Link
-            href={mode === "login" ? "/register" : "/login"}
-            onClick={() => { setError(""); setPassword(""); setShowPassword(false); setResetHelp(false); }}
-          >
-            {mode === "login" ? "Create an account" : "Back to sign in"}
-          </Link>
         </div>
-        {resetHelp && (
-          <p className={styles.resetHelp} role="status">
-            Self-service password reset is currently unavailable.
-          </p>
-        )}
       </section>
       <p className={styles.footnote}>KnowFlow · Retrieval-augmented knowledge workspace</p>
     </main>

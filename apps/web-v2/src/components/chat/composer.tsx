@@ -1,13 +1,29 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { useDocumentsContext, useKnowledgeContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { useDraft } from "@/components/store";
 import styles from "./chat.module.css";
 
+function fitQuestion(input: HTMLTextAreaElement | null) {
+  if (!input) return;
+  input.style.height = "auto";
+  const max = Number.parseFloat(getComputedStyle(input).maxHeight) || 144;
+  input.style.height = `${Math.min(input.scrollHeight, max)}px`;
+}
+
 export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   const { draft, setDraft } = useDraft();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    fitQuestion(inputRef.current);
+  }, [draft]);
+  useEffect(() => {
+    const resize = () => fitQuestion(inputRef.current);
+    window.addEventListener("resize", resize, { passive: true });
+    return () => window.removeEventListener("resize", resize);
+  }, []);
   const stream = useStreamControls();
   const knowledge = useKnowledgeContext();
   const { readyDocuments } = useDocumentsContext();
@@ -31,6 +47,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   return (
     <form className={styles.composer} onSubmit={submit}>
       <textarea
+        ref={inputRef}
         id="desk-question"
         name="question"
         aria-label="问题"
@@ -42,7 +59,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
         placeholder={placeholder}
         maxLength={4000}
         disabled={!ready || stream.busy}
-        rows={2}
+        rows={1}
       />
       <div className={styles.composerFoot}>
         <span className={styles.composerHint}>

@@ -5,29 +5,9 @@
 .eyebrow {
   margin: 0 0 7px;
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-}
-
-.pageHead,
-.detailHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
-}
-
-.pageHead h1,
-.detailHead h1 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: clamp(30px, 3.2vw, 38px);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
 }
 
 .pageLead {
@@ -40,7 +20,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
@@ -72,18 +51,16 @@
 .toolbarMeta {
   flex: none;
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
 .baseGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
 }
 
 .baseCard {
   content-visibility: auto;
-  contain-intrinsic-size: auto 88px;
   position: relative;
   display: flex;
   min-width: 0;
@@ -100,10 +77,8 @@
 }
 
 .baseCardLink {
-  display: flex;
   min-width: 0;
   flex: 1;
-  align-items: center;
   border: 0;
   background: transparent;
   color: inherit;
@@ -151,10 +126,7 @@
   position: absolute;
   display: grid;
   place-items: center;
-  border: 0;
   border-radius: var(--radius-xs);
-  background: transparent;
-  color: transparent;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -212,7 +184,6 @@
   flex: none;
   place-items: center;
   border: 1px solid var(--line);
-  background: #fff;
 }
 
 .uploadText {
@@ -231,8 +202,7 @@
   line-height: 1.6;
 }
 
-.uploadAction,
-.emptyUpload {
+.uploadAction, .emptyUpload {
   display: inline-flex;
   min-height: 32px;
   flex: none;
@@ -243,20 +213,18 @@
   background: #fff;
   padding: 0 13px;
   color: var(--ink);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .uploadAction:hover,
-.emptyUpload:hover {
+  .uploadAction:hover, .emptyUpload:hover {
     border-color: var(--ink-3);
   }
 }
 
-.uploadAction input,
-.emptyUpload input {
+.uploadAction input, .emptyUpload input {
   display: none;
 }
 
@@ -279,7 +247,7 @@
 
 .filter span {
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -304,7 +272,7 @@
 
 .syncing {
   color: var(--ink-3);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .statusMessage {
@@ -325,7 +293,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
 }
 
@@ -353,7 +321,7 @@
   flex: none;
   place-items: center;
   color: var(--ink-2);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -453,7 +421,7 @@
   gap: 8px;
   padding: 30px 16px;
   color: var(--ink-3);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .loadMore {
@@ -463,33 +431,17 @@
   background: transparent;
   padding: 6px 10px;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 @media (max-width: 760px) {
-  .pageHead,
-  .detailHead {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .pageHead h1,
-  .detailHead h1 {
-    font-size: clamp(26px, 8vw, 32px);
-  }
   .toolbar {
     gap: 10px;
   }
   .search {
     width: 100%;
-  }
-  .baseGrid {
-    grid-template-columns: 1fr;
-  }
-  .baseCardDelete {
-    color: var(--ink-3);
   }
   .uploadZone {
     align-items: flex-start;
@@ -513,18 +465,7 @@
 }
 
 .eyebrow {
-  font: 10px/1.5 var(--font-mono);
-  letter-spacing: .16em;
   margin-bottom: 10px;
-}
-
-.pageHead {
-  padding: 10px 0 28px;
-  margin-bottom: 0;
-}
-
-.pageHead h1, .detailHead h1 {
-  font-size: var(--type-h1);
 }
 
 .pageLead {
@@ -536,7 +477,6 @@
 
 .toolbar {
   padding: 12px 0;
-  margin-bottom: 24px;
 }
 
 .search {
@@ -552,43 +492,20 @@
 }
 
 .toolbarMeta {
-  font: 11px var(--font-mono);
-}
-
-.baseGrid {
-  gap: 16px;
+  font: 12px var(--font-mono);
 }
 
 .baseCard {
-  min-height: 154px;
   box-shadow: var(--shadow-card);
   transition: transform var(--dur) var(--ease);
 }
 
 .baseCardLink {
-  flex-wrap: wrap;
   align-content: flex-start;
-  gap: 16px;
-  padding: 22px;
 }
 
 .baseCardIcon {
-  width: 42px;
-  height: 42px;
-  background: var(--accent-soft);
   border: 1px solid #dfe7ed;
-  color: var(--accent);
-  box-shadow: var(--highlight);
-}
-
-.baseCardText {
-  flex: 1 0 100%;
-  order: 2;
-}
-
-.baseCardText strong {
-  font-size: 15px;
-  letter-spacing: -.02em;
 }
 
 .baseCardText small {
@@ -601,13 +518,6 @@
   align-self: center;
 }
 
-.baseCardDelete {
-  width: 30px;
-  height: 30px;
-  top: 16px;
-  right: 16px;
-}
-
 .baseCardLink .baseCardArrow {
   margin-right: 28px;
 }
@@ -618,32 +528,20 @@
   gap: 8px;
 }
 
-.detailHead {
-  margin-bottom: 26px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--line);
-}
-
 .detailBadge {
-  font-size: 11px;
+  font-size: 12px;
   background: var(--bg-subtle);
   border-radius: 7px;
 }
 
 .uploadZone {
   position: relative;
-  min-height: 126px;
   gap: 20px;
-  border-color: #cbd4dc;
-  background: radial-gradient(ellipse at 0 0, var(--accent-soft), #fcfdfe 70%);
   padding: 24px;
 }
 
 .uploadIcon {
-  width: 48px;
-  height: 48px;
   border-radius: 13px;
-  color: var(--accent);
   box-shadow: var(--shadow-card);
   transition: transform var(--dur) var(--ease);
 }
@@ -691,7 +589,7 @@
 }
 
 .filter span {
-  font: 10px var(--font-mono);
+  font: 12px var(--font-mono);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -735,7 +633,7 @@
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--bg-subtle);
-  font: 10px var(--font-mono);
+  font: 12px var(--font-mono);
   box-shadow: var(--highlight);
 }
 
@@ -744,12 +642,12 @@
 }
 
 .docName small {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
 }
 
 .docStatus small {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .docMenu > button {
@@ -798,55 +696,23 @@
 }
 
 @media (max-width: 760px) {
-  .pageHead {
-    padding: 0 0 24px;
-  }
   .pageLead {
     font-size: 13px;
   }
-  .baseCard {
-    min-height: 112px;
-  }
-  .baseCardLink {
-    flex-wrap: nowrap;
-    align-items: center;
-    padding: 18px 52px 18px 16px;
-    gap: 14px;
-  }
-  .baseCardText {
-    flex: 1;
-    order: 0;
-  }
   .baseCardLink .baseCardArrow {
     margin-right: 0;
-  }
-  .baseCardDelete {
-    top: 15px;
-    right: 10px;
   }
   .search {
     min-width: 0;
   }
   .toolbarMeta {
-    font-size: 10px;
-  }
-  .detailHead {
-    gap: 16px;
-    padding-bottom: 22px;
+    font-size: 12px;
   }
   .uploadZone {
-    padding: 20px 16px;
     gap: 14px;
-  }
-  .uploadIcon {
-    width: 40px;
-    height: 40px;
   }
   .uploadText strong {
     font-size: 13px;
-  }
-  .uploadText span {
-    font-size: 11px;
   }
   .uploadAction {
     min-height: 38px;
@@ -871,7 +737,6 @@
     grid-template-columns: 34px minmax(0, 1fr) 30px;
     gap: 8px 12px;
     min-height: 94px;
-    padding: 14px;
   }
   .docFormat {
     width: 34px;
@@ -895,17 +760,16 @@
     align-self: center;
   }
   .docStatus small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .detailFootnote {
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   @media (hover: hover) and (pointer: fine) {
-    .baseCard:hover,
-.baseCard:hover .baseCardArrow {
+    .baseCard:hover, .baseCard:hover .baseCardArrow {
       transform: none;
     }
   }
@@ -922,7 +786,7 @@
   }
 }
 
-/*Radix Presence retains the surface for this short exit; menu rows stay still.*/
+/* Radix Presence retains the surface for this short exit; menu rows stay still. */
 
 .docMenuPanel[data-state="closed"] {
   animation: menuOut 100ms var(--ease) both;
@@ -945,4 +809,382 @@
   .docMenuPanel[data-state="closed"] {
     animation: menuFade 100ms var(--ease) both !important;
   }
+}
+
+/* Curated folios: real names/times beneath an entirely decorative contour cover. */
+
+.eyebrow {
+  font: 600 11px/1.5 var(--font-sans);
+  letter-spacing: .12em;
+}
+
+.toolbar {
+  border-top: 0;
+  padding-top: 0;
+  margin-bottom: 24px;
+}
+
+.baseGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.baseCard {
+  min-height: 232px;
+  contain-intrinsic-size: auto 232px;
+  animation: none;
+}
+
+.baseCardLink {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.baseCover {
+  display: block;
+  position: relative;
+  min-height: 106px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: #eef1f4;
+}
+
+.baseCover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/knowledge-contours.svg") center / cover no-repeat;
+  pointer-events: none;
+}
+
+.baseCover[data-tone="1"] {
+  background: #293139;
+}
+
+.baseCover[data-tone="1"]::after {
+  filter: invert(1);
+  opacity: .65;
+  background-position: right center;
+}
+
+.baseCover[data-tone="2"] {
+  background: #f5f5f2;
+}
+
+.baseCover[data-tone="2"]::after {
+  transform: scaleX(-1);
+  opacity: .65;
+}
+
+.baseCardIcon {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  color: var(--ink-2);
+  background: #ffffffed;
+  border-color: #ffffffb3;
+  box-shadow: 0 2px 8px #191c2008;
+}
+
+.baseCardText {
+  flex: 1;
+  order: 0;
+  padding: 22px 22px 14px;
+}
+
+.baseCardText strong {
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.baseCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 22px 22px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.baseOpen {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.baseCardLink .baseCardArrow {
+  width: 15px;
+  margin: 0;
+  color: var(--accent);
+}
+
+.baseCardDelete {
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  background: #ffffffed;
+  border: 1px solid #ffffffb3;
+  color: var(--ink-2);
+}
+
+.baseCreate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 232px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: #f7f9fa80;
+  padding: 24px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.createTile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--accent);
+}
+
+.baseCreate strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.baseCreate > span:last-child {
+  font-size: 12px;
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 24px;
+  padding: 4px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.stat:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.stat dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.stat dd {
+  margin: 0;
+  font: 500 28px/1.2 var(--font-sans);
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat[data-state="ready"] dd {
+  color: var(--success-ink);
+}
+
+.stat[data-state="working"] dd {
+  color: var(--warning-ink);
+}
+
+.stat[data-state="failed"] dd {
+  color: var(--danger);
+}
+
+.partialCounts {
+  margin: -12px 0 20px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.uploadZone {
+  min-height: 116px;
+  background: #f8fafc;
+  border-color: #d0d9e1;
+}
+
+.uploadIcon {
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  color: var(--accent);
+}
+
+.uploadZone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 10px) top / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 10px) bottom / 100% 1px no-repeat, repeating-linear-gradient(0deg, var(--accent) 0 5px, transparent 5px 10px) left / 1px 100% no-repeat, repeating-linear-gradient(0deg, var(--accent) 0 5px, transparent 5px 10px) right / 1px 100% no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploadDragging::after {
+  animation: dropBorder 800ms var(--ease-in-out) infinite alternate;
+}
+
+@keyframes dropBorder {
+  from {
+    opacity: .25;
+  }
+  to {
+    opacity: .8;
+  }
+}
+
+@keyframes folioEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .baseCreate:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .baseCard:hover .baseOpen {
+    color: var(--accent);
+  }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .baseGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .baseGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .baseCard {
+    min-height: 200px;
+    contain-intrinsic-size: auto 200px;
+  }
+  .baseCover {
+    min-height: 76px;
+  }
+  .baseCardIcon {
+    left: 18px;
+    bottom: 16px;
+    width: 36px;
+    height: 36px;
+  }
+  .baseCardText {
+    flex: 1;
+    padding: 18px 18px 12px;
+  }
+  .baseCardText strong {
+    font-size: 16px;
+  }
+  .baseCardFoot {
+    padding: 0 18px 18px;
+    gap: 12px;
+  }
+  .baseCardDelete {
+    top: 12px;
+    right: 12px;
+  }
+  .baseCreate {
+    min-height: 164px;
+  }
+  .statRow {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+  .stat {
+    padding-left: 16px;
+  }
+  .stat dd {
+    font-size: 24px;
+  }
+  .stat dt {
+    font-size: 12px;
+  }
+  .uploadZone {
+    padding: 18px 16px;
+  }
+  .uploadText span {
+    font-size: 12px;
+    line-height: 1.75;
+  }
+  .docCard {
+    padding: 16px 14px;
+  }
+  .docStatus {
+    flex-wrap: wrap;
+  }
+  .docStatus small {
+    text-align: left;
+  }
+  .detailFootnote {
+    line-height: 1.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.baseCard:nth-child(-n+4)) {
+    animation: gentle-fade 120ms var(--ease) both !important;
+  }
+  .uploadDragging::after {
+    animation: none;
+    opacity: .7;
+  }
+}
+
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.baseCard {
+  overflow: visible;
+}
+
+.baseCardLink {
+  border-radius: inherit;
+}
+
+.baseCover {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.baseCard:nth-child(-n+4) {
+  animation: folioEnter 180ms var(--ease) backwards;
 }

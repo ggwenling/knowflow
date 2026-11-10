@@ -7,7 +7,7 @@ import { PerformanceReporter } from "./performance-reporter";
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      if (!event.metaKey && !event.ctrlKey && !event.altKey) document.documentElement.dataset.input = "keyboard";
+      document.documentElement.dataset.input = "keyboard";
       if (event.key === "Escape") {
         document.querySelectorAll<HTMLDetailsElement>("details[data-popover][open]").forEach((popover) => {
           popover.open = false;

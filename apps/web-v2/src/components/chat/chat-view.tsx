@@ -132,8 +132,8 @@ export function ChatView() {
   }
 
   return (
-    <div className={`${styles.page} page-enter`}>
-      <header className={styles.chatHeader}>
+    <div className={styles.page}>
+      <header className="workspace-header">
         <div className={styles.chatTitle}>
           <p className={styles.eyebrow}>Conversations</p>
           <h1>对话</h1>
@@ -141,7 +141,7 @@ export function ChatView() {
             {selected ? selected.name : "选择一个知识库开始"} · {readyDocuments.length} 份资料可用于问答
           </p>
         </div>
-        <div className={styles.chatActions}>
+        <div className={styles.chatActions} data-header-actions>
           {knowledge.bases.length > 1 && (
             <label className={styles.baseSelect}>
               <Layers size={14} aria-hidden="true" />

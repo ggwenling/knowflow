@@ -72,6 +72,7 @@ export function BaseDetailView() {
   const base = knowledge.bases.find((item) => item.id === baseId) ?? (remote?.id === baseId ? remote : null);
   const readyCount = documents.documents.filter((document) => document.status === "READY").length;
   const visible = useMemo(() => documents.documents.filter((document) => matches(document, filter)), [documents.documents, filter]);
+  const counts = Object.fromEntries(filters.map(({ key }) => [key, documents.documents.filter((document) => matches(document, key)).length])) as Record<Filter, number>;
 
   async function upload(file: File | undefined, target?: Document) {
     if (!file) return;
@@ -92,7 +93,7 @@ export function BaseDetailView() {
   }
 
   return (
-    <div className={`${styles.page} page-enter`}>
+    <div className={styles.page}>
       <Link className={styles.back} href="/knowledge-bases">
         <ArrowLeft size={14} aria-hidden="true" /> 全部知识库
       </Link>
@@ -101,7 +102,7 @@ export function BaseDetailView() {
         <p className={styles.statusMessage} role="status">{error}</p>
       ) : (
         <>
-          <header className={styles.detailHead}>
+          <header className="workspace-header">
             <div>
               <p className={styles.eyebrow}>Knowledge base</p>
               <h1>{base?.name ?? "知识库"}</h1>
@@ -111,10 +112,18 @@ export function BaseDetailView() {
                   : `${documents.documents.length} 份资料 · ${readyCount} 份可用于问答`}
               </p>
             </div>
-            <span className={styles.detailBadge}>
+            <span className={styles.detailBadge} data-header-tag>
               <Layers size={14} aria-hidden="true" /> 私有空间
             </span>
           </header>
+
+          <dl className={styles.statRow} aria-label={documents.hasMore ? "已加载资料统计" : "资料统计"}>
+            {filters.map(({ key, label }) => <div className={styles.stat} key={key} data-state={key}>
+              <dt>{label}</dt>
+              <dd>{documents.refreshing && !documents.documents.length ? "—" : counts[key]}</dd>
+            </div>)}
+          </dl>
+          {documents.hasMore && <p className={styles.partialCounts}>以上为已加载资料的数量，可继续加载更多。</p>}
 
           <UploadZone
             disabled={!baseId || Boolean(error)}
@@ -133,7 +142,7 @@ export function BaseDetailView() {
               >
                 {label}
                 <span>
-                  {key === "all" ? documents.documents.length : documents.documents.filter((document) => matches(document, key)).length}
+                  {counts[key]}
                 </span>
               </button>
             ))}

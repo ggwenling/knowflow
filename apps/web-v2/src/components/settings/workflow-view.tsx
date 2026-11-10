@@ -16,14 +16,14 @@ export function WorkflowView() {
   const router = useRouter();
 
   return (
-    <div className={`${styles.page} page-enter`}>
-      <header className={`${styles.head} ${styles.workflowHero}`}>
+    <div className={styles.page}>
+      <header className="workspace-header">
         <div>
           <p className={styles.eyebrow}>Workflows</p>
           <h1>工作流</h1>
           <p>把多步检索与处理串成可复用的流程。该能力仍在开发中，当前版本只提供单轮问答。</p>
         </div>
-        <Image className={styles.workflowArtwork} src="/archive-study.webp" alt="" width={300} height={200} />
+        <span className={styles.plannedBadge} data-header-tag>开发中</span>
       </header>
 
       <div className={styles.workflowSteps}>
@@ -38,6 +38,7 @@ export function WorkflowView() {
       </div>
 
       <section className={`${styles.section} ${styles.workflowAvailable}`}>
+        <Image className={styles.workflowArtwork} src="/archive-study.webp" alt="" width={300} height={200} />
         <h2>当前可用能力</h2>
         <p className={styles.note}>
           工作流功能暂未开放。你可以先创建知识库、上传资料，再在对话页逐条提问；每一步都会保留可核验的原文来源。

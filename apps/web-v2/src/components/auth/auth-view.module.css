@@ -146,8 +146,7 @@
   font-size: 14px;
 }
 
-.links button,
-.links a {
+.links button, .links a {
   border: 0;
   background: none;
   padding: 0;
@@ -167,7 +166,6 @@
   position: absolute;
   left: 5.9vw;
   margin: 0;
-  color: var(--ink-3);
   text-transform: uppercase;
 }
 
@@ -277,8 +275,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .links a:hover,
-.links button:hover {
+  .links a:hover, .links button:hover {
     color: var(--ink);
     text-decoration-color: var(--ink);
   }
@@ -287,8 +284,7 @@
 .footnote {
   bottom: 24px;
   font-family: var(--font-mono);
-  letter-spacing: .08em;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .error {
@@ -332,5 +328,47 @@
   }
   .spinner {
     animation: none;
+  }
+}
+
+/* Two overlapping beats, while the brand and ribbon remain still. */
+
+.intro {
+  animation: authIntro 200ms var(--ease) backwards;
+}
+
+.formGroup {
+  animation: authForm 180ms var(--ease) 40ms backwards;
+}
+
+.footnote {
+  color: var(--ink-3);
+  font: 600 12px/1.6 var(--font-sans);
+  letter-spacing: .06em;
+}
+
+@keyframes authIntro {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes authForm {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes authFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro, .formGroup {
+    animation: authFade 120ms var(--ease) both !important;
   }
 }

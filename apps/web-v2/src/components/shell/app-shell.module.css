@@ -140,12 +140,10 @@
   gap: 8px;
   padding: 0 6px 6px;
   color: var(--ink-3);
-  font-weight: 700;
   text-transform: uppercase;
 }
 
-.sectionHead button,
-.sectionHead a {
+.sectionHead button, .sectionHead a {
   display: grid;
   width: 22px;
   height: 22px;
@@ -158,8 +156,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .sectionHead button:hover,
-.sectionHead a:hover {
+  .sectionHead button:hover, .sectionHead a:hover {
     background: #ededed;
     color: var(--ink);
   }
@@ -215,7 +212,7 @@
 .emptyHint {
   margin: 2px 8px 8px;
   color: var(--ink-3);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -315,7 +312,7 @@
   background: transparent;
   padding: 8px;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -337,7 +334,7 @@
   border-radius: 50%;
   background: var(--ink);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -362,7 +359,7 @@
   background: transparent;
   padding: 4px;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -415,11 +412,10 @@
   padding: 2px 4px 8px;
   border-bottom: 1px solid var(--line);
   color: var(--ink-2);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
-.accountPopover button,
-.accountPopover a {
+.accountPopover button, .accountPopover a {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -434,8 +430,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .accountPopover button:hover,
-.accountPopover a:hover {
+  .accountPopover button:hover, .accountPopover a:hover {
     background: var(--bg-muted);
   }
 }
@@ -481,7 +476,7 @@
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
 }
 
@@ -498,8 +493,7 @@
   .shell {
     display: block;
   }
-  .homeSidebar .library,
-  .chatSidebar .library {
+  .homeSidebar .library, .chatSidebar .library {
     display: none;
   }
   .sidebar {
@@ -585,7 +579,7 @@
 }
 
 .brand small {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: .12em;
 }
 
@@ -658,8 +652,7 @@
 }
 
 .sectionHead {
-  font-size: 11px;
-  letter-spacing: .04em;
+  font-size: 12px;
   margin-top: 3px;
   padding-bottom: 8px;
 }
@@ -697,7 +690,7 @@
 }
 
 .historyItem small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-3);
 }
 
@@ -714,12 +707,8 @@
   border: 1px solid #dbe3e9;
 }
 
-.accountText {
-  font-size: 11px;
-}
-
 .accountText small {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .avatar {
@@ -757,7 +746,7 @@
     font-size: 22px;
   }
   .brand small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .nav {
     display: grid;
@@ -802,7 +791,7 @@
     align-items: center;
     justify-content: space-between;
     min-height: 40px;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--ink-2);
     cursor: pointer;
     border-top: 1px solid var(--line);
@@ -872,7 +861,7 @@
   }
   .libraryContent .sectionHead {
     display: flex;
-    font-size: 11px;
+    font-size: 12px;
     padding-top: 6px;
   }
   .libraryContent .historyScroll {
@@ -924,5 +913,30 @@
 @media (prefers-reduced-motion: reduce) {
   .accountMenu:not([open]) .accountPopover {
     transform: none;
+  }
+}
+
+/* A faint paper light belongs to the reading surface, not to a floating card. */
+
+.mainColumn {
+  background: radial-gradient(ellipse 85% 320px at 40% 0, #f4f6f8aa, transparent);
+}
+
+.sectionHead {
+  letter-spacing: .04em;
+  font-weight: 600;
+}
+
+.accountText {
+  font-size: 12px;
+}
+
+.accountText small, .historyItem small {
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .mainColumn {
+    background: linear-gradient(#f8fafb80, transparent 260px);
   }
 }

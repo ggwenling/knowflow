@@ -50,8 +50,8 @@ export function BasesView() {
   }
 
   return (
-    <div className={`${styles.page} page-enter`}>
-      <header className={styles.pageHead}>
+    <div className={styles.page} data-entrance="cards">
+      <header className="workspace-header">
         <div>
           <p className={styles.eyebrow}>Knowledge bases</p>
           <h1>{hasBases ? "我的知识库" : "开始整理你的资料"}</h1>
@@ -86,17 +86,21 @@ export function BasesView() {
         <SkeletonRows rows={4} />
       ) : filtered.length ? (
         <div className={styles.baseGrid}>
-          {filtered.map((base) => (
-            <article className={styles.baseCard} key={base.id}>
+          {filtered.map((base, index) => (
+            <article className={styles.baseCard} key={base.id} style={index < 4 ? { animationDelay: `${[0, 40, 70, 95][index]}ms` } : undefined}>
               <Link className={styles.baseCardLink} href={`/knowledge-bases/${base.id}`} prefetch={false}>
-                <span className={styles.baseCardIcon}>
-                  <Folder size={19} strokeWidth={1.5} aria-hidden="true" />
+                <span className={styles.baseCover} data-tone={Array.from(base.id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3} aria-hidden="true">
+                  <span className={styles.baseCardIcon}>
+                    <Folder size={19} strokeWidth={1.5} aria-hidden="true" />
+                  </span>
                 </span>
                 <span className={styles.baseCardText}>
                   <strong>{base.name}</strong>
-                  <small>{base.updated_at ? `更新于 ${relativeTime(base.updated_at)}` : "查看资料与索引状态"}</small>
                 </span>
-                <ArrowRight size={16} className={styles.baseCardArrow} aria-hidden="true" />
+                <span className={styles.baseCardFoot}>
+                  <span>{base.updated_at ? `更新于 ${relativeTime(base.updated_at)}` : "查看资料与索引状态"}</span>
+                  <span className={styles.baseOpen}>打开 <ArrowRight size={15} className={styles.baseCardArrow} aria-hidden="true" /></span>
+                </span>
               </Link>
               <button
                 className={styles.baseCardDelete}
@@ -108,6 +112,11 @@ export function BasesView() {
               </button>
             </article>
           ))}
+          {!query && <button className={styles.baseCreate} aria-label="在网格中新建知识库" onClick={focusCreate}>
+            <span className={styles.createTile} aria-hidden="true"><Plus size={24} strokeWidth={1.4} /></span>
+            <strong>新建知识库</strong>
+            <span>为下一组资料留一个位置</span>
+          </button>}
         </div>
       ) : query ? (
         <EmptyState
