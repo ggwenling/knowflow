@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
@@ -14,7 +13,6 @@ const Ribbon = dynamic(() => import("@/components/login-ribbon"), { ssr: false }
 
 export function AuthView({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const session = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,16 +43,11 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <main className={styles.page} lang="en">
+    <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
       <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
         <DeferredVisual><Ribbon /></DeferredVisual>
       </div>
-      <motion.section
-        className={styles.content}
-        initial={reduce ? false : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      >
+      <section key={mode} className={`${styles.content} page-enter`}>
         <div className={styles.brand}>KnowFlow</div>
         <h1>
           {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
@@ -129,7 +122,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
             Self-service password reset is currently unavailable.
           </p>
         )}
-      </motion.section>
+      </section>
       <p className={styles.footnote}>KnowFlow · Retrieval-augmented knowledge workspace</p>
     </main>
   );

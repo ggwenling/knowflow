@@ -10,6 +10,7 @@ import { useQuestions } from "@/hooks/use-questions";
 import { useQuestionStream } from "@/hooks/use-question-stream";
 import { actions, useWorkspaceDispatch } from "@/components/store";
 import { Button } from "@/components/ui/button";
+import { PageFallback } from "@/components/ui/page-fallback";
 import styles from "./workspace.module.css";
 
 const SessionContext = createContext<ReturnType<typeof useSession> | null>(null);
@@ -68,9 +69,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("knowflow-session-expired", expired);
   }, []);
 
-  if (session.loading) return <main className={styles.gate} role="status">正在检查登录状态…</main>;
+  if (session.loading) return <main id="main-content" tabIndex={-1} className={styles.gate}><PageFallback label="正在检查登录状态…" /></main>;
   if (session.error) return (
-    <main className={styles.gate}>
+    <main id="main-content" tabIndex={-1} className={styles.gate}>
       <div className={styles.gateCard} role="alert">
         <p className={styles.gateEyebrow}>连接中断</p>
         <h1>暂时无法连接工作区</h1>
@@ -79,10 +80,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       </div>
     </main>
   );
-  if (!session.user) return <main className={styles.gate} role="status">正在前往登录…</main>;
+  if (!session.user) return <main id="main-content" tabIndex={-1} className={styles.gate}><PageFallback label="正在前往登录…" /></main>;
 
   // Settle the account reset before mounting route effects (e.g. loading a deep-linked answer).
-  if (streamOwner !== userId) return <main className={styles.gate} role="status">正在准备你的工作区…</main>;
+  if (streamOwner !== userId) return <main id="main-content" tabIndex={-1} className={styles.gate}><PageFallback label="正在准备你的工作区…" /></main>;
 
   // Authentication/account reset gates the shell; remote lists never do.
   // Stable domain values keep draft edits and answer deltas out of unrelated consumers.

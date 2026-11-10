@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { HomeComposer } from "./home-composer";
@@ -35,7 +34,6 @@ function ModelNotice() {
 
 export function HomeView() {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const session = useSessionContext();
   const knowledge = useKnowledgeContext();
   const documents = useDocumentsContext();
@@ -59,12 +57,7 @@ export function HomeView() {
   }
 
   return (
-    <motion.div
-      className={styles.home}
-      initial={reduce ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.32 }}
-    >
+    <div className={styles.home}>
       <div className={styles.wave} aria-hidden="true">
         <div className={`home-art ${styles.art}`}>
           <DeferredVisual><Wave /></DeferredVisual>
@@ -72,7 +65,7 @@ export function HomeView() {
       </div>
 
       <header className={styles.header}>
-        <details className={styles.notifications}>
+        <details className={styles.notifications} data-popover>
           <summary aria-label="通知"><Bell size={21} strokeWidth={1.6} /></summary>
           <div className={styles.popover}>
             <strong>通知</strong>
@@ -126,6 +119,6 @@ export function HomeView() {
         <span>{session.user?.email}</span>
         <span>{knowledge.bases.length} 个知识库 · {questions.history.length} 条问答</span>
       </footer>
-    </motion.div>
+    </div>
   );
 }

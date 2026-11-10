@@ -10,14 +10,26 @@
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: .01em;
   white-space: nowrap;
   text-decoration: none;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+  box-shadow: var(--highlight);
+  transition: transform var(--dur-fast) var(--ease);
 }
 
 .button:disabled {
-  opacity: 0.45;
+  opacity: .4;
+  box-shadow: none;
+}
+
+.button[aria-busy="true"] {
+  opacity: .75;
+  cursor: wait;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+  transition-duration: 100ms;
 }
 
 .md {
@@ -37,29 +49,23 @@
   font-size: 14px;
 }
 
-.primary:hover:not(:disabled) {
-  background: #333;
+.primary {
+  background: linear-gradient(180deg, #2c3035, var(--ink));
+  border-color: var(--ink);
+  box-shadow: inset 0 1px 0 #ffffff20, 0 1px 2px #191c201a;
 }
 
 .secondary {
   border-color: var(--line-strong);
   background: #fff;
   color: var(--ink);
-}
-
-.secondary:hover:not(:disabled) {
-  border-color: #b9b9b9;
-  background: var(--bg-subtle);
+  box-shadow: var(--highlight), 0 1px 2px #191c2008;
 }
 
 .ghost {
   background: transparent;
   color: var(--ink-2);
-}
-
-.ghost:hover:not(:disabled) {
-  background: var(--bg-muted);
-  color: var(--ink);
+  box-shadow: none;
 }
 
 .danger {
@@ -68,23 +74,61 @@
   color: var(--danger);
 }
 
-.danger:hover:not(:disabled) {
-  border-color: var(--danger);
-  background: var(--danger-soft);
-}
-
 .text {
   min-height: 28px;
   padding: 0 4px;
   background: transparent;
   color: var(--ink-2);
   font-weight: 500;
-}
-
-.text:hover:not(:disabled) {
-  color: var(--ink);
+  box-shadow: none;
 }
 
 .full {
   width: 100%;
+}
+
+.loader {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover:not(:disabled) {
+    background: #343a41;
+  }
+  .secondary:hover:not(:disabled) {
+    border-color: #aeb8c3;
+    background: var(--bg-subtle);
+  }
+  .ghost:hover:not(:disabled) {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
+  .danger:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: var(--danger-soft);
+  }
+  .text:hover:not(:disabled) {
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+  .loader {
+    animation: none;
+    opacity: .6;
+  }
 }

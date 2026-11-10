@@ -18,7 +18,7 @@ export function ShortcutGrid({ uploadHref }: { uploadHref: string }) {
           className={styles.shortcut}
           href={href || uploadHref}
           aria-label={title}
-          style={{ animationDelay: `${80 + index * 45}ms` }}
+          style={{ animationDelay: `${[0, 40, 70, 95][index]}ms` }}
         >
           <Icon className={styles.shortcutIcon} size={26} strokeWidth={1.5} aria-hidden="true" />
           <span className={styles.shortcutText}>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowRight, Folder, Plus, Search, Trash2 } from "lucide-react";
 import { useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
@@ -18,7 +17,6 @@ import styles from "./knowledge.module.css";
 
 export function BasesView() {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const knowledge = useKnowledgeContext();
   const questions = useQuestionsContext();
   const [query, setQuery] = useQueryState("q", "", 200);
@@ -32,7 +30,10 @@ export function BasesView() {
   const hasBases = knowledge.bases.length > 0;
 
   function focusCreate() {
-    document.getElementById("new-base-name")?.focus();
+    const input = document.getElementById("new-base-name");
+    const group = input?.closest("details");
+    if (group) group.open = true;
+    input?.focus();
   }
 
   async function remove() {
@@ -49,12 +50,7 @@ export function BasesView() {
   }
 
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26 }}
-    >
+    <div className={`${styles.page} page-enter`}>
       <header className={styles.pageHead}>
         <div>
           <p className={styles.eyebrow}>Knowledge bases</p>
@@ -121,6 +117,7 @@ export function BasesView() {
         />
       ) : (
         <EmptyState
+          illustration
           icon={<Folder size={20} strokeWidth={1.5} />}
           title="这里还没有知识库"
           description="创建第一个知识库，上传资料并等待索引就绪。之后每次提问都会附带可核验的原文来源。"
@@ -136,6 +133,6 @@ export function BasesView() {
         onConfirm={() => void remove()}
         busy={knowledge.working}
       />
-    </motion.div>
+    </div>
   );
 }

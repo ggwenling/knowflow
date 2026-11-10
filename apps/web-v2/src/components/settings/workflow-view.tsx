@@ -1,7 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ArrowRight, FileText, Quote, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import styles from "./settings.module.css";
@@ -14,19 +14,16 @@ const steps = [
 
 export function WorkflowView() {
   const router = useRouter();
-  const reduce = useReducedMotion();
 
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26 }}
-    >
-      <header className={styles.head}>
-        <p className={styles.eyebrow}>Workflows</p>
-        <h1>工作流</h1>
-        <p>把多步检索与处理串成可复用的流程。该能力仍在开发中，当前版本只提供单轮问答。</p>
+    <div className={`${styles.page} page-enter`}>
+      <header className={`${styles.head} ${styles.workflowHero}`}>
+        <div>
+          <p className={styles.eyebrow}>Workflows</p>
+          <h1>工作流</h1>
+          <p>把多步检索与处理串成可复用的流程。该能力仍在开发中，当前版本只提供单轮问答。</p>
+        </div>
+        <Image className={styles.workflowArtwork} src="/archive-study.webp" alt="" width={300} height={200} />
       </header>
 
       <div className={styles.workflowSteps}>
@@ -40,7 +37,7 @@ export function WorkflowView() {
         ))}
       </div>
 
-      <section className={styles.section}>
+      <section className={`${styles.section} ${styles.workflowAvailable}`}>
         <h2>当前可用能力</h2>
         <p className={styles.note}>
           工作流功能暂未开放。你可以先创建知识库、上传资料，再在对话页逐条提问；每一步都会保留可核验的原文来源。
@@ -52,6 +49,6 @@ export function WorkflowView() {
           <Button variant="secondary" onClick={() => router.push("/conversations")}>开始提问</Button>
         </div>
       </section>
-    </motion.div>
+    </div>
   );
 }

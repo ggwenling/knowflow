@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { CircleHelp, FileText, FolderOpen, Layers, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { useDraftActions } from "@/components/store";
@@ -17,9 +16,10 @@ import { HistoryRail } from "./history-rail";
 import { AnswerPanel } from "./answer-panel";
 import { Composer } from "./composer";
 import { SourceDialog } from "./source-dialog";
+import { CurrentSources } from "./current-sources";
 import styles from "./chat.module.css";
 
-function DocumentsPanel() {
+function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, documentName: string, trigger: HTMLButtonElement) => void }) {
   const documents = useDocumentsContext();
   const knowledge = useKnowledgeContext();
   const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
@@ -39,6 +39,7 @@ function DocumentsPanel() {
       <p className={styles.docsHint}>
         {selected ? `${selected.name} · ${documents.documents.filter((item) => item.status === "READY").length} 份可用于问答` : "先选择一个知识库"}
       </p>
+      <CurrentSources onOpen={onOpenSource} />
 
       {documents.documents.length ? (
         <div className={styles.docList}>
@@ -83,7 +84,6 @@ function DocumentsPanel() {
 
 export function ChatView() {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const params = useParams<{ questionId?: string }>();
   const questionId = params?.questionId;
   const knowledge = useKnowledgeContext();
@@ -126,13 +126,13 @@ export function ChatView() {
 
   const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
 
+  function openSource(source: Source, documentName: string, trigger: HTMLButtonElement) {
+    setSourceTrigger(trigger);
+    setViewing({ source, documentName });
+  }
+
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-    >
+    <div className={`${styles.page} page-enter`}>
       <header className={styles.chatHeader}>
         <div className={styles.chatTitle}>
           <p className={styles.eyebrow}>Conversations</p>
@@ -198,10 +198,7 @@ export function ChatView() {
         <section className={styles.chatMain} aria-label="问答">
           <div className={styles.answerScroll}>
             <AnswerPanel
-              onOpenSource={(source, documentName, trigger) => {
-                setSourceTrigger(trigger);
-                setViewing({ source, documentName });
-              }}
+              onOpenSource={openSource}
               onEditQuestion={(question) => {
                 setDraft(question);
                 requestAnimationFrame(() => document.getElementById("desk-question")?.focus());
@@ -216,7 +213,7 @@ export function ChatView() {
         </section>
 
         <aside className={styles.docsColumn}>
-          <DocumentsPanel />
+          <DocumentsPanel onOpenSource={openSource} />
         </aside>
       </div>
 
@@ -238,7 +235,7 @@ export function ChatView() {
               onNew={() => { setPanel(null); newChat(); }}
               onNavigate={() => setPanel(null)}
             />
-          ) : <DocumentsPanel />}
+          ) : <DocumentsPanel onOpenSource={openSource} />}
         </DialogContent>
       </Dialog>
 
@@ -250,6 +247,6 @@ export function ChatView() {
         returnFocus={sourceTrigger}
       />
 
-    </motion.div>
+    </div>
   );
 }

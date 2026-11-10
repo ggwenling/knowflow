@@ -15,7 +15,8 @@
   pointer-events: none;
 }
 
-/* Keep the existing fallback asset at its original position and proportions. */
+/*Keep the existing fallback asset at its original position and proportions.*/
+
 .wave:not(:has(canvas)) {
   top: 132px;
   height: 268px;
@@ -55,9 +56,11 @@
   display: none;
 }
 
-.notifications summary:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .notifications summary:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .popover {
@@ -70,7 +73,6 @@
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
   padding: 16px;
   box-shadow: var(--shadow-pop);
 }
@@ -95,7 +97,6 @@
   color: var(--ink-3);
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.2em;
   text-transform: uppercase;
 }
 
@@ -112,34 +113,22 @@
 .lead {
   margin: 14px 0 30px;
   color: var(--ink-2);
-  font-size: clamp(15px, 1.3vw, 18px);
   line-height: 1.5;
 }
 
 .ask {
   display: flex;
   width: min(720px, 100%);
-  height: 66px;
   align-items: center;
   gap: 14px;
   margin: 0 auto;
   border: 1px solid #e6e6e6;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.9);
   padding: 10px 10px 10px 20px;
-  box-shadow: 0 10px 30px rgba(17, 17, 17, 0.05);
   text-align: left;
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
-}
-
-.ask:focus-within {
-  border-color: #b9b9b9;
-  box-shadow: 0 14px 36px rgba(17, 17, 17, 0.07);
 }
 
 .ask > svg {
   flex: none;
-  color: var(--ink-2);
 }
 
 .ask input {
@@ -153,7 +142,7 @@
 }
 
 .ask input::placeholder {
-  color: #8f8f8f;
+  color: var(--ink-3);
   opacity: 1;
 }
 
@@ -167,11 +156,12 @@
   border-radius: 13px;
   background: var(--ink);
   color: #fff;
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
-.ask > button:hover:not(:disabled) {
-  background: #333;
+@media (hover: hover) and (pointer: fine) {
+  .ask > button:hover:not(:disabled) {
+    background: #333;
+  }
 }
 
 .ask > button:disabled {
@@ -184,19 +174,14 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-top: 12px;
   color: var(--ink-3);
-  font-size: 11.5px;
 }
 
 .scope select {
   max-width: 200px;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
-  padding: 3px 7px;
   color: var(--ink-2);
-  font-size: 11.5px;
 }
 
 .modeNote {
@@ -204,7 +189,6 @@
   max-width: min(660px, 100%);
   margin: 16px auto 0;
   color: var(--ink-3);
-  font-size: 10.5px;
   letter-spacing: 0.01em;
   text-align: center;
 }
@@ -241,36 +225,31 @@
 .shortcuts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 30px;
 }
 
 .shortcut {
   display: flex;
   min-width: 0;
-  min-height: 96px;
   align-items: center;
   gap: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.92);
-  padding: 18px 18px;
   color: var(--ink);
   text-align: left;
   text-decoration: none;
-  animation: rise 0.5s var(--ease) both;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), transform var(--dur) var(--ease);
+  animation: rise 200ms var(--ease) both;
 }
 
-.shortcut:hover {
-  border-color: #c9c9c9;
-  background: #fff;
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .shortcut:hover {
+    border-color: #c9c9c9;
+    background: #fff;
+  }
 }
 
 .shortcutIcon {
   flex: none;
-  color: var(--ink);
 }
 
 .shortcutText {
@@ -280,7 +259,6 @@
 
 .shortcutText strong {
   display: block;
-  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -290,7 +268,6 @@
   margin-top: 4px;
   overflow: hidden;
   color: var(--ink-3);
-  font-size: 11.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -298,19 +275,18 @@
 .shortcutArrow {
   flex: none;
   color: #bdbdbd;
-  transition: transform var(--dur) var(--ease), color var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease);
 }
 
-.shortcut:hover .shortcutArrow {
-  color: var(--ink);
-  transform: translateX(3px);
+@media (hover: hover) and (pointer: fine) {
+  .shortcut:hover .shortcutArrow {
+    color: var(--ink);
+  }
 }
 
 .overview {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-  gap: 22px;
-  margin-top: 30px;
 }
 
 .panel {
@@ -333,7 +309,6 @@
 
 .panelHead h2 {
   margin: 0;
-  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -351,9 +326,11 @@
   text-decoration: none;
 }
 
-.panelHead > button:hover,
+@media (hover: hover) and (pointer: fine) {
+  .panelHead > button:hover,
 .panelHead > a:hover {
-  color: var(--ink);
+    color: var(--ink);
+  }
 }
 
 .baseList,
@@ -399,7 +376,6 @@
   flex: none;
   place-items: center;
   border-radius: 10px;
-  background: var(--bg-muted);
   color: var(--ink-2);
 }
 
@@ -424,10 +400,12 @@
   font-size: 11px;
 }
 
-.baseLink:hover .baseText strong,
+@media (hover: hover) and (pointer: fine) {
+  .baseLink:hover .baseText strong,
 .conversation:hover strong {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
 }
 
 .count {
@@ -449,9 +427,11 @@
   color: var(--ink-3);
 }
 
-.moreIcon:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .moreIcon:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .conversation {
@@ -522,10 +502,12 @@
   font-size: 11.5px;
 }
 
-.empty button:hover {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+@media (hover: hover) and (pointer: fine) {
+  .empty button:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
 .footer {
@@ -533,11 +515,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-top: 34px;
   border-top: 1px solid var(--line);
   padding-top: 12px;
   color: var(--ink-3);
-  font-size: 10px;
   letter-spacing: 0.02em;
 }
 
@@ -558,15 +538,12 @@
   .shortcuts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
   .overview {
     grid-template-columns: 1fr;
   }
-
   .wave {
     height: 340px;
   }
-
   .wave:not(:has(canvas)) {
     height: 230px;
   }
@@ -576,102 +553,287 @@
   .header {
     height: 34px;
   }
-
-  .hero {
-    padding-top: 18px;
-  }
-
   .eyebrow {
     display: none;
   }
-
   .hero h1 {
     font-size: clamp(44px, 15vw, 56px);
   }
-
   .lead {
     margin: 10px 0 22px;
-    font-size: 14px;
   }
-
   .ask {
-    height: 58px;
     gap: 10px;
     padding: 8px 8px 8px 14px;
-    border-radius: 15px;
   }
-
   .ask input {
     font-size: 14px;
   }
-
   .ask > button {
     width: 42px;
     height: 42px;
     border-radius: 11px;
   }
-
   .wave {
     top: 0;
     right: -16px;
     left: -16px;
     height: 216px;
   }
-
   .wave:not(:has(canvas)) {
     top: 96px;
     height: 168px;
   }
-
-  .modeNote {
-    margin-top: 12px;
-    font-size: 9.5px;
-  }
-
-  .shortcuts {
-    gap: 10px;
-    margin-top: 20px;
-  }
-
-  .shortcut {
-    min-height: 84px;
-    gap: 10px;
-    padding: 13px 12px;
-  }
-
-  .shortcutIcon {
-    width: 21px;
-    height: 21px;
-  }
-
-  .shortcutText strong {
-    font-size: 12.5px;
-  }
-
   .shortcutText small {
-    font-size: 10px;
     white-space: normal;
   }
-
   .shortcutArrow {
     display: none;
   }
-
-  .overview {
-    gap: 14px;
-    margin-top: 20px;
-  }
-
-  .panel {
-    padding: 14px 14px 6px;
-  }
-
   .count {
     display: none;
   }
+}
 
-  .footer {
+.hero {
+  padding-top: 26px;
+}
+
+.eyebrow {
+  font: 10px/1.5 var(--font-mono);
+  letter-spacing: .18em;
+  margin-bottom: 18px;
+}
+
+.lead {
+  font-size: 17px;
+  margin-top: 18px;
+  margin-bottom: 30px;
+}
+
+.ask {
+  height: 72px;
+  border-color: #d8dfe5;
+  border-radius: 18px;
+  background: #ffffffed;
+  box-shadow: var(--shadow-raised), var(--highlight);
+  transition: transform var(--dur) var(--ease);
+}
+
+.ask:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px #506e830d, var(--shadow-raised);
+}
+
+.ask input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.ask > svg {
+  color: var(--accent);
+}
+
+.ask > button {
+  box-shadow: inset 0 1px 0 #ffffff20;
+}
+
+.ask > button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.askKbd {
+  margin-right: 8px;
+}
+
+.scope {
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.scope select {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--bg-subtle);
+}
+
+.modeNote {
+  margin-top: 18px;
+  font-size: 11px;
+}
+
+.shortcuts {
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.shortcut {
+  min-height: 100px;
+  border-color: var(--line);
+  box-shadow: var(--shadow-card);
+  padding: 18px 16px;
+  transition: transform var(--dur) var(--ease);
+}
+
+.shortcut:first-child {
+  background: var(--bg-subtle);
+  border-color: var(--line-strong);
+}
+
+.shortcutIcon {
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+}
+
+.shortcutText strong {
+  font-size: 14px;
+}
+
+.shortcutText small {
+  font-size: 11px;
+}
+
+.overview {
+  gap: 20px;
+  margin-top: 26px;
+}
+
+.panel {
+  padding-top: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.panelHead h2 {
+  font-size: 15px;
+}
+
+.panelHead a {
+  font-size: 12px;
+}
+
+.rowIcon {
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+}
+
+.baseText small, .conversation small, .status, .count {
+  font-size: 11px;
+}
+
+.footer {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  margin-top: 28px;
+}
+
+.popover {
+  transform-origin: top right;
+  background: var(--surface-overlay);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+@starting-style {
+  .popover {
+    opacity: 0;
+    transform: translateY(-4px) scale(.97);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .shortcut:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-raised);
+  }
+  .shortcut:hover .shortcutArrow {
+    transform: translateX(2px);
+  }
+}
+
+@media (max-width: 760px) {
+  .hero {
+    padding-top: 12px;
+  }
+  .lead {
+    font-size: 14px;
+    margin-top: 14px;
+    margin-bottom: 24px;
+  }
+  .ask {
+    height: 62px;
+  }
+  .askKbd {
+    display: none;
+  }
+  .modeNote {
+    font-size: 11px;
+    line-height: 1.65;
+    max-width: 290px;
+  }
+  .shortcuts {
+    gap: 10px;
     margin-top: 24px;
-    font-size: 9px;
+  }
+  .shortcut {
+    min-height: 90px;
+    padding: 14px 12px;
+    gap: 9px;
+  }
+  .shortcutText strong {
+    font-size: 13px;
+  }
+  .shortcutText small {
+    font-size: 11px;
+  }
+  .panel {
+    padding: 16px 14px 6px;
+  }
+  .scope select {
+    max-width: 160px;
+  }
+  .footer {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shortcut {
+    animation: gentle-fade 120ms var(--ease) both !important;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .shortcut:hover,
+.shortcut:hover .shortcutArrow {
+      transform: none;
+    }
+  }
+  .ask > button:active {
+    transform: none;
+  }
+  @starting-style {
+    .popover {
+      transform: none;
+    }
+  }
+}
+
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.notifications::details-content {
+  transition: content-visibility 180ms allow-discrete;
+}
+
+.notifications:not([open]) .popover {
+  opacity: 0;
+  transform: translateY(-4px) scale(.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notifications:not([open]) .popover {
+    transform: none;
   }
 }

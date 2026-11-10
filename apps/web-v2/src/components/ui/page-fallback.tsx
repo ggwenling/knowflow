@@ -1,16 +1,19 @@
-export function PageFallback() {
+import { Skeleton } from "./skeleton";
+import styles from "../workspace/workspace.module.css";
+
+export function PageFallback({ label = "正在加载…" }: { label?: string }) {
   return (
     <div
       role="status"
-      style={{
-        display: "grid",
-        minHeight: "40svh",
-        placeItems: "center",
-        color: "#8c8c8c",
-        fontSize: 13,
-      }}
+      className={styles.loading}
     >
-      正在加载…
+      <span className={styles.loadingBrand} aria-hidden="true">KnowFlow</span>
+      <p>{label}</p>
+      <div className={styles.loadingLines} aria-hidden="true">
+        <Skeleton height={8} width="100%" />
+        <Skeleton height={8} width="72%" />
+        <Skeleton height={8} width="42%" />
+      </div>
     </div>
   );
 }

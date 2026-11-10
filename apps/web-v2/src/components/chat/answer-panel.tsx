@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Clipboard, Sparkles, SquarePen } from "lucide-react";
@@ -36,7 +37,7 @@ export function AnswerPanel({
   if (!answer) {
     return (
       <div className={styles.answerEmpty}>
-        <span className={styles.emptyMark} aria-hidden="true">问</span>
+        <Image className={styles.emptyArtwork} src="/archive-study.webp" alt="" width={240} height={160} />
         <h2>从一个具体问题开始</h2>
         <p>回答会附上可打开的原文来源，方便你核对关键事实。每次提问独立检索，不会把上一轮回答当作上下文。</p>
         <div className={styles.examples}>
@@ -109,6 +110,7 @@ export function AnswerPanel({
           <div className={styles.generating}>
             <span className={styles.pulse} aria-hidden="true" />
             正在检索并生成回答…
+            <span className={styles.phase} aria-hidden="true">{hasText ? "生成回答" : answer.sources.length ? `已找到 ${answer.sources.length} 段依据` : "检索资料"}</span>
           </div>
         )}
         {hasText && (

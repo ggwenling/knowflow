@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, Layers } from "lucide-react";
 import { api, type Document, type KnowledgeBase } from "@/services/api";
@@ -36,7 +35,6 @@ function matches(document: Document, filter: Filter) {
 export function BaseDetailView() {
   const params = useParams<{ baseId: string }>();
   const baseId = params?.baseId ?? "";
-  const reduce = useReducedMotion();
   const knowledge = useKnowledgeContext();
   const documents = useDocumentsContext();
   const [remote, setRemote] = useState<KnowledgeBase | null>(null);
@@ -94,12 +92,7 @@ export function BaseDetailView() {
   }
 
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26 }}
-    >
+    <div className={`${styles.page} page-enter`}>
       <Link className={styles.back} href="/knowledge-bases">
         <ArrowLeft size={14} aria-hidden="true" /> 全部知识库
       </Link>
@@ -130,6 +123,7 @@ export function BaseDetailView() {
           />
 
           <div className={styles.filterRow} role="group" aria-label="筛选资料">
+            <span className={styles.filterIndicator} style={{ transform: `translateX(${filters.findIndex((item) => item.key === filter) * 100}%)` }} aria-hidden="true" />
             {filters.map(({ key, label }) => (
               <button
                 key={key}
@@ -172,6 +166,7 @@ export function BaseDetailView() {
             />
           ) : (
             <EmptyState
+              illustration={!documents.documents.length}
               icon={<FileText size={20} strokeWidth={1.5} />}
               title={documents.documents.length ? "这个筛选下没有资料" : "还没有资料"}
               description={documents.documents.length
@@ -188,8 +183,9 @@ export function BaseDetailView() {
               加载更多资料
             </button>
           )}
+          <p className={styles.detailFootnote}>资料仅自己可见 · 只有已就绪的资料会参与检索与问答</p>
         </>
       )}
-    </motion.div>
+    </div>
   );
 }

@@ -24,9 +24,7 @@
 }
 
 .brand {
-  margin-bottom: 7.2vh;
   font-family: var(--font-serif);
-  font-size: 42px;
   font-weight: 400;
   letter-spacing: -1.5px;
   line-height: 1;
@@ -36,24 +34,17 @@
   overflow-wrap: anywhere;
   margin: 0;
   font-family: var(--font-serif);
-  font-size: clamp(52px, 6.15vw, 90px);
   font-weight: 400;
-  letter-spacing: -0.035em;
   line-height: 1;
 }
 
 .lead {
   margin: 28px 0 40px;
   color: var(--ink-2);
-  font-size: 23px;
-  line-height: 1.38;
 }
 
 .form label {
   display: block;
-  margin-bottom: 10px;
-  font-size: 17px;
-  font-weight: 700;
 }
 
 .form input {
@@ -63,25 +54,12 @@
   padding: 0 18px;
   border: 1px solid #d1d1d1;
   border-radius: 12px;
-  background: #fff;
   color: var(--ink);
   font-size: 16px;
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 
 .form input::placeholder {
-  color: #666;
   opacity: 1;
-}
-
-.form input:focus {
-  border-color: var(--ink);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06);
-}
-
-.form > input {
-  margin-bottom: 24px;
 }
 
 .passwordField {
@@ -104,9 +82,11 @@
   color: var(--ink-2);
 }
 
-.passwordField button:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .passwordField button:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .hint {
@@ -126,18 +106,12 @@
 .submit {
   display: inline-flex;
   width: 100%;
-  min-height: 64px;
   align-items: center;
   justify-content: center;
   gap: 10px;
   margin-top: 28px;
-  border: 0;
-  border-radius: 15px;
-  background: var(--ink);
   color: #fff;
-  font-size: 18px;
   font-weight: 700;
-  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
 }
 
 .spinner {
@@ -155,8 +129,10 @@
   }
 }
 
-.submit:hover:not(:disabled) {
-  background: #333;
+@media (hover: hover) and (pointer: fine) {
+  .submit:hover:not(:disabled) {
+    background: #333;
+  }
 }
 
 .submit:disabled {
@@ -167,8 +143,6 @@
 .links {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 22px;
-  margin-top: 28px;
   font-size: 14px;
 }
 
@@ -191,32 +165,16 @@
 
 .footnote {
   position: absolute;
-  bottom: 26px;
   left: 5.9vw;
   margin: 0;
   color: var(--ink-3);
-  font-size: 10px;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 @media (max-height: 820px) and (min-width: 701px) {
-  .content {
-    padding-top: 6vh;
-  }
-
-  .brand {
-    margin-bottom: 5vh;
-  }
-
-  .content h1 {
-    font-size: clamp(52px, 5.5vw, 72px);
-  }
-
   .lead {
     margin: 20px 0 26px;
   }
-
   .submit {
     margin-top: 24px;
   }
@@ -228,31 +186,151 @@
     margin: 0 auto;
     padding: 36px 0 64px;
   }
-
-  .brand {
-    margin-bottom: clamp(88px, 19svh, 150px);
-    font-size: 32px;
-  }
-
-  .content h1 {
-    font-size: clamp(46px, 13vw, 62px);
-  }
-
   .lead {
     margin: 16px 0 26px;
-    font-size: 17px;
   }
-
   .break {
     display: none;
   }
-
   .ribbon {
     inset: 28px 0 auto 18%;
     height: 26svh;
   }
-
   .footnote {
     display: none;
+  }
+}
+
+.content {
+  padding-top: 7.5vh;
+  padding-bottom: 88px;
+}
+
+.brand {
+  font-size: 32px;
+  margin-bottom: 7vh;
+}
+
+.content h1 {
+  font-size: clamp(52px, 5.8vw, 84px);
+  letter-spacing: -.045em;
+}
+
+.lead {
+  font-size: 19px;
+  line-height: 1.6;
+  margin-top: 24px;
+  margin-bottom: 32px;
+}
+
+.form label {
+  font-size: 13px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form input {
+  border-color: var(--line-strong);
+  background: #ffffffed;
+  box-shadow: inset 0 1px 2px #191c2003;
+}
+
+.form input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px #506e8308;
+}
+
+.form input::placeholder {
+  color: var(--ink-3);
+}
+
+.form > input {
+  margin-bottom: 22px;
+}
+
+.submit {
+  min-height: 56px;
+  border: 1px solid var(--ink);
+  border-radius: 11px;
+  font-size: 15px;
+  background: linear-gradient(180deg, #2c3035, var(--ink));
+  box-shadow: inset 0 1px 0 #ffffff20, 0 2px 3px #191c2012;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.links {
+  margin-top: 24px;
+  gap: 20px;
+}
+
+.links a, .links button {
+  font-size: 13px;
+  color: var(--ink-2);
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 5px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .links a:hover,
+.links button:hover {
+    color: var(--ink);
+    text-decoration-color: var(--ink);
+  }
+}
+
+.footnote {
+  bottom: 24px;
+  font-family: var(--font-mono);
+  letter-spacing: .08em;
+  font-size: 10px;
+}
+
+.error {
+  border: 1px solid #ecd8d2;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  padding: 10px 12px;
+}
+
+@media (max-width: 700px) {
+  .content {
+    padding-top: 32px;
+    padding-bottom: 48px;
+  }
+  .brand {
+    margin-bottom: clamp(100px, 18svh, 140px);
+    font-size: 28px;
+  }
+  .content h1 {
+    font-size: 52px;
+  }
+  .lead {
+    font-size: 16px;
+    margin-top: 18px;
+    margin-bottom: 28px;
+  }
+  .form input {
+    height: 54px;
+  }
+  .submit {
+    margin-top: 24px;
+  }
+  .links {
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submit:active:not(:disabled) {
+    transform: none;
+  }
+  .spinner {
+    animation: none;
   }
 }

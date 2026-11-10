@@ -7,7 +7,6 @@
   color: var(--ink-3);
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
@@ -32,11 +31,8 @@
 }
 
 .pageLead {
-  max-width: 600px;
   margin: 8px 0 0;
   color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.75;
 }
 
 .toolbar {
@@ -46,8 +42,6 @@
   gap: 16px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin-bottom: 18px;
-  padding: 10px 0;
 }
 
 .search {
@@ -61,20 +55,18 @@
 .search input {
   min-width: 0;
   flex: 1;
-  height: 30px;
   border: 0;
   background: transparent;
-  font-size: 12px;
   outline: none;
 }
 
 .search input:focus-visible {
-  outline: 2px solid #555;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
 .search input::placeholder {
-  color: #9d9d9d;
+  color: var(--ink-3);
 }
 
 .toolbarMeta {
@@ -87,7 +79,6 @@
 .baseGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
-  gap: 12px;
 }
 
 .baseCard {
@@ -99,12 +90,13 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #fff;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.baseCard:hover {
-  border-color: #c9c9c9;
-  background: #fdfdfd;
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover {
+    border-color: #c9c9c9;
+    background: #fdfdfd;
+  }
 }
 
 .baseCardLink {
@@ -112,10 +104,8 @@
   min-width: 0;
   flex: 1;
   align-items: center;
-  gap: 12px;
   border: 0;
   background: transparent;
-  padding: 17px 44px 17px 16px;
   color: inherit;
   text-align: left;
   text-decoration: none;
@@ -123,24 +113,18 @@
 
 .baseCardIcon {
   display: grid;
-  width: 38px;
-  height: 38px;
   flex: none;
   place-items: center;
   border-radius: 10px;
-  background: var(--bg-muted);
-  color: var(--ink-2);
 }
 
 .baseCardText {
   min-width: 0;
-  flex: 1;
 }
 
 .baseCardText strong {
   display: block;
   overflow: hidden;
-  font-size: 13.5px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -148,62 +132,62 @@
 
 .baseCardText small {
   display: block;
-  margin-top: 3px;
   color: var(--ink-3);
-  font-size: 10.5px;
 }
 
 .baseCardArrow {
   flex: none;
   color: #bdbdbd;
-  transition: transform var(--dur) var(--ease), color var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease);
 }
 
-.baseCard:hover .baseCardArrow {
-  color: var(--ink);
-  transform: translateX(2px);
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover .baseCardArrow {
+    color: var(--ink);
+  }
 }
 
 .baseCardDelete {
   position: absolute;
-  top: 10px;
-  right: 10px;
   display: grid;
-  width: 26px;
-  height: 26px;
   place-items: center;
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
   color: transparent;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.baseCard:hover .baseCardDelete,
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover .baseCardDelete {
+    color: var(--ink-3);
+  }
+}
+
 .baseCardDelete:focus-visible {
   color: var(--ink-3);
 }
 
-.baseCardDelete:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+  .baseCardDelete:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .back {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   border: 0;
   background: transparent;
-  margin-bottom: 14px;
   padding: 2px 0;
   color: var(--ink-2);
-  font-size: 11px;
   text-decoration: none;
 }
 
-.back:hover {
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .back:hover {
+    color: var(--ink);
+  }
 }
 
 .detailBadge {
@@ -212,38 +196,23 @@
   align-items: center;
   gap: 5px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
   padding: 5px 11px;
   color: var(--ink-3);
-  font-size: 10px;
 }
 
 .uploadZone {
   display: flex;
   align-items: center;
-  gap: 14px;
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius);
-  background: #fcfcfc;
-  padding: 15px 16px;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
-}
-
-.uploadDragging {
-  border-color: var(--ink);
-  background: #f6f6f6;
 }
 
 .uploadIcon {
   display: grid;
-  width: 38px;
-  height: 38px;
   flex: none;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 10px;
   background: #fff;
-  color: var(--ink-2);
 }
 
 .uploadText {
@@ -253,15 +222,12 @@
 
 .uploadText strong {
   display: block;
-  font-size: 12.5px;
   font-weight: 600;
 }
 
 .uploadText span {
   display: block;
-  margin-top: 3px;
   color: var(--ink-3);
-  font-size: 10.5px;
   line-height: 1.6;
 }
 
@@ -282,9 +248,11 @@
   cursor: pointer;
 }
 
-.uploadAction:hover,
+@media (hover: hover) and (pointer: fine) {
+  .uploadAction:hover,
 .emptyUpload:hover {
-  border-color: var(--ink-3);
+    border-color: var(--ink-3);
+  }
 }
 
 .uploadAction input,
@@ -295,9 +263,7 @@
 .filterRow {
   display: flex;
   align-items: center;
-  gap: 4px;
   border-bottom: 1px solid var(--line);
-  margin: 18px 0 12px;
   padding-bottom: 8px;
 }
 
@@ -308,9 +274,7 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  padding: 5px 8px;
   color: var(--ink-2);
-  font-size: 11.5px;
 }
 
 .filter span {
@@ -319,12 +283,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.filter:hover {
-  background: var(--bg-muted);
+@media (hover: hover) and (pointer: fine) {
+  .filter:hover {
+    background: var(--bg-muted);
+  }
 }
 
 .filterActive {
-  background: var(--bg-muted);
   color: var(--ink);
   font-weight: 600;
 }
@@ -376,9 +341,7 @@
   contain-intrinsic-size: auto 58px;
   display: flex;
   align-items: center;
-  gap: 12px;
   border-bottom: 1px solid #f4f4f4;
-  padding: 11px 13px;
 }
 
 .docCard:last-child {
@@ -387,12 +350,8 @@
 
 .docFormat {
   display: grid;
-  width: 34px;
-  height: 38px;
   flex: none;
   place-items: center;
-  border-radius: 6px;
-  background: var(--bg-muted);
   color: var(--ink-2);
   font-size: 8.5px;
   font-weight: 700;
@@ -408,7 +367,6 @@
 
 .docName strong {
   overflow: hidden;
-  font-size: 12.5px;
   font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,7 +374,6 @@
 
 .docName small {
   color: var(--ink-3);
-  font-size: 10px;
 }
 
 .docStatus {
@@ -429,7 +386,6 @@
 .docStatus small {
   max-width: 140px;
   color: var(--ink-3);
-  font-size: 9.5px;
   text-align: right;
 }
 
@@ -440,8 +396,6 @@
 
 .docMenu > button {
   display: grid;
-  width: 26px;
-  height: 26px;
   place-items: center;
   border: 0;
   border-radius: var(--radius-xs);
@@ -449,20 +403,22 @@
   color: var(--ink-3);
 }
 
-.docMenu > button:hover,
+@media (hover: hover) and (pointer: fine) {
+  .docMenu > button:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
+}
+
 .docMenu > button[aria-expanded="true"] {
   background: var(--bg-muted);
   color: var(--ink);
 }
 
 .docMenuPanel {
-  z-index: 12;
   display: grid;
-  min-width: 132px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fff;
-  padding: 4px;
   box-shadow: var(--shadow-pop);
 }
 
@@ -470,13 +426,17 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  padding: 7px 8px;
   color: var(--ink-2);
-  font-size: 11.5px;
   text-align: left;
 }
 
-.docMenuPanel button:hover,
+@media (hover: hover) and (pointer: fine) {
+  .docMenuPanel button:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
+}
+
 .docMenuPanel button[data-highlighted] {
   background: var(--bg-muted);
   color: var(--ink);
@@ -515,65 +475,474 @@
     flex-direction: column;
     gap: 14px;
   }
-
   .pageHead h1,
   .detailHead h1 {
     font-size: clamp(26px, 8vw, 32px);
   }
-
-  .pageLead {
-    font-size: 11.5px;
-  }
-
   .toolbar {
     gap: 10px;
   }
-
   .search {
     width: 100%;
   }
-
   .baseGrid {
     grid-template-columns: 1fr;
   }
-
   .baseCardDelete {
     color: var(--ink-3);
   }
-
   .uploadZone {
     align-items: flex-start;
     flex-wrap: wrap;
-    padding: 13px;
   }
-
-  .uploadText span {
-    font-size: 9.5px;
-  }
-
   .uploadAction {
     width: 100%;
   }
-
   .filterRow {
     overflow-x: auto;
   }
-
   .filter {
     flex: none;
   }
-
   .docCard {
     align-items: flex-start;
-    gap: 9px;
-    padding: 10px;
   }
-
   .docStatus {
     align-self: center;
   }
+}
 
+.eyebrow {
+  font: 10px/1.5 var(--font-mono);
+  letter-spacing: .16em;
+  margin-bottom: 10px;
+}
+
+.pageHead {
+  padding: 10px 0 28px;
+  margin-bottom: 0;
+}
+
+.pageHead h1, .detailHead h1 {
+  font-size: var(--type-h1);
+}
+
+.pageLead {
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-top: 12px;
+}
+
+.toolbar {
+  padding: 12px 0;
+  margin-bottom: 24px;
+}
+
+.search {
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+}
+
+.search input {
+  height: 36px;
+  font-size: 13px;
+}
+
+.toolbarMeta {
+  font: 11px var(--font-mono);
+}
+
+.baseGrid {
+  gap: 16px;
+}
+
+.baseCard {
+  min-height: 154px;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur) var(--ease);
+}
+
+.baseCardLink {
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 16px;
+  padding: 22px;
+}
+
+.baseCardIcon {
+  width: 42px;
+  height: 42px;
+  background: var(--accent-soft);
+  border: 1px solid #dfe7ed;
+  color: var(--accent);
+  box-shadow: var(--highlight);
+}
+
+.baseCardText {
+  flex: 1 0 100%;
+  order: 2;
+}
+
+.baseCardText strong {
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+.baseCardText small {
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.baseCardArrow {
+  margin-left: auto;
+  align-self: center;
+}
+
+.baseCardDelete {
+  width: 30px;
+  height: 30px;
+  top: 16px;
+  right: 16px;
+}
+
+.baseCardLink .baseCardArrow {
+  margin-right: 28px;
+}
+
+.back {
+  margin-bottom: 24px;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.detailHead {
+  margin-bottom: 26px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detailBadge {
+  font-size: 11px;
+  background: var(--bg-subtle);
+  border-radius: 7px;
+}
+
+.uploadZone {
+  position: relative;
+  min-height: 126px;
+  gap: 20px;
+  border-color: #cbd4dc;
+  background: radial-gradient(ellipse at 0 0, var(--accent-soft), #fcfdfe 70%);
+  padding: 24px;
+}
+
+.uploadIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  color: var(--accent);
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur) var(--ease);
+}
+
+.uploadText strong {
+  font-size: 14px;
+}
+
+.uploadText span {
+  margin-top: 6px;
+  font-size: 12px;
+  max-width: 560px;
+}
+
+.uploadAction {
+  min-height: 36px;
+  font-size: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.uploadDragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.uploadDragging .uploadIcon {
+  transform: translateY(-3px);
+}
+
+.filterRow {
+  position: relative;
+  gap: 0;
+  margin: 26px 0 16px;
+  padding: 0 0 12px;
+}
+
+.filter {
+  z-index: 1;
+  width: 86px;
+  height: 34px;
+  justify-content: center;
+  font-size: 12px;
+  padding: 0;
+}
+
+.filter span {
+  font: 10px var(--font-mono);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filterActive:hover {
+    background: transparent;
+  }
+}
+
+.filterActive {
+  background: transparent;
+}
+
+.filterIndicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 86px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--bg-subtle);
+  box-shadow: var(--highlight);
+  transition: transform 180ms var(--ease);
+  pointer-events: none;
+}
+
+.docList {
+  box-shadow: var(--shadow-card);
+}
+
+.docCard {
+  min-height: 78px;
+  padding: 16px 18px;
+  gap: 16px;
+  border-bottom-color: var(--line);
+}
+
+.docFormat {
+  width: 38px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg-subtle);
+  font: 10px var(--font-mono);
+  box-shadow: var(--highlight);
+}
+
+.docName strong {
+  font-size: 14px;
+}
+
+.docName small {
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.docStatus small {
+  font-size: 11px;
+}
+
+.docMenu > button {
+  width: 30px;
+  height: 30px;
+}
+
+.docMenuPanel {
+  z-index: var(--z-popover);
+  min-width: 160px;
+  padding: 5px;
+  background: var(--surface-overlay);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  transition: transform 180ms var(--ease), opacity 180ms var(--ease);
+}
+
+.docMenuPanel button {
+  font-size: 12px;
+  padding: 9px 10px;
+}
+
+.detailFootnote {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin: 18px 0 0;
+}
+
+@starting-style {
+  .docMenuPanel {
+    opacity: 0;
+    transform: translateY(-4px) scale(.97);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-raised);
+  }
+  .baseCard:hover .baseCardArrow {
+    transform: translateX(2px);
+  }
+  .docCard:hover {
+    background: #fafbfd;
+  }
+}
+
+@media (max-width: 760px) {
+  .pageHead {
+    padding: 0 0 24px;
+  }
+  .pageLead {
+    font-size: 13px;
+  }
+  .baseCard {
+    min-height: 112px;
+  }
+  .baseCardLink {
+    flex-wrap: nowrap;
+    align-items: center;
+    padding: 18px 52px 18px 16px;
+    gap: 14px;
+  }
+  .baseCardText {
+    flex: 1;
+    order: 0;
+  }
+  .baseCardLink .baseCardArrow {
+    margin-right: 0;
+  }
+  .baseCardDelete {
+    top: 15px;
+    right: 10px;
+  }
+  .search {
+    min-width: 0;
+  }
+  .toolbarMeta {
+    font-size: 10px;
+  }
+  .detailHead {
+    gap: 16px;
+    padding-bottom: 22px;
+  }
+  .uploadZone {
+    padding: 20px 16px;
+    gap: 14px;
+  }
+  .uploadIcon {
+    width: 40px;
+    height: 40px;
+  }
+  .uploadText strong {
+    font-size: 13px;
+  }
+  .uploadText span {
+    font-size: 11px;
+  }
+  .uploadAction {
+    min-height: 38px;
+    margin-top: 6px;
+  }
+  .filterRow {
+    overflow: visible;
+  }
+  .filter, .filterIndicator {
+    width: 25%;
+  }
+  .filterSpacer {
+    display: none;
+  }
+  .syncing {
+    position: absolute;
+    right: 0;
+    bottom: -16px;
+  }
+  .docCard {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 30px;
+    gap: 8px 12px;
+    min-height: 94px;
+    padding: 14px;
+  }
+  .docFormat {
+    width: 34px;
+    height: 40px;
+    grid-row: 1 / 3;
+  }
   .docName strong {
-    font-size: 11.5px;
+    font-size: 13px;
+  }
+  .docStatus {
+    grid-column: 2;
+    grid-row: 2;
+    justify-items: start;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .docMenu {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+  .docStatus small {
+    font-size: 10px;
+  }
+  .detailFootnote {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @media (hover: hover) and (pointer: fine) {
+    .baseCard:hover,
+.baseCard:hover .baseCardArrow {
+      transform: none;
+    }
+  }
+  .uploadDragging .uploadIcon {
+    transform: none;
+  }
+  .docMenuPanel {
+    transition: opacity 120ms var(--ease);
+  }
+  @starting-style {
+    .docMenuPanel {
+      transform: none;
+    }
+  }
+}
+
+/*Radix Presence retains the surface for this short exit; menu rows stay still.*/
+
+.docMenuPanel[data-state="closed"] {
+  animation: menuOut 100ms var(--ease) both;
+}
+
+@keyframes menuOut {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(.97);
+  }
+}
+
+@keyframes menuFade {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docMenuPanel[data-state="closed"] {
+    animation: menuFade 100ms var(--ease) both !important;
   }
 }

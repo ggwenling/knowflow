@@ -27,10 +27,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [recentLimit, setRecentLimit] = useState(5);
   const inputRef = useRef<HTMLInputElement>(null);
   const accountRef = useRef<HTMLDetailsElement>(null);
+  const libraryRef = useRef<HTMLDetailsElement>(null);
   const isChat = pathname.startsWith("/conversations");
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const sync = () => { if (libraryRef.current) libraryRef.current.open = !media.matches; };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
     if (pathname === "/knowledge-bases" && new URLSearchParams(window.location.search).has("create")) {
+      if (libraryRef.current) libraryRef.current.open = true;
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [pathname]);
@@ -75,7 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <small>知识工作台</small>
             </span>
           </Link>
-          <details className={styles.accountMenu} ref={accountRef}>
+          <details className={styles.accountMenu} ref={accountRef} data-popover>
             <summary aria-label="账户菜单">
               <span className={styles.avatar}>{session.user?.email.slice(0, 1).toUpperCase()}</span>
             </summary>
@@ -92,6 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className={styles.nav} aria-label="主导航">
+          <span className={styles.navIndicator} data-index={navItems.findIndex((item) => item.match(pathname))} aria-hidden="true" />
           {navItems.map(({ label, href, Icon, match }) => (
             <Link
               key={href}
@@ -105,77 +116,80 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className={styles.library}>
-          <div className={styles.sectionHead}>
-            <span>我的知识库</span>
-            <Link href="/knowledge-bases" aria-label="打开全部知识库">
-              <ArrowRight size={14} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className={styles.baseList}>
-            {knowledge.bases.map((base) => (
-              <Link
-                key={base.id}
-                className={knowledge.selectedBase === base.id ? `${styles.baseItem} ${styles.baseActive}` : styles.baseItem}
-                href={`/knowledge-bases/${base.id}`}
-                prefetch={false}
-              >
-                <Folder size={15} strokeWidth={1.6} aria-hidden="true" />
-                <span>{base.name}</span>
+        <details className={styles.library} ref={libraryRef} open>
+          <summary className={styles.mobileLibraryToggle}>工作区快捷入口 <span aria-hidden="true">＋</span></summary>
+          <div className={styles.libraryContent}>
+            <div className={styles.sectionHead}>
+              <span>我的知识库</span>
+              <Link href="/knowledge-bases" aria-label="打开全部知识库">
+                <ArrowRight size={14} aria-hidden="true" />
               </Link>
-            ))}
-            {!knowledge.bases.length && <p className={styles.emptyHint}>还没有知识库，先建一个。</p>}
-          </div>
-          {pathname !== "/" && (
-            <form className={styles.createForm} onSubmit={createBase}>
-              <input
-                ref={inputRef}
-                id="new-base-name"
-                aria-label="新知识库名称"
-                name="name"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="新建知识库名称"
-                maxLength={200}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-              <button aria-label="创建知识库" disabled={!name.trim() || knowledge.working || knowledge.loading}>
-                ＋
-              </button>
-            </form>
-          )}
-
-          {!isChat && (
-            <>
-              <div className={styles.sectionHead}>
-                <span>最近问答</span>
-                <Link href="/conversations" aria-label="查看全部问答">
-                  <ArrowRight size={14} aria-hidden="true" />
+            </div>
+            <div className={styles.baseList}>
+              {knowledge.bases.map((base) => (
+                <Link
+                  key={base.id}
+                  className={knowledge.selectedBase === base.id ? `${styles.baseItem} ${styles.baseActive}` : styles.baseItem}
+                  href={`/knowledge-bases/${base.id}`}
+                  prefetch={false}
+                >
+                  <Folder size={15} strokeWidth={1.6} aria-hidden="true" />
+                  <span>{base.name}</span>
                 </Link>
-              </div>
-              <div className={styles.historyScroll}>
-                {recent.map((item) => (
-                  <Link
-                    key={item.question_id}
-                    className={styles.historyItem}
-                    href={`/conversations/${item.question_id}`}
-                    prefetch={false}
-                  >
-                    <span>{item.question}</span>
-                    <small>{questionStatusLabel(item.status)}</small>
+              ))}
+              {!knowledge.bases.length && <p className={styles.emptyHint}>还没有知识库，先建一个。</p>}
+            </div>
+            {pathname !== "/" && (
+              <form className={styles.createForm} onSubmit={createBase}>
+                <input
+                  ref={inputRef}
+                  id="new-base-name"
+                  aria-label="新知识库名称"
+                  name="name"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="新建知识库名称"
+                  maxLength={200}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+                <button aria-label="创建知识库" aria-busy={knowledge.working || undefined} disabled={!name.trim() || knowledge.working || knowledge.loading}>
+                  {knowledge.working ? "…" : "＋"}
+                </button>
+              </form>
+            )}
+
+            {!isChat && (
+              <>
+                <div className={styles.sectionHead}>
+                  <span>最近问答</span>
+                  <Link href="/conversations" aria-label="查看全部问答">
+                    <ArrowRight size={14} aria-hidden="true" />
                   </Link>
-                ))}
-                {!recent.length && <p className={styles.emptyHint}>还没有问答记录。</p>}
-                {(questions.hasMore || recentLimit < questions.history.length) && (
-                  <button className={styles.moreButton} onClick={() => { setRecentLimit((limit) => limit + 50); if (recentLimit + 50 > questions.history.length) void questions.loadMore(); }} disabled={questions.loading}>
-                    加载更多问答
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                </div>
+                <div className={styles.historyScroll}>
+                  {recent.map((item) => (
+                    <Link
+                      key={item.question_id}
+                      className={styles.historyItem}
+                      href={`/conversations/${item.question_id}`}
+                      prefetch={false}
+                    >
+                      <span>{item.question}</span>
+                      <small>{questionStatusLabel(item.status)}</small>
+                    </Link>
+                  ))}
+                  {!recent.length && <p className={styles.emptyHint}>还没有问答记录。</p>}
+                  {(questions.hasMore || recentLimit < questions.history.length) && (
+                    <button className={styles.moreButton} onClick={() => { setRecentLimit((limit) => limit + 50); if (recentLimit + 50 > questions.history.length) void questions.loadMore(); }} disabled={questions.loading}>
+                      加载更多问答
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </details>
 
         <div className={styles.account}>
           <span className={styles.avatar}>{session.user?.email.slice(0, 1).toUpperCase()}</span>

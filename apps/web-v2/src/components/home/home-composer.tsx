@@ -25,6 +25,7 @@ export function HomeComposer({ inputRef }: { inputRef: RefObject<HTMLInputElemen
     <form className={styles.ask} onSubmit={ask}>
       <Sparkles size={22} strokeWidth={1.5} aria-hidden="true" />
       <input ref={inputRef} name="question" aria-label="向知识库提问" autoComplete="off" value={draft} maxLength={4000} onChange={(event) => setDraft(event.target.value)} placeholder="向你的知识库提问…" />
+      <kbd className={styles.askKbd} aria-hidden="true">↵</kbd>
       <button aria-label="提问" disabled={!draft.trim() || !readyDocuments.length || stream.busy} title={stream.busy ? "正在生成回答" : !readyDocuments.length ? "请先上传文档，等待索引就绪后提问" : "发送问题"}>
         <ArrowRight size={21} strokeWidth={1.8} aria-hidden="true" />
       </button>

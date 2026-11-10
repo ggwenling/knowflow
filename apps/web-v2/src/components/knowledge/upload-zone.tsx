@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { FilePicker } from "@/components/ui/file-picker";
 import { Upload } from "lucide-react";
 import styles from "./knowledge.module.css";
@@ -15,10 +15,12 @@ export function UploadZone({
   onUpload: (file: File | undefined) => void;
 }) {
   const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
 
   function drop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setDragging(false);
+    dragDepth.current = 0;
     if (disabled || busy) return;
     const file = event.dataTransfer.files?.[0];
     if (file) onUpload(file);
@@ -27,8 +29,10 @@ export function UploadZone({
   return (
     <div
       className={`${styles.uploadZone} ${dragging ? styles.uploadDragging : ""}`}
-      onDragOver={(event) => { event.preventDefault(); if (!disabled && !busy) setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
+      aria-busy={busy || undefined}
+      onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = disabled || busy ? "none" : "copy"; }}
+      onDragEnter={(event) => { event.preventDefault(); dragDepth.current += 1; if (!disabled && !busy) setDragging(true); }}
+      onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }}
       onDrop={drop}
     >
       <span className={styles.uploadIcon}>

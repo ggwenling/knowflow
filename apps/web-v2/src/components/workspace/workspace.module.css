@@ -3,7 +3,6 @@
   min-height: 100svh;
   place-items: center;
   padding: 32px;
-  background: var(--bg);
   color: var(--ink-2);
   font-size: 13px;
 }
@@ -15,8 +14,6 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: #fff;
-  padding: 32px;
-  box-shadow: var(--shadow-card);
 }
 
 .gateCard h1 {
@@ -39,6 +36,47 @@
 
 .gateText {
   margin: 0 0 6px;
-  font-size: 13px;
   line-height: 1.75;
+}
+
+.gate {
+  background: radial-gradient(ellipse at 50% 0, var(--surface-sunken), #fff 65%);
+}
+
+.gateCard {
+  box-shadow: var(--shadow-raised);
+  padding: 36px;
+}
+
+.gateText {
+  font-size: 14px;
+}
+
+.loading {
+  display: flex;
+  min-height: 40svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.loading p {
+  margin: 0;
+}
+
+.loadingBrand {
+  color: var(--ink);
+  font: 30px/1.4 var(--font-serif);
+  letter-spacing: -.04em;
+}
+
+.loadingLines {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  width: 220px;
+  margin-top: 20px;
 }

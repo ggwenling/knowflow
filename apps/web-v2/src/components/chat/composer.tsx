@@ -46,7 +46,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
       />
       <div className={styles.composerFoot}>
         <span className={styles.composerHint}>
-          {ready ? "Enter 发送 · Shift + Enter 换行" : "至少需要一份已就绪的资料"}
+          {ready ? <><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 换行</> : "至少需要一份已就绪的资料"}
         </span>
         {stream.busy ? (
           <button className={styles.stop} type="button" onClick={stream.cancel}>
