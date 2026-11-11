@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { StaticArt } from "@/components/ui/static-art";
 import { BrandSeal } from "@/components/ui/brand-seal";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -49,7 +49,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   return (
     <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
       <div className={styles.artPanel} aria-hidden="true">
-        <Image className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} preload sizes="(max-width: 700px) 1px, 54vw" />
+        <StaticArt className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} loading="eager" fetchPriority="high" />
         <div className={`loginFlow ${styles.ribbon}`}>
           <DeferredVisual><Ribbon paused={motionPaused} /></DeferredVisual>
         </div>

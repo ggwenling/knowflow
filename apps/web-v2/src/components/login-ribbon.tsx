@@ -1,29 +1,30 @@
 "use client";
 import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import { BufferGeometry, Camera, Float32BufferAttribute, LineSegments, Scene, ShaderMaterial, Vector2, WebGLRenderer } from "three";
 
 export default function Flow({ paused = false }: { paused?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(paused);
   useEffect(() => {
     pausedRef.current = paused;
+    host.current?.toggleAttribute("data-motion-paused", paused);
     host.current?.dispatchEvent(new Event("motionchange"));
   }, [paused]);
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    let renderer: THREE.WebGLRenderer;
+    let renderer: WebGLRenderer;
     try {
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("webgl2", { alpha: true, antialias: true });
       if (!context) return;
-      renderer = new THREE.WebGLRenderer({ canvas, context, alpha: true, antialias: true });
+      renderer = new WebGLRenderer({ canvas, context, alpha: true, antialias: true });
     } catch {
       return;
     }
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.Camera();
+    const scene = new Scene();
+    const camera = new Camera();
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     const compact = window.matchMedia('(max-width: 700px)');
     const segments = 180;
@@ -36,13 +37,13 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
         vertices.push(step / segments, v, 0, (step + 1) / segments, v, 0);
       }
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
     const uniforms = {
       time: { value: 0 },
-      pointer: { value: new THREE.Vector2() },
+      pointer: { value: new Vector2() },
     };
-    const material = new THREE.ShaderMaterial({
+    const material = new ShaderMaterial({
       uniforms,
       transparent: true,
       depthWrite: false,
@@ -74,21 +75,23 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
         }
       `,
     });
-    const ribbon = new THREE.LineSegments(geometry, material);
+    const ribbon = new LineSegments(geometry, material);
     ribbon.frustumCulled = false;
     scene.add(ribbon);
     el.appendChild(renderer.domElement);
 
-    const target = new THREE.Vector2();
+    const target = new Vector2();
     let frame = 0;
     let previous: number | undefined;
-    let visible = true;
+    let visible = false;
     let contextLost = false;
     let disposed = false;
+    let compiled = false;
+    let compilation = 0;
     let bounds = el.getBoundingClientRect();
     const draw = (now: number) => {
       frame = 0;
-      if (disposed || contextLost || !visible || document.hidden) return;
+      if (disposed || !compiled || contextLost || !visible || document.hidden) return;
       const dt = previous === undefined ? 0 : Math.min((now - previous) / 1000, .05);
       previous = now;
       if (reduce.matches) {
@@ -99,6 +102,7 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
         uniforms.pointer.value.lerp(target, 1 - Math.exp(-dt * 3));
       }
       renderer.render(scene, camera);
+      if (renderer.domElement.dataset.sceneReady !== "true") renderer.domElement.dataset.sceneReady = "true";
       if (!reduce.matches && !pausedRef.current) frame = requestAnimationFrame(draw);
     };
     const resize = () => {
@@ -129,9 +133,30 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
       draw(performance.now());
     };
 
+    async function prepare() {
+      const token = ++compilation;
+      try {
+        await renderer.compileAsync(scene, camera);
+        if (disposed || contextLost || token !== compilation) return;
+        compiled = true;
+        restart();
+      } catch {
+        if (!disposed && token === compilation) renderer.domElement.remove();
+      }
+    }
+
     const canvas = renderer.domElement;
-    const lost = (event: Event) => { event.preventDefault(); contextLost = true; cancelAnimationFrame(frame); canvas.remove(); };
-    const restored = () => { contextLost = false; el.appendChild(canvas); resize(); };
+    canvas.setAttribute("aria-hidden", "true");
+    const lost = (event: Event) => {
+      event.preventDefault();
+      contextLost = true;
+      compiled = false;
+      compilation++;
+      delete canvas.dataset.sceneReady;
+      cancelAnimationFrame(frame);
+      canvas.remove();
+    };
+    const restored = () => { contextLost = false; el.appendChild(canvas); resize(); void prepare(); };
     const updateBounds = () => { bounds = el.getBoundingClientRect(); };
     const observer = new ResizeObserver(resize);
     const intersection = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; restart(); });
@@ -142,6 +167,7 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
     document.addEventListener('visibilitychange', restart);
     window.addEventListener('scroll', updateBounds, { capture: true, passive: true });
     resize();
+    void prepare();
     window.addEventListener('pointermove', move, { passive: true });
     document.documentElement.addEventListener('pointerleave', reset);
     reduce.addEventListener('change', restart);
@@ -161,7 +187,9 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
       el.removeEventListener('motionchange', restart);
       geometry.dispose();
       material.dispose();
+      scene.clear();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, []);

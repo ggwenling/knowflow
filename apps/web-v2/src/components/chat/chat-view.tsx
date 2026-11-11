@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { OnDemand } from "@/components/ui/on-demand";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CircleHelp, FileText, FolderOpen, Layers, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { useDraftActions } from "@/components/store";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/ui/file-picker";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -15,9 +16,11 @@ import type { Source } from "@/services/api";
 import { HistoryRail } from "./history-rail";
 import { AnswerPanel } from "./answer-panel";
 import { Composer } from "./composer";
-import { SourceDialog } from "./source-dialog";
 import { CurrentSources } from "./current-sources";
 import styles from "./chat.module.css";
+
+const SourceDialog = dynamic(() => import("./source-dialog").then((module) => module.SourceDialog), { ssr: false });
+const MobilePanel = dynamic(() => import("./mobile-panel").then((module) => module.MobilePanel), { ssr: false });
 
 function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, documentName: string, trigger: HTMLButtonElement) => void }) {
   const documents = useDocumentsContext();
@@ -219,14 +222,8 @@ export function ChatView() {
         </aside>
       </div>
 
-      <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) setPanel(null); }}>
-        <DialogContent size="lg" className={styles.sheet}>
-          <DialogTitle className={styles.sheetTitle}>
-            {panel === "history" ? "对话历史" : "资料"}
-          </DialogTitle>
-          <DialogDescription className={styles.srOnly}>
-            {panel === "history" ? "选择一条历史问答查看答案与来源。" : "当前知识库中的资料与索引状态。"}
-          </DialogDescription>
+      <OnDemand open={panel !== null}>
+        <MobilePanel panel={panel} onClose={() => setPanel(null)}>
           {panel === "history" ? (
             <HistoryRail
               items={questions.history}
@@ -238,16 +235,18 @@ export function ChatView() {
               onNavigate={() => setPanel(null)}
             />
           ) : <DocumentsPanel onOpenSource={openSource} />}
-        </DialogContent>
-      </Dialog>
+        </MobilePanel>
+      </OnDemand>
 
-      <SourceDialog
-        source={viewing?.source ?? null}
-        documentName={viewing?.documentName ?? ""}
-        open={viewing !== null}
-        onOpenChange={(open) => { if (!open) setViewing(null); }}
-        returnFocus={sourceTrigger}
-      />
+      <OnDemand open={viewing !== null}>
+        <SourceDialog
+          source={viewing?.source ?? null}
+          documentName={viewing?.documentName ?? ""}
+          open={viewing !== null}
+          onOpenChange={(open) => { if (!open) setViewing(null); }}
+          returnFocus={sourceTrigger}
+        />
+      </OnDemand>
 
     </div>
   );

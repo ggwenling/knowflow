@@ -64,7 +64,6 @@
   display: flex;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
   background: var(--surface-raised);
 }
 
@@ -89,7 +88,6 @@
   display: grid;
   flex: none;
   place-items: center;
-  border-radius: 10px;
 }
 
 .baseCardText {
@@ -99,7 +97,6 @@
 .baseCardText strong {
   display: block;
   overflow: hidden;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -526,7 +523,6 @@
 }
 
 .back {
-  margin-bottom: 24px;
   font-size: 12px;
   gap: 8px;
 }
@@ -737,7 +733,6 @@
   }
   .docCard {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) 30px;
     gap: 8px 12px;
     min-height: 94px;
   }
@@ -869,13 +864,7 @@
 }
 
 .baseCover[data-tone="1"]::after {
-  filter: invert(1);
-  opacity: .65;
   background-position: right center;
-}
-
-.baseCover[data-tone="2"] {
-  background: var(--bg-subtle);
 }
 
 .baseCover[data-tone="2"]::after {
@@ -886,10 +875,7 @@
 .baseCardIcon {
   position: absolute;
   left: 22px;
-  bottom: 20px;
   z-index: 1;
-  width: 40px;
-  height: 40px;
   color: var(--ink-2);
   background: var(--surface-overlay);
   border-color: var(--line);
@@ -1157,12 +1143,6 @@
   .uploadDragging::after {
     animation: none;
     opacity: .7;
-  }
-}
-
-@keyframes gentle-fade {
-  from {
-    opacity: 0;
   }
 }
 

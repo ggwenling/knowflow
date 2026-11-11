@@ -1,0 +1,63 @@
+.deferred-visual {
+  position: absolute;
+  inset: 0;
+  contain: strict;
+}
+
+.home-wave, .loginCanvas,
+.home-wave canvas, .loginCanvas canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.home-wave, .loginCanvas {
+  overflow: hidden;
+  contain: strict;
+}
+
+.home-art, .loginFlow {
+  /* Keep the fallback URL observable on the existing host, paint it in its own
+     layer so transparent WebGL and paper can crossfade without moving either. */
+  background-size: 0 0;
+  background-repeat: no-repeat;
+}
+
+.home-art { background-image: url("/home-wave.webp"); }
+.loginFlow { background-image: url("/login-ribbon.webp"); }
+
+.home-art::before, .loginFlow::before {
+  content: "";
+  position: absolute;
+  inset: var(--fallback-top, 0px) 0 auto;
+  height: var(--fallback-height, 100%);
+  background-image: inherit;
+  background-position: center;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  transition: opacity 260ms var(--ease);
+}
+
+.home-wave canvas, .loginCanvas canvas {
+  opacity: 0;
+  transition: opacity 260ms var(--ease);
+}
+
+.home-art:has([data-scene-ready="true"])::before,
+.loginFlow:has([data-scene-ready="true"])::before { opacity: 0; }
+canvas[data-scene-ready="true"] { opacity: 1; }
+
+/* Pause also settles an in-flight crossfade, keeping the captured still stable. */
+[data-motion-paused] canvas,
+.home-art:has([data-motion-paused])::before,
+.loginFlow:has([data-motion-paused])::before { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-art::before, .loginFlow::before,
+  .home-wave canvas, .loginCanvas canvas { transition: none; }
+}

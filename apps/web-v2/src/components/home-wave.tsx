@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import * as THREE from "three";
+import { BufferAttribute, BufferGeometry, Color, Float32BufferAttribute, MathUtils, Mesh, NormalBlending, PerspectiveCamera, Points, SRGBColorSpace, Scene, ShaderMaterial, Vector2, Vector4, WebGLRenderer } from "three";
 
 const STRANDS = 40;
 const SEGMENTS = 160;
@@ -164,7 +164,7 @@ const particleFragment = /* glsl */ `
 `;
 
 function makeFilaments() {
-  const geometry = new THREE.BufferGeometry();
+  const geometry = new BufferGeometry();
   const positions = new Float32Array(STRANDS * (SEGMENTS + 1) * 6);
   const indices = new Uint16Array(STRANDS * SEGMENTS * 6);
   let vertex = 0;
@@ -186,25 +186,25 @@ function makeFilaments() {
       }
     }
   }
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.setAttribute("position", new BufferAttribute(positions, 3));
+  geometry.setIndex(new BufferAttribute(indices, 1));
   return geometry;
 }
 
 function makeParticles() {
-  const geometry = new THREE.BufferGeometry();
+  const geometry = new BufferGeometry();
   const positions = new Float32Array(PARTICLES * 3);
   for (let i = 0; i < PARTICLES; i++) {
     // Low-discrepancy seeds give a repeatable still, with no startup clumps.
     positions[i * 3] = (i * .61803398875) % 1;
     positions[i * 3 + 1] = (i % STRANDS) / (STRANDS - 1) * 2 - 1;
   }
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("position", new BufferAttribute(positions, 3));
   return geometry;
 }
 
 function makeNodes() {
-  const geometry = new THREE.BufferGeometry();
+  const geometry = new BufferGeometry();
   // The answer is first so mobile retains it alongside two retrieval points.
   const positions = [
     .82, 0, 2,
@@ -214,7 +214,7 @@ function makeNodes() {
     .44, -.5, 1,
     .91, -.65, 1,
   ];
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   return geometry;
 }
 
@@ -223,6 +223,7 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
   const pausedRef = useRef(paused);
   useEffect(() => {
     pausedRef.current = paused;
+    host.current?.toggleAttribute("data-motion-paused", paused);
     host.current?.dispatchEvent(new Event("motionchange"));
   }, [paused]);
 
@@ -232,17 +233,17 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
 
     const canvas = document.createElement("canvas");
     canvas.setAttribute("aria-hidden", "true");
-    let renderer: THREE.WebGLRenderer;
+    let renderer: WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "low-power" });
+      renderer = new WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "low-power" });
     } catch {
       return;
     }
     renderer.setClearColor(0xf5f0e6, 0);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.outputColorSpace = SRGBColorSpace;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(32, 1, .1, 30);
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(32, 1, .1, 30);
     camera.position.z = 7;
     const tokens = getComputedStyle(element);
     const hero = element.closest(".home-art")?.parentElement?.parentElement
@@ -250,29 +251,29 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
     const uniforms = {
       uTime: { value: 0 },
       uPixelRatio: { value: 1 },
-      uResolution: { value: new THREE.Vector2(1200, 400) },
-      uViewport: { value: new THREE.Vector2() },
+      uResolution: { value: new Vector2(1200, 400) },
+      uViewport: { value: new Vector2() },
       uMobile: { value: 0 },
-      uComposer: { value: new THREE.Vector4(-10000, -10000, 1, 1) },
-      uScope: { value: new THREE.Vector4(-10000, -10000, 1, 1) },
-      uWordmark: { value: new THREE.Vector4(600, 140, 240, 65) },
-      uInk: { value: new THREE.Color(tokens.getPropertyValue("--ink-2").trim() || "#575249") },
-      uAccent: { value: new THREE.Color(tokens.getPropertyValue("--accent").trim() || "#ad402c") },
+      uComposer: { value: new Vector4(-10000, -10000, 1, 1) },
+      uScope: { value: new Vector4(-10000, -10000, 1, 1) },
+      uWordmark: { value: new Vector4(600, 140, 240, 65) },
+      uInk: { value: new Color(tokens.getPropertyValue("--ink-2").trim() || "#575249") },
+      uAccent: { value: new Color(tokens.getPropertyValue("--accent").trim() || "#ad402c") },
     };
     const filamentGeometry = makeFilaments();
     const particleGeometry = makeParticles();
     const nodeGeometry = makeNodes();
-    const filamentMaterial = new THREE.ShaderMaterial({
+    const filamentMaterial = new ShaderMaterial({
       uniforms, vertexShader: filamentVertex, fragmentShader: filamentFragment,
-      transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending,
+      transparent: true, depthTest: false, depthWrite: false, blending: NormalBlending,
     });
-    const particleMaterial = new THREE.ShaderMaterial({
+    const particleMaterial = new ShaderMaterial({
       uniforms, vertexShader: particleVertex, fragmentShader: particleFragment,
-      transparent: true, depthTest: false, depthWrite: false, blending: THREE.NormalBlending,
+      transparent: true, depthTest: false, depthWrite: false, blending: NormalBlending,
     });
-    const filaments = new THREE.Mesh(filamentGeometry, filamentMaterial);
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    const nodes = new THREE.Points(nodeGeometry, particleMaterial);
+    const filaments = new Mesh(filamentGeometry, filamentMaterial);
+    const particles = new Points(particleGeometry, particleMaterial);
+    const nodes = new Points(nodeGeometry, particleMaterial);
     // The GPU computes positions; CPU bounds describe only path parameters.
     filaments.frustumCulled = particles.frustumCulled = nodes.frustumCulled = false;
     filaments.renderOrder = 0;
@@ -287,15 +288,18 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
     let visible = false;
     let contextLost = false;
     let disposed = false;
+    let compiled = false;
+    let compilation = 0;
 
     function render(now: number) {
       frame = 0;
-      if (disposed || contextLost || !visible || document.hidden) return;
+      if (disposed || !compiled || contextLost || !visible || document.hidden) return;
       // Clamp resumed frames, keeping the flow continuous after tab changes.
       if (previousTime && !pausedRef.current) elapsed += Math.min((now - previousTime) / 1000, .05);
       previousTime = now;
       uniforms.uTime.value = reducedMotion.matches ? 0 : elapsed;
       renderer.render(scene, camera);
+      if (canvas.dataset.sceneReady !== "true") canvas.dataset.sceneReady = "true";
       if (!reducedMotion.matches && !pausedRef.current) frame = requestAnimationFrame(render);
     }
     function restart() {
@@ -315,7 +319,7 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      const viewHeight = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const viewHeight = 2 * camera.position.z * Math.tan(MathUtils.degToRad(camera.fov / 2));
       uniforms.uViewport.value.set(viewHeight * camera.aspect, viewHeight);
       uniforms.uResolution.value.set(width, height);
       uniforms.uPixelRatio.value = ratio;
@@ -323,7 +327,7 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
       // Layout reads happen only on resize (including hero height changes when
       // the selector appears). The render loop updates just the time uniform.
       const hostBounds = element!.getBoundingClientRect();
-      function measureControl(control: Element | null | undefined, target: THREE.Vector4) {
+      function measureControl(control: Element | null | undefined, target: Vector4) {
         if (!control) {
           target.set(-10000, -10000, 1, 1);
           return;
@@ -350,14 +354,31 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
     function onContextLost(event: Event) {
       event.preventDefault();
       contextLost = true;
+      compiled = false;
+      compilation++;
+      delete canvas.dataset.sceneReady;
       cancelAnimationFrame(frame);
-      // The :has(canvas) fallback switches back to the static artwork.
+      // The static layer stays in the same reserved box during context loss.
       canvas.remove();
     }
     function onContextRestored() {
       contextLost = false;
       element!.appendChild(canvas);
       resize();
+      void prepare();
+    }
+
+    async function prepare() {
+      const token = ++compilation;
+      try {
+        await renderer.compileAsync(scene, camera);
+        if (disposed || contextLost || token !== compilation) return;
+        compiled = true;
+        restart();
+      } catch {
+        // Leave the paper fallback visible if the context cannot compile.
+        if (!disposed && token === compilation) canvas.remove();
+      }
     }
 
     canvas.addEventListener("webglcontextlost", onContextLost);
@@ -375,6 +396,7 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
     element.addEventListener("motionchange", restart);
     document.addEventListener("visibilitychange", restart);
     resize();
+    void prepare();
 
     return () => {
       disposed = true;

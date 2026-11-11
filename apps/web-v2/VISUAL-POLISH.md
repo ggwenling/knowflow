@@ -112,3 +112,16 @@
 ## 既有 R1 素材提示词（存档，R3 未重新生成）
 
 > Use case: stylized-concept. Asset type: decorative editorial illustration for a premium knowledge workspace empty state and workflow panel. A small sculptural archive made of three thin folded sheets of pearl white paper, one graphite thread flows between their precise edges, subtly suggesting knowledge connecting. Architectural studio still life, orthographic three-quarter view, generous completely white negative space around a single centered object, very light contact shadow, delicate etched graphite contours, quiet tactile paper detail. Strict monochrome white and graphite, no color, no glossy plastic, no stock-photo aesthetic, no text, no letters, no symbols, no watermark. Landscape 3:2 composition. Intended to look refined at 240px wide on a white UI.
+
+## Round C · Performance（2026-11-11）
+
+保留 Round A+B 的纸墨排版、素材、交互与选择器；本轮不增加依赖，不修改预算，不执行 build / Chromium / commit / push。
+
+- **共享 JS 回退**：现有 `.next` 的 client-reference manifest 显示，Round A 给 RecoveryView 增加的 `next/image` 进入普通 error、global-error 与共享 RSC 图。`3kpe7muluw9xa` / `1z9r3yub1tsbi` 两个约 17 KB raw 的 chunk 含重复 image runtime，`3pmmz5ib8sxjz` 与路由 chunk 也含 image 模块。这解释了各路由共同增长；字体为 CSS / WOFF2，BrandSeal 为小型纯 SVG，并非该 JS 增长的主要来源。atlas 素材改用统一的原生 StaticArt：保留 width / height、空 alt 与 lazy；auth art 独有 eager / fetchPriority=high。原图 1.3–3.8 KB（auth 26 KB），已按展示尺寸的约 1–2 倍输出，无需再经过 image client / optimizer。
+- **进一步减少首载 JS**：cn 的全部调用只组合 CSS module 类，移除不需要的 tailwind-merge 执行路径。ConfirmDialog、SourceDialog 与移动资料 / 历史抽屉首次打开才加载；打开后保留组件，让关闭动效和焦点归还继续工作。Markdown、资料操作菜单维持已有 lazy 路径。预计共享 JS 减少约 20–30 KB gzip，涉及弹层的页面另有收益；需新生产构建确认，不能用旧 `.next` 宣称新预算已通过。
+- **WebGL 离开首屏关键路径**：先绘制原 WebP fallback，等待 load、host 可见、页面前台及至少 1.8 秒绘制窗口，再通过 requestIdleCallback（1.2 秒 timeout；不支持时用 timer）挂载动态场景。两个场景均用具名 Three.js import，无 addons；compileAsync 完成并绘制首帧后以 260ms opacity 交叉淡入。保留原几何、shader、DPR 上限、暂停控制、离屏 / 后台暂停、reduced-motion 静帧及 context loss 回退 / 恢复；异步编译在卸载或 context 变化后不再启动渲染。暂停会立即完成交叉淡入，保证静帧稳定。预期减少 LCP 前下载、JS 求值与 shader 阻塞。
+- **CLS**：移除依赖 `:has(canvas)` 改变 wave top / height 的规则。外层一次预留静态图与场景的联合范围，内层 canvas 始终为原 400 / 340 / 216px 高度；fallback 单独定位并保持原尺寸 / 位置。挂载、编译、淡入、context loss 不再改变 host 的几何。移动 `.home-art` 固定为 216px，原 168px fallback 在独立纸面层中；home-scene e2e 同时验证 mount / loss / restore 前后边界一致。
+- **字体**：DM Serif Display 继续用既有 latin-only 文件并 preload / swap；DM Sans 两个正文权重按使用加载，显式启用 Arial metric fallback。中文标题子集改 optional，避免迟到的字形替换引起位移；不 preload，不把 next/font 的拉丁 Arial / Times 指标套用到系统中文衬线。既有构建只有四份 WOFF2（Sans 400/700、Serif Latin 400、Noto 中文子集），没有重复 fontsource CSS 下载。
+- **CSS / 缓存**：按相同 selector + 相同 at-rule 上下文删除 93 个被后续覆盖的声明；删除无引用的旧规则与 keyframes，保留媒体条件和级联顺序。Tailwind 保留 Preflight，关闭未使用的 utility 扫描生成；场景样式只随 DeferredVisual 引入。next.config.ts 为 atlas / wave / ribbon / contours / grain 提供一年 immutable cache；替换素材内容时须更名，API proxy 的 no-store 未改。
+
+验证：`npm run lint`、`npm run typecheck`、`npm test` 通过；CSS PostCSS / Tailwind 编译与静态资源 header 路径解析通过，API 路径未被缓存规则匹配。更新 home-scene 的固定 box / context loss 验证。浏览器 e2e、a11y、CLS、Lighthouse、perf:budget 待操作员在沙箱外用新生产构建重测；既有 `.next` 仅用于只读归因，没有运行 npm run build。

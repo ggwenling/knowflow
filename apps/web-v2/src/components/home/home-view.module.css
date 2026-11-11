@@ -10,23 +10,21 @@
   right: -24px;
   left: -24px;
   z-index: -1;
-  height: 400px;
+  height: max(var(--scene-height), calc(var(--fallback-top) + var(--fallback-height)));
+  contain: layout paint;
+  --fallback-top: 120px;
+  --fallback-height: 268px;
+  --scene-height: 400px;
   overflow: hidden;
   pointer-events: none;
 }
 
-/* Keep the existing fallback asset at its original position and proportions. */
-
-.wave:not(:has(canvas)) {
-  top: 132px;
-  height: 268px;
-}
-
 .art {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 100%;
+  height: var(--scene-height);
   background-position: center;
-  background-size: 100% 100%;
   background-repeat: no-repeat;
 }
 
@@ -273,7 +271,6 @@
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface-overlay);
 }
 
 .panelHead {
@@ -286,7 +283,6 @@
 
 .panelHead h2 {
   margin: 0;
-  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -381,25 +377,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.moreIcon {
-  display: grid;
-  width: 28px;
-  height: 30px;
-  flex: none;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: none;
-  color: var(--ink-3);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .moreIcon:hover {
-    background: var(--bg-muted);
-    color: var(--ink);
-  }
-}
-
 .conversation {
   display: flex;
   width: 100%;
@@ -491,29 +468,17 @@
   white-space: nowrap;
 }
 
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-
 @media (max-width: 1100px) {
   .shortcuts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .wave {
-    height: 340px;
+    --scene-height: 340px;
   }
-  .wave:not(:has(canvas)) {
-    height: 230px;
-  }
+  .wave { --fallback-height: 230px; }
 }
 
 @media (max-width: 760px) {
-  .header {
-    height: 34px;
-  }
   .eyebrow {
     display: none;
   }
@@ -536,12 +501,9 @@
     top: 0;
     right: -16px;
     left: -16px;
-    height: 216px;
+    --scene-height: 216px;
   }
-  .wave:not(:has(canvas)) {
-    top: 96px;
-    height: 168px;
-  }
+  .wave { --fallback-top: 96px; --fallback-height: 168px; }
   .count {
     display: none;
   }
@@ -607,11 +569,6 @@
 
 .panel {
   padding-top: 18px;
-  box-shadow: var(--shadow-card);
-}
-
-.panelHead h2 {
-  font-size: 15px;
 }
 
 .panelHead a {
@@ -619,7 +576,6 @@
 }
 
 .rowIcon {
-  background: var(--bg-subtle);
   border: 1px solid var(--line);
 }
 
@@ -676,12 +632,6 @@
     .popover {
       transform: none;
     }
-  }
-}
-
-@keyframes gentle-fade {
-  from {
-    opacity: 0;
   }
 }
 
@@ -794,7 +744,6 @@
 .rowIcon {
   width: 40px;
   height: 40px;
-  border-radius: 11px;
   box-shadow: var(--highlight);
 }
 

@@ -108,7 +108,6 @@
 }
 
 .navActive {
-  color: var(--ink);
   font-weight: 600;
 }
 
@@ -540,7 +539,6 @@
 
 .sidebar {
   padding-top: 24px;
-  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-subtle));
 }
 
 .brandRow {
@@ -591,8 +589,6 @@
   height: 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--surface-raised);
-  box-shadow: 0 1px 3px #382b1606;
   transform: translateY(0);
   transition: transform 220ms var(--ease);
   pointer-events: none;
@@ -601,12 +597,7 @@
 .navIndicator::before {
   position: absolute;
   content: "";
-  left: -15px;
-  top: 10px;
-  width: 3px;
-  height: 16px;
   background: var(--accent);
-  border-radius: 0 3px 3px 0;
 }
 
 .library {
@@ -674,8 +665,6 @@
 .account .avatar {
   width: 32px;
   height: 32px;
-  background: var(--bg-muted);
-  color: var(--accent);
   border: 1px solid var(--line);
 }
 
@@ -696,7 +685,6 @@
 @starting-style {
   .accountPopover {
     opacity: 0;
-    transform: translateY(-4px) scale(.97);
   }
 }
 
@@ -785,7 +773,6 @@
   }
   .baseItem {
     font-size: 12px;
-    min-height: 32px;
   }
   .content {
     padding-top: var(--page-top);
@@ -795,11 +782,6 @@
 @media (prefers-reduced-motion: reduce) {
   .accountPopover {
     transition: opacity 120ms var(--ease);
-  }
-  @starting-style {
-    .accountPopover {
-      transform: none;
-    }
   }
 }
 
@@ -1054,12 +1036,6 @@
   }
   .accountMenu {
     position: absolute;
-    top: 17px;
-    right: 16px;
-  }
-  .accountMenu summary, .accountMenu summary .avatar {
-    width: 28px;
-    height: 28px;
   }
   .accountMenu .avatar {
     border: 0;
@@ -1067,7 +1043,6 @@
     color: var(--on-ink);
   }
   .accountPopover {
-    top: 36px;
     right: 0;
     bottom: auto;
     left: auto;
@@ -1173,7 +1148,7 @@
 
 /* The seal travels with the existing interruptible navigation indicator. */
 .sidebar { background: var(--bg-subtle); }
-.navIndicator { border-color: var(--line); background: var(--surface-raised); box-shadow: none; }
+.navIndicator { background: var(--surface-raised); box-shadow: none; }
 .navIndicator::before { width: 4px; height: 4px; top: 16px; left: 5px; border-radius: 1px; }
 .navActive { color: var(--ink); }
 .navActive > svg { color: var(--accent); }

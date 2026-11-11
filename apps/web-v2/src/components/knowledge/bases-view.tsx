@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ArrowRight, Folder, Plus, Search, Trash2 } from "lucide-react";
 import { useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/lazy-confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { relativeTime } from "@/lib/format";

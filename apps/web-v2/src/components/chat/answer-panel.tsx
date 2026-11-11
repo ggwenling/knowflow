@@ -1,12 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import { StaticArt } from "@/components/ui/static-art";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Clipboard, Sparkles, SquarePen } from "lucide-react";
 import { useStreamContext, useDocumentsContext, useKnowledgeContext } from "@/components/workspace/workspace-provider";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/lazy-confirm-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { questionStatusLabel } from "@/lib/format";
 import { CitationList } from "./citation-list";
@@ -37,7 +37,7 @@ export function AnswerPanel({
   if (!answer) {
     return (
       <div className={styles.answerEmpty}>
-        <Image className={styles.emptyArtwork} src="/atlas-empty-history.webp" alt="" width={240} height={160} loading="lazy" />
+        <StaticArt className={styles.emptyArtwork} src="/atlas-empty-history.webp" alt="" width={240} height={160} loading="lazy" />
         <h2 data-display-heading>从一个具体问题开始</h2>
         <p>回答会附上可打开的原文来源，方便你核对关键事实。每次提问独立检索，不会把上一轮回答当作上下文。</p>
         <div className={styles.examples}>

@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { StaticArt } from "@/components/ui/static-art";
 import Link from "next/link";
 import { ArrowRight, Folder, MessageSquare } from "lucide-react";
 import type { KnowledgeBase, QuestionHistory } from "@/services/api";
@@ -61,7 +61,7 @@ export function RecentPanels({
           </div>
         ) : (
           <div className={styles.empty}>
-            <Image src="/atlas-empty-bases.webp" alt="" width={108} height={72} loading="lazy" />
+            <StaticArt src="/atlas-empty-bases.webp" alt="" width={108} height={72} loading="lazy" />
             <p>这里还没有知识库。</p>
             <Link href="/knowledge-bases?create=1">创建第一个知识库 <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
@@ -92,7 +92,7 @@ export function RecentPanels({
           </div>
         ) : (
           <div className={styles.empty}>
-            <Image src="/atlas-empty-history.webp" alt="" width={108} height={72} loading="lazy" />
+            <StaticArt src="/atlas-empty-history.webp" alt="" width={108} height={72} loading="lazy" />
             <p>还没有对话，开始提问吧。</p>
             <button onClick={onFocusComposer}>向知识库提问 <ArrowRight size={16} aria-hidden="true" /></button>
           </div>

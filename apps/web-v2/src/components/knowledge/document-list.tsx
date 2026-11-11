@@ -6,7 +6,7 @@ import { acceptedFileTypes } from "@/lib/upload-rules";
 import { FileText } from "lucide-react";
 import type { Document } from "@/services/api";
 import { formatBytes, formatLabel } from "@/lib/format";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/lazy-confirm-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import styles from "./knowledge.module.css";
 

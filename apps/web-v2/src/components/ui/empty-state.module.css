@@ -8,7 +8,6 @@
   padding: 40px 24px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(ellipse at 50% 10%, var(--surface-raised), var(--bg-subtle));
   text-align: center;
 }
 
@@ -32,8 +31,6 @@
 
 .title {
   margin: 0;
-  font-size: var(--type-title);
-  font-weight: 600;
   letter-spacing: -.02em;
   color: var(--ink);
 }
@@ -53,8 +50,6 @@
 .illustration {
   display: block;
   width: 200px;
-  height: 128px;
-  object-fit: cover;
   mix-blend-mode: multiply;
   margin: -16px 0 8px;
 }

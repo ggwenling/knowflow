@@ -5,7 +5,6 @@
   grid-template-columns: minmax(0, 1fr);
   isolation: isolate;
   overflow: clip;
-  background: var(--surface-raised);
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -52,7 +51,6 @@
   height: 58px;
   padding: 0 18px;
   border: 1px solid var(--line-strong);
-  border-radius: 12px;
   color: var(--ink);
   font-size: 16px;
 }
@@ -125,12 +123,6 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .submit:hover:not(:disabled) {
-    background: var(--ink-hover);
   }
 }
 
@@ -223,8 +215,6 @@
 }
 
 .form input {
-  border-color: var(--line-strong);
-  background: var(--surface-overlay);
   box-shadow: inset 0 1px 2px #382b1603;
 }
 
@@ -246,9 +236,7 @@
 .submit {
   min-height: 56px;
   border: 1px solid var(--ink);
-  border-radius: 11px;
   font-size: 15px;
-  background: linear-gradient(180deg, var(--ink-hover), var(--ink));
   box-shadow: inset 0 1px 0 #ffffff20, 0 2px 3px #382b1612;
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -290,10 +278,6 @@
 }
 
 @media (max-width: 700px) {
-  .content {
-    padding-top: 32px;
-    padding-bottom: 48px;
-  }
   .brand {
     margin-bottom: clamp(100px, 18svh, 140px);
     font-size: 28px;

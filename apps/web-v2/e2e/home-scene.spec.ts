@@ -39,8 +39,12 @@ for (const width of [1440, 390]) {
   test(`home scene leaves the composer and scope clear at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
+    const artwork = page.locator(".home-art");
+    await expect(artwork).toBeVisible();
+    const reserved = await artwork.boundingBox();
     const canvas = page.locator(".home-wave canvas");
     await expect(canvas).toBeVisible();
+    expect(await artwork.boundingBox()).toEqual(reserved);
     await expect(page.getByRole("combobox", { name: "选择知识库" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => (window as SceneWindow).homeDraws)).toBeGreaterThan(6);
     const result = await canvas.evaluate((node: HTMLCanvasElement) => new Promise<{
@@ -149,6 +153,7 @@ test("mobile caps resolution and restores the static fallback during WebGL conte
   await expect.poll(() => page.evaluate(() => (window as SceneWindow).homeDraws)).toBeGreaterThan(6);
   expect(await canvas.evaluate((node: HTMLCanvasElement) => node.width / node.clientWidth)).toBeLessThanOrEqual(1.5);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const reserved = await page.locator(".home-art").boundingBox();
   await canvas.evaluate((node: HTMLCanvasElement) => {
     const extension = node.getContext("webgl2")!.getExtension("WEBGL_lose_context")!;
     (window as SceneWindow).restoreHomeContext = () => extension.restoreContext();
@@ -156,12 +161,14 @@ test("mobile caps resolution and restores the static fallback during WebGL conte
   });
   await expect(canvas).toHaveCount(0);
   await expect(page.locator(".home-art")).toHaveCSS("background-image", /home-wave\.webp/);
-  await expect(page.locator(".home-art")).toHaveCSS("height", "168px");
+  await expect(page.locator(".home-art")).toHaveCSS("height", "216px");
+  expect(await page.locator(".home-art").boundingBox()).toEqual(reserved);
   const before = await page.evaluate(() => (window as SceneWindow).homeDraws);
   await page.waitForTimeout(180);
   expect(await page.evaluate(() => (window as SceneWindow).homeDraws)).toBe(before);
   await page.evaluate(() => (window as SceneWindow).restoreHomeContext!());
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveCSS("height", "216px");
+  expect(await page.locator(".home-art").boundingBox()).toEqual(reserved);
   await expect.poll(() => page.evaluate(() => (window as SceneWindow).homeDraws)).toBeGreaterThan(before);
 });
