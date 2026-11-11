@@ -37,16 +37,19 @@
 
 .baseSelect select {
   max-width: 180px;
-  border: 0;
-  background: transparent;
   padding: 8px 0;
   font-size: 12px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   outline: none;
 }
 
 .baseSelect select:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .chatNotice {
@@ -134,14 +137,13 @@
 .search input {
   min-width: 0;
   flex: 1;
-  border: 0;
-  background: transparent;
-  outline: none;
 }
 
 .search input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .historyScroll {
@@ -400,7 +402,6 @@
 .markdown h1, .markdown h2, .markdown h3 {
   margin: 20px 0 8px;
   color: var(--ink);
-  font-size: 15px;
   font-weight: 650;
   line-height: 1.4;
 }
@@ -610,16 +611,15 @@
   display: block;
   width: 100%;
   resize: none;
-  border: 0;
   border-radius: var(--radius-xs);
-  background: transparent;
   color: var(--ink);
-  outline: none;
 }
 
 .composer textarea:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .composer textarea::placeholder {
@@ -1033,6 +1033,10 @@
 .search input {
   font-size: 12px;
   height: 34px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .groupLabel {
@@ -1402,6 +1406,10 @@
   .baseSelect select {
     width: 100%;
     max-width: none;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
   }
   .answerEmpty {
     padding: 12px 0 24px;
@@ -1555,6 +1563,10 @@
   max-height: 144px;
   overflow-y: auto;
   line-height: 1.65;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .composer textarea:placeholder-shown {
@@ -1617,6 +1629,10 @@
     min-height: 40px;
     max-height: 120px;
     padding: 6px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
   }
   .composerFoot {
     grid-column: 2;
@@ -1674,6 +1690,7 @@
 }
 
 /* Header and notices keep their natural height; only the layout absorbs the squeeze. */
+
 .page > :not(.layout) {
   flex-shrink: 0;
 }

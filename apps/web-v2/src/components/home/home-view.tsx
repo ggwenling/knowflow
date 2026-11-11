@@ -79,21 +79,9 @@ export function HomeView() {
         <h1 id="home-title">KnowFlow</h1>
         <p className={styles.lead}>基于 RAG 的智能知识管理与问答系统</p>
         <HomeComposer inputRef={inputRef} />
-        {knowledge.bases.length > 1 && (
-          <label className={styles.scope}>
-            提问知识库
-            <select
-              aria-label="选择知识库"
-              value={knowledge.selectedBase}
-              onChange={(event) => knowledge.selectBase(event.target.value)}
-            >
-              {knowledge.bases.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-            </select>
-          </label>
-        )}
+        <ModelNotice />
       </section>
 
-      <ModelNotice />
       {(notice || stream.notice) && (
         <div className={styles.notice} role="status">
           <span>{notice || stream.notice}</span>

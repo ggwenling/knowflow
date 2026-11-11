@@ -212,16 +212,8 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  border: 1px solid var(--line);
   border-bottom-color: var(--line-strong);
-  border-radius: 5px;
-  background: var(--bg-subtle);
-  padding: 0 4px;
-  color: var(--ink-3);
   font: 12px/1 var(--font-mono);
-  box-shadow: 0 1px 0 var(--line);
 }
 
 [data-sonner-toast] {
@@ -244,6 +236,7 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   animation-duration: .01ms !important;
   animation-delay: 0ms !important;
   transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
 }
 
 @media (max-width: 760px) {
@@ -401,4 +394,31 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   .workspace-header > [data-header-tag] {
     align-self: flex-start;
   }
+}
+
+/* Composite controls have one focus boundary, on the enclosing surface. */
+
+[data-composite-field]:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+[data-composite-field] :is(input, textarea, select), [data-composite-field] :is(input, textarea, select):is(:focus, :focus-visible) {
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+kbd {
+  min-width: 0;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  color: var(--ink-2);
+  cursor: text;
 }

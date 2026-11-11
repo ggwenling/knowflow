@@ -39,7 +39,7 @@ export function HistoryRail({ items, loading, hasMore, activeId, onLoadMore, onN
           <Plus size={16} aria-hidden="true" />
         </button>
       </div>
-      <label className={styles.search}>
+      <label className={styles.search} data-composite-field>
         <Search size={14} aria-hidden="true" />
         <input
           aria-label="搜索对话历史"

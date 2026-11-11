@@ -219,17 +219,13 @@
 .createForm {
   display: flex;
   min-width: 0;
-  gap: 5px;
   border-bottom: 1px solid var(--line);
 }
 
 .createForm input {
   min-width: 0;
   flex: 1;
-  height: 30px;
-  border: 1px solid transparent;
   border-radius: var(--radius-xs);
-  background: transparent;
   padding: 0 8px;
 }
 
@@ -238,21 +234,17 @@
 }
 
 .createForm input:focus-visible {
-  border-color: var(--ink-3);
-  background: #fff;
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .createForm button {
   display: grid;
-  width: 30px;
-  height: 30px;
   flex: none;
   place-items: center;
-  border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
   color: var(--ink);
   font-size: 16px;
   line-height: 1;
@@ -377,8 +369,6 @@
 
 .accountMenu summary {
   display: grid;
-  width: 28px;
-  height: 28px;
   place-items: center;
   border-radius: 50%;
   list-style: none;
@@ -389,15 +379,8 @@
   display: none;
 }
 
-.accountMenu summary .avatar {
-  width: 28px;
-  height: 28px;
-}
-
 .accountPopover {
   position: absolute;
-  top: 36px;
-  right: 0;
   display: grid;
   width: 226px;
   gap: 4px;
@@ -537,25 +520,15 @@
     border-bottom: 0;
   }
   .createForm input {
-    height: 32px;
     border-color: var(--line);
-    background: #fff;
   }
   .createForm button {
-    background: var(--ink);
     border-color: var(--ink);
     color: #fff;
   }
   .historyScroll {
     max-height: 92px;
     overflow-y: auto;
-  }
-  .account {
-    display: none;
-  }
-  .accountMenu {
-    position: absolute;
-    right: 16px;
   }
   .mainColumn {
     min-width: 0;
@@ -673,7 +646,6 @@
 }
 
 .createForm {
-  padding: 0 3px 16px;
   margin-bottom: 12px;
 }
 
@@ -717,7 +689,6 @@
 
 .accountPopover {
   z-index: var(--z-popover);
-  transform-origin: top right;
   background: var(--surface-overlay);
   transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
@@ -816,15 +787,8 @@
     font-size: 12px;
     min-height: 32px;
   }
-  .createForm {
-    margin: 0;
-    padding: 0;
-  }
   .content {
     padding-top: 26px;
-  }
-  .accountMenu {
-    top: 17px;
   }
 }
 
@@ -907,20 +871,9 @@
 
 .accountMenu:not([open]) .accountPopover {
   opacity: 0;
-  transform: translateY(-4px) scale(.97);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .accountMenu:not([open]) .accountPopover {
-    transform: none;
-  }
 }
 
 /* A faint paper light belongs to the reading surface, not to a floating card. */
-
-.mainColumn {
-  background: radial-gradient(ellipse 85% 320px at 40% 0, #f4f6f8aa, transparent);
-}
 
 .sectionHead {
   letter-spacing: .04em;
@@ -935,8 +888,289 @@
   font-size: 12px;
 }
 
+/* The only layout transition: a user-requested sidebar width change. */
+
+.shell {
+  transition: grid-template-columns 220ms var(--ease);
+}
+
+.sidebar {
+  min-width: 0;
+}
+
+.sidebarToggle {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.expandIcon {
+  display: none;
+}
+
+.railTooltip {
+  display: none;
+}
+
+.accountMenu summary {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.accountMenu summary .avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.accountPopover {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 12px);
+  left: 0;
+  transform-origin: bottom left;
+}
+
+.accountMenu:not([open]) .accountPopover {
+  transform: translateY(4px) scale(.97);
+}
+
+@starting-style {
+  .accountPopover {
+    transform: translateY(4px) scale(.97);
+  }
+}
+
+.mainColumn {
+  background: radial-gradient(ellipse 85% 320px at 40% 0, color-mix(in srgb, var(--bg-subtle) 70%, transparent), transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebarToggle:hover {
+    color: var(--ink);
+    border-color: var(--line);
+    background: var(--surface-raised);
+  }
+}
+
+@media (min-width: 761px) {
+  :global(html[data-sidebar-collapsed="true"]) .shell {
+    --sidebar: 64px;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .sidebar {
+    padding: 24px 12px 16px;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .brandRow {
+    height: 66px;
+    min-height: 66px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .brand {
+    gap: 0;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .brand > span, :global(html[data-sidebar-collapsed="true"]) .navLabel, :global(html[data-sidebar-collapsed="true"]) .library, :global(html[data-sidebar-collapsed="true"]) .accountText, :global(html[data-sidebar-collapsed="true"]) .signOut, :global(html[data-sidebar-collapsed="true"]) .collapseIcon {
+    display: none;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .expandIcon {
+    display: block;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .navItem {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .navItem > svg {
+    width: 20px;
+    height: 20px;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .navIndicator::before {
+    left: -13px;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .account {
+    justify-content: center;
+    margin-top: auto;
+    padding: 16px 0 0;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .accountPopover {
+    bottom: 0;
+    left: calc(100% + 16px);
+    transform-origin: bottom left;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .railTooltip {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 12px);
+    z-index: var(--z-popover);
+    width: max-content;
+    max-width: 280px;
+    padding: 6px 9px;
+    border: 1px solid #ffffff15;
+    border-radius: 6px;
+    background: var(--ink);
+    box-shadow: var(--shadow-card);
+    color: #fff;
+    font: 500 12px/1.6 var(--font-sans);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-50%);
+    transition: opacity 120ms var(--ease);
+  }
+  :global(html[data-sidebar-collapsed="true"]:not([data-sidebar-tooltip-dismissed="true"])) .navItem:focus .railTooltip, :global(html[data-sidebar-collapsed="true"]:not([data-sidebar-tooltip-dismissed="true"])) .accountMenu summary:focus .railTooltip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0ms;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :global(html[data-sidebar-collapsed="true"]:not([data-sidebar-tooltip-dismissed="true"])) .navItem:hover .railTooltip, :global(html[data-sidebar-collapsed="true"]:not([data-sidebar-tooltip-dismissed="true"])) .accountMenu summary:hover .railTooltip {
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 160ms;
+    }
+  }
+}
+
 @media (max-width: 760px) {
+  .shell {
+    transition: none;
+  }
+  .sidebarToggle {
+    display: none;
+  }
+  .account {
+    display: contents;
+  }
+  .accountText, .signOut {
+    display: none;
+  }
+  .accountMenu {
+    position: absolute;
+    top: 17px;
+    right: 16px;
+  }
+  .accountMenu summary, .accountMenu summary .avatar {
+    width: 28px;
+    height: 28px;
+  }
+  .accountMenu .avatar {
+    border: 0;
+    background: var(--ink);
+    color: #fff;
+  }
+  .accountPopover {
+    top: 36px;
+    right: 0;
+    bottom: auto;
+    left: auto;
+    transform-origin: top right;
+  }
+  .accountMenu:not([open]) .accountPopover {
+    transform: translateY(-4px) scale(.97);
+  }
+  @starting-style {
+    .accountPopover {
+      transform: translateY(-4px) scale(.97);
+    }
+  }
   .mainColumn {
-    background: linear-gradient(#f8fafb80, transparent 260px);
+    background: linear-gradient(color-mix(in srgb, var(--bg-subtle) 55%, transparent), transparent 260px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    transition: none;
+  }
+  .accountMenu:not([open]) .accountPopover {
+    transform: none;
+  }
+  @starting-style {
+    .accountPopover {
+      transform: none;
+    }
+  }
+}
+
+.accountMenu[open] summary .railTooltip {
+  display: none;
+}
+
+.createForm {
+  align-items: center;
+  gap: 4px;
+  margin: 0 3px 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.createForm input {
+  height: 28px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.createForm button {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: var(--bg-subtle);
+}
+
+@media (max-width: 760px) {
+  .createForm {
+    margin: 0;
+  }
+  .createForm input {
+    height: 32px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+}
+
+.createForm {
+  margin-inline: 6px;
+}
+
+@media (min-width: 761px) {
+  :global(html[data-sidebar-collapsed="true"]) .railTooltip {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 760px) {
+  .createForm {
+    margin-inline: 0;
+  }
+}
+
+@media (min-width: 761px) {
+  :global(html[data-sidebar-collapsed="true"]) .railTooltip {
+    pointer-events: auto;
+  }
+  :global(html[data-sidebar-collapsed="true"]) .railTooltip::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -12px;
+    width: 12px;
   }
 }

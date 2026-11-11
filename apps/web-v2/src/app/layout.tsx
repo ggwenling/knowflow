@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { sans, serif } from "./fonts";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { sidebarBootstrap } from "@/lib/sidebar-preference";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
@@ -32,7 +33,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="zh-CN" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
+      <head>
+        <script id="sidebar-preference" dangerouslySetInnerHTML={{ __html: sidebarBootstrap }} />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>

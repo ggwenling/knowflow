@@ -21,8 +21,19 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   }, [draft]);
   useEffect(() => {
     const resize = () => fitQuestion(inputRef.current);
+    const input = inputRef.current;
+    let width = input?.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (!input || input.clientWidth === width) return;
+      width = input.clientWidth;
+      fitQuestion(input);
+    });
+    if (input) observer.observe(input);
     window.addEventListener("resize", resize, { passive: true });
-    return () => window.removeEventListener("resize", resize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+    };
   }, []);
   const stream = useStreamControls();
   const knowledge = useKnowledgeContext();
@@ -45,7 +56,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   }
 
   return (
-    <form className={styles.composer} onSubmit={submit}>
+    <form className={styles.composer} data-composite-field onSubmit={submit}>
       <textarea
         ref={inputRef}
         id="desk-question"

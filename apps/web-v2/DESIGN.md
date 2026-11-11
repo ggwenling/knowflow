@@ -32,7 +32,7 @@
 | 抬起表面 | `--shadow-card`：极淡环线 + 2px 接触影 + 8px 环境影；`--shadow-raised`：4px + 16px；`--shadow-pop`：8px + 24px，均为低透明度墨色 |
 | 内高光 | `--highlight: inset 0 1px 0 rgba(255,255,255,.8)` |
 | 间距令牌 | `--space-1/2/3/4/6/8`: 4 / 8 / 12 / 16 / 24 / 32px |
-| 布局 | 侧栏 `248px`（≤1180px 为 226px），内容最大宽度 `1280px` |
+| 布局 | 侧栏展开 `248px`（≤1180px 为 226px）、收起 `64px`；内容最大宽度 `1280px` |
 | 字体 | `DM Sans` 正文；`DM Serif Display` 标题；中文回退 `PingFang SC` / `Microsoft YaHei` |
 
 ## 3. 排版
@@ -58,7 +58,10 @@
 
 `src/components/shell/app-shell.tsx`
 
-- 桌面：固定 248px 侧栏，包含品牌、主导航（首页/对话/知识库/工作流/设置）、知识库快捷入口与内联创建、最近问答、账户区。
+- 桌面：固定 248px 侧栏，包含品牌、主导航（首页/对话/知识库/工作流/设置）、知识库快捷入口与内联创建、最近问答、账户区。支持按钮与 ⌘/Ctrl+B 收起到 64px 图标轨道，toggle 的 aria-expanded / aria-controls 与状态一致；账户菜单在底部，展开 / 收起均可使用。
+- 收起后隐藏品牌文字、库 / 历史 / 创建区域与账户文字；导航保留 aria-label，并在 hover / focus 展示可悬停、Esc 可关闭的 CSS tooltip。邮箱 tooltip 关联账户菜单说明。移动 ≤760px 不展示 toggle，不使用收起样式，保留顶栏账户菜单与原导航。
+- 偏好键为 `knowflow.sidebar.collapsed`。根布局的短内联脚本在绘制前设置 html data-sidebar-collapsed；仅 html 对该额外属性启用 suppressHydrationWarning，子树不抑制。SidebarToggle 独立 useSyncExternalStore 订阅，使用稳定的服务端快照；不向 AppShell / WorkspaceProvider 增加状态。支持 storage 事件与存储不可用时的当前页回退。
+- 新建知识库的所有聚焦入口先展开桌面侧栏，再打开快捷区并聚焦输入，移动创建不修改桌面偏好。
 - 主内容：使用 `<main id="main-content" tabIndex={-1}>`，最大 1280px 居中，上边距 40px；页面首个可聚焦元素是“跳到主要内容”。非首页使用统一 `workspace-header` 页头带：标题 / 一句说明 / 行动底部对齐、24px 下留白与发丝分隔线；移动自然换行，不省略说明。内容顶端只用极淡且宽的纸面光。
 - 导航、知识库卡片、历史记录必须是 `<a>`/`Link`，支持 Cmd/Ctrl+click、中键与新标签；创建、上传、提问、停止、删除等动作保持 `<button>`。
 - `≤1180px`：侧栏 226px，内容留白 28px，对话资料栏收窄。
@@ -72,8 +75,9 @@
 ### 5.1 首页 `/`
 
 - 衬线 `KnowFlow` + 一句定位语 + 单行提问框，下方 Three.js 波浪；无 WebGL 时回退 `home-wave.webp`。
+- 单一提问外框由问题主行与底栏组成，知识库选择整合到底栏；不保留首页 ↵ 芯片。内部输入与 select 无边框 / 背景 / 阴影 / outline，外框以 focus-within 提供 2px 焦点环。模型模式文案作为英雄区的安静辅助文字。
 - 四个快捷操作：创建知识库、新建对话、上传文档、创建工作流；四项都落到真实路由或明确的占位页。创建知识库使用明确的墨色主卡，其余白底；每张都有独立图标瓷片、说明与 hover 箭头。桌面上下排版，移动双列紧凑横排。
-- “我的知识库”“最近问答”两栏细线卡片；行有更充分的点击留白、40px 图标与 ≥12px 元数据，hover 浅底反馈；空态给出唯一下一步。
+- “我的知识库”“最近问答”采用等宽两栏、相同的 76px 行基准；快捷卡、面板与主内容网格边线一致，英雄区提问框最长 800px 居中。窄屏单列面板、紧凑快捷卡；40px 行图标与 ≥12px 元数据，空态保留唯一下一步。
 - 通知与账户浮层使用原生 `details`，点击外部关闭；Esc 关闭并回到触发器。支持 `::details-content` 的浏览器保留离场过渡，旧浏览器直接关闭。
 - 初始数据未到时提问按钮禁用；没有 READY 资料时按钮禁用并给出原因。
 
@@ -114,7 +118,9 @@
 
 ### 5.6 设置 `/settings`
 
-- 编号账户 / 模型两张信息卡，桌面并列、窄屏堆叠；信息行展示登录邮箱、空间、知识库数量、模型模式、问答方式、资料范围。未开放功能使用次级浅底区，不制造可操作控件。
+- 桌面为左侧 156px 分区导航 + 右侧单列内容，最大 1040px，列间距 32px。账户 / 模型与数据 / 暂未开放使用原生锚点，当前状态跟随 URL hash，支持浏览器返回 / 前进与可聚焦目标；导航独立订阅，不使事实卡重渲染。
+- 卡片标题下有一句说明，信息行按 label / value 网格对齐，展示登录邮箱、空间、知识库数量、模型模式、问答方式、资料范围。退出登录放在账户卡底部的独立“危险操作”区，保持原动作与文案。
+- ≤980px 分区导航变为横向分段行，移动 label / value 使用 72px / 自适应列，长值自然换行。未开放功能使用次级浅底区，不制造可操作控件。
 - 退出登录为危险按钮；明确“自助找回密码、团队协作、账单与导出暂未开放”。
 
 ### 5.7 工作流 `/workflow`
@@ -143,16 +149,17 @@
 
 按钮文字使用动词；同一动作在按钮、Toast、确认框中保持同名。导航用链接、动作用按钮；不要用 `div` 模拟控件。
 
-表单补 `name`、`autoComplete`、`spellCheck`；占位符以 `…` 结尾并展示示例格式。输入、选择器与 textarea 必须有可见焦点环，不得只写 `outline: none`。
+表单补 `name`、`autoComplete`、`spellCheck`；占位符以 `…` 结尾并展示示例格式。输入、选择器与 textarea 必须有可见焦点环。带外壳的复合字段统一标记 `data-composite-field`：内部控件在普通 / focus / focus-visible 下均无 border、background、box-shadow 与 outline；2px 焦点环放在外壳的 focus-within，不能内外叠加。独立的登录输入仍保留自身焦点环。kbd 只用等宽文字、无边框 / 底色 / 阴影，不伪装成按钮。
 
 ## 7. 动效
 
 - 首页/登录：Three.js 波浪为唯一高光；页面不可见时暂停，减少动态效果时只绘制静态帧。
 - 页面进入：由 `(workspace)/template.tsx` 在客户端导航时重建路由内容，统一 220ms 淡入 + 6px 上移；外壳 / Store / WorkspaceProvider 留在 layout，不加导航状态，不做退出等待。
 - 一个容器只做一层进入：首页只随路由整体进入，不再二次 stagger 快捷卡。知识库列表模板容器静止，页头与首 4 张卡分别进入；卡片 180ms，延迟 0 / 40 / 70 / 95ms，总计 ≤275ms。其余长列表条目静止，避免 500 个同时合成的动画。搜索键盘路径无动画。
+- 侧栏宽度是本轮明确允许的布局过渡例外：shell grid-template-columns 使用 220ms Expo，使主内容真实获得空间；键盘触发和 reduced-motion 下即时完成。不能用纯 transform 假收起后仍占据原宽度。
 - 导航底板 220ms、筛选底板 180ms，CSS transform 过渡可中断。位置值写在指示器本身，不逐帧修改父级 CSS 变量。
 - 弹层桌面 220ms 进入 / 140ms 退出；遮罩 180 / 120ms；移动抽屉从底部 18px 进入，使用 drawer 曲线。浮层由触发点 180ms 进入，菜单行不再二次动画。
-- 键盘操作时，由 Providers 事件监听设置 DOM `data-input="keyboard"`，所有进入与交互过渡立即完成；不使用 React 状态，也不订阅草稿 / SSE。指针操作恢复常规动效。
+- 键盘操作时，由 Providers 事件监听设置 DOM `data-input="keyboard"`，所有进入与交互过渡及延迟立即完成；不使用 React 状态，也不订阅草稿 / SSE。指针操作恢复常规动效。
 - 流式答案：50ms 缓冲刷新，避免逐字触发整棵树重渲染；完成后一次性解析 Markdown。
 - Hover 限 `@media (hover:hover) and (pointer:fine)` 内产生位移，最多 2px；按压 1px / 100–120ms，无缩放弹跳。边框 / 阴影采用静态状态切换，不逐帧插值重绘。
 - 骨架扫光 1800ms linear，用伪元素 transform；流式正文仅首次出现淡入 120ms，不逐字 stagger，保持 50ms 缓冲与一次完成解析。Sonner 260ms transform / 180ms opacity，不引入额外逐帧状态。
@@ -160,7 +167,7 @@
 
 ## 8. 可访问性
 
-- 焦点环统一 `2px var(--focus-ring)`（`#506E83`），偏移 2–3px；不得移除 outline。
+- 焦点环统一 `2px var(--focus-ring)`（`#506E83`），偏移 3px。复合字段的焦点环由外框承载，内部 outline 为 none 是有意的等价焦点行为；内联创建框保留足够左右余量以免被侧栏裁切。
 - 图标按钮必须有 `aria-label`；菜单使用 `role="menu"` / `role="menuitem"`。
 - 弹层使用 Radix Dialog：焦点陷阱、Esc 关闭、关闭后回到触发元素。
 - 流式答案容器 `aria-live="polite"`；加载/错误使用 `role="status"` / `role="alert"`。
@@ -202,3 +209,9 @@ npx playwright test
 - `public/knowledge-contours.svg`：1,407 bytes、800×200，原生路径绘制的石墨等高线。用于知识库封面，仅装饰；三个中性色裁切方向 / 底色，不编造业务统计。无新增 AI 图片或依赖。
 - `public/archive-study.webp`：720×480、4,226 bytes，AI 生成的三张纸页与石墨连接线；用于知识库空态、对话空态与工作流。`next/image` 显式尺寸、`alt=""`，默认延迟加载。提示词与验证记录见 `VISUAL-POLISH.md`。
 - 参考研究：[Linear 的层级和对齐](https://linear.app/now/how-we-redesigned-the-linear-ui)、[Geist 系统](https://vercel.com/geist/introduction)、[Perplexity 的可追溯来源](https://www.perplexity.ai/help-center/en/articles/10352903-what-is-pro-search)。只借鉴原则，不复制版式、商标或产品能力。
+
+## 12. Round 3 补充验收
+
+- `e2e/sidebar-and-composer.spec.ts`：11 个用例覆盖 1440 / 900 侧栏、hover / focus / Esc tooltip、两种快捷键、reload 持久化、预绘制属性、390px 不受桌面偏好影响、账户菜单、创建自动展开、render probe、reduced-motion 三栏、内框移除与设置锚点。
+- `a11y.spec.ts` 与 `agent-acceptance.spec.ts` 的复合字段断言移到外框，仍验证 2px 焦点指示；内层明确验证 outline none。
+- 纸面色审查：全局仍为 #FFF / #F7F8F9 / #EEF0F2，没有新增全局米黄或滤镜。纸面光统一通过既有 bg-subtle 混合，保持色相一致；局部档案封面原有微暖灰保持原样。本轮没有真实浏览器原图可复现显示色偏，不另行改变调色板。

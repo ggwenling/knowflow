@@ -143,7 +143,7 @@ export function ChatView() {
         </div>
         <div className={styles.chatActions} data-header-actions>
           {knowledge.bases.length > 1 && (
-            <label className={styles.baseSelect}>
+            <label className={styles.baseSelect} data-composite-field>
               <Layers size={14} aria-hidden="true" />
               <select
                 aria-label="切换知识库"

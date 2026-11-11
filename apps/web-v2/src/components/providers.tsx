@@ -7,7 +7,7 @@ import { PerformanceReporter } from "./performance-reporter";
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
-      document.documentElement.dataset.input = "keyboard";
+      if (document.documentElement.dataset.input !== "keyboard") document.documentElement.dataset.input = "keyboard";
       if (event.key === "Escape") {
         document.querySelectorAll<HTMLDetailsElement>("details[data-popover][open]").forEach((popover) => {
           popover.open = false;
@@ -16,7 +16,7 @@ export function Providers({ children }: { children: ReactNode }) {
       }
     };
     const pointer = (event: PointerEvent) => {
-      document.documentElement.dataset.input = "pointer";
+      if (document.documentElement.dataset.input !== "pointer") document.documentElement.dataset.input = "pointer";
       document.querySelectorAll<HTMLDetailsElement>("details[data-popover][open]").forEach((popover) => {
         if (event.target instanceof Node && !popover.contains(event.target)) popover.open = false;
       });

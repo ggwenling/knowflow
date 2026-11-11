@@ -34,14 +34,13 @@
 .search input {
   min-width: 0;
   flex: 1;
-  border: 0;
-  background: transparent;
-  outline: none;
 }
 
 .search input:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .search input::placeholder {
@@ -489,6 +488,10 @@
 .search input {
   height: 36px;
   font-size: 13px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .toolbarMeta {

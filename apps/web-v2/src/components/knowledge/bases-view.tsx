@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { relativeTime } from "@/lib/format";
 import { useQueryState } from "@/lib/query-state";
+import { revealSidebarForCreate } from "@/lib/sidebar-preference";
 import type { KnowledgeBase } from "@/services/api";
 import styles from "./knowledge.module.css";
 
@@ -30,6 +31,7 @@ export function BasesView() {
   const hasBases = knowledge.bases.length > 0;
 
   function focusCreate() {
+    revealSidebarForCreate();
     const input = document.getElementById("new-base-name");
     const group = input?.closest("details");
     if (group) group.open = true;
@@ -67,7 +69,7 @@ export function BasesView() {
       </header>
 
       <div className={styles.toolbar}>
-        <label className={styles.search}>
+        <label className={styles.search} data-composite-field>
           <Search size={14} aria-hidden="true" />
           <input
             aria-label="搜索知识库"

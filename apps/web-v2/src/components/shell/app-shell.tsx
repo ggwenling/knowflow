@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { ArrowRight, Folder, Home, Layers, MessageSquare, Settings, Workflow } from "lucide-react";
 import { useSessionContext, useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
 import { questionStatusLabel } from "@/lib/format";
+import { allowSidebarTooltip, revealSidebarForCreate } from "@/lib/sidebar-preference";
+import { SidebarToggle } from "./sidebar-toggle";
 import styles from "./app-shell.module.css";
 
 const navItems = [
@@ -40,6 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (pathname === "/knowledge-bases" && new URLSearchParams(window.location.search).has("create")) {
+      revealSidebarForCreate();
       if (libraryRef.current) libraryRef.current.open = true;
       requestAnimationFrame(() => inputRef.current?.focus());
     }
@@ -71,7 +74,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={styles.shell}>
       <a className={styles.skipLink} href="#main-content" tabIndex={0}>跳到主要内容</a>
 
-      <aside className={`${styles.sidebar} ${pathname === "/" ? styles.homeSidebar : ""} ${isChat ? styles.chatSidebar : ""}`}>
+      <aside id="workspace-sidebar" className={`${styles.sidebar} ${pathname === "/" ? styles.homeSidebar : ""} ${isChat ? styles.chatSidebar : ""}`}>
         <div className={styles.brandRow}>
           <Link className={styles.brand} href="/" aria-label="KnowFlow 首页">
             <svg viewBox="0 0 28 28" width="24" height="24" fill="currentColor" aria-hidden="true">
@@ -85,20 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <small>知识工作台</small>
             </span>
           </Link>
-          <details className={styles.accountMenu} ref={accountRef} data-popover>
-            <summary aria-label="账户菜单">
-              <span className={styles.avatar}>{session.user?.email.slice(0, 1).toUpperCase()}</span>
-            </summary>
-            <div className={styles.accountPopover}>
-              <span className={styles.accountEmail}>{session.user?.email}</span>
-              <Link href="/settings" onClick={() => { if (accountRef.current) accountRef.current.open = false; }}>
-                账户设置 <ArrowRight size={14} />
-              </Link>
-              <button onClick={signOut}>
-                退出 <ArrowRight size={14} />
-              </button>
-            </div>
-          </details>
+          <SidebarToggle />
         </div>
 
         <nav className={styles.nav} aria-label="主导航">
@@ -108,10 +98,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               key={href}
               className={match(pathname) ? `${styles.navItem} ${styles.navActive}` : styles.navItem}
               href={href}
+              aria-label={label}
+              onFocus={allowSidebarTooltip}
+              onPointerEnter={allowSidebarTooltip}
               aria-current={match(pathname) ? "page" : undefined}
             >
               <Icon size={18} strokeWidth={1.6} aria-hidden="true" />
-              <span>{label}</span>
+              <span className={styles.navLabel}>{label}</span>
+              <span className={styles.railTooltip} role="tooltip" aria-label={label}>{label}</span>
             </Link>
           ))}
         </nav>
@@ -140,7 +134,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {!knowledge.bases.length && <p className={styles.emptyHint}>还没有知识库，先建一个。</p>}
             </div>
             {pathname !== "/" && (
-              <form className={styles.createForm} onSubmit={createBase}>
+              <form className={styles.createForm} data-composite-field onSubmit={createBase}>
                 <input
                   ref={inputRef}
                   id="new-base-name"
@@ -192,7 +186,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         </details>
 
         <div className={styles.account}>
-          <span className={styles.avatar}>{session.user?.email.slice(0, 1).toUpperCase()}</span>
+          <details className={styles.accountMenu} ref={accountRef} data-popover>
+            <summary aria-label="账户菜单" aria-describedby="sidebar-account-tooltip" onFocus={allowSidebarTooltip} onPointerEnter={allowSidebarTooltip}>
+              <span className={styles.avatar}>{session.user?.email.slice(0, 1).toUpperCase()}</span>
+              <span id="sidebar-account-tooltip" className={styles.railTooltip} role="tooltip" aria-label={session.user?.email}>{session.user?.email}</span>
+            </summary>
+            <div className={styles.accountPopover}>
+              <span className={styles.accountEmail}>{session.user?.email}</span>
+              <Link href="/settings" onClick={() => { if (accountRef.current) accountRef.current.open = false; }}>
+                账户设置 <ArrowRight size={14} />
+              </Link>
+              <button onClick={signOut}>退出 <ArrowRight size={14} /></button>
+            </div>
+          </details>
           <span className={styles.accountText}>
             {session.user?.email}
             <small>个人空间</small>
