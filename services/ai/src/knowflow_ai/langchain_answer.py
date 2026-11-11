@@ -27,12 +27,12 @@ from .adapters import ProcessingError
 from .answering import LlmSettings, answer_messages
 from .http_client import build_async_client
 from .provider_budget import reserve_provider_call
+from .provider_completion import validate_completion
 from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
 from .streaming import IncrementalAnswerParser
 
 OUTPUT_TOKENS = 1024
 MAX_BYTES = 1024 * 1024
-MAX_ATTEMPTS = 3
 DOMAIN = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}", re.ASCII)
 _logger = logging.getLogger(__name__)
 
@@ -92,7 +92,6 @@ class LangChainAnswerModel:
         self.supports_tools = self.default or settings.supports_tools
         self.search = None
         self.last_usage = None
-        self.attempts = 0
         self.request_id = "probe"
         self.retry_policy = ProviderRetryPolicy.from_environment() if self.default else None
         self.probe = probe
@@ -133,8 +132,7 @@ class LangChainAnswerModel:
                 self.model = ChatOpenAI(**shared, use_responses_api=False, stream_usage=False)
 
     async def _before_request(self, request):
-        self.attempts += 1
-        if self.attempts > MAX_ATTEMPTS or request.method != "POST":
+        if request.method != "POST":
             raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
         request.headers["Accept-Encoding"] = "identity"
         if self.protocol == "anthropic_messages":
@@ -152,6 +150,24 @@ class LangChainAnswerModel:
             await response.aclose()
             raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
         response.stream = _BoundedResponse(response.stream)
+        if response.is_success:
+            # SDKs may stop reading at a terminator and discard the rest. Read
+            # within MAX_BYTES first so missing terminators and trailing junk
+            # cannot escape validation, including on the agent's ainvoke path.
+            try:
+                body = await response.aread()
+                if len(body) > MAX_BYTES:
+                    raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False)
+                payload = json.loads(response.request.content)
+                streaming = payload.get("stream", False)
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].strip()
+                if streaming and content_type != "text/event-stream":
+                    raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False)
+                validate_completion(body, protocol=self.protocol, model_id=self.model_id,
+                                    streaming=streaming,
+                                    allow_tools=bool(payload.get("tools")) and payload.get("tool_choice") != "none")
+            finally:
+                await response.aclose()
 
     def set_search(self, search):
         self.search = search
@@ -177,6 +193,10 @@ class LangChainAnswerModel:
                                       retryable=self.default and transient, provider_status=status,
                                       retry_after=retry_after_seconds(response.headers.get("Retry-After"))
                                       if response is not None else None) from None
+            except (openai.OpenAIError, anthropic.AnthropicError, ValueError):
+                # Includes SDK length/content-filter and structured-output
+                # parse errors. Their payloads can contain the full completion.
+                raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
 
         if self.default:
             return await run_provider_with_retry(run, policy=self.retry_policy, request_id=self.request_id,

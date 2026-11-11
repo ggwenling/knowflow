@@ -5,11 +5,13 @@ from uuid import uuid4
 
 import httpx
 import httpx2
+import openai
 import pytest
 
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.answering import AnswerService, LlmSettings
 from knowflow_ai.langchain_answer import CustomModel, LangChainAnswerModel
+from knowflow_ai.provider_retry import ProviderRetryPolicy
 from knowflow_ai import langchain_answer, model_egress
 
 
@@ -17,15 +19,16 @@ OUTPUT = {"answer": "The observatory opens at 09:45 [source-1].", "has_answer": 
           "source_ids": ["source-1"]}
 
 
-def sse(*events, response_class=httpx.Response):
+def sse(*events, response_class=httpx.Response, done=False):
     return response_class(200, headers={"content-type": "text/event-stream"}, content="".join(
         (f"event: {item['type']}\n" if "type" in item else "") + f"data: {json.dumps(item)}\n\n"
-        for item in events))
+        for item in events) + ("data: [DONE]\n\n" if done else ""))
 
 
-def chat(delta, finish="stop"):
-    return sse({"id": "chat-1", "model": "test-model", "object": "chat.completion.chunk", "created": 0,
-                "choices": [{"index": 0, "delta": {"role": "assistant", **delta}, "finish_reason": finish}]})
+def chat(delta, finish="stop", *, model_id="test-model", done=True):
+    return sse({"id": "chat-1", "model": model_id, "object": "chat.completion.chunk", "created": 0,
+                "choices": [{"index": 0, "delta": {"role": "assistant", **delta}, "finish_reason": finish}]},
+               done=done)
 
 
 def anthropic_events(text):
@@ -89,7 +92,214 @@ async def test_protocol_stream(protocol, path, response):
 
 
 @pytest.mark.asyncio
-async def test_agent_only_searches_once_and_reserves_each_deepseek_call(monkeypatch):
+async def test_chat_complete_fragmented_wire_with_separate_finish_and_usage():
+    output = {**OUTPUT, "answer": OUTPUT["answer"] + " 已确认。"}
+    base = {"id": "chat-1", "model": "test-model", "object": "chat.completion.chunk", "created": 0}
+    events = [
+        {**base, "choices": [{"index": 0, "delta": {"content": json.dumps(output, ensure_ascii=False)},
+                               "finish_reason": None}]},
+        {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+        {**base, "choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}},
+    ]
+    wire = ("".join(f"data: {json.dumps(event, ensure_ascii=False)}\r\n\r\n" for event in events)
+            + "data: [DONE]\r\n\r\n").encode()
+
+    class Fragmented(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for offset in range(0, len(wire), 3):
+                yield wire[offset:offset + 3]
+
+    model = LangChainAnswerModel(model_config(), transport=httpx.MockTransport(
+        lambda _: httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=Fragmented())))
+    try:
+        assert await model.generate("question", [], request_id="question") == output
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["custom", "default", "default_agent"])
+@pytest.mark.parametrize("fault", ["missing_done", "null_finish", "length", "content_filter",
+                                    "wrong_model", "early_done", "trailing_junk"])
+async def test_chat_rejects_invalid_wire_completion(path, fault, monkeypatch):
+    reservations = []
+
+    async def reserve(*args):
+        reservations.append(args)
+
+    monkeypatch.setattr(langchain_answer, "reserve_provider_call", reserve)
+    model_id = "test-model" if path == "custom" else "deepseek-flash"
+    calls = []
+
+    async def handle(request):
+        calls.append(request)
+        response = chat({"content": json.dumps(OUTPUT)},
+                        finish={"null_finish": None, "length": "length", "content_filter": "content_filter"}.get(fault, "stop"),
+                        model_id="other-model" if fault == "wrong_model" else model_id,
+                        done=fault != "missing_done")
+        wire = response.content
+        if fault == "early_done":
+            wire = b"data: [DONE]\n\n" + wire
+        if fault == "trailing_junk":
+            wire += b"unexpected provider text\n\n"
+        return httpx.Response(200, headers=response.headers, content=wire)
+
+    config = model_config() if path == "custom" else LlmSettings(api_key="a" * 32)
+    model = LangChainAnswerModel(config, transport=httpx.MockTransport(handle))
+    if path == "default_agent":
+        async def search(_query):
+            pytest.fail("Invalid final completion must not trigger retrieval")
+        model.set_search(search)
+    try:
+        with pytest.raises(ProcessingError) as caught:
+            await model.generate("question", [], request_id="question")
+        assert caught.value.status == 502 and caught.value.retryable is False
+        assert str(caught.value) == "AI_PROCESSING_FAILED"
+        assert len(calls) == 1
+        assert len(reservations) == (0 if path == "custom" else 1)
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("protocol", ["responses", "anthropic_messages"])
+@pytest.mark.parametrize("fault", ["missing_completion", "failed_completion", "wrong_model"])
+async def test_other_protocols_require_their_own_completion(protocol, fault):
+    def handle(_request):
+        response = (responses_events if protocol == "responses" else anthropic_events)(json.dumps(OUTPUT))
+        wire = response.content
+        if fault == "missing_completion":
+            wire = wire[:wire.rfind(b"event:")]
+        elif fault == "wrong_model":
+            wire = wire.replace(b'test-model', b'other-model')
+        elif protocol == "responses":
+            wire = wire.replace(b'"status": "completed"', b'"status": "incomplete"')
+        else:
+            wire = wire.replace(b'"stop_reason": "end_turn"', b'"stop_reason": "max_tokens"')
+        response_class = httpx2.Response if protocol == "anthropic_messages" else httpx.Response
+        return response_class(200, headers=response.headers, content=wire)
+
+    transport = httpx2.MockTransport if protocol == "anthropic_messages" else httpx.MockTransport
+    model = LangChainAnswerModel(model_config(protocol), transport=transport(handle))
+    try:
+        with pytest.raises(ProcessingError) as caught:
+            await model.generate("question", [], request_id="question")
+        assert caught.value.status == 502 and caught.value.retryable is False
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+async def test_default_retry_budget_is_fresh_for_generate_and_repair(monkeypatch):
+    calls, reservations = [], []
+
+    async def reserve(*args):
+        reservations.append(args)
+
+    monkeypatch.setattr(langchain_answer, "reserve_provider_call", reserve)
+
+    def handle(request):
+        calls.append(json.loads(request.content))
+        if len(calls) % 4:
+            return httpx.Response(503, json={"error": {"message": "unavailable"}})
+        return chat({"content": json.dumps(OUTPUT)}, model_id="deepseek-flash")
+
+    model = LangChainAnswerModel(LlmSettings(api_key="a" * 32), transport=httpx.MockTransport(handle))
+    model.retry_policy = ProviderRetryPolicy(max_attempts=5, base_seconds=0)
+    try:
+        assert await model.generate("question", [], request_id="question") == OUTPUT
+        assert len(calls) == 4
+        assert await model.generate_repair("question", [], OUTPUT, request_id="question") == OUTPUT
+        assert len(calls) == len(reservations) == 8
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("default,expected", [(True, 3), (False, 1)])
+async def test_retry_policy_stops_at_three_and_custom_never_retries(default, expected, monkeypatch):
+    calls, reservations = [], []
+
+    async def reserve(*args):
+        reservations.append(args)
+
+    monkeypatch.setattr(langchain_answer, "reserve_provider_call", reserve)
+
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(503, json={"error": {"message": "unavailable"}})
+
+    config = LlmSettings(api_key="a" * 32) if default else model_config()
+    model = LangChainAnswerModel(config, transport=httpx.MockTransport(handle))
+    if default:
+        model.retry_policy = ProviderRetryPolicy(max_attempts=3, base_seconds=0)
+    try:
+        with pytest.raises(ProcessingError) as caught:
+            await model.generate("question", [], request_id="question")
+        assert caught.value.status == 502
+        assert caught.value.retryable is default
+        assert len(calls) == expected
+        assert len(reservations) == (expected if default else 0)
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("finish", ["stop", None, "length", "content_filter"])
+async def test_default_non_stream_completion(finish, monkeypatch):
+    async def reserve(*args):
+        pass
+
+    monkeypatch.setattr(langchain_answer, "reserve_provider_call", reserve)
+
+    def handle(request):
+        assert not json.loads(request.content).get("stream")
+        return httpx.Response(200, json={"id": "chat-1", "model": "deepseek-flash", "created": 0,
+            "object": "chat.completion", "choices": [{"index": 0, "finish_reason": finish,
+            "message": {"role": "assistant", "content": json.dumps(OUTPUT)}}]})
+
+    model = LangChainAnswerModel(LlmSettings(api_key="a" * 32), transport=httpx.MockTransport(handle))
+    model.model.streaming = False
+
+    async def invoke():
+        return await model._invoke(lambda: model.model.ainvoke([{"role": "user", "content": "question"}]))
+
+    try:
+        if finish == "stop":
+            assert json.loads((await invoke()).text) == OUTPUT
+        else:
+            with pytest.raises(ProcessingError) as caught:
+                await invoke()
+            assert caught.value.status == 502 and caught.value.retryable is False
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("default", [True, False])
+@pytest.mark.parametrize("error", [openai.LengthFinishReasonError(completion=openai.types.chat.ChatCompletion(
+                                      id="chat-1", model="test-model", choices=[], created=0, object="chat.completion")),
+                                  openai.ContentFilterFinishReasonError(), ValueError("private completion")])
+async def test_sdk_parse_errors_are_sanitized_non_retryable_502(default, error, caplog):
+    config = LlmSettings(api_key="a" * 32) if default else model_config()
+    model = LangChainAnswerModel(config, transport=httpx.MockTransport(lambda _: chat({})))
+
+    async def fail():
+        raise error
+
+    try:
+        with pytest.raises(ProcessingError) as caught:
+            await model._invoke(fail)
+        assert caught.value.status == 502 and caught.value.retryable is False
+        assert str(caught.value) == "AI_PROCESSING_FAILED"
+        assert "private completion" not in caplog.text
+    finally:
+        await model.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retries_before_success", [0, 3])
+async def test_agent_only_searches_once_and_reserves_each_deepseek_call(monkeypatch, retries_before_success):
     calls, reservations, searches = [], [], []
 
     async def reserve(provider, model, payload):
@@ -101,17 +311,19 @@ async def test_agent_only_searches_once_and_reserves_each_deepseek_call(monkeypa
         payload = json.loads(request.content)
         calls.append(payload)
         assert payload["max_tokens"] == 1024 and "max_completion_tokens" not in payload
-        if len(calls) == 1:
+        if len(calls) % (retries_before_success + 1):
+            return httpx.Response(503, json={"error": {"message": "unavailable"}})
+        if len(calls) == retries_before_success + 1:
             assert payload["thinking"] == {"type": "disabled"}
             assert payload["tools"][0]["function"]["name"] == "search_knowledge_base"
             return chat({"tool_calls": [
                 {"index": index, "id": f"tool-{index}", "type": "function",
                  "function": {"name": "search_knowledge_base", "arguments": '{"query":"Saturday hours"}'}}
                 for index in range(2)
-            ]}, "tool_calls")
+            ]}, "tool_calls", model_id="deepseek-flash")
         assert not payload.get("tools")
         assert any(item["role"] == "tool" and "09:45" in item["content"] for item in payload["messages"])
-        return chat({"content": json.dumps(OUTPUT)})
+        return chat({"content": json.dumps(OUTPUT)}, model_id="deepseek-flash")
 
     async def search(query):
         searches.append(query)
@@ -119,13 +331,14 @@ async def test_agent_only_searches_once_and_reserves_each_deepseek_call(monkeypa
         return [{"source_id": "source-1", "text": "09:45"}]
 
     model = LangChainAnswerModel(LlmSettings(api_key="a" * 32), transport=httpx.MockTransport(handle))
+    model.retry_policy = ProviderRetryPolicy(max_attempts=5, base_seconds=0)
     model.set_search(search)
     try:
         assert await model.generate("What time?", [], request_id="question") == OUTPUT
     finally:
         await model.aclose()
     assert searches == ["Saturday hours"]
-    assert reservations == [("deepseek", "deepseek-flash", 1024)] * 2
+    assert reservations == [("deepseek", "deepseek-flash", 1024)] * (2 * (retries_before_success + 1))
 
 
 @pytest.mark.asyncio

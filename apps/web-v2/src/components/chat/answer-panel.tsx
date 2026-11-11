@@ -5,10 +5,12 @@ import { StaticArt } from "@/components/ui/static-art";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Clipboard, Sparkles, SquarePen } from "lucide-react";
-import { useStreamContext, useDocumentsContext, useKnowledgeContext } from "@/components/workspace/workspace-provider";
+import { useStreamContext, useDocumentsContext } from "@/components/workspace/workspace-provider";
 import { ConfirmDialog } from "@/components/ui/lazy-confirm-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { questionStatusLabel } from "@/lib/format";
+import { retryQuestionArgs } from "@/lib/question-request";
+import { useLlmModels } from "@/components/workspace/llm-models";
 import { CitationList } from "./citation-list";
 import { loadMarkdown } from "./load-markdown";
 import styles from "./chat.module.css";
@@ -29,7 +31,7 @@ export function AnswerPanel({
 }) {
   const stream = useStreamContext();
   const documents = useDocumentsContext();
-  const knowledge = useKnowledgeContext();
+  const { catalog, error: catalogError } = useLlmModels();
   const answer = stream.answer;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -77,6 +79,16 @@ export function AnswerPanel({
       toast.success("问答记录已删除");
       onEditQuestion("");
       onDeleted(questionId);
+    }
+  }
+
+  function retry() {
+    if (!answer) return;
+    try {
+      const args = retryQuestionArgs(answer, catalog, catalogError);
+      void stream.ask(...args);
+    } catch (reason) {
+      toast.error((reason as Error).message);
     }
   }
 
@@ -134,8 +146,8 @@ export function AnswerPanel({
             <button onClick={() => onEditQuestion(answer.question)}>
               <SquarePen size={16} aria-hidden="true" /> 重新编辑问题
             </button>
-            {knowledge.selectedBase && (
-              <button onClick={() => void stream.ask(answer.question, knowledge.selectedBase)}>重试提问</button>
+            {answer.knowledge_base_id && (
+              <button onClick={retry}>重试提问</button>
             )}
           </div>
         </div>

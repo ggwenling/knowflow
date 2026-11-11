@@ -5,9 +5,10 @@ import { api, apiFetch, streamQuestion, type QuestionDetail, type Source } from 
 import { messageOf } from "@/lib/format";
 import { preloadMarkdown } from "@/components/chat/load-markdown";
 import { reportPerformance } from "@/lib/performance";
+import { questionRequestBody, type LocalQuestionModel } from "@/lib/question-request";
 
 export function useQuestionStream(onSettled: () => void) {
-  const [answer, setAnswer] = useState<QuestionDetail | null>(null);
+  const [answer, setAnswer] = useState<(QuestionDetail & LocalQuestionModel) | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const controller = useRef<AbortController | null>(null);
@@ -69,6 +70,7 @@ export function useQuestionStream(onSettled: () => void) {
     setAnswer({
       question_id: "",
       knowledge_base_id: knowledgeBaseId,
+      requestedModelId: modelId ?? "",
       question: text,
       status: "PROCESSING",
       finished_at: null,
@@ -83,7 +85,7 @@ export function useQuestionStream(onSettled: () => void) {
         method: "POST",
         signal: abort.signal,
         headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-        body: JSON.stringify({ question: text, ...(modelId ? { llm_model_id: modelId } : {}) }),
+        body: JSON.stringify(questionRequestBody(text, modelId)),
       });
       if (!isCurrent()) return false;
       if (response.ok) preloadMarkdown();
