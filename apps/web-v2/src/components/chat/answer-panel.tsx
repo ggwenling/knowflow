@@ -37,7 +37,7 @@ export function AnswerPanel({
   if (!answer) {
     return (
       <div className={styles.answerEmpty}>
-        <StaticArt className={styles.emptyArtwork} src="/atlas-empty-history.webp" alt="" width={240} height={160} loading="lazy" />
+        <StaticArt className={styles.emptyArtwork} src="/atlas-empty-history.webp?v=monochrome-d" alt="" width={240} height={160} loading="lazy" />
         <h2 data-display-heading>从一个具体问题开始</h2>
         <p>回答会附上可打开的原文来源，方便你核对关键事实。每次提问独立检索，不会把上一轮回答当作上下文。</p>
         <div className={styles.examples}>

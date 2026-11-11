@@ -26,8 +26,8 @@
   background-repeat: no-repeat;
 }
 
-.home-art { background-image: url("/home-wave.webp"); }
-.loginFlow { background-image: url("/login-ribbon.webp"); }
+.home-art { background-image: url("/home-wave.webp?v=monochrome-d"); }
+.loginFlow { background-image: url("/login-ribbon.webp?v=monochrome-d"); }
 
 .home-art::before, .loginFlow::before {
   content: "";
@@ -39,6 +39,7 @@
   background-size: 100% 100%;
   background-repeat: no-repeat;
   mix-blend-mode: multiply;
+  filter: grayscale(1);
   pointer-events: none;
   transition: opacity 260ms var(--ease);
 }

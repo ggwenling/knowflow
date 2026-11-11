@@ -1146,10 +1146,10 @@
   }
 }
 
-/* The seal travels with the existing interruptible navigation indicator. */
+/* The graphite dot travels with the interruptible navigation indicator. */
 .sidebar { background: var(--bg-subtle); }
 .navIndicator { background: var(--surface-raised); box-shadow: none; }
-.navIndicator::before { width: 4px; height: 4px; top: 16px; left: 5px; border-radius: 1px; }
+.navIndicator::before { width: 4px; height: 4px; top: 16px; left: 5px; border-radius: 50%; }
 .navActive { color: var(--ink); }
 .navActive > svg { color: var(--accent); }
 .account .avatar { border-radius: 6px; background: var(--surface-sunken); color: var(--ink-2); }

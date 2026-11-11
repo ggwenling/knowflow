@@ -239,7 +239,7 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
     } catch {
       return;
     }
-    renderer.setClearColor(0xf5f0e6, 0);
+    renderer.setClearColor(0xffffff, 0);
     renderer.outputColorSpace = SRGBColorSpace;
 
     const scene = new Scene();
@@ -257,8 +257,8 @@ export default function HomeWave({ paused = false }: { paused?: boolean }) {
       uComposer: { value: new Vector4(-10000, -10000, 1, 1) },
       uScope: { value: new Vector4(-10000, -10000, 1, 1) },
       uWordmark: { value: new Vector4(600, 140, 240, 65) },
-      uInk: { value: new Color(tokens.getPropertyValue("--ink-2").trim() || "#575249") },
-      uAccent: { value: new Color(tokens.getPropertyValue("--accent").trim() || "#ad402c") },
+      uInk: { value: new Color(tokens.getPropertyValue("--ink-2").trim() || "#525252") },
+      uAccent: { value: new Color(tokens.getPropertyValue("--accent").trim() || "#171717") },
     };
     const filamentGeometry = makeFilaments();
     const particleGeometry = makeParticles();

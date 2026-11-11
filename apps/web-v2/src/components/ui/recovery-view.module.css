@@ -20,7 +20,7 @@
 
 .code {
   margin: 0 0 12px;
-  color: var(--accent, #ad402c);
+  color: var(--accent, #171717);
   font: 12px/1.5 ui-monospace, monospace;
   text-transform: uppercase;
 }
@@ -34,7 +34,7 @@
 
 .description {
   margin: 18px 0 26px;
-  color: var(--ink-2, #575249);
+  color: var(--ink-2, #525252);
   font-size: 14px;
   line-height: 1.85;
   overflow-wrap: anywhere;
@@ -45,7 +45,7 @@
   min-height: 40px;
   align-items: center;
   gap: 12px;
-  border: 1px solid #17150f;
+  border: 1px solid #171717;
   border-radius: 9px;
   padding: 0 16px;
   font-family: inherit;
@@ -57,7 +57,7 @@
 }
 
 .action:focus-visible {
-  outline: 2px solid #ad402c;
+  outline: 2px solid #171717;
   outline-offset: 3px;
 }
 
@@ -72,7 +72,7 @@
 }
 
 .code {
-  border-top: 1px solid var(--line, #dcd3c3);
+  border-top: 1px solid var(--line, #e5e5e5);
   padding-top: 24px;
   font-family: var(--font-sans, "DM Sans", "PingFang SC", sans-serif);
   font-size: 12px;
@@ -100,13 +100,13 @@
   }
 }
 
-.page { background: var(--bg, #f7f4ed); color: var(--ink, #17150f); }
+.page { background: var(--bg, #ffffff); color: var(--ink, #171717); }
 .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
-.artwork { display: block; width: 240px; max-width: 100%; height: auto; margin: 0 0 24px; mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
-.title { font-family: var(--font-cjk-display, "Songti SC", "Noto Serif CJK SC", serif); }
-.action { background: var(--ink, #17150f); border-color: var(--ink, #17150f); color: #fbf8f2; }
-.action:focus-visible { outline-color: #ad402c; }
-@media (hover: hover) and (pointer: fine) { .action:hover { background: #ad402c; } }
+.artwork { filter: grayscale(1); display: block; width: 240px; max-width: 100%; height: auto; margin: 0 0 24px; mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.title { font-family: var(--font-sans, "DM Sans", "PingFang SC", "Microsoft YaHei", sans-serif); font-weight: 600; }
+.action { background: var(--ink, #171717); border-color: var(--ink, #171717); color: #ffffff; }
+.action:focus-visible { outline-color: #171717; }
+@media (hover: hover) and (pointer: fine) { .action:hover { background: #171717; } }
 
 @media (max-width: 760px) {
   .page { padding: calc(32px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }

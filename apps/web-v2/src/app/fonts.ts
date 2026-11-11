@@ -22,15 +22,3 @@ export const serif = localFont({
   adjustFontFallback: "Times New Roman",
   fallback: ["Georgia", "Songti SC", "serif"],
 });
-
-export const cjkDisplay = localFont({
-  src: "./fonts/noto-serif-sc-headings-400.woff2",
-  variable: "--font-noto-serif-sc",
-  weight: "400",
-  // Never replace a painted Chinese heading late in the page's lifetime.
-  display: "optional",
-  preload: false,
-  // next/font's Arial/Times metrics don't describe the system CJK serif faces.
-  adjustFontFallback: false,
-  fallback: ["Songti SC", "Noto Serif CJK SC", "serif"],
-});

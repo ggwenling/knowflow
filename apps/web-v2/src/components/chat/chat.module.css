@@ -505,7 +505,7 @@
 
 .citationIndex {
   padding-top: 1px;
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -1019,7 +1019,7 @@
 
 .historyActive {
   background: var(--surface-raised);
-  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px #382b1605;
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.020);
 }
 
 .railFoot {
@@ -1154,7 +1154,7 @@
 
 .composer:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px #ad402c0b, var(--shadow-card);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.043), var(--shadow-card);
 }
 
 .composer textarea {
@@ -1682,8 +1682,8 @@
 .sourceNumber { color: var(--accent); font-family: var(--font-mono); animation: none; }
 .currentSources { border-radius: 4px; background: var(--bg-subtle); }
 .currentSources button { border-bottom: 1px solid var(--line); }
-.emptyArtwork { filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
-.answerEmpty h2 { font-family: var(--font-cjk-display); font-weight: 400; font-size: 23px; }
+.emptyArtwork { filter: grayscale(1); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.answerEmpty h2 { font-family: var(--font-sans); font-weight: 600; font-size: 23px; }
 .composer::before { background: linear-gradient(to top, var(--surface-raised), transparent); }
 
 .baseSelect, .search, .newChat, .uploadChip { border-color: var(--control-line); }

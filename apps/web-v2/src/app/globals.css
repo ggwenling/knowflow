@@ -3,42 +3,41 @@
 
 :root {
   color-scheme: light;
-  --on-ink: #fdfbf6;
-  --ink-hover: #302b22;
-  --success-soft: #e8eddf;
-  --warning-soft: #f2e7d2;
-  --danger-line: #a16f60;
-  --font-cjk-display: var(--font-noto-serif-sc), "Songti SC", "Noto Serif CJK SC", serif;
-  --bg: #f7f4ed;
-  --bg-subtle: #f2eee5;
-  --bg-muted: #eae5da;
-  --ink: #17150f;
-  --ink-2: #575249;
-  --ink-3: #655f55;
-  --line: #dcd3c3;
-  --line-strong: #c5b9a5;
-  --control-line: #8b8172;
-  --accent: #ad402c;
-  --accent-soft: #f2e4d9;
-  --success: #647e61;
-  --warning: #987139;
-  --success-ink: #426044;
-  --warning-ink: #795521;
-  --danger: #a13c2d;
-  --danger-soft: #f5e5dc;
+  --on-ink: #ffffff;
+  --ink-hover: #303030;
+  --success-soft: #f5f5f5;
+  --warning-soft: #f5f5f5;
+  --danger-line: #737373;
+  --bg: #ffffff;
+  --bg-subtle: #fafafa;
+  --bg-muted: #eeeeee;
+  --ink: #171717;
+  --ink-2: #525252;
+  --ink-3: #626262;
+  --line: #e5e5e5;
+  --line-strong: #d4d4d4;
+  --control-line: #808080;
+  --accent: #171717;
+  --accent-soft: #f0f0f0;
+  --success: #525252;
+  --warning: #626262;
+  --success-ink: #525252;
+  --warning-ink: #525252;
+  --danger: #525252;
+  --danger-soft: #f5f5f5;
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
   --radius-pill: 999px;
-  --surface-raised: #fdfbf6;
-  --surface-sunken: #eee9df;
-  --surface-overlay: rgba(253, 251, 246, .98);
-  --shadow-card: 0 0 0 1px rgba(56, 43, 22, .015), 0 2px 3px rgba(56, 43, 22, .025), 0 8px 24px rgba(56, 43, 22, .025);
-  --shadow-raised: 0 0 0 1px rgba(56, 43, 22, .025), 0 4px 8px rgba(56, 43, 22, .035), 0 16px 40px rgba(56, 43, 22, .055);
-  --shadow-pop: 0 0 0 1px rgba(56, 43, 22, .04), 0 8px 16px rgba(56, 43, 22, .06), 0 24px 64px rgba(56, 43, 22, .1);
+  --surface-raised: #ffffff;
+  --surface-sunken: #f5f5f5;
+  --surface-overlay: rgba(255, 255, 255, .98);
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, .015), 0 2px 3px rgba(0, 0, 0, .025), 0 8px 24px rgba(0, 0, 0, .025);
+  --shadow-raised: 0 0 0 1px rgba(0, 0, 0, .025), 0 4px 8px rgba(0, 0, 0, .035), 0 16px 40px rgba(0, 0, 0, .055);
+  --shadow-pop: 0 0 0 1px rgba(0, 0, 0, .04), 0 8px 16px rgba(0, 0, 0, .06), 0 24px 64px rgba(0, 0, 0, .1);
   --highlight: inset 0 1px 0 rgba(255, 255, 255, .8);
-  --focus-ring: #ad402c;
+  --focus-ring: #171717;
   --type-display: clamp(56px, 5.6vw, 84px);
   --type-h1: clamp(30px, 3.2vw, 40px);
   --type-h2: 20px;
@@ -284,9 +283,9 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
 
 .workspace-header h1 {
   margin: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--type-h1);
-  font-weight: 400;
+  font-weight: 600;
   line-height: 1.15;
   letter-spacing: -.04em;
   overflow-wrap: anywhere;
@@ -299,12 +298,6 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   margin: 0 0 12px;
   font: 600 11px/1.5 var(--font-sans);
   color: var(--ink-3);
-}
-
-.workspace-header > div > p:first-child::before {
-  content: "";
-  flex: none;
-  background: var(--accent);
 }
 
 .workspace-header > div > p:last-child {
@@ -401,21 +394,20 @@ kbd {
   cursor: text;
 }
 
-/* Keep reading surfaces clean. Grain is confined to catalogue covers. */
+/* Clean neutral reading surfaces; display lettering is reserved for the brand. */
 .lucide { stroke-width: 1.5; }
 [data-display-heading] {
-  font-family: var(--font-cjk-display);
-  font-weight: 400;
-  letter-spacing: .015em;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -.025em;
 }
 .workspace-header h1[data-display-heading] {
-  font-family: var(--font-cjk-display);
+  font-family: var(--font-sans);
   letter-spacing: -.025em;
   line-height: 1.35;
 }
 .workspace-header { animation: ink-settle 220ms var(--ease) backwards; }
 .workspace-header > div > p:first-child { text-transform: none; letter-spacing: .055em; }
-.workspace-header > div > p:first-child::before { width: 7px; height: 7px; border-radius: 1px; }
 [data-sonner-toast][data-styled=true] { border-left: 1px solid var(--accent) !important; }
 @media (prefers-reduced-motion: reduce) {
   .workspace-header { animation: gentle-fade 120ms var(--ease) backwards !important; }

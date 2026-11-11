@@ -82,4 +82,4 @@
 
 .loadingBrand { display: flex; align-items: center; gap: 10px; }
 
-.gateCard h1 { font-family: var(--font-cjk-display); line-height: 1.4; }
+.gateCard h1 { font-family: var(--font-sans); line-height: 1.4; }

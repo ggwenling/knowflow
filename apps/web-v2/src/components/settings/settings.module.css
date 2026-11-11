@@ -64,7 +64,7 @@
 
 .stepNumber {
   display: block;
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13px;
   letter-spacing: 0.06em;
 }
@@ -487,12 +487,12 @@
 }
 
 .section { box-shadow: none; }
-.section h2, .step h2 { font-family: var(--font-cjk-display); font-weight: 400; font-size: 18px; }
+.section h2, .step h2 { font-family: var(--font-sans); font-weight: 600; font-size: 16px; }
 .sectionIndex { color: var(--ink-3); }
 .step svg { color: var(--ink-2); width: 20px; height: 20px; }
 .step:last-child { background: var(--surface-sunken); }
 .step:last-child .stepNumber { color: var(--accent); }
-.workflowArtwork { mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.workflowArtwork { filter: grayscale(1); mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
 
 @media (max-width: 980px) {
   .sectionNav a { display: flex; align-items: center; justify-content: center; min-height: 40px; }

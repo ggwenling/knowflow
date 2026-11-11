@@ -71,7 +71,7 @@ export default function Flow({ paused = false }: { paused?: boolean }) {
       fragmentShader: `
         varying float ink;
         void main() {
-          gl_FragColor = vec4(vec3(.34, .32, .28), ink);
+          gl_FragColor = vec4(vec3(.32), ink);
         }
       `,
     });

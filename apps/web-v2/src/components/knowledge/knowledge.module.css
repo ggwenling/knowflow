@@ -855,7 +855,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: url("/knowledge-contours.svg") center / cover no-repeat;
+  background: url("/knowledge-contours.svg?v=monochrome-d") center / cover no-repeat;
   pointer-events: none;
 }
 
@@ -879,7 +879,7 @@
   color: var(--ink-2);
   background: var(--surface-overlay);
   border-color: var(--line);
-  box-shadow: 0 2px 8px #382b1608;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.031);
 }
 
 .baseCardText {
@@ -1160,14 +1160,13 @@
 
 .baseCard:nth-child(-n+4) { animation: none; }
 
-/* Catalogue covers: a paper spine, contour plate and actual list position. */
+/* Catalogue covers: neutral contours and actual list position. */
 .baseCard { border-radius: var(--radius); }
 .baseCardLink { border-left: 0; }
 .baseCover, .baseCover[data-tone="1"], .baseCover[data-tone="2"] {
   background: var(--surface-sunken);
 }
 .baseCover::after { opacity: .42; mix-blend-mode: multiply; }
-.baseCover { background-image: url('/paper-grain.svg'); }
 .baseCover[data-tone="1"]::after { filter: none; opacity: .6; }
 .baseCover[data-tone="2"] { background: var(--bg-subtle); }
 .callNumber {

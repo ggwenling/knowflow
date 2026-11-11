@@ -55,5 +55,5 @@
 }
 
 .empty { background: var(--bg-subtle); border-color: var(--line); box-shadow: none; }
-.title { font-family: var(--font-cjk-display); font-size: 20px; font-weight: 400; }
-.illustration { height: auto; aspect-ratio: 3 / 2; object-fit: contain; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.title { font-family: var(--font-sans); font-size: 20px; font-weight: 600; }
+.illustration { filter: grayscale(1); height: auto; aspect-ratio: 3 / 2; object-fit: contain; mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }

@@ -49,7 +49,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   return (
     <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
       <div className={styles.artPanel} aria-hidden="true">
-        <StaticArt className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} loading="eager" fetchPriority="high" />
+        <StaticArt className={styles.atlasArt} src="/atlas-auth.webp?v=monochrome-d" alt="" width={720} height={1080} loading="eager" fetchPriority="high" />
         <div className={`loginFlow ${styles.ribbon}`}>
           <DeferredVisual><Ribbon paused={motionPaused} /></DeferredVisual>
         </div>

@@ -1,4 +1,34 @@
-# KnowFlow web-v2 视觉精修：Round 3
+# KnowFlow web-v2 · 黑白极简 / Monochrome minimal
+
+## Round D · 恢复黑白极简（2026-11-11）
+
+用户反馈原文：“不做这种黄色，我想保留原来的黑白极简风格”。本轮基于分支 `feat/web-v2-visual-polish` 的 `05bde01`，撤回 Round A 暖纸配色，参照 `b7fd541` 的白底结构，并进一步移除蓝灰强调色。下面的 Round 3 / C 内容为历史记录，当前风格以本节及 DESIGN.md 为准。
+
+- **配色与品牌**：全局、模块样式、全局错误页、分享图、themeColor、favicon、KF 标记、等高线和 WebGL 均改为纯中性灰。底色 #FFFFFF、次级底 #FAFAFA、强调 / 焦点 #171717。所有阴影为黑色 / 白色透明值；选区、光标、滚动条遵循同一体系。成功 / 处理中 / 失败也为灰色，保留全部状态文字与图标；无非中性色例外。侧栏活动项为黑点，移除页头装饰方块。
+- **字体与表面**：保留 DM Serif Display 品牌 / 英文展示标题；中文标题和正文改回 DM Sans + 系统中文无衬线。删除 25,056 字节中文标题子集、loader、专用许可 / 字形文件和无引用的生成脚本。移除纹理文件及封面引用。
+- **素材**：采用用户允许的灰度转换，保持主题、构图、原文件名、像素尺寸和透明通道。六张 atlas 提白背景；wave / ribbon 回退和 contours 同步中性化。更新 atlas 提示词，不调用生成服务、不增加依赖。WebP 从 R=G=B 源图压缩，解码最大通道差仅 1/255（编码舍入），展示层 grayscale(1) 保证无偏色；wave 回退解码也为严格 R=G=B。八张 WebP 合计 **120,436 → 102,076 字节**。
+- **性能与交互**：保留原生 StaticArt、延迟 WebGL / 弹层、场景固定尺寸、字体 preload 限制、暂停按钮、safe-area、≥40px 触控区、禁用发送、Round 3 侧栏 / composers / 首页与设置布局。素材 URL 加 `?v=monochrome-d`，保留 immutable 缓存并避免复用旧暖色缓存。未修改依赖、预算文件、E2E 选择器 / accessible names 或业务逻辑。
+
+| 素材 | 原尺寸保持 | 字节 Before → After |
+|---|---|---|
+| `atlas-auth.webp` | 720×1080 | 26,556 → 27,534 |
+| `atlas-empty-bases.webp` | 400×267 | 1,820 → 1,736 |
+| `atlas-empty-documents.webp` | 400×267 | 1,352 → 1,268 |
+| `atlas-empty-history.webp` | 480×320 | 1,852 → 1,682 |
+| `atlas-recovery.webp` | 480×320 | 3,752 → 3,634 |
+| `atlas-workflow.webp` | 440×293 | 2,776 → 2,770 |
+| `home-wave.webp` | 1440×124 | 11,784 → 11,324 |
+| `login-ribbon.webp` | 1200×1200 | 70,544 → 52,128 |
+
+验证结果：
+
+- `npm run lint && npm run typecheck && npm test`：全部通过，5 个测试文件。
+- `node scripts/contrast-audit.mjs`：通过；新增全部 hex 令牌中性断言和成功 / 处理中颜色检查。普通文字 ≥4.5:1，焦点 / 控件边界 ≥3:1；辅助文字最低 5.26:1，控件边界最低 3.40:1。
+- 颜色值自查覆盖 src / public 的 hex、rgb、hsl、oklch、Three.js 常量与 GLSL；无非中性色。原有选择器与可访问名称未改；8 张图片逐张检查尺寸、灰度与 atlas 白底，并确认透明回退 alpha 未改。
+- `git diff --check`、15 个 CSS 文件解析与 Tailwind / PostCSS 全局编译：通过。未运行 build / 浏览器 / perf:budget，按要求由操作员在可运行环境验证新截图、E2E、CLS、Lighthouse 与预算；不声称浏览器验收已通过。
+- 未触碰 `eval-out/` 和 `docs/reviews/2026-11-05-sol-blind-v6-docs.md`，未 commit / push。
+
+## Round 3 · 布局与交互记录
 
 本轮基于 `23301a2`（PR #18）与产品负责人实际浏览器反馈。实现焦点边界、侧栏收起、首页及设置重排；不修改数据契约、Three.js 场景或既有页面路由。未提交或推送。
 
@@ -6,7 +36,7 @@
 
 | 项目 | 实现 |
 |---|---|
-| 1. 输入框套输入框 | 首页问题、对话 composer、知识库 / 历史搜索、侧栏内联创建、知识库切换均标记 `data-composite-field`。内层 input / textarea / select 在普通与 focus / focus-visible 下统一 border 0、background transparent、shadow none、outline none；外框 focus-within 承载 2px #506E83 outline，偏移 3px。独立的登录输入只有一层可见边界，保留原焦点环。 |
+| 1. 输入框套输入框 | 首页问题、对话 composer、知识库 / 历史搜索、侧栏内联创建、知识库切换均标记 `data-composite-field`。内层 input / textarea / select 在普通与 focus / focus-visible 下统一 border 0、background transparent、shadow none、outline none；外框 focus-within 承载 2px var(--focus-ring) outline（当前 #171717），偏移 3px。独立的登录输入只有一层可见边界，保留原焦点环。 |
 | 2. ↵ 芯片 | 首页提示节点与样式已移除，保留真实发送箭头。对话辅助文字仍可用，kbd 取消边框、底色、圆角及阴影，呈现为安静的等宽文本；移动仍隐藏。 |
 | 3. 侧栏收起 | >760px 展开宽 248px（≤1180px 226px）/ 收起 64px；有带 aria-expanded / aria-controls 的 toggle 与 ⌘/Ctrl+B，忽略按键 repeat / IME。收起只保留标记、图标导航和底部账户菜单；库 / 历史 / 输入隐藏。导航保留 accessible name，tooltip 支持 hover、focus、悬停内容、Esc 关闭；账户有邮箱说明。移动保留四项顶部导航与右上账户菜单，无 toggle。 |
 | 4. 首页 | 更紧的英雄区、最长 800px 的单一提问表面，知识库选择在内置底栏；模型说明在框下作为辅助文案。快捷卡同主内容网格对齐，最近两个面板等宽、行高同为 76px，空态也使用相同高度基准。选择器独立 memo，避免每次输入重复渲染整棵 options 列表。 |
@@ -22,9 +52,9 @@
 - 对话输入增加只读宽度变化的 ResizeObserver：侧栏改变可用宽度时重新计算高度。宽度未变则跳过，避免高度反馈循环；无高度 React 状态，卸载清理 observer / listener。
 - Modality 仅在键盘 / 指针类别改变时写 DOM 属性，键盘触发同时取消延迟，不在每个按键重复写全局属性。
 
-## 纸面色与版式
+## Round 3 配色与版式（历史记录，当前以 Round D 为准）
 
-源码全局仍为 #FFF / #F7F8F9 / #EEF0F2，没有增加全局米黄色或滤镜。内容纸面光统一由原有 bg-subtle 混合，避免多处硬编码色偏；R2 档案封面局部微暖灰保留。负责人浏览器的原始图片本轮没有提供，无法验证显示环境差异，因此没有再给整个产品叠加暖色。
+Round 3 保持当时的白底与浅灰层级。Round D 已统一为 #FFFFFF / #FAFAFA / #EEEEEE，移除原有蓝灰强调色及后来加入的暖色背景；当前规范见 DESIGN.md 与本文开头的 Round D 记录。
 
 首页保留 DM Serif Display 与所有原有场景选择器。Three.js 已有 ResizeObserver 会跟随真实 form / label 边界，场景源文件与 fallback 资产未改。
 
@@ -115,13 +145,13 @@
 
 ## Round C · Performance（2026-11-11）
 
-保留 Round A+B 的纸墨排版、素材、交互与选择器；本轮不增加依赖，不修改预算，不执行 build / Chromium / commit / push。
+Round C 基于 Round A+B，当时保留排版、素材、交互与选择器；不增加依赖，不修改预算，不执行 build / Chromium / commit / push。Round D 只撤回暖色与中文衬线，以下性能实现继续有效。
 
 - **共享 JS 回退**：现有 `.next` 的 client-reference manifest 显示，Round A 给 RecoveryView 增加的 `next/image` 进入普通 error、global-error 与共享 RSC 图。`3kpe7muluw9xa` / `1z9r3yub1tsbi` 两个约 17 KB raw 的 chunk 含重复 image runtime，`3pmmz5ib8sxjz` 与路由 chunk 也含 image 模块。这解释了各路由共同增长；字体为 CSS / WOFF2，BrandSeal 为小型纯 SVG，并非该 JS 增长的主要来源。atlas 素材改用统一的原生 StaticArt：保留 width / height、空 alt 与 lazy；auth art 独有 eager / fetchPriority=high。原图 1.3–3.8 KB（auth 26 KB），已按展示尺寸的约 1–2 倍输出，无需再经过 image client / optimizer。
 - **进一步减少首载 JS**：cn 的全部调用只组合 CSS module 类，移除不需要的 tailwind-merge 执行路径。ConfirmDialog、SourceDialog 与移动资料 / 历史抽屉首次打开才加载；打开后保留组件，让关闭动效和焦点归还继续工作。Markdown、资料操作菜单维持已有 lazy 路径。预计共享 JS 减少约 20–30 KB gzip，涉及弹层的页面另有收益；需新生产构建确认，不能用旧 `.next` 宣称新预算已通过。
 - **WebGL 离开首屏关键路径**：先绘制原 WebP fallback，等待 load、host 可见、页面前台及至少 1.8 秒绘制窗口，再通过 requestIdleCallback（1.2 秒 timeout；不支持时用 timer）挂载动态场景。两个场景均用具名 Three.js import，无 addons；compileAsync 完成并绘制首帧后以 260ms opacity 交叉淡入。保留原几何、shader、DPR 上限、暂停控制、离屏 / 后台暂停、reduced-motion 静帧及 context loss 回退 / 恢复；异步编译在卸载或 context 变化后不再启动渲染。暂停会立即完成交叉淡入，保证静帧稳定。预期减少 LCP 前下载、JS 求值与 shader 阻塞。
 - **CLS**：移除依赖 `:has(canvas)` 改变 wave top / height 的规则。外层一次预留静态图与场景的联合范围，内层 canvas 始终为原 400 / 340 / 216px 高度；fallback 单独定位并保持原尺寸 / 位置。挂载、编译、淡入、context loss 不再改变 host 的几何。移动 `.home-art` 固定为 216px，原 168px fallback 在独立纸面层中；home-scene e2e 同时验证 mount / loss / restore 前后边界一致。
-- **字体**：DM Serif Display 继续用既有 latin-only 文件并 preload / swap；DM Sans 两个正文权重按使用加载，显式启用 Arial metric fallback。中文标题子集改 optional，避免迟到的字形替换引起位移；不 preload，不把 next/font 的拉丁 Arial / Times 指标套用到系统中文衬线。既有构建只有四份 WOFF2（Sans 400/700、Serif Latin 400、Noto 中文子集），没有重复 fontsource CSS 下载。
-- **CSS / 缓存**：按相同 selector + 相同 at-rule 上下文删除 93 个被后续覆盖的声明；删除无引用的旧规则与 keyframes，保留媒体条件和级联顺序。Tailwind 保留 Preflight，关闭未使用的 utility 扫描生成；场景样式只随 DeferredVisual 引入。next.config.ts 为 atlas / wave / ribbon / contours / grain 提供一年 immutable cache；替换素材内容时须更名，API proxy 的 no-store 未改。
+- **字体**：DM Serif Display 继续用既有 latin-only 文件并 preload / swap；DM Sans 两个正文权重按使用加载，显式启用 Arial metric fallback。中文标题子集改 optional，避免迟到的字形替换引起位移；不 preload，不把 next/font 的拉丁 Arial / Times 指标套用到系统中文衬线。当时构建只有四份 WOFF2（Sans 400/700、Serif Latin 400、中文子集），没有重复 fontsource CSS 下载；Round D 已删除中文子集及 loader，保留三份。
+- **CSS / 缓存**：按相同 selector + 相同 at-rule 上下文删除 93 个被后续覆盖的声明；删除无引用的旧规则与 keyframes，保留媒体条件和级联顺序。Tailwind 保留 Preflight，关闭未使用的 utility 扫描生成；场景样式只随 DeferredVisual 引入。next.config.ts 为 atlas / wave / ribbon / contours 提供一年 immutable cache；Round D 移除纹理缓存规则，并使用素材 URL 版本参数更新缓存键；替换素材内容时须更新 URL，API proxy 的 no-store 未改。
 
 验证：`npm run lint`、`npm run typecheck`、`npm test` 通过；CSS PostCSS / Tailwind 编译与静态资源 header 路径解析通过，API 路径未被缓存规则匹配。更新 home-scene 的固定 box / context loss 验证。浏览器 e2e、a11y、CLS、Lighthouse、perf:budget 待操作员在沙箱外用新生产构建重测；既有 `.next` 仅用于只读归因，没有运行 npm run build。

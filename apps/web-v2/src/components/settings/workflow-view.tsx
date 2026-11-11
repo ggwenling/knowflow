@@ -35,7 +35,7 @@ export function WorkflowView() {
       </div>
 
       <section className={`${styles.section} ${styles.workflowAvailable}`}>
-        <StaticArt className={styles.workflowArtwork} src="/atlas-workflow.webp" alt="" width={220} height={147} loading="lazy" />
+        <StaticArt className={styles.workflowArtwork} src="/atlas-workflow.webp?v=monochrome-d" alt="" width={220} height={147} loading="lazy" />
         <h2 data-display-heading>当前可用能力</h2>
         <p className={styles.note}>
           工作流功能暂未开放。你可以先创建知识库、上传资料，再在对话页逐条提问；每一步都会保留可核验的原文来源。

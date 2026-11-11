@@ -1,15 +1,15 @@
-# KnowFlow Web v2 · 纸墨 / Ink & Paper Atlas
+# KnowFlow Web v2 · 黑白极简 / Monochrome minimal
 
-适用范围：`apps/web-v2` 全部页面与状态。基于 Round A `9dc6fd7`，Round B 于 2026-11-11 完成源码与既有截图复审。工作区以墨黑、清洁的微暖纸面与小面积朱砂色建立统一层级；这是已有视觉世界的精修。
+适用范围：`apps/web-v2` 全部页面与状态。Round D（2026-11-11）基于 `05bde01`，按用户反馈“ 不做这种黄色，我想保留原来的黑白极简风格 ”撤回 Round A 暖纸配色。参照 `b7fd541` 的白底结构，进一步移除蓝灰强调色：纯白、中性灰、石墨黑构成全部界面和语义状态。保留 Round 3 布局、Round B 无障碍和 Round C 性能优化。
 
 ## 1. 设计立场
 
 像一本排版精确的产品手册，而不是通用后台。
 
-- 衬线大字建立记忆点，细线、序号与留白建立秩序。
-- 朱砂强调色用于焦点、来源序号与小面积图标；其余颜色只用于状态与危险操作。
+- DM Serif Display 仅用于 KnowFlow 品牌与英文展示标题；中文标题、正文与控件使用 DM Sans + 系统中文无衬线。细线与留白建立秩序。
+- 强调色、焦点、来源序号与图标均为石墨黑；KF 标记为黑底白字。侧栏活动项用黑点与浅灰表面；页头取消装饰方块。状态由明确文字与图标表达，成功、处理中、失败及危险操作也使用中性灰，无彩色表面。
 - 首页与登录页保留既有 Three.js 波浪。其余动效为反馈、定位与状态服务，120–260ms，无弹跳。
-- 允许轻微环线 + 分层软阴影、抬起表面的 1px 内高光、英雄区极淡径向光。禁止重阴影、强玻璃、霓虹与多色卡片。浮层可用 96% 纸面表面，不增加背景模糊。
+- 允许轻微环线 + 分层软阴影、抬起表面的 1px 内高光、英雄区极淡径向光。禁止重阴影、强玻璃、霓虹与多色卡片。浮层可用 98% 白色表面，不增加背景模糊。
 - 工作区保持中文；登录/注册保留英文品牌语气。
 
 ## 2. 设计令牌
@@ -18,13 +18,13 @@
 
 | 类别 | 值 |
 |---|---|
-| 背景 / 下沉表面 | `--bg: #F7F4ED`、`--bg-subtle: #F2EEE5`、`--bg-muted: #EAE5DA`、`--surface-sunken: #EEE9DF` |
-| 浮起 / 覆盖表面 | `--surface-raised: #FDFBF6`、`--surface-overlay: rgba(253,251,246,.98)` |
-| 文字 | `--ink: #17150F`、`--ink-2: #575249`、`--ink-3: #655F55` |
-| 边框 | 装饰分隔 `--line: #DCD3C3` / `--line-strong: #C5B9A5`；控件 `--control-line: #8B8172`，均为 1px |
-| 语义色 | 朱砂 / 焦点 `#AD402C`，浅底 `#F2E4D9`；成功点 `#647E61`、警告点 `#987139`、危险 `#A13C2D`，危险边界 `#A16F60` |
-| 语义文字 | 成功 `#426044`、警告 `#795521`；状态圆点保留原语义色 |
-| 圆角 | 6 / 9 / 14 / 20 / 999px |
+| 背景 / 下沉表面 | `--bg: #FFFFFF`、`--bg-subtle: #FAFAFA`、`--bg-muted: #EEEEEE`、`--surface-sunken: #F5F5F5` |
+| 浮起 / 覆盖表面 | `--surface-raised: #FFFFFF`、`--surface-overlay: rgba(255,255,255,.98)` |
+| 文字 | `--ink: #171717`、`--ink-2: #525252`、`--ink-3: #626262` |
+| 边框 | 装饰分隔 `--line: #E5E5E5` / `--line-strong: #D4D4D4`；控件 `--control-line: #808080`，均为 1px |
+| 强调 / 焦点 | `--accent` / `--focus-ring: #171717`，选中浅底 `--accent-soft: #F0F0F0`；反白文字 `#FFFFFF`，深色 hover `#303030` |
+| 状态 | 成功点 `#525252`、处理中点 `#626262`；成功 / 警告 / 危险文字 `#525252`，危险边界 `#737373`，所有状态浅底 `#F5F5F5` |
+| 圆角 | 4 / 6 / 10 / 14 / 999px |
 | 间距 | 4 的倍数；区块间距 18–30px；页面左右 24–52px |
 | 动效 | `--dur-fast: 120ms` / `--dur: 180ms` / `--dur-page: 220ms` / `--dur-slow: 260ms` |
 | 曲线 | `--ease-out-expo` / `--ease`: `cubic-bezier(.23,1,.32,1)`；`--ease-in-out`: `(.77,0,.175,1)`；抽屉 `--ease-drawer`: `(.32,.72,0,1)` |
@@ -33,26 +33,26 @@
 | 内高光 | `--highlight: inset 0 1px 0 rgba(255,255,255,.8)` |
 | 间距令牌 | `--space-1/2/3/4/6/8`: 4 / 8 / 12 / 16 / 24 / 32px |
 | 布局 | 侧栏展开 `248px`（≤1180px 为 226px）、收起 `64px`；内容最大宽度 `1280px` |
-| 字体 | `DM Sans` 正文；`DM Serif Display` 英文品牌 / auth 标题；中文编辑标题用本地 Noto Serif SC 子集；正文中文回退 `PingFang SC` / `Microsoft YaHei` |
+| 字体 | `DM Sans` + `PingFang SC` / `Microsoft YaHei` 用于中文标题、正文及控件；`DM Serif Display` 仅用于品牌 / 英文展示标题；无中文字体下载 |
 
 ## 3. 排版
 
 | 角色 | 字号 | 用法 |
 |---|---|---|
-| 品牌 / 页面主标题 | `--type-h1`（30–40px），首页约 54–84px | 衬线、字重 400、`letter-spacing: -.03em` |
+| 品牌 / 页面主标题 | `--type-h1`（30–40px），首页约 54–84px | 品牌衬线 400；中文页面标题无衬线 600、`letter-spacing: -.025em` |
 | 登录主标题 | 桌面 52–84px，移动 52px | 衬线、行高 1 |
 | 区块标题 | 13–15px / 600 | 无衬线，句子式大小写 |
 | 正文 | 13–15px / 1.7–1.9 | 无衬线 |
 | 辅助信息 | ≥12px | `--ink-3`；只有格式、大小、序号、ID、kbd 用系统等宽栈 |
-| 英文目录标签 | 11–12px / 600 | 无衬线，`.12em` 字距；页面标题带 7px 朱砂方印，避免细长的等宽大字距 |
+| 英文目录标签 | 11–12px / 600 | 无衬线，页头 `.055em` 字距；无装饰方块 |
 | 控件文字 | 不低于 12px | 按钮、标签、筛选 |
 | 数字 | `font-variant-numeric: tabular-nums` | 时间、计数、大小 |
 
-衬线字体用于品牌、页面 h1、少量中文区块标题；动态知识库名称保持系统中文回退，避免未收录字形跳动。回答标题和弹层使用无衬线，来源序号用等宽。系统等宽栈为 `ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace`，不下载字体。
+衬线字体用于品牌与英文展示标题；页面 h1、中文区块标题、知识库名称、回答标题和弹层统一无衬线，来源序号用等宽。中文标题子集、loader 和生成脚本已移除，系统中文直接绘制。系统等宽栈为 `ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace`，不下载字体。
 
 字号角色令牌：`--type-display` 56–84、`--type-h1` 30–40、`--type-h2` 20、`--type-title` 15、`--type-body` 14、`--type-small` 12、`--type-micro` 12px。回答正文 15px / 1.8，最长约 70ch。移动输入统一不小于 16px，避免聚焦时浏览器放大。
 
-字体通过 next/font/local 复用既有 DM Sans 400/700 与 DM Serif Display 400 文件，预加载并使用 swap，保留发行字形与既有中间字重的匹配行为。新增字重必须另做视觉与资源预算验收。
+字体通过 next/font/local 复用既有 DM Sans 400/700 与 DM Serif Display 400 文件，使用 swap；只 preload 拉丁展示字体，正文按使用加载，保留 Round C 的 Arial metric fallback。新增字重必须另做视觉与资源预算验收。
 
 ## 4. 外壳与响应式
 
@@ -85,7 +85,7 @@
 
 - 左侧表单，右侧独立 artPanel 同时容纳 `atlas-auth.webp` 与 ribbon。整个容器左边缘渐隐 30%，插画顶部渐隐，ribbon 在插画 folio 上方渐隐，禁止横穿表单。`≤700px` 插画隐藏，ribbon 收为顶部窄带；保留 `.loginFlow`、`.loginCanvas` 与 `login-ribbon.webp` 回退。
 - 输入框桌面 58px / 移动 54px 高、6px 圆角；提交按钮 56px 高、6px 圆角。更紧的英文眉题、较轻的表单标签与清晰焦点，注册 / 登录分两个重叠节拍：标题与说明 220ms / 4px，表单与链接 180ms / 4px，延迟 40ms；品牌和 ribbon 保持静止，不等待旧页面退出。页脚用 12px / 600 无衬线与 .06em 字距。
-- 错误以朱砂文字出现在表单内，`role="alert"`；字段使用 aria-invalid / aria-describedby 关联错误，注册密码说明也关联字段；提交中按钮显示 `Please wait…` 并禁用。
+- 错误以明确的中性深灰文字出现在表单内，`role="alert"`；字段使用 aria-invalid / aria-describedby 关联错误，注册密码说明也关联字段；提交中按钮显示 `Please wait…` 并禁用。
 - 已登录访问 auth 页自动回到 `/`。
 
 ### 5.3 对话 `/conversations`、`/conversations/[questionId]`
@@ -144,7 +144,7 @@
 | ConfirmDialog | `ui/confirm-dialog.tsx` | 危险操作；标题说明后果，主按钮“确认删除” |
 | EmptyState | `ui/empty-state.tsx` | 图标 + 一句标题 + 一句说明 + 唯一下一步 |
 | Skeleton | `ui/skeleton.tsx` | 低对比扫光，只用于首屏列表 |
-| StatusBadge | `ui/status-badge.tsx` | 5px 点 + 12px 文案 + 低饱和语义浅底；成功/处理中/失败/取消/中性，颜色不独立承载意义 |
+| StatusBadge | `ui/status-badge.tsx` | 5px 点 + 12px 文案 + 中性灰浅底；成功/处理中/失败/取消/中性，颜色不独立承载意义 |
 | Toast | `sonner` | 仅用于异步操作结果，文案短、可关闭 |
 
 按钮文字使用动词；同一动作在按钮、Toast、确认框中保持同名。导航用链接、动作用按钮；不要用 `div` 模拟控件。
@@ -157,19 +157,19 @@
 - Auth 标题遵循 ink-settle，表单 180ms / 4px，重叠 40ms；品牌与 artPanel 静止。
 - 键盘输入通过 DOM `data-input="keyboard"` 即时完成动画；不以 React 状态广播按键。减少动态效果时页头只淡入 120ms，无位移；Three.js 静帧，无循环。
 - 两个 Three.js 场景均提供原生暂停按钮与 aria-pressed。暂停保持当前画面及 canvas，只停止 rAF 调度；恢复不重建 renderer / geometry。后台标签页、离屏、context loss、卸载仍按原策略暂停 / 清理。
-- 导航底板 220ms、筛选底板 180ms，transform 过渡可中断；朱砂标记是导航底板的伪元素，一起移动。收起轨道中也放在底板内部。
+- 导航底板 220ms、筛选底板 180ms，transform 过渡可中断；黑色圆点是导航底板的伪元素，一起移动。收起轨道中也放在底板内部。
 - 既有侧栏 `grid-template-columns` 220ms 是保留的布局过渡例外：它让阅读区真实获得空间，不是假收起。键盘及 reduced motion 即时完成。本轮没有新增布局动画。
 - 弹层进入 220ms / 退出 140ms；浮层从触发点 180ms / 100ms 退出，菜单行静止。hover 位移仅 fine pointer，最多 2px；按压 1px / 100–120ms。
 - 50ms SSE 缓冲与完成后一次 Markdown 解析保持不变；骨架 / 生成指示用于真实等待状态，reduced motion 下静止。
 
 ## 8. 可访问性
 
-- 焦点环统一 `2px var(--focus-ring)`（`#AD402C`），偏移 3px。复合字段的焦点环由外框承载，内部 outline 为 none 是有意的等价焦点行为；内联创建框保留足够左右余量以免被侧栏裁切。
+- 焦点环统一 `2px var(--focus-ring)`（`#171717`），偏移 3px。复合字段的焦点环由外框承载，内部 outline 为 none 是有意的等价焦点行为；内联创建框保留足够左右余量以免被侧栏裁切。
 - 图标按钮必须有 `aria-label`；菜单使用 `role="menu"` / `role="menuitem"`。
 - 弹层使用 Radix Dialog：焦点陷阱、Esc 关闭、关闭后回到触发元素。
 - 流式答案容器 `aria-live="polite"`；加载/错误使用 `role="status"` / `role="alert"`。
 - 键盘可完成：登录、提问、打开引用、关闭弹层、切换知识库、打开移动抽屉。
-- 对比度：正文 `#17150F` / `#575249` 于三类纸面；辅助与状态文字在实际背景上达到普通文字 4.5:1，状态圆点可保留原语义色，不承载唯一状态信息。
+- 对比度：正文 `#171717` / `#525252` 于白色和中性灰表面；辅助与状态文字在实际背景上达到普通文字 4.5:1，状态圆点使用中性灰，不承载唯一状态信息。
 - 弹层与抽屉设置 `overscroll-behavior: contain`；可点区域设置 `touch-action: manipulation`；不要禁用缩放。
 - 历史列表超过 50 项使用 `content-visibility: auto` 与 `contain-intrinsic-size`，避免一次性布局全部行。
 
@@ -202,10 +202,10 @@ npx playwright test
 
 ## 11. 素材与表面
 
-- 保留 `home-wave.tsx` loom 与 `login-ribbon.tsx` canvas、两张静态 webp 回退、现有渲染 / context loss 测试。本轮仅增加 pause 通道，不改变几何与 shader。
-- 沿用 Round A 的 `atlas-auth.webp`、`atlas-empty-{bases,documents,history}.webp`、`atlas-workflow.webp`、`atlas-recovery.webp`；无新图片、字体或依赖。图片均为装饰，空 alt 与明确尺寸。auth 图位于首屏并 preload，其余非关键装饰延迟加载。
-- `knowledge-contours.svg` 为封面几何线条。`paper-grain.svg` alpha 由 .035 降到 .008，仅用于封面；大面积 page / sidebar / auth / recovery 无 grain，无全局暖色滤镜。
-- 本地 CJK 标题字体是 Round A 提供的 `noto-serif-sc-headings-400.woff2`，包含许可与字形列表；不把任意用户内容强制设为子集字体。
+- 保留 `home-wave.tsx` loom 与 `login-ribbon.tsx` canvas、两张静态 webp 回退、现有渲染 / context loss 测试。Round D 只将场景颜色改为中性石墨，保留几何、shader 运算、pause 与 Round C 的延迟加载 / 异步编译 / 固定尺寸。
+- 原位转换 `atlas-auth.webp`、`atlas-empty-{bases,documents,history}.webp`、`atlas-workflow.webp`、`atlas-recovery.webp` 为中性灰度并提白背景；两张场景回退也去色。保留原尺寸、透明通道与文件名，无新依赖。StaticArt 使用原生 img，空 alt 与明确尺寸，auth eager / high priority，其余 lazy。
+- `knowledge-contours.svg` 为中性灰封面几何线条。移除纹理文件及其 CSS 引用，所有表面保持清洁。素材 URL 带 `?v=monochrome-d`，维持一年 immutable 缓存并避开旧素材缓存；后续替换内容须更新版本参数。
+- 移除 Round A 中文衬线子集、独立许可 / 字形清单及无引用的生成脚本，减少 25,056 字节字体资源。保留两份 DM Sans 和一份 DM Serif Display。
 
 ## 12. Round B 验收边界
 
@@ -213,3 +213,11 @@ npx playwright test
 - 390px 点击区域至少 40px，输入至少 16px；导航、账户、资料操作、弹层关闭、设置索引与 auth 辅助链接均覆盖。viewport-fit cover 与安全区域内边距配合；不禁用缩放。
 - `node scripts/contrast-audit.mjs` 读取当前 CSS token 并断言文本 ≥4.5、焦点 / 控件边界 ≥3。完整矩阵、例外说明与验证状态见 VISUAL-POLISH.md。
 - 预算文件不得修改；生产 JS 按原 `npm run perf:budget` 的每路由 +5% 上限验收。浏览器测试在可启动 Chromium 的环境运行。
+
+## 13. Round D 验证与性能边界
+
+- `npm run lint && npm run typecheck && npm test` 全部通过，5 个测试文件通过。
+- 对比度脚本同时断言全部颜色令牌 R=G=B，并新增成功 / 处理中点颜色检查；所有普通文字 ≥4.5:1，焦点 / 控件边界 ≥3:1。辅助文字最低 5.26:1，控件边界最低 3.40:1。
+- 源码 / SVG 的 hex、rgb、hsl、oklch、GLSL 与 Three.js 颜色自查：无非中性色，无需语义色例外。WebP 从灰度源压缩，解码 RGB 最大通道差 1/255（编码舍入），展示层 grayscale(1) 保证中性显示；透明回退 alpha 保持原值。
+- Round C 原生 StaticArt、首次打开才加载弹层、延迟 WebGL、保留场景尺寸、字体 preload 限制与 immutable 缓存继续保留。预算、依赖、选择器、accessible names 与业务逻辑未改。
+- 按本轮要求未运行 build / 浏览器 / perf:budget；新生产构建的截图、E2E、CLS、Lighthouse 和预算由操作员执行，不能将源码核查当作浏览器验收。

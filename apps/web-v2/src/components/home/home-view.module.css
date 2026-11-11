@@ -524,7 +524,7 @@
 
 .ask:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px #ad402c0d, var(--shadow-raised);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.051), var(--shadow-raised);
 }
 
 .ask input:focus-visible {
@@ -723,7 +723,7 @@
 }
 
 .shortcut:first-child .shortcutText small {
-  color: #dfd5c3;
+  color: #d4d4d4;
 }
 
 .panelHead {
@@ -1106,9 +1106,9 @@
 /* The wordmark is the lead; the loom and controls are already present beneath it. */
 .hero .eyebrow { text-transform: none; letter-spacing: .04em; color: var(--ink-2); font-size: 12px; }
 .panel { background: var(--surface-raised); box-shadow: none; }
-.panelHead h2 { font-family: var(--font-cjk-display); font-size: 17px; font-weight: 400; }
+.panelHead h2 { font-family: var(--font-sans); font-size: 15px; font-weight: 600; }
 .rowIcon { border-radius: 5px; background: var(--bg-subtle); }
-.empty img { width: 108px; height: 72px; object-fit: contain; mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 50%, transparent 74%); }
+.empty img { filter: grayscale(1); width: 108px; height: 72px; object-fit: contain; mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 50%, transparent 74%); }
 
 .shortcutArrow, .rowArrow { color: var(--ink-3); }
 .askMain > button:disabled svg { opacity: .5; }

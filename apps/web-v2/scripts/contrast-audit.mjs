@@ -13,9 +13,14 @@ function ratio(a, b) {
   const x = luminance(a), y = luminance(b);
   return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
 }
+// Round D: every token is neutral, including semantic states and their surfaces.
+for (const [name, hex] of Object.entries(tokens)) {
+  const [r, g, b] = hex.slice(1).match(/../g);
+  assert(r === g && g === b, `${name} must be monochrome: ${hex}`);
+}
 const surfaces = ['bg', 'surface-raised', 'bg-subtle', 'surface-sunken', 'bg-muted', 'accent-soft', 'success-soft', 'warning-soft', 'danger-soft'];
 const rows = [];
-for (const token of ['ink', 'ink-2', 'ink-3', 'accent', 'success-ink', 'warning-ink', 'danger', 'focus-ring', 'control-line', 'danger-line']) {
+for (const token of ['ink', 'ink-2', 'ink-3', 'accent', 'success', 'warning', 'success-ink', 'warning-ink', 'danger', 'focus-ring', 'control-line', 'danger-line']) {
   const minimum = ['focus-ring', 'control-line', 'danger-line'].includes(token) ? 3 : 4.5;
   const row = { token, hex: tokens[token] };
   for (const surface of surfaces) {

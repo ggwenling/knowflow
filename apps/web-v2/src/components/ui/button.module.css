@@ -52,14 +52,14 @@
 .primary {
   background: linear-gradient(180deg, var(--ink-hover), var(--ink));
   border-color: var(--ink);
-  box-shadow: inset 0 1px 0 #ffffff20, 0 1px 2px #382b161a;
+  box-shadow: inset 0 1px 0 #ffffff20, 0 1px 2px rgba(0, 0, 0, 0.102);
 }
 
 .secondary {
   border-color: var(--control-line);
   background: var(--surface-raised);
   color: var(--ink);
-  box-shadow: var(--highlight), 0 1px 2px #382b1608;
+  box-shadow: var(--highlight), 0 1px 2px rgba(0, 0, 0, 0.031);
 }
 
 .ghost {
