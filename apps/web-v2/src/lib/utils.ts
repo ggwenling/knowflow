@@ -1,4 +1,4 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
+// Callers combine CSS module classes, which cannot have Tailwind conflicts.
+export function cn(...inputs: ClassValue[]) { return clsx(inputs); }

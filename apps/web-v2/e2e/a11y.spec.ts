@@ -55,13 +55,17 @@ test("inputs expose a visible focus ring", async ({ page }) => {
   await page.goto("/knowledge-bases");
   const search = page.getByRole("textbox", { name: "搜索知识库" });
   await search.focus();
-  await expect(search).toHaveCSS("outline-style", "solid");
+  await expect(search).toHaveCSS("outline-style", "none");
+  await expect(search.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-width", "2px");
+  await expect(search.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-style", "solid");
 
   await page.goto("/conversations");
   const composer = page.getByRole("textbox", { name: "问题" });
   await expect(composer).toBeEnabled();
   await composer.focus();
-  await expect(composer).toHaveCSS("outline-style", "solid");
+  await expect(composer).toHaveCSS("outline-style", "none");
+  await expect(composer.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-width", "2px");
+  await expect(composer.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-style", "solid");
 });
 
 test("search and filter state survive reload through the URL", async ({ page }) => {

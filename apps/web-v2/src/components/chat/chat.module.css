@@ -5,33 +5,14 @@
 .eyebrow {
   margin: 0 0 6px;
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.chatHeader {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 18px;
-}
-
-.chatTitle h1 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 36px;
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
 }
 
 .chatMeta {
   margin: 7px 0 0;
   color: var(--ink-3);
-  font-size: 11.5px;
 }
 
 .chatActions {
@@ -49,23 +30,27 @@
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 8px;
   color: var(--ink-2);
 }
 
 .baseSelect select {
+  min-width: 0;
   max-width: 180px;
+  padding: 8px 0;
+  font-size: 12px;
   border: 0;
   background: transparent;
-  padding: 8px 0;
-  font-size: 11.5px;
+  box-shadow: none;
   outline: none;
 }
 
 .baseSelect select:focus-visible {
-  outline: 2px solid #555;
-  outline-offset: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .chatNotice {
@@ -74,11 +59,11 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
-  border: 1px solid #ecd9c4;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fffaf3;
+  background: var(--warning-soft);
   padding: 9px 12px;
-  color: #7d5a32;
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -86,33 +71,25 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
 }
 
 .layout {
   display: grid;
-  grid-template-columns: 244px minmax(0, 1fr) 276px;
-  align-items: start;
-  gap: 18px;
 }
 
-.railColumn,
-.docsColumn {
+.railColumn, .docsColumn {
   min-width: 0;
 }
 
 .rail {
   display: flex;
-  height: calc(100svh - 128px);
-  min-height: 420px;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
   padding: 14px 12px 10px;
   position: sticky;
-  top: 18px;
 }
 
 .railHead {
@@ -136,13 +113,15 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink-2);
 }
 
-.newChat:hover {
-  border-color: var(--ink-3);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .newChat:hover {
+    border-color: var(--ink-3);
+    color: var(--ink);
+  }
 }
 
 .search {
@@ -159,16 +138,13 @@
 .search input {
   min-width: 0;
   flex: 1;
-  height: 30px;
-  border: 0;
-  background: transparent;
-  font-size: 11.5px;
-  outline: none;
 }
 
 .search input:focus-visible {
-  outline: 2px solid #555;
-  outline-offset: 1px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .historyScroll {
@@ -181,16 +157,14 @@
 .railEmpty {
   margin: 10px 6px;
   color: var(--ink-3);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.7;
 }
 
 .groupLabel {
   margin: 10px 6px 3px;
   color: var(--ink-3);
-  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -200,7 +174,6 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  padding: 7px 7px;
   color: var(--ink-2);
   text-align: left;
   text-decoration: none;
@@ -208,14 +181,15 @@
   contain-intrinsic-size: auto 44px;
 }
 
-.historyButton:hover {
-  background: var(--bg-muted);
+@media (hover: hover) and (pointer: fine) {
+  .historyButton:hover {
+    background: var(--bg-muted);
+  }
 }
 
 .historyButton span {
   display: block;
   overflow: hidden;
-  font-size: 11.5px;
   line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -223,13 +197,7 @@
 
 .historyButton small {
   display: block;
-  margin-top: 2px;
   color: var(--ink-3);
-  font-size: 10px;
-}
-
-.historyActive {
-  background: #f3f3f3;
 }
 
 .historyActive span {
@@ -243,7 +211,7 @@
   background: transparent;
   padding: 9px;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -256,62 +224,36 @@
   margin-top: 8px;
   padding: 9px 4px 0;
   color: var(--ink-3);
-  font-size: 9.5px;
 }
 
 .chatMain {
   display: flex;
-  min-height: calc(100svh - 128px);
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
 }
 
 .answerScroll {
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 22px 22px 10px;
 }
 
 .answerEmpty {
   display: flex;
-  min-height: 100%;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 18px;
   text-align: center;
-}
-
-.emptyMark {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  place-items: center;
-  margin-bottom: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg-subtle);
-  color: var(--ink-2);
-  font-family: var(--font-serif);
-  font-size: 20px;
 }
 
 .answerEmpty h2 {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
 }
 
 .answerEmpty p {
-  max-width: 400px;
   margin: 8px 0 0;
   color: var(--ink-2);
-  font-size: 12px;
   line-height: 1.8;
 }
 
@@ -319,8 +261,6 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 7px;
-  margin-top: 20px;
 }
 
 .examples button {
@@ -328,17 +268,15 @@
   align-items: center;
   gap: 6px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: #fff;
-  padding: 6px 11px;
+  background: var(--surface-raised);
   color: var(--ink-2);
-  font-size: 11px;
-  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
-.examples button:hover {
-  border-color: var(--ink-3);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .examples button:hover {
+    border-color: var(--ink-3);
+    color: var(--ink);
+  }
 }
 
 .answerCard {
@@ -348,19 +286,13 @@
 .questionLine {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
 }
 
 .questionMark {
   display: grid;
-  width: 22px;
-  height: 22px;
   flex: none;
   place-items: center;
-  border-radius: var(--radius-xs);
-  background: var(--bg-muted);
-  color: var(--ink-2);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -369,9 +301,7 @@
   flex: 1;
   margin: 1px 0 0;
   overflow-wrap: anywhere;
-  font-size: 14px;
   font-weight: 600;
-  line-height: 1.6;
 }
 
 .questionActions {
@@ -394,21 +324,17 @@
   line-height: 1;
 }
 
-.iconAction:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
-}
-
-.answerBody {
-  margin: 18px 0 0 31px;
+@media (hover: hover) and (pointer: fine) {
+  .iconAction:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .generating {
   display: flex;
   align-items: center;
-  gap: 8px;
   color: var(--ink-3);
-  font-size: 12.5px;
 }
 
 .pulse {
@@ -416,12 +342,11 @@
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  animation: pulse 1s ease-in-out infinite alternate;
 }
 
 .streamingText {
   margin: 0;
-  color: #28323a;
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.9;
   white-space: pre-wrap;
@@ -438,7 +363,7 @@
 }
 
 .markdown {
-  color: #28323a;
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.9;
   overflow-wrap: anywhere;
@@ -456,30 +381,21 @@
   margin: 0 0 12px;
 }
 
-.markdown h1,
-.markdown h2,
-.markdown h3 {
+.markdown h1, .markdown h2, .markdown h3 {
   margin: 20px 0 8px;
   color: var(--ink);
-  font-size: 15px;
   font-weight: 650;
   line-height: 1.4;
 }
 
-.markdown ul,
-.markdown ol {
+.markdown ul, .markdown ol {
   margin: 0 0 12px;
   padding-left: 20px;
 }
 
-.markdown li {
-  margin: 3px 0;
-}
-
 .markdown blockquote {
   margin: 12px 0;
-  border-left: 2px solid var(--line-strong);
-  padding: 2px 0 2px 12px;
+  border-left: 1px solid var(--line);
   color: var(--ink-2);
 }
 
@@ -504,7 +420,7 @@
   margin: 12px 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fbfbfb;
+  background: var(--bg-subtle);
   padding: 12px 14px;
   font-family: ui-monospace, "Cascadia Code", monospace;
   font-size: 12px;
@@ -531,8 +447,7 @@
   font-size: 12.5px;
 }
 
-.markdown th,
-.markdown td {
+.markdown th, .markdown td {
   border: 1px solid var(--line);
   padding: 7px 9px;
   text-align: left;
@@ -551,18 +466,14 @@
 }
 
 .citations {
-  margin: 20px 0 0 31px;
   border-top: 1px solid var(--line);
-  padding-top: 12px;
 }
 
 .citationTitle {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
   color: var(--ink-2);
-  font-size: 11px;
   font-weight: 600;
 }
 
@@ -574,36 +485,27 @@
   border-radius: var(--radius-pill);
   background: var(--bg-muted);
   color: var(--ink-3);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .citation {
   display: flex;
   width: 100%;
   align-items: flex-start;
-  gap: 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  padding: 10px;
   color: inherit;
   text-align: left;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.citation + .citation {
-  margin-top: 6px;
-}
-
-.citation:hover {
-  border-color: #b9c9d3;
-  background: var(--accent-soft);
+@media (hover: hover) and (pointer: fine) {
+  .citation:hover {
+    border-color: var(--control-line);
+    background: var(--accent-soft);
+  }
 }
 
 .citationIndex {
   padding-top: 1px;
-  color: var(--accent);
-  font-family: var(--font-serif);
+  font-family: var(--font-mono);
   font-size: 12px;
 }
 
@@ -616,22 +518,19 @@
 
 .citationBody > span {
   color: var(--ink);
-  font-size: 11.5px;
   font-weight: 600;
 }
 
 .citationBody small {
   color: var(--ink-3);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .citationBody em {
   display: -webkit-box;
   overflow: hidden;
   color: var(--ink-2);
-  font-size: 11px;
   font-style: normal;
-  line-height: 1.6;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -639,7 +538,6 @@
 .citationArrow {
   flex: none;
   color: var(--ink-3);
-  font-size: 11px;
 }
 
 .answerEnd {
@@ -651,7 +549,7 @@
 .answerEnd p {
   margin: 0;
   color: var(--ink-3);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .answerEndActions {
@@ -669,41 +567,38 @@
   background: transparent;
   padding: 2px 0;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.answerEndActions button:hover {
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .answerEndActions button:hover {
+    color: var(--ink);
+  }
 }
 
 .composer {
   border-top: 1px solid var(--line);
-  padding: 10px 12px 10px;
 }
 
 .composer textarea {
   display: block;
   width: 100%;
   resize: none;
-  border: 0;
   border-radius: var(--radius-xs);
-  background: transparent;
-  padding: 6px 7px;
   color: var(--ink);
-  font-size: 13px;
-  line-height: 1.65;
-  outline: none;
 }
 
 .composer textarea:focus-visible {
-  outline: 2px solid #555;
-  outline-offset: 2px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .composer textarea::placeholder {
-  color: #9c9c9c;
+  color: var(--ink-3);
 }
 
 .composer textarea:disabled {
@@ -720,7 +615,6 @@
 
 .composerHint {
   color: var(--ink-3);
-  font-size: 10px;
 }
 
 .send {
@@ -732,15 +626,17 @@
   border-radius: var(--radius-xs);
   background: var(--ink);
   padding: 0 12px;
-  color: #fff;
-  font-size: 11.5px;
+  color: var(--on-ink);
+  font-size: 12px;
   font-weight: 600;
 }
 
 .send:disabled {
-  border-color: #e4e4e4;
-  background: #f1f1f1;
-  color: #b9b9b9;
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
+  color: var(--ink-3);
+  box-shadow: none;
 }
 
 .stop {
@@ -748,25 +644,21 @@
   min-height: 32px;
   align-items: center;
   gap: 6px;
-  border: 1px solid #e0cec9;
+  border: 1px solid var(--danger-line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 11px;
   color: var(--danger);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .docs {
   display: flex;
-  max-height: calc(100svh - 128px);
   min-height: 320px;
   flex-direction: column;
   position: sticky;
-  top: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
-  padding: 14px 13px 12px;
 }
 
 .docsHead {
@@ -793,7 +685,7 @@
   border-radius: var(--radius-pill);
   background: var(--bg-muted);
   color: var(--ink-3);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .uploadChip {
@@ -804,14 +696,16 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink-2);
   cursor: pointer;
 }
 
-.uploadChip:hover {
-  border-color: var(--ink-3);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .uploadChip:hover {
+    border-color: var(--ink-3);
+    color: var(--ink);
+  }
 }
 
 .uploadChip input {
@@ -819,9 +713,7 @@
 }
 
 .docsHint {
-  margin: 7px 0 10px;
   color: var(--ink-3);
-  font-size: 10px;
   line-height: 1.6;
 }
 
@@ -834,23 +726,18 @@
 .docRow {
   content-visibility: auto;
   contain-intrinsic-size: auto 48px;
-  display: flex;
   align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid #f4f4f4;
-  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .docBadge {
   display: grid;
   width: 27px;
-  height: 31px;
   flex: none;
   place-items: center;
   border-radius: 5px;
-  background: var(--bg-muted);
   color: var(--ink-2);
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -864,7 +751,6 @@
 .docText strong {
   overflow: hidden;
   color: var(--ink);
-  font-size: 11px;
   font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -872,7 +758,7 @@
 
 .docText small {
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
 }
 
 .docsEmpty {
@@ -882,7 +768,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: var(--radius-sm);
   background: var(--bg-subtle);
   padding: 16px;
@@ -893,13 +779,13 @@
 .docsEmpty p {
   margin: 4px 0 0;
   color: var(--ink-2);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .docsEmpty span {
   max-width: 180px;
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -915,7 +801,6 @@
 
 .privacy p {
   margin: 0;
-  font-size: 9.5px;
   line-height: 1.65;
 }
 
@@ -925,7 +810,6 @@
   gap: 5px;
   margin-top: 10px;
   color: var(--ink-2);
-  font-size: 10.5px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -954,9 +838,11 @@
   line-height: 1;
 }
 
-.sourceClose:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .sourceClose:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .sourceHead {
@@ -966,26 +852,12 @@
 
 .sourceTitle {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: 22px;
-  font-weight: 400;
   letter-spacing: -0.02em;
 }
 
 .sourceDescription {
   margin: 4px 0 0;
   color: var(--ink-3);
-  font-size: 11px;
-}
-
-.sourceQuote {
-  margin: 14px 22px 0;
-  border-left: 3px solid var(--accent);
-  background: var(--accent-soft);
-  padding: 9px 12px;
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.75;
 }
 
 .sourceFeedback {
@@ -1000,7 +872,7 @@
   overflow: auto;
   margin: 12px 0 0;
   padding: 0 22px 22px;
-  color: #33404a;
+  color: var(--ink-2);
   font: 12px/1.9 ui-monospace, "Cascadia Code", monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1022,8 +894,7 @@
   font-size: 22px;
 }
 
-.sheet .rail,
-.sheet .docs {
+.sheet .rail, .sheet .docs {
   position: static;
   height: auto;
   max-height: 66svh;
@@ -1053,31 +924,410 @@
   display: none;
 }
 
-@keyframes pulse {
-  to {
-    opacity: 0.35;
-    transform: scale(0.75);
-  }
-}
-
 @keyframes blink {
   to {
     opacity: 0;
   }
 }
 
-@media (max-width: 1180px) {
-  .layout {
-    grid-template-columns: 216px minmax(0, 1fr) 244px;
-    gap: 14px;
+@media (max-width: 980px) {
+  .railColumn, .docsColumn {
+    display: none;
   }
-
-  .answerScroll {
-    padding: 18px 18px 8px;
+  .mobileOnly {
+    display: inline-flex;
   }
-
+  .rail {
+    position: static;
+  }
   .docs {
-    padding: 12px 11px 10px;
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .chatActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .answerBody, .citations, .answerEnd {
+    margin-left: 0;
+  }
+  .sourceDialog {
+    height: 86svh;
+  }
+  .sourceHead {
+    padding: 18px 18px 10px;
+  }
+  .sourcePre {
+    padding: 0 18px 18px;
+  }
+}
+
+.chatMeta {
+  font-size: 12px;
+}
+
+.layout {
+  grid-template-columns: 216px minmax(0, 1fr) 258px;
+  gap: 16px;
+}
+
+.rail {
+  background: var(--bg-subtle);
+  border-color: var(--line);
+  top: 20px;
+  min-height: 440px;
+}
+
+.railHead {
+  padding-bottom: 16px;
+}
+
+.search {
+  background: var(--surface-raised);
+}
+
+.search input {
+  font-size: 12px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.groupLabel {
+  font-size: 12px;
+  letter-spacing: .06em;
+  margin-top: 18px;
+  margin-bottom: 6px;
+}
+
+.historyButton {
+  padding: 10px 9px;
+}
+
+.historyButton span {
+  font-size: 12px;
+}
+
+.historyButton small {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.historyActive {
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px rgba(0, 0, 0, 0.020);
+}
+
+.railFoot {
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.chatMain {
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.answerScroll {
+  padding: 24px 24px 20px;
+}
+
+.questionLine {
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.questionLine p {
+  flex-basis: calc(100% - 34px);
+  font-size: 16px;
+  letter-spacing: -.02em;
+  line-height: 1.65;
+}
+
+.questionMark {
+  width: 24px;
+  height: 26px;
+  border: 1px solid var(--line);
+}
+
+.questionActions {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.questionActions .iconAction:first-of-type {
+  margin-left: auto;
+}
+
+.answerBody {
+  max-width: 70ch;
+  margin: 24px 0 0;
+}
+
+.markdown, .streamingText {
+  font-size: 15px;
+}
+
+.markdown h1, .markdown h2, .markdown h3 {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  letter-spacing: -.02em;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.markdown li {
+  margin: 7px 0;
+}
+
+.markdown li::marker {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown blockquote {
+  border-left-color: var(--accent);
+  background: var(--bg-subtle);
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+}
+
+.citations {
+  margin: 24px 0 0;
+  padding-top: 18px;
+}
+
+.citationTitle {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.citation {
+  gap: 12px;
+  padding: 13px 12px;
+}
+
+.citationIndex {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  font: 12px var(--font-mono);
+}
+
+.citationBody > span {
+  font-size: 12px;
+}
+
+.citationBody small {
+  font: 12px/1.8 var(--font-mono);
+}
+
+.citationBody em {
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.citationArrow {
+  font-size: 14px;
+}
+
+.answerEnd {
+  margin-left: 0;
+}
+
+.composer {
+  border: 1px solid var(--control-line);
+  border-radius: 11px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.043), var(--shadow-card);
+}
+
+.composer textarea {
+  padding: 6px;
+  font-size: 14px;
+}
+
+.composerFoot {
+  padding-top: 8px;
+}
+
+.composerHint {
+  line-height: 1.8;
+}
+
+.composerHint kbd {
+  min-width: 0;
+  padding: 0 3px;
+}
+
+.send, .stop {
+  min-height: 32px;
+  font-size: 12px;
+  border-radius: 7px;
+}
+
+.send {
+  box-shadow: inset 0 1px 0 #ffffff20;
+}
+
+.send:active:not(:disabled), .stop:active {
+  transform: translateY(1px);
+}
+
+.docs {
+  top: 20px;
+  background: var(--bg-subtle);
+  padding: 16px 13px;
+}
+
+.docsHint {
+  font-size: 12px;
+  margin: 12px 0;
+}
+
+.docRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 5px 8px;
+  border-bottom-color: var(--line);
+  padding: 12px 0;
+}
+
+.docRow > :last-child {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.docBadge {
+  grid-row: 1 / 3;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  font: 12px var(--font-mono);
+  height: 34px;
+}
+
+.docText strong {
+  font-size: 12px;
+}
+
+.docText small {
+  font: 12px/1.8 var(--font-mono);
+}
+
+.privacy p {
+  font-size: 12px;
+}
+
+.privacy svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.docsLink {
+  font-size: 12px;
+}
+
+.answerEmpty {
+  min-height: 100%;
+  padding: 18px 0 32px;
+}
+
+.emptyArtwork {
+  width: min(240px, 80%);
+  height: auto;
+  margin: 0 auto 18px;
+}
+
+.answerEmpty h2 {
+  font: 600 22px/1.5 var(--font-sans);
+  letter-spacing: -.03em;
+}
+
+.answerEmpty p {
+  font-size: 13px;
+  max-width: 360px;
+}
+
+.examples {
+  flex-direction: column;
+  width: min(100%, 320px);
+  margin-top: 24px;
+  gap: 8px;
+}
+
+.examples button {
+  border-radius: 8px;
+  text-align: left;
+  font-size: 12px;
+  padding: 10px 12px;
+}
+
+.examples button svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.generating {
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.phase {
+  border: 1px solid var(--line);
+  background: var(--bg-subtle);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.pulse {
+  animation: blink 1200ms var(--ease-in-out) infinite alternate;
+}
+
+.streamingText {
+  animation: gentle-fade 120ms var(--ease);
+}
+
+.sourceTitle {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.sourceDescription {
+  font-size: 12px;
+}
+
+@media (min-width: 981px) and (max-width: 1270px) {
+  .layout {
+    grid-template-columns: 180px minmax(0, 1fr) 208px;
+    gap: 12px;
+  }
+  .answerScroll {
+    padding: 20px 16px;
+  }
+  .docs {
+    padding: 14px 10px;
+  }
+  .questionLine p {
+    font-size: 15px;
   }
 }
 
@@ -1085,109 +1335,372 @@
   .layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
 
-  .railColumn,
-  .docsColumn {
-    display: none;
+@media (max-width: 760px) {
+  .chatMeta {
+    font-size: 12px;
   }
-
-  .mobileOnly {
-    display: inline-flex;
+  .chatActions {
+    gap: 6px;
   }
-
-  .chatMain {
-    min-height: calc(100svh - 280px);
+  .baseSelect {
+    width: 100%;
+    max-width: none;
+    padding: 0 10px;
   }
+  .baseSelect select {
+    width: 100%;
+    max-width: none;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+  .answerEmpty {
+    padding: 12px 0 24px;
+  }
+  .emptyArtwork {
+    width: 180px;
+    margin-bottom: 14px;
+  }
+  .answerEmpty h2 {
+    font-size: 20px;
+  }
+  .answerEmpty p {
+    font-size: 12px;
+  }
+  .examples {
+    margin-top: 18px;
+  }
+  .examples button {
+    font-size: 12px;
+  }
+  .composerHint {
+    max-width: 65%;
+  }
+  .sourceTitle {
+    font-size: 20px;
+  }
+  .sheet .docs {
+    background: var(--surface-raised);
+  }
+}
 
-  .rail {
+@media (prefers-reduced-motion: reduce) {
+  .pulse, .caret {
+    animation: none;
+  }
+  .send:active:not(:disabled), .stop:active {
+    transform: none;
+  }
+}
+
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.currentSources {
+  margin-bottom: 14px;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.currentSources h3 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.currentSources h3 span {
+  font-family: var(--font-mono);
+}
+
+.currentSources button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.sourceNumber {
+  flex-shrink: 0;
+  font: 12px var(--font-mono);
+}
+
+.sourceName {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .currentSources button:hover .sourceName {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* The composer owns its space; the last citation scrolls clear of the fade. */
+
+.eyebrow {
+  font: 600 11px/1.5 var(--font-sans);
+  letter-spacing: .12em;
+}
+
+.chatMain {
+  position: relative;
+  height: calc(100svh - 232px);
+  min-height: 480px;
+}
+
+.rail {
+  height: calc(100svh - 232px);
+}
+
+.answerScroll {
+  padding-bottom: 48px;
+  scroll-padding-block: 24px 56px;
+  overscroll-behavior: contain;
+}
+
+.citation {
+  scroll-margin-block: 20px 40px;
+}
+
+.composer {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  margin: 8px;
+  padding: 10px;
+}
+
+.composer::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: -25px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.composer textarea {
+  min-height: 44px;
+  max-height: 144px;
+  overflow-y: auto;
+  line-height: 1.65;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.composer textarea:placeholder-shown {
+  white-space: pre;
+  overflow-x: hidden;
+}
+
+.composerHint {
+  font-size: 12px;
+}
+
+.composerHint kbd {
+  font-size: 12px;
+  height: 20px;
+}
+
+.send, .stop {
+  flex-shrink: 0;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.currentSources button {
+  gap: 7px;
+}
+
+.currentSources h3, .sourceNumber, .docText small {
+  font-size: 12px;
+}
+
+.docsHint, .privacy p {
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+@media (max-width: 980px) {
+  .sheet .rail {
     height: auto;
-    min-height: 0;
-    position: static;
-  }
-
-  .docs {
-    max-height: none;
-    position: static;
   }
 }
 
 @media (max-width: 760px) {
-  .chatHeader {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .chatTitle h1 {
-    font-size: 30px;
-  }
-
-  .chatMeta {
-    font-size: 10.5px;
-  }
-
-  .chatActions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .baseSelect {
-    max-width: 100%;
-  }
-
   .chatMain {
-    height: calc(100svh - 326px);
-    min-height: 380px;
+    height: calc(100svh - 354px);
+    min-height: 400px;
   }
-
-  .composer {
-    flex: none;
-  }
-
   .answerScroll {
-    padding: 16px 14px 6px;
+    padding: 18px 16px 44px;
   }
-
-  .answerBody,
-  .citations,
-  .answerEnd {
-    margin-left: 0;
-  }
-
   .composer {
-    padding: 8px 8px 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+    padding: 8px;
+    margin: 6px;
   }
-
+  .composer textarea {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 40px;
+    max-height: 120px;
+    padding: 6px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+  }
+  .composerFoot {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0;
+    gap: 0;
+  }
   .composerHint {
-    max-width: 60%;
-    font-size: 9.5px;
+    display: none;
   }
-
-  .answerEmpty {
-    padding: 32px 10px;
+  .send, .stop {
+    min-height: 40px;
+    padding-inline: 10px;
   }
-
-  .answerEmpty h2 {
-    font-size: 22px;
+  .composer::before {
+    top: -21px;
+    height: 20px;
+    left: -6px;
+    right: -6px;
   }
-
-  .examples button {
-    font-size: 10.5px;
+  .questionActions {
+    padding-left: 0;
   }
-
-  .sourceDialog {
-    height: 86svh;
+  .questionLine {
+    gap: 10px;
+    padding-bottom: 16px;
   }
-
-  .sourceHead {
-    padding: 18px 18px 10px;
+  .questionLine p {
+    font-size: 15px;
   }
-
-  .sourceQuote {
-    margin: 12px 18px 0;
+  .citationBody small {
+    font-family: var(--font-sans);
   }
-
-  .sourcePre {
-    padding: 0 18px 18px;
+  .railFoot {
+    font-size: 12px;
+  }
+  .baseSelect {
+    margin-bottom: 2px;
   }
 }
+
+/* Reserve the viewport once; the actual header height determines reading space. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100svh - 64px);
+  min-height: 640px;
+}
+
+.layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+/* Header and notices keep their natural height; only the layout absorbs the squeeze. */
+
+.page > :not(.layout) {
+  flex-shrink: 0;
+}
+
+.railColumn, .docsColumn {
+  height: 100%;
+  min-height: 0;
+}
+
+.chatMain, .rail {
+  height: 100%;
+  min-height: 0;
+}
+
+.docs {
+  max-height: 100%;
+}
+
+.docsHead h2 span, .citationTitle span {
+  min-width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    min-height: 320px;
+  }
+  .chatMain {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .layout {
+    min-height: 300px;
+  }
+}
+
+/* Answers are a reading surface; source entries follow the catalogue language. */
+.chatMain { background: var(--surface-raised); }
+.markdown, .streamingText { color: var(--ink); line-height: 1.9; max-width: 70ch; }
+.questionMark { background: var(--surface-sunken); color: var(--ink-2); border-color: var(--line); border-radius: 3px; }
+.citation { border: 1px solid var(--line); border-radius: 4px; background: var(--bg-subtle); }
+.citation + .citation { margin-top: 8px; }
+.citationIndex { color: var(--accent); border: 0; border-radius: 0; background: transparent; animation: none; }
+.sourceNumber { color: var(--accent); font-family: var(--font-mono); animation: none; }
+.currentSources { border-radius: 4px; background: var(--bg-subtle); }
+.currentSources button { border-bottom: 1px solid var(--line); }
+.emptyArtwork { filter: grayscale(1); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.answerEmpty h2 { font-family: var(--font-sans); font-weight: 600; font-size: 23px; }
+.composer::before { background: linear-gradient(to top, var(--surface-raised), transparent); }
+
+.baseSelect, .search, .newChat, .uploadChip { border-color: var(--control-line); }
+.send:disabled svg { opacity: .5; }
+@media (hover: hover) and (pointer: fine) {
+  .send:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+  .stop:hover { background: var(--danger-soft); border-color: var(--danger); }
+  .loadMore:hover, .docsLink:hover, .chatNotice button:hover { color: var(--ink); }
+}
+.citationBody > span, .sourceDescription, .docsHint, .streamingText { overflow-wrap: anywhere; }
+.sourceHead { padding-right: 62px; }
+@media (max-width: 760px) {
+  .newChat, .uploadChip, .iconAction, .sourceClose { width: 40px; height: 40px; }
+  .baseSelect select { min-height: 40px; }
+  .currentSources button, .docsLink, .loadMore, .answerEndActions button, .chatNotice button { min-height: 40px; }
+  .docsLink { align-items: center; }
+  .chatNotice { flex-wrap: wrap; }
+  .page { height: calc(100svh - 180px - env(safe-area-inset-top)); min-height: 560px; }
+}
+.citation, .examples button { border-color: var(--control-line); }

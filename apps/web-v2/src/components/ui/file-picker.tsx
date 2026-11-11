@@ -17,7 +17,7 @@ export function FilePicker({ label, children, className, disabled, onPick }: {
       <button type="button" className={className} aria-label={label} disabled={disabled} onClick={() => input.current?.click()}>
         {children ?? label}
       </button>
-      <input ref={input} type="file" accept={acceptedFileTypes} hidden aria-label={label} onChange={(event) => {
+      <input ref={input} name="file" type="file" accept={acceptedFileTypes} hidden aria-label={label} onChange={(event) => {
         const file = event.target.files?.[0];
         event.currentTarget.value = "";
         if (file) onPick(file);

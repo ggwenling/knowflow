@@ -5,38 +5,14 @@
 .eyebrow {
   margin: 0 0 7px;
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
-.pageHead,
-.detailHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
-}
-
-.pageHead h1,
-.detailHead h1 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: clamp(30px, 3.2vw, 38px);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-
 .pageLead {
-  max-width: 600px;
   margin: 8px 0 0;
   color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.75;
 }
 
 .toolbar {
@@ -44,10 +20,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  margin-bottom: 18px;
-  padding: 10px 0;
 }
 
 .search {
@@ -61,61 +34,51 @@
 .search input {
   min-width: 0;
   flex: 1;
-  height: 30px;
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  outline: none;
 }
 
 .search input:focus-visible {
-  outline: 2px solid #555;
-  outline-offset: 1px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .search input::placeholder {
-  color: #9d9d9d;
+  color: var(--ink-3);
 }
 
 .toolbarMeta {
   flex: none;
   color: var(--ink-3);
-  font-size: 10.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
 .baseGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
-  gap: 12px;
 }
 
 .baseCard {
   content-visibility: auto;
-  contain-intrinsic-size: auto 88px;
   position: relative;
   display: flex;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: #fff;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  background: var(--surface-raised);
 }
 
-.baseCard:hover {
-  border-color: #c9c9c9;
-  background: #fdfdfd;
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover {
+    border-color: var(--control-line);
+    background: var(--surface-raised);
+  }
 }
 
 .baseCardLink {
-  display: flex;
   min-width: 0;
   flex: 1;
-  align-items: center;
-  gap: 12px;
   border: 0;
   background: transparent;
-  padding: 17px 44px 17px 16px;
   color: inherit;
   text-align: left;
   text-decoration: none;
@@ -123,87 +86,76 @@
 
 .baseCardIcon {
   display: grid;
-  width: 38px;
-  height: 38px;
   flex: none;
   place-items: center;
-  border-radius: 10px;
-  background: var(--bg-muted);
-  color: var(--ink-2);
 }
 
 .baseCardText {
   min-width: 0;
-  flex: 1;
 }
 
 .baseCardText strong {
   display: block;
   overflow: hidden;
-  font-size: 13.5px;
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .baseCardText small {
   display: block;
-  margin-top: 3px;
   color: var(--ink-3);
-  font-size: 10.5px;
 }
 
 .baseCardArrow {
   flex: none;
-  color: #bdbdbd;
-  transition: transform var(--dur) var(--ease), color var(--dur) var(--ease);
+  color: var(--control-line);
+  transition: transform var(--dur) var(--ease);
 }
 
-.baseCard:hover .baseCardArrow {
-  color: var(--ink);
-  transform: translateX(2px);
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover .baseCardArrow {
+    color: var(--ink);
+  }
 }
 
 .baseCardDelete {
   position: absolute;
-  top: 10px;
-  right: 10px;
   display: grid;
-  width: 26px;
-  height: 26px;
   place-items: center;
-  border: 0;
   border-radius: var(--radius-xs);
-  background: transparent;
-  color: transparent;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 
-.baseCard:hover .baseCardDelete,
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover .baseCardDelete {
+    color: var(--ink-3);
+  }
+}
+
 .baseCardDelete:focus-visible {
   color: var(--ink-3);
 }
 
-.baseCardDelete:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+  .baseCardDelete:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .back {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
   border: 0;
   background: transparent;
-  margin-bottom: 14px;
   padding: 2px 0;
   color: var(--ink-2);
-  font-size: 11px;
   text-decoration: none;
 }
 
-.back:hover {
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .back:hover {
+    color: var(--ink);
+  }
 }
 
 .detailBadge {
@@ -212,38 +164,22 @@
   align-items: center;
   gap: 5px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
   padding: 5px 11px;
   color: var(--ink-3);
-  font-size: 10px;
 }
 
 .uploadZone {
   display: flex;
   align-items: center;
-  gap: 14px;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: var(--radius);
-  background: #fcfcfc;
-  padding: 15px 16px;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
-}
-
-.uploadDragging {
-  border-color: var(--ink);
-  background: #f6f6f6;
 }
 
 .uploadIcon {
   display: grid;
-  width: 38px;
-  height: 38px;
   flex: none;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--ink-2);
 }
 
 .uploadText {
@@ -253,51 +189,45 @@
 
 .uploadText strong {
   display: block;
-  font-size: 12.5px;
   font-weight: 600;
 }
 
 .uploadText span {
   display: block;
-  margin-top: 3px;
   color: var(--ink-3);
-  font-size: 10.5px;
   line-height: 1.6;
 }
 
-.uploadAction,
-.emptyUpload {
+.uploadAction, .emptyUpload {
   display: inline-flex;
   min-height: 32px;
   flex: none;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 13px;
   color: var(--ink);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.uploadAction:hover,
-.emptyUpload:hover {
-  border-color: var(--ink-3);
+@media (hover: hover) and (pointer: fine) {
+  .uploadAction:hover, .emptyUpload:hover {
+    border-color: var(--ink-3);
+  }
 }
 
-.uploadAction input,
-.emptyUpload input {
+.uploadAction input, .emptyUpload input {
   display: none;
 }
 
 .filterRow {
   display: flex;
   align-items: center;
-  gap: 4px;
   border-bottom: 1px solid var(--line);
-  margin: 18px 0 12px;
   padding-bottom: 8px;
 }
 
@@ -308,23 +238,22 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  padding: 5px 8px;
   color: var(--ink-2);
-  font-size: 11.5px;
 }
 
 .filter span {
   color: var(--ink-3);
-  font-size: 9.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.filter:hover {
-  background: var(--bg-muted);
+@media (hover: hover) and (pointer: fine) {
+  .filter:hover {
+    background: var(--bg-muted);
+  }
 }
 
 .filterActive {
-  background: var(--bg-muted);
   color: var(--ink);
   font-weight: 600;
 }
@@ -339,7 +268,7 @@
 
 .syncing {
   color: var(--ink-3);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .statusMessage {
@@ -348,11 +277,11 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 12px;
-  border: 1px solid #ecd9c4;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fffaf3;
+  background: var(--warning-soft);
   padding: 9px 12px;
-  color: #7d5a32;
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -360,7 +289,7 @@
   border: 0;
   background: transparent;
   color: inherit;
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
 }
 
@@ -368,7 +297,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .docCard {
@@ -376,9 +305,7 @@
   contain-intrinsic-size: auto 58px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #f4f4f4;
-  padding: 11px 13px;
+  border-bottom: 1px solid var(--line);
 }
 
 .docCard:last-child {
@@ -387,14 +314,10 @@
 
 .docFormat {
   display: grid;
-  width: 34px;
-  height: 38px;
   flex: none;
   place-items: center;
-  border-radius: 6px;
-  background: var(--bg-muted);
   color: var(--ink-2);
-  font-size: 8.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -408,7 +331,6 @@
 
 .docName strong {
   overflow: hidden;
-  font-size: 12.5px;
   font-weight: 550;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -416,7 +338,6 @@
 
 .docName small {
   color: var(--ink-3);
-  font-size: 10px;
 }
 
 .docStatus {
@@ -429,7 +350,6 @@
 .docStatus small {
   max-width: 140px;
   color: var(--ink-3);
-  font-size: 9.5px;
   text-align: right;
 }
 
@@ -440,8 +360,6 @@
 
 .docMenu > button {
   display: grid;
-  width: 26px;
-  height: 26px;
   place-items: center;
   border: 0;
   border-radius: var(--radius-xs);
@@ -449,20 +367,22 @@
   color: var(--ink-3);
 }
 
-.docMenu > button:hover,
+@media (hover: hover) and (pointer: fine) {
+  .docMenu > button:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
+}
+
 .docMenu > button[aria-expanded="true"] {
   background: var(--bg-muted);
   color: var(--ink);
 }
 
 .docMenuPanel {
-  z-index: 12;
   display: grid;
-  min-width: 132px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fff;
-  padding: 4px;
   box-shadow: var(--shadow-pop);
 }
 
@@ -470,13 +390,17 @@
   border: 0;
   border-radius: var(--radius-xs);
   background: transparent;
-  padding: 7px 8px;
   color: var(--ink-2);
-  font-size: 11.5px;
   text-align: left;
 }
 
-.docMenuPanel button:hover,
+@media (hover: hover) and (pointer: fine) {
+  .docMenuPanel button:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
+}
+
 .docMenuPanel button[data-highlighted] {
   background: var(--bg-muted);
   color: var(--ink);
@@ -493,7 +417,7 @@
   gap: 8px;
   padding: 30px 16px;
   color: var(--ink-3);
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .loadMore {
@@ -503,77 +427,782 @@
   background: transparent;
   padding: 6px 10px;
   color: var(--ink-2);
-  font-size: 11px;
+  font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 @media (max-width: 760px) {
-  .pageHead,
-  .detailHead {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .pageHead h1,
-  .detailHead h1 {
-    font-size: clamp(26px, 8vw, 32px);
-  }
-
-  .pageLead {
-    font-size: 11.5px;
-  }
-
   .toolbar {
     gap: 10px;
   }
-
   .search {
     width: 100%;
   }
-
-  .baseGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .baseCardDelete {
-    color: var(--ink-3);
-  }
-
   .uploadZone {
     align-items: flex-start;
     flex-wrap: wrap;
-    padding: 13px;
   }
-
-  .uploadText span {
-    font-size: 9.5px;
-  }
-
   .uploadAction {
     width: 100%;
   }
-
   .filterRow {
     overflow-x: auto;
   }
-
   .filter {
     flex: none;
   }
-
   .docCard {
     align-items: flex-start;
-    gap: 9px;
-    padding: 10px;
   }
-
   .docStatus {
     align-self: center;
   }
+}
 
-  .docName strong {
-    font-size: 11.5px;
+.eyebrow {
+  margin-bottom: 10px;
+}
+
+.pageLead {
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-top: 12px;
+}
+
+.toolbar {
+  padding: 12px 0;
+}
+
+.search {
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+}
+
+.search input {
+  height: 36px;
+  font-size: 13px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.toolbarMeta {
+  font: 12px var(--font-mono);
+}
+
+.baseCard {
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur) var(--ease);
+}
+
+.baseCardLink {
+  align-content: flex-start;
+}
+
+.baseCardIcon {
+  border: 1px solid var(--line);
+}
+
+.baseCardText small {
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.baseCardArrow {
+  margin-left: auto;
+  align-self: center;
+}
+
+.baseCardLink .baseCardArrow {
+  margin-right: 28px;
+}
+
+.back {
+  font-size: 12px;
+  gap: 8px;
+}
+
+.detailBadge {
+  font-size: 12px;
+  background: var(--bg-subtle);
+  border-radius: 7px;
+}
+
+.uploadZone {
+  position: relative;
+  gap: 20px;
+  padding: 24px;
+}
+
+.uploadIcon {
+  border-radius: 13px;
+  box-shadow: var(--shadow-card);
+  transition: transform var(--dur) var(--ease);
+}
+
+.uploadText strong {
+  font-size: 14px;
+}
+
+.uploadText span {
+  margin-top: 6px;
+  font-size: 12px;
+  max-width: 560px;
+}
+
+.uploadAction {
+  min-height: 36px;
+  font-size: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.uploadDragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.uploadDragging .uploadIcon {
+  transform: translateY(-3px);
+}
+
+.filterRow {
+  position: relative;
+  gap: 0;
+  margin: 26px 0 16px;
+  padding: 0 0 12px;
+}
+
+.filter {
+  z-index: 1;
+  width: 86px;
+  height: 34px;
+  justify-content: center;
+  font-size: 12px;
+  padding: 0;
+}
+
+.filter span {
+  font: 12px var(--font-mono);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .filterActive:hover {
+    background: transparent;
   }
 }
+
+.filterActive {
+  background: transparent;
+}
+
+.filterIndicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 86px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--bg-subtle);
+  box-shadow: var(--highlight);
+  transition: transform 180ms var(--ease);
+  pointer-events: none;
+}
+
+.docList {
+  box-shadow: var(--shadow-card);
+}
+
+.docCard {
+  min-height: 78px;
+  padding: 16px 18px;
+  gap: 16px;
+  border-bottom-color: var(--line);
+}
+
+.docFormat {
+  width: 38px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg-subtle);
+  font: 12px var(--font-mono);
+  box-shadow: var(--highlight);
+}
+
+.docName strong {
+  font-size: 14px;
+}
+
+.docName small {
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.docStatus small {
+  font-size: 12px;
+}
+
+.docMenu > button {
+  width: 30px;
+  height: 30px;
+}
+
+.docMenuPanel {
+  z-index: var(--z-popover);
+  min-width: 160px;
+  padding: 5px;
+  background: var(--surface-overlay);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  transition: transform 180ms var(--ease), opacity 180ms var(--ease);
+}
+
+.docMenuPanel button {
+  font-size: 12px;
+  padding: 9px 10px;
+}
+
+.detailFootnote {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin: 18px 0 0;
+}
+
+@starting-style {
+  .docMenuPanel {
+    opacity: 0;
+    transform: translateY(-4px) scale(.97);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .baseCard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-raised);
+  }
+  .baseCard:hover .baseCardArrow {
+    transform: translateX(2px);
+  }
+  .docCard:hover {
+    background: var(--surface-raised);
+  }
+}
+
+@media (max-width: 760px) {
+  .pageLead {
+    font-size: 13px;
+  }
+  .baseCardLink .baseCardArrow {
+    margin-right: 0;
+  }
+  .search {
+    min-width: 0;
+  }
+  .toolbarMeta {
+    font-size: 12px;
+  }
+  .uploadZone {
+    gap: 14px;
+  }
+  .uploadText strong {
+    font-size: 13px;
+  }
+  .uploadAction {
+    min-height: 38px;
+    margin-top: 6px;
+  }
+  .filterRow {
+    overflow: visible;
+  }
+  .filter, .filterIndicator {
+    width: 25%;
+  }
+  .filterSpacer {
+    display: none;
+  }
+  .syncing {
+    position: absolute;
+    right: 0;
+    bottom: -16px;
+  }
+  .docCard {
+    display: grid;
+    gap: 8px 12px;
+    min-height: 94px;
+  }
+  .docFormat {
+    width: 34px;
+    height: 40px;
+    grid-row: 1 / 3;
+  }
+  .docName strong {
+    font-size: 13px;
+  }
+  .docStatus {
+    grid-column: 2;
+    grid-row: 2;
+    justify-items: start;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .docMenu {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+  .docStatus small {
+    font-size: 12px;
+  }
+  .detailFootnote {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @media (hover: hover) and (pointer: fine) {
+    .baseCard:hover, .baseCard:hover .baseCardArrow {
+      transform: none;
+    }
+  }
+  .uploadDragging .uploadIcon {
+    transform: none;
+  }
+  .docMenuPanel {
+    transition: opacity 120ms var(--ease);
+  }
+  @starting-style {
+    .docMenuPanel {
+      transform: none;
+    }
+  }
+}
+
+/* Radix Presence retains the surface for this short exit; menu rows stay still. */
+
+.docMenuPanel[data-state="closed"] {
+  animation: menuOut 100ms var(--ease) both;
+}
+
+@keyframes menuOut {
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(.97);
+  }
+}
+
+@keyframes menuFade {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .docMenuPanel[data-state="closed"] {
+    animation: menuFade 100ms var(--ease) both !important;
+  }
+}
+
+/* Curated folios: real names/times beneath an entirely decorative contour cover. */
+
+.eyebrow {
+  font: 600 11px/1.5 var(--font-sans);
+  letter-spacing: .12em;
+}
+
+.toolbar {
+  border-top: 0;
+  padding-top: 0;
+  margin-bottom: 24px;
+}
+
+.baseGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.baseCard {
+  min-height: 232px;
+  contain-intrinsic-size: auto 232px;
+  animation: none;
+}
+
+.baseCardLink {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.baseCover {
+  display: block;
+  position: relative;
+  min-height: 106px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+}
+
+.baseCover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("/knowledge-contours.svg?v=monochrome-d") center / cover no-repeat;
+  pointer-events: none;
+}
+
+.baseCover[data-tone="1"] {
+  background: var(--ink-hover);
+}
+
+.baseCover[data-tone="1"]::after {
+  background-position: right center;
+}
+
+.baseCover[data-tone="2"]::after {
+  transform: scaleX(-1);
+  opacity: .65;
+}
+
+.baseCardIcon {
+  position: absolute;
+  left: 22px;
+  z-index: 1;
+  color: var(--ink-2);
+  background: var(--surface-overlay);
+  border-color: var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.031);
+}
+
+.baseCardText {
+  flex: 1;
+  order: 0;
+  padding: 22px 22px 14px;
+}
+
+.baseCardText strong {
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.baseCardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 22px 22px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.baseOpen {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.baseCardLink .baseCardArrow {
+  width: 15px;
+  margin: 0;
+  color: var(--accent);
+}
+
+.baseCardDelete {
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.baseCreate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 232px;
+  border: 1px dashed var(--control-line);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  padding: 24px;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.createTile {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border: 1px dashed var(--control-line);
+  border-radius: 12px;
+  background: var(--surface-raised);
+  color: var(--accent);
+}
+
+.baseCreate strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.baseCreate > span:last-child {
+  font-size: 12px;
+}
+
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 24px;
+  padding: 4px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.stat:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.stat dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.stat dd {
+  margin: 0;
+  font: 500 28px/1.2 var(--font-sans);
+  letter-spacing: -.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat[data-state="ready"] dd {
+  color: var(--success-ink);
+}
+
+.stat[data-state="working"] dd {
+  color: var(--warning-ink);
+}
+
+.stat[data-state="failed"] dd {
+  color: var(--danger);
+}
+
+.partialCounts {
+  margin: -12px 0 20px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.uploadZone {
+  min-height: 116px;
+  background: var(--bg-subtle);
+  border-color: var(--control-line);
+}
+
+.uploadIcon {
+  width: 48px;
+  height: 48px;
+  background: var(--surface-raised);
+  color: var(--accent);
+}
+
+.uploadZone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 10px) top / 100% 1px no-repeat, repeating-linear-gradient(90deg, var(--accent) 0 5px, transparent 5px 10px) bottom / 100% 1px no-repeat, repeating-linear-gradient(0deg, var(--accent) 0 5px, transparent 5px 10px) left / 1px 100% no-repeat, repeating-linear-gradient(0deg, var(--accent) 0 5px, transparent 5px 10px) right / 1px 100% no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploadDragging::after {
+  animation: dropBorder 800ms var(--ease-in-out) infinite alternate;
+}
+
+@keyframes dropBorder {
+  from {
+    opacity: .25;
+  }
+  to {
+    opacity: .8;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .baseCreate:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .baseCard:hover .baseOpen {
+    color: var(--accent);
+  }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .baseGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .baseGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .baseCard {
+    min-height: 200px;
+    contain-intrinsic-size: auto 200px;
+  }
+  .baseCover {
+    min-height: 76px;
+  }
+  .baseCardIcon {
+    left: 18px;
+    bottom: 16px;
+    width: 36px;
+    height: 36px;
+  }
+  .baseCardText {
+    flex: 1;
+    padding: 18px 18px 12px;
+  }
+  .baseCardText strong {
+    font-size: 16px;
+  }
+  .baseCardFoot {
+    padding: 0 18px 18px;
+    gap: 12px;
+  }
+  .baseCardDelete {
+    top: 12px;
+    right: 12px;
+  }
+  .baseCreate {
+    min-height: 164px;
+  }
+  .statRow {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+  .stat {
+    padding-left: 16px;
+  }
+  .stat dd {
+    font-size: 24px;
+  }
+  .stat dt {
+    font-size: 12px;
+  }
+  .uploadZone {
+    padding: 18px 16px;
+  }
+  .uploadText span {
+    font-size: 12px;
+    line-height: 1.75;
+  }
+  .docCard {
+    padding: 16px 14px;
+  }
+  .docStatus {
+    flex-wrap: wrap;
+  }
+  .docStatus small {
+    text-align: left;
+  }
+  .detailFootnote {
+    line-height: 1.8;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uploadDragging::after {
+    animation: none;
+    opacity: .7;
+  }
+}
+
+.baseCard {
+  overflow: visible;
+}
+
+.baseCardLink {
+  border-radius: inherit;
+}
+
+.baseCover {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.baseCard:nth-child(-n+4) { animation: none; }
+
+/* Catalogue covers: neutral contours and actual list position. */
+.baseCard { border-radius: var(--radius); }
+.baseCardLink { border-left: 0; }
+.baseCover, .baseCover[data-tone="1"], .baseCover[data-tone="2"] {
+  background: var(--surface-sunken);
+}
+.baseCover::after { opacity: .42; mix-blend-mode: multiply; }
+.baseCover[data-tone="1"]::after { filter: none; opacity: .6; }
+.baseCover[data-tone="2"] { background: var(--bg-subtle); }
+.callNumber {
+  position: absolute;
+  top: 19px;
+  left: 22px;
+  z-index: 1;
+  color: var(--ink-2);
+  font: 12px/1 var(--font-mono);
+  letter-spacing: .08em;
+}
+.baseCardIcon { width: 32px; height: 32px; bottom: 14px; border-radius: 4px; }
+.baseCardText strong { font-weight: 600; }
+
+.search, .baseCardDelete { border-color: var(--control-line); }
+.back { min-height: 40px; margin-bottom: 16px; }
+.baseCardFoot > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.baseOpen { flex: none; }
+@media (hover: hover) and (pointer: fine) {
+  /* Stay hit-testable while hidden: the pointer is already over the card when it fades in. */
+  .baseCardDelete { opacity: 0; }
+  .baseCard:hover .baseCardDelete, .baseCard:focus-within .baseCardDelete { opacity: 1; }
+  .baseCardDelete:hover, .baseCardDelete:focus-visible { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+  .statusMessage button:hover, .loadMore:hover { color: var(--ink); }
+}
+@media (any-pointer: coarse) {
+  .baseCardDelete { opacity: 1; pointer-events: auto; }
+}
+@media (max-width: 760px) {
+  .search input, .filter, .filterIndicator { min-height: 40px; }
+  .filterIndicator { height: 40px; }
+  .uploadAction, .emptyUpload, .loadMore, .docMenuPanel button, .statusMessage button { min-height: 40px; }
+  .docMenu > button { width: 40px; height: 40px; }
+  .docCard { grid-template-columns: 34px minmax(0, 1fr) 40px; }
+  .docName strong { white-space: normal; overflow-wrap: anywhere; }
+  .statusMessage { flex-wrap: wrap; }
+}
+.filterIndicator { border-color: var(--control-line); }
+.docMenuPanel { overscroll-behavior: contain; }

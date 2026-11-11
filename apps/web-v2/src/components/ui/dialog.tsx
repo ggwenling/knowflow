@@ -34,7 +34,7 @@ export function DialogContent({
       <Primitive.Content className={cn(styles.content, styles[size], className)} {...props}>
         {showClose && (
           <Primitive.Close aria-label={closeLabel} className={styles.close}>
-            {closeIcon ?? <X size={18} />}
+            {closeIcon ?? <X size={18} aria-hidden="true" />}
           </Primitive.Close>
         )}
         {children}

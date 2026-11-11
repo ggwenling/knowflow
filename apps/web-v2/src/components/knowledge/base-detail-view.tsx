@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, Layers } from "lucide-react";
 import { api, type Document, type KnowledgeBase } from "@/services/api";
@@ -36,7 +35,6 @@ function matches(document: Document, filter: Filter) {
 export function BaseDetailView() {
   const params = useParams<{ baseId: string }>();
   const baseId = params?.baseId ?? "";
-  const reduce = useReducedMotion();
   const knowledge = useKnowledgeContext();
   const documents = useDocumentsContext();
   const [remote, setRemote] = useState<KnowledgeBase | null>(null);
@@ -74,6 +72,7 @@ export function BaseDetailView() {
   const base = knowledge.bases.find((item) => item.id === baseId) ?? (remote?.id === baseId ? remote : null);
   const readyCount = documents.documents.filter((document) => document.status === "READY").length;
   const visible = useMemo(() => documents.documents.filter((document) => matches(document, filter)), [documents.documents, filter]);
+  const counts = Object.fromEntries(filters.map(({ key }) => [key, documents.documents.filter((document) => matches(document, key)).length])) as Record<Filter, number>;
 
   async function upload(file: File | undefined, target?: Document) {
     if (!file) return;
@@ -94,21 +93,16 @@ export function BaseDetailView() {
   }
 
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.26 }}
-    >
+    <div className={styles.page}>
       <Link className={styles.back} href="/knowledge-bases">
-        <ArrowLeft size={14} aria-hidden="true" /> 全部知识库
+        <ArrowLeft size={16} aria-hidden="true" /> 全部知识库
       </Link>
 
       {error ? (
         <p className={styles.statusMessage} role="status">{error}</p>
       ) : (
         <>
-          <header className={styles.detailHead}>
+          <header className="workspace-header">
             <div>
               <p className={styles.eyebrow}>Knowledge base</p>
               <h1>{base?.name ?? "知识库"}</h1>
@@ -118,10 +112,18 @@ export function BaseDetailView() {
                   : `${documents.documents.length} 份资料 · ${readyCount} 份可用于问答`}
               </p>
             </div>
-            <span className={styles.detailBadge}>
-              <Layers size={14} aria-hidden="true" /> 私有空间
+            <span className={styles.detailBadge} data-header-tag>
+              <Layers size={16} aria-hidden="true" /> 私有空间
             </span>
           </header>
+
+          <dl className={styles.statRow} aria-label={documents.hasMore ? "已加载资料统计" : "资料统计"}>
+            {filters.map(({ key, label }) => <div className={styles.stat} key={key} data-state={key}>
+              <dt>{label}</dt>
+              <dd>{documents.refreshing && !documents.documents.length ? "—" : counts[key]}</dd>
+            </div>)}
+          </dl>
+          {documents.hasMore && <p className={styles.partialCounts}>以上为已加载资料的数量，可继续加载更多。</p>}
 
           <UploadZone
             disabled={!baseId || Boolean(error)}
@@ -130,6 +132,7 @@ export function BaseDetailView() {
           />
 
           <div className={styles.filterRow} role="group" aria-label="筛选资料">
+            <span className={styles.filterIndicator} style={{ transform: `translateX(${filters.findIndex((item) => item.key === filter) * 100}%)` }} aria-hidden="true" />
             {filters.map(({ key, label }) => (
               <button
                 key={key}
@@ -139,7 +142,7 @@ export function BaseDetailView() {
               >
                 {label}
                 <span>
-                  {key === "all" ? documents.documents.length : documents.documents.filter((document) => matches(document, key)).length}
+                  {counts[key]}
                 </span>
               </button>
             ))}
@@ -172,6 +175,7 @@ export function BaseDetailView() {
             />
           ) : (
             <EmptyState
+              illustration={!documents.documents.length ? "documents" : false}
               icon={<FileText size={20} strokeWidth={1.5} />}
               title={documents.documents.length ? "这个筛选下没有资料" : "还没有资料"}
               description={documents.documents.length
@@ -188,8 +192,9 @@ export function BaseDetailView() {
               加载更多资料
             </button>
           )}
+          <p className={styles.detailFootnote}>资料仅自己可见 · 只有已就绪的资料会参与检索与问答</p>
         </>
       )}
-    </motion.div>
+    </div>
   );
 }
