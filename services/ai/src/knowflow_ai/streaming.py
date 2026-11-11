@@ -366,7 +366,7 @@ async def answer_events(service, request):
                          request["request_id"], round((time.monotonic() - retrieval_started) * 1000),
                          len(evidence))
             if evidence:
-                model = service._llm_factory()
+                model = service._generation_model(request, evidence, deadline)
                 generation_started = time.monotonic()
                 parser = IncrementalAnswerParser()
                 try:

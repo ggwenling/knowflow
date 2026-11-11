@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.knowflow.api.error.ApiError;
+import com.knowflow.api.error.ApiFailure;
 import com.knowflow.api.security.RequestIdFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -25,14 +26,18 @@ public final class AiAnswerClient {
     }
 
     public AiAnswerResponse answer(TrustedAnswerRequest request, Duration remainingBudget) {
+        return answer(request, remainingBudget, null);
+    }
+
+    AiAnswerResponse answer(TrustedAnswerRequest request, Duration remainingBudget, LlmModelService.Connection model) {
         if (remainingBudget == null || remainingBudget.isZero() || remainingBudget.isNegative()) {
             throw new IllegalStateException("Question budget exhausted",
                     new java.util.concurrent.TimeoutException());
         }
         AiAnswerResponse response = client.post()
-                .uri("/internal/v1/answers")
+                .uri(model == null ? "/internal/v1/answers" : "/internal/v1/custom-answers")
                 .header(RequestIdFilter.HEADER, request.requestId())
-                .bodyValue(request)
+                .bodyValue(model == null ? request : new CustomAnswer(request, model))
                 .exchangeToMono(result -> {
                     if (!result.statusCode().is2xxSuccessful()) {
                         return result.createException().flatMap(Mono::error);
@@ -49,6 +54,11 @@ public final class AiAnswerClient {
     }
 
     public Flux<AiAnswerStreamEvent> stream(TrustedAnswerRequest request, Duration remainingBudget) {
+        return stream(request, remainingBudget, null);
+    }
+
+    Flux<AiAnswerStreamEvent> stream(TrustedAnswerRequest request, Duration remainingBudget,
+                                    LlmModelService.Connection model) {
         if (remainingBudget == null || remainingBudget.isZero() || remainingBudget.isNegative()) {
             return Flux.error(new IllegalStateException("Question budget exhausted",
                     new java.util.concurrent.TimeoutException()));
@@ -56,10 +66,10 @@ public final class AiAnswerClient {
         return Flux.defer(() -> {
             AtomicReference<StreamState> state = new AtomicReference<>(new StreamState(0, "START"));
             return client.post()
-                .uri("/internal/v1/answers/stream")
+                .uri(model == null ? "/internal/v1/answers/stream" : "/internal/v1/custom-answers/stream")
                 .header(RequestIdFilter.HEADER, request.requestId())
                 .accept(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
-                .bodyValue(request)
+                .bodyValue(model == null ? request : new CustomAnswer(request, model))
                 .retrieve()
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {})
                 .timeout(remainingBudget)
@@ -79,6 +89,22 @@ public final class AiAnswerClient {
                         : Flux.error(new IllegalStateException("AI stream ended without a terminal event"))));
         });
     }
+
+    boolean probeModel(LlmModelService.Connection model) {
+        ModelProbe response = client.post().uri("/internal/v1/llm-models/probe").bodyValue(model)
+                .exchangeToMono(result -> result.statusCode().is2xxSuccessful()
+                        ? result.bodyToMono(ModelProbe.class) : Mono.empty())
+                .timeout(Duration.ofSeconds(12))
+                .onErrorResume(failure -> Mono.empty()).block();
+        if (response == null) {
+            throw new ApiFailure(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "LLM_MODEL_PROBE_FAILED",
+                    "The configured model could not complete a connection test.");
+        }
+        return response.supportsTools();
+    }
+
+    private record CustomAnswer(TrustedAnswerRequest request, LlmModelService.Connection model) {}
+    private record ModelProbe(boolean supportsTools) {}
 
     private AiAnswerStreamEvent decodeStreamEvent(String data) {
         if (data == null) {

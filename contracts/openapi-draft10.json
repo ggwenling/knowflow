@@ -11,6 +11,51 @@
     }
   ],
   "paths": {
+    "/api/v1/llm-models": {
+      "get": {
+        "summary": "列出当前账号的自定义模型",
+        "responses": {
+          "200": {
+            "description": "自定义模型开关和当前账号的配置",
+            "content": {"application/json": {"schema": {
+              "type": "object", "required": ["enabled", "models"], "properties": {
+                "enabled": {"type": "boolean"}, "models": {"type": "array", "items": {"$ref": "#/components/schemas/LlmModel"}}
+              }
+            }}}
+          },
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      },
+      "post": {
+        "summary": "测试并添加自定义模型",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "allOf": [{"$ref": "#/components/schemas/LlmModelInput"}, {"required": ["api_key"]}]
+        }}}},
+        "responses": {
+          "201": {"description": "已保存", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModel"}}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/v1/llm-models/{id}": {
+      "put": {
+        "summary": "测试并更新自定义模型",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModelInput"}}}},
+        "responses": {
+          "200": {"description": "已更新", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModel"}}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      },
+      "delete": {
+        "summary": "删除当前账号的自定义模型",
+        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+        "responses": {
+          "204": {"description": "已删除"},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
     "/api/v1/auth/register": {
       "post": {
         "summary": "注册",
@@ -777,7 +822,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "./schemas/protocol.schema.json#/$defs/PublicQuestion"
+                "$ref": "#/components/schemas/PublicQuestionWithModel"
               }
             }
           }
@@ -829,7 +874,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "./schemas/protocol.schema.json#/$defs/PublicQuestion"
+                "$ref": "#/components/schemas/PublicQuestionWithModel"
               }
             }
           }
@@ -1323,6 +1368,44 @@
         ]
       }
     },
+    "/internal/v1/llm-models/probe": {
+      "post": {
+        "summary": "验证自定义模型的文本和工具能力",
+        "security": [{"internalBearer": []}],
+        "servers": [{"url": "http://localhost:8000"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmConnection"}}}},
+        "responses": {
+          "200": {"description": "通过测试", "content": {"application/json": {"schema": {
+            "type": "object", "required": ["supports_tools"], "properties": {"supports_tools": {"type": "boolean"}}
+          }}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/internal/v1/custom-answers": {
+      "post": {
+        "summary": "在可信知识库快照内使用自定义模型问答",
+        "security": [{"internalBearer": []}],
+        "servers": [{"url": "http://localhost:8000"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomAnswerRequest"}}}},
+        "responses": {
+          "200": {"description": "已校验回答", "content": {"application/json": {"schema": {"$ref": "./schemas/protocol.schema.json#/$defs/AnswerResponse"}}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/internal/v1/custom-answers/stream": {
+      "post": {
+        "summary": "在可信知识库快照内使用自定义模型流式问答",
+        "security": [{"internalBearer": []}],
+        "servers": [{"url": "http://localhost:8000"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomAnswerRequest"}}}},
+        "responses": {
+          "200": {"description": "SSE，data 字段沿用 AnswerStreamEvent。", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
     "/internal/v1/answers": {
       "post": {
         "summary": "可信快照问答",
@@ -1456,6 +1539,45 @@
       }
     },
     "schemas": {
+      "PublicQuestionWithModel": {
+        "type": "object", "required": ["question"], "additionalProperties": false,
+        "properties": {
+          "question": {"type": "string", "minLength": 1, "maxLength": 16000},
+          "llm_model_id": {"type": ["string", "null"], "format": "uuid", "description": "省略时使用内置模型。"}
+        }
+      },
+      "LlmModelInput": {
+        "type": "object", "required": ["base_url", "protocol", "model_id"], "additionalProperties": false,
+        "properties": {
+          "base_url": {"type": "string", "format": "uri", "maxLength": 1024},
+          "protocol": {"enum": ["chat_completions", "responses", "anthropic_messages"]},
+          "model_id": {"type": "string", "minLength": 1, "maxLength": 160},
+          "api_key": {"type": "string", "maxLength": 2048, "writeOnly": true, "description": "编辑时留空且地址与协议相同可沿用原密钥。"}
+        }
+      },
+      "LlmModel": {
+        "type": "object", "required": ["id", "base_url", "protocol", "model_id", "supports_tools"],
+        "properties": {
+          "id": {"type": "string", "format": "uuid"},
+          "base_url": {"type": "string", "format": "uri"},
+          "protocol": {"enum": ["chat_completions", "responses", "anthropic_messages"]},
+          "model_id": {"type": "string"},
+          "supports_tools": {"type": "boolean"}
+        }
+      },
+      "LlmConnection": {
+        "allOf": [
+          {"$ref": "#/components/schemas/LlmModel"},
+          {"type": "object", "required": ["api_key"], "properties": {"api_key": {"type": "string", "writeOnly": true}}}
+        ]
+      },
+      "CustomAnswerRequest": {
+        "type": "object", "additionalProperties": false, "required": ["request", "model"],
+        "properties": {
+          "request": {"$ref": "./schemas/protocol.schema.json#/$defs/TrustedAnswerRequest"},
+          "model": {"$ref": "#/components/schemas/LlmConnection"}
+        }
+      },
       "ProviderReadiness": {
         "type": "object",
         "additionalProperties": false,

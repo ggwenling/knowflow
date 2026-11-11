@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp, Square } from "lucide-react";
 import { useDocumentsContext, useKnowledgeContext, useStreamControls } from "@/components/workspace/workspace-provider";
+import { ModelSelect, useLlmModels } from "@/components/workspace/llm-models";
 import { useDraft } from "@/components/store";
 import styles from "./chat.module.css";
 
@@ -13,8 +14,9 @@ function fitQuestion(input: HTMLTextAreaElement | null) {
   input.style.height = `${Math.min(input.scrollHeight, max)}px`;
 }
 
-export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
+export function Composer({ onAsk }: { onAsk: (question: string, modelId: string) => void }) {
   const { draft, setDraft } = useDraft();
+  const { selected } = useLlmModels();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     fitQuestion(inputRef.current);
@@ -46,7 +48,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.trim() || !ready || stream.busy) return;
-    onAsk(draft);
+    onAsk(draft, selected);
   }
 
   function keyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -73,6 +75,7 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
         rows={1}
       />
       <div className={styles.composerFoot}>
+        <ModelSelect className={styles.modelSelect} disabled={stream.busy} />
         <span className={styles.composerHint}>
           {ready ? <><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 换行</> : "至少需要一份已就绪的资料"}
         </span>

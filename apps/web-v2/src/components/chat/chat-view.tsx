@@ -114,11 +114,11 @@ export function ChatView() {
     });
   }, [questionId, selectBase, loadAnswer]);
 
-  function ask(question: string) {
+  function ask(question: string, modelId: string) {
     if (!knowledge.selectedBase) return;
     if (questionId) router.replace("/conversations");
     clearDraft();
-    void stream.ask(question, knowledge.selectedBase);
+    void stream.ask(question, knowledge.selectedBase, modelId);
   }
 
   function newChat() {

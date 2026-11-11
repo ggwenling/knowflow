@@ -107,4 +107,4 @@ async function proxy(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-export { proxy as GET, proxy as POST, proxy as DELETE };
+export { proxy as GET, proxy as POST, proxy as PUT, proxy as DELETE };

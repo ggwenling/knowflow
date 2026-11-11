@@ -5,7 +5,12 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi==0.162.0",
     "httpx==0.28.1",
+    "httpx2>=2.5.0",
     "jsonschema==4.26.0",
+    "langchain>=1.4.10",
+    "langchain-anthropic>=1.7.10",
+    "langchain-deepseek>=1.1.1",
+    "langchain-openai>=1.7.4",
     "psycopg[binary]==3.3.6",
     "pydantic==2.14.2",
     "pypdf==6.21.4",

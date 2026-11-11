@@ -67,7 +67,7 @@ if (-not $AllowDirty) {
 $prefix = "$Registry/$Repository"
 $components = @(
     [pscustomobject]@{ Name = "api"; Context = "services/api"; Dockerfile = "Dockerfile" },
-    [pscustomobject]@{ Name = "web"; Context = "apps/web"; Dockerfile = "Dockerfile" },
+    [pscustomobject]@{ Name = "web"; Context = "apps/web-v2"; Dockerfile = "Dockerfile" },
     [pscustomobject]@{ Name = "ai"; Context = "."; Dockerfile = "services/ai/Dockerfile" }
 )
 

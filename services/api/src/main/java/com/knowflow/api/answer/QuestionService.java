@@ -45,14 +45,22 @@ public class QuestionService {
     private final AiAnswerClient client;
     private final QuestionProperties properties;
     private final Semaphore questionPermits;
+    private final LlmModelService models;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                           AiAnswerClient client, QuestionProperties properties) {
+                           AiAnswerClient client, QuestionProperties properties, LlmModelService models) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.client = client;
         this.properties = properties;
+        this.models = models;
         this.questionPermits = new Semaphore(properties.getMaxConcurrentRequests());
+    }
+
+    QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions, AiAnswerClient client,
+                    QuestionProperties properties) {
+        this(jdbc, transactions, client, properties, null);
     }
 
     public AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input) {
@@ -100,7 +108,7 @@ public class QuestionService {
                 QuestionSnapshot snapshot;
                 try {
                     snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                            requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey));
+                            requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey), input.llmModelId());
                 } catch (ApiFailure failure) {
                     if ("QUESTION_REQUEST_CONFLICT".equals(failure.code())) {
                         return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
@@ -116,8 +124,10 @@ public class QuestionService {
                         .map(index -> new TrustedAnswerRequest.IndexScope(index.documentId(),
                                 index.contentVersionId(), index.indexVersionId())).toList()));
                 StreamState state = new StreamState(requestId, snapshot, requestStartedAt, cancellation);
-                Flux<PublicAnswerStreamEvent> upstream = client.stream(request,
-                                remainingBudget(requestStartedAt))
+                Duration remaining = remainingBudget(requestStartedAt);
+                Flux<AiAnswerStreamEvent> events = snapshot.model() == null ? client.stream(request, remaining)
+                        : client.stream(request, remaining, snapshot.model());
+                Flux<PublicAnswerStreamEvent> upstream = events
                         .publishOn(Schedulers.boundedElastic())
                         .concatMap(event -> state.handle(event, user, request));
                 return Flux.concat(Mono.fromCallable(() -> {
@@ -165,7 +175,7 @@ public class QuestionService {
         QuestionSnapshot snapshot;
         try {
             snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                    requestStartedAt, cancellation, idempotencyKey);
+                    requestStartedAt, cancellation, idempotencyKey, input.llmModelId());
         } catch (RuntimeException failure) {
             if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT
                     || isTimeout(failure)) {
@@ -197,7 +207,9 @@ public class QuestionService {
             if (cancellation.reason() != null) {
                 throw new CancellationException("Question request was cancelled");
             }
-            response = client.answer(request, remainingBudget(requestStartedAt));
+            Duration remaining = remainingBudget(requestStartedAt);
+            response = snapshot.model() == null ? client.answer(request, remaining)
+                    : client.answer(request, remaining, snapshot.model());
             LOGGER.info("question_stage request_id={} stage=ai_answer duration_ms={} outcome=success",
                     requestId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - aiStartedAt));
             validateAnswer(response);
@@ -273,7 +285,7 @@ public class QuestionService {
                                             String question, String requestId,
                                             long requestStartedAt,
                                             QuestionCancellation cancellation,
-                                            UUID idempotencyKey) {
+                                            UUID idempotencyKey, UUID modelId) {
         QuestionSnapshot snapshot = transactions.execute(status -> {
             registerDeadlineCheck(requestStartedAt, cancellation);
             setStatementTimeout(requestStartedAt, cancellation);
@@ -340,6 +352,11 @@ public class QuestionService {
             if (inserted.isEmpty()) {
                 throw ApiFailure.questionRequestConflict();
             }
+            LlmModelService.Connection model = null;
+            if (modelId != null) {
+                model = models.resolve(user.id(), modelId);
+                jdbc.update("UPDATE knowflow.questions SET selected_llm_model_id=? WHERE id=?", modelId, questionId);
+            }
             for (IndexRef index : indexes) {
                 setStatementTimeout(requestStartedAt, cancellation);
                 jdbc.update("""
@@ -351,7 +368,7 @@ public class QuestionService {
                         index.contentVersionId(), index.indexVersionId());
             }
             return new QuestionSnapshot(questionId, snapshotId, user.id(), knowledgeBaseId,
-                    List.copyOf(indexes));
+                    List.copyOf(indexes), model);
         });
         if (snapshot == null) {
             throw new IllegalStateException("Question snapshot transaction returned no result");
@@ -686,7 +703,7 @@ public class QuestionService {
 
     private record IndexRef(UUID documentId, UUID contentVersionId, UUID indexVersionId) {}
     private record QuestionSnapshot(UUID questionId, UUID snapshotId, UUID ownerId,
-                                    UUID knowledgeBaseId, List<IndexRef> indexes) {}
+                                    UUID knowledgeBaseId, List<IndexRef> indexes, LlmModelService.Connection model) {}
     private record StoredChunk(String text, AiAnswerResponse.Locator locator) {}
 
     private final class StreamState {

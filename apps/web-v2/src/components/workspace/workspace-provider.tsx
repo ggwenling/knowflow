@@ -11,6 +11,7 @@ import { useQuestionStream } from "@/hooks/use-question-stream";
 import { actions, useWorkspaceDispatch } from "@/components/store";
 import { Button } from "@/components/ui/button";
 import { PageFallback } from "@/components/ui/page-fallback";
+import { LlmModelsProvider } from "./llm-models";
 import styles from "./workspace.module.css";
 
 const SessionContext = createContext<ReturnType<typeof useSession> | null>(null);
@@ -93,7 +94,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         <DocumentsContext.Provider value={documents}>
           <QuestionsContext.Provider value={questions}>
             <StreamControlsContext.Provider value={stream.controls}>
-              <StreamContext.Provider value={stream}>{children}</StreamContext.Provider>
+              <StreamContext.Provider value={stream}>
+                <LlmModelsProvider key={userId}>{children}</LlmModelsProvider>
+              </StreamContext.Provider>
             </StreamControlsContext.Provider>
           </QuestionsContext.Provider>
         </DocumentsContext.Provider>

@@ -75,7 +75,9 @@ class PostgreSqlMigrationIntegrationTest {
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
+            assertThat(queryLong("SELECT count(*) FROM knowflow.questions WHERE selected_llm_model_id IS NULL"))
+                    .isEqualTo(1L);
             assertThat(queryLong("""
                     SELECT count(*) FROM information_schema.columns
                      WHERE table_schema = 'knowflow' AND table_name = 'questions'
@@ -227,7 +229,7 @@ class PostgreSqlMigrationIntegrationTest {
             insertQuestionSource(app, "00000000-0000-0000-0000-000000000501",
                     null, null, null, null, "retained quote with missing locator");
 
-            Flyway flyway = migrationFlyway(null);
+            Flyway flyway = migrationFlyway("8");
             assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class);
             assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
             assertThat(queryLong(app, """

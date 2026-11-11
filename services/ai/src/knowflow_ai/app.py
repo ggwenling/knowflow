@@ -3,11 +3,13 @@ import asyncio
 from contextlib import aclosing, asynccontextmanager
 import hmac
 import json
+import os
 import re
 import uuid
 from typing import Any
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ConfigDict
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, StreamingResponse
 from .config import ConfigurationError, Settings
@@ -15,6 +17,7 @@ from .protocol import CONTRACT_VERSION, ContractConsumer, ErrorBody, InvalidMess
 from .adapters import ProcessingError
 from .answering import AnswerService, LlmSettings
 from .embedding import EmbeddingSettings
+from .langchain_answer import CustomModel, LangChainAnswerModel
 from .java_client import JavaGateway
 from .provider_probe import ProviderReadiness
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
@@ -137,7 +140,8 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     settings = settings or Settings.from_environment()
     contract = ContractConsumer(settings.contract_path)
     worker_factory = worker_factory if worker_factory is not None else IndexWorker
-    answer_service_factory = answer_service_factory if answer_service_factory is not None else AnswerService
+    use_langchain = answer_service_factory is None
+    answer_service_factory = answer_service_factory or AnswerService
 
     @asynccontextmanager
     async def lifespan(app):
@@ -233,19 +237,28 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
         await request.app.state.index_worker.cancel(payload)
         return Response(status_code=204)
 
-    @app.post('/internal/v1/answers')
-    async def answer(request: Request, payload: dict[str, Any]):
+    def build_answer(request, payload, custom=None):
         contract.validate('TrustedAnswerRequest', payload)
         if payload['request_id'] != request.state.request_id:
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
         if not settings.ai_database_url:
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
         embedding_settings = EmbeddingSettings.from_environment()
-        llm_settings = LlmSettings.from_environment()
-        service = answer_service_factory(settings.ai_database_url, contract,
-                                         embedding_settings=embedding_settings,
-                                         model_profile={"embedding_model_profile_id": embedding_settings.model,
-                                                        "llm_model_profile_id": llm_settings.model})
+        llm_settings = custom if custom is not None else LlmSettings.from_environment()
+        options = {"embedding_settings": embedding_settings, "model_profile": {
+            "embedding_model_profile_id": embedding_settings.model,
+            "llm_model_profile_id": f"custom:{custom.id}" if custom is not None else llm_settings.model,
+        }}
+        if use_langchain or custom is not None:
+            options['llm_factory'] = lambda: LangChainAnswerModel(llm_settings)
+        return answer_service_factory(settings.ai_database_url, contract, **options)
+
+    def require_custom():
+        if os.environ.get('KNOWFLOW_CUSTOM_LLM_ENABLED', '').lower() != 'true':
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=False)
+
+    async def execute_answer(request, payload, custom=None):
+        service = build_answer(request, payload, custom)
         admission = request.app.state.question_admission
         if not admission.try_acquire():
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
@@ -254,20 +267,8 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
         finally:
             admission.release()
 
-    @app.post('/internal/v1/answers/stream')
-    async def stream_answer(request: Request, payload: dict[str, Any]):
-        contract.validate('TrustedAnswerRequest', payload)
-        if payload['request_id'] != request.state.request_id:
-            raise ProcessingError('INVALID_REQUEST', 400, retryable=False)
-        if not settings.ai_database_url:
-            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
-        embedding_settings = EmbeddingSettings.from_environment()
-        llm_settings = LlmSettings.from_environment()
-        service = answer_service_factory(settings.ai_database_url, contract,
-                                         embedding_settings=embedding_settings,
-                                         model_profile={"embedding_model_profile_id": embedding_settings.model,
-                                                        "llm_model_profile_id": llm_settings.model})
-
+    async def execute_stream(request, payload, custom=None):
+        service = build_answer(request, payload, custom)
         admission = request.app.state.question_admission
         if not admission.try_acquire():
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
@@ -281,5 +282,50 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
         return ClosingStreamingResponse(frames(), media_type='text/event-stream',
                                         on_close=admission.release,
                                         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+    @app.post('/internal/v1/answers')
+    async def answer(request: Request, payload: dict[str, Any]):
+        return await execute_answer(request, payload)
+
+    @app.post('/internal/v1/answers/stream')
+    async def stream_answer(request: Request, payload: dict[str, Any]):
+        return await execute_stream(request, payload)
+
+    class CustomAnswer(BaseModel):
+        model_config = ConfigDict(extra='forbid')
+        request: dict[str, Any]
+        model: CustomModel
+
+    @app.post('/internal/v1/custom-answers')
+    async def custom_answer(request: Request, payload: CustomAnswer):
+        require_custom()
+        return await execute_answer(request, payload.request, payload.model)
+
+    @app.post('/internal/v1/custom-answers/stream')
+    async def custom_stream(request: Request, payload: CustomAnswer):
+        require_custom()
+        return await execute_stream(request, payload.request, payload.model)
+
+    @app.post('/internal/v1/llm-models/probe')
+    async def probe_model(request: Request, payload: CustomModel):
+        require_custom()
+        admission = request.app.state.question_admission
+        if not admission.try_acquire():
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+
+        async def probe():
+            model = LangChainAnswerModel(payload, probe=True)
+            try:
+                async with asyncio.timeout(10):
+                    return {'supports_tools': await model.probe_capabilities()}
+            except TimeoutError:
+                raise ProcessingError('PROCESSING_TIMEOUT', 504) from None
+            finally:
+                await model.aclose()
+
+        try:
+            return await await_answer_or_disconnect(request, probe)
+        finally:
+            admission.release()
 
     return app

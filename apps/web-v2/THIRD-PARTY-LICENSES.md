@@ -2,9 +2,11 @@
 
 - 生成时间：2026-11-08T06:42:04.759Z
 - 作用域：`npm ls --omit=dev --all` 解析到的运行时依赖闭包（不含 devDependencies）
-- 条目：221；许可证未知：0
+- npm 条目：221；许可证未知：0
 - 性质：发行证据清单，不构成法律意见。许可证原文仍需在发行前随镜像分发。
 - 说明：根 `THIRD-PARTY-LICENSES.md` 仍只覆盖 `apps/web`；合并前需扩展 `scripts/audit-dependencies.py` 的 Node 作用域。
+
+随应用分发的非 npm 字体为阿里巴巴普惠体 3.0 55 Regular。项目使用[阿里巴巴官方下载的 WOFF2](https://www.alibabafonts.com/)，保留原始文件。适用[官方字体法律声明](https://www.yuque.com/yiguang-wkqc2/hgpff0/nus9wiinq4aeiegy)。
 
 | 包 | 版本 | 许可证 | 仓库 |
 |---|---|---|---|

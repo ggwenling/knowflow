@@ -39,7 +39,7 @@ def _validated_environment_proxy() -> httpx.URL | None:
 
 def build_async_client(timeout, *, follow_redirects: bool = False,
                        trust_env: bool = True,
-                       environment_proxy_fallback: bool = False) -> httpx.AsyncClient:
+                       environment_proxy_fallback: bool = False, **options) -> httpx.AsyncClient:
     """Build an adapter-owned client, tolerating a malformed proxy environment.
 
     ``environment_proxy_fallback`` keeps an outbound provider reachable through
@@ -50,7 +50,7 @@ def build_async_client(timeout, *, follow_redirects: bool = False,
         try:
             return httpx.AsyncClient(timeout=timeout,
                                      follow_redirects=follow_redirects,
-                                     trust_env=True)
+                                     trust_env=True, **options)
         except httpx.InvalidURL:
             _logger.warning("http_client_proxy_environment_ignored")
         except ImportError:
@@ -59,4 +59,4 @@ def build_async_client(timeout, *, follow_redirects: bool = False,
             _logger.warning("http_client_socks_transport_unavailable")
     proxy = _validated_environment_proxy() if environment_proxy_fallback else None
     return httpx.AsyncClient(timeout=timeout, follow_redirects=follow_redirects,
-                             trust_env=False, proxy=proxy)
+                             trust_env=False, proxy=proxy, **options)

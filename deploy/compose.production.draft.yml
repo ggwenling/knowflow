@@ -134,6 +134,8 @@ services:
       # 供应商密钥通过 KEY_ENV 间接注入，下面两个键名必须与 KEY_ENV 的值一致
       KNOWFLOW_EMBEDDING_API_KEY: ${KNOWFLOW_EMBEDDING_API_KEY:?set KNOWFLOW_EMBEDDING_API_KEY}
       KNOWFLOW_LLM_API_KEY: ${KNOWFLOW_LLM_API_KEY:?set KNOWFLOW_LLM_API_KEY}
+      KNOWFLOW_CUSTOM_LLM_ENABLED: ${KNOWFLOW_CUSTOM_LLM_ENABLED:-false}
+      KNOWFLOW_CUSTOM_LLM_PROXY: http://model-egress:3129
       # Provider 预算门禁（fail-closed）：三件套任一缺失/不可读/策略过期，
       # 每次真实 provider 调用都会被拒绝（BUDGET_CONFIGURATION_REQUIRED）。
       # 账本落独立命名卷；价格与策略文件从宿主目录只读挂载，禁止提交进仓库。
@@ -172,7 +174,21 @@ services:
         read_only: true
     # ai 只接入 internal 知识网络与 egress-proxy 的前置 internal 网络，没有直连外网。
     # 额外接入 edge-ai（internal）仅供 edge 转发 /health/ready。
-    networks: [knowflow, egress-internal, edge-ai]
+    networks: [knowflow, egress-internal, edge-ai, model-internal]
+
+  model-egress:
+    profiles: [custom-llm]
+    image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/ai:${KNOWFLOW_RELEASE:-local}
+    command: ["python", "-m", "knowflow_ai.model_egress"]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    environment:
+      KNOWFLOW_CUSTOM_LLM_DENY_CIDRS: ${KNOWFLOW_CUSTOM_LLM_DENY_CIDRS:-}
+    logging: *default-logging
+    networks: [model-internal, model-public-egress]
 
   # 一次性修正预算账本卷属主；ai 以 10001 运行，卷默认属主是 root。
   budget-init:
@@ -202,6 +218,8 @@ services:
       KNOWFLOW_STORAGE_ACCESS_KEY: ${KNOWFLOW_STORAGE_ACCESS_KEY:?set KNOWFLOW_STORAGE_ACCESS_KEY}
       KNOWFLOW_STORAGE_SECRET_KEY: ${KNOWFLOW_STORAGE_SECRET_KEY:?set KNOWFLOW_STORAGE_SECRET_KEY}
       KNOWFLOW_AI_BASE_URL: http://ai:8000
+      KNOWFLOW_CUSTOM_LLM_ENABLED: ${KNOWFLOW_CUSTOM_LLM_ENABLED:-false}
+      KNOWFLOW_CUSTOM_LLM_ENCRYPTION_KEY: ${KNOWFLOW_CUSTOM_LLM_ENCRYPTION_KEY:-}
       KNOWFLOW_INTERNAL_SHARED_SECRET: ${KNOWFLOW_INTERNAL_SHARED_SECRET:?set KNOWFLOW_INTERNAL_SHARED_SECRET}
       KNOWFLOW_QUESTION_MAX_CONCURRENT: ${KNOWFLOW_QUESTION_MAX_CONCURRENT:-4}
       KNOWFLOW_INDEXING_SCHEDULER_ENABLED: "true"
@@ -225,7 +243,7 @@ services:
 
   web:
     build:
-      context: ../apps/web
+      context: ../apps/web-v2
       dockerfile: Dockerfile
     image: ${KNOWFLOW_IMAGE_REPOSITORY:-knowflow}/web:${KNOWFLOW_RELEASE:-local}
     restart: unless-stopped
@@ -288,3 +306,6 @@ networks:
     internal: true
   # 唯一有外网出口的网络，只接 egress-proxy；白名单在代理配置中强制执行。
   provider-egress:
+  model-internal:
+    internal: true
+  model-public-egress:

@@ -54,7 +54,7 @@ export function useQuestionStream(onSettled: () => void) {
     if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
   }, []);
 
-  const ask = useCallback(async (question: string, knowledgeBaseId: string) => {
+  const ask = useCallback(async (question: string, knowledgeBaseId: string, modelId?: string) => {
     const text = question.trim();
     if (!text || !knowledgeBaseId) return false;
     const viewId = ++view.current;
@@ -83,7 +83,7 @@ export function useQuestionStream(onSettled: () => void) {
         method: "POST",
         signal: abort.signal,
         headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
-        body: JSON.stringify({ question: text }),
+        body: JSON.stringify({ question: text, ...(modelId ? { llm_model_id: modelId } : {}) }),
       });
       if (!isCurrent()) return false;
       if (response.ok) preloadMarkdown();
@@ -116,14 +116,15 @@ export function useQuestionStream(onSettled: () => void) {
       if (!isCurrent()) return false;
       flush();
       const cancelled = abort.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError");
+      const failure = modelId ? `所选模型未能完成问答。可检查模型配置或切换到默认模型。${messageOf(reason)}` : messageOf(reason);
       setAnswer((old) => (old ? {
         ...old,
         status: cancelled ? "CANCELLED" : "FAILED",
-        failure_code: cancelled ? "用户停止生成" : messageOf(reason),
+        failure_code: cancelled ? "用户停止生成" : failure,
         has_answer: null,
         sources: [],
       } : old));
-      if (!cancelled) setNotice(messageOf(reason));
+      if (!cancelled) setNotice(failure);
       reportPerformance("question_duration_ms", performance.now() - startedAt, "ms", cancelled ? "cancelled" : "failed");
       settled.current();
       return false;
