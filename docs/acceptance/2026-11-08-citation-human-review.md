@@ -1,81 +1,72 @@
-# 答案支持度与引用真人审阅（2026-11-08）
+# 公开评测答案与引用独立人审
 
-状态：**工作表已生成；真人逐条审阅与签字待负责人完成**。现有 `review.json` 的 `reviewed_by` 仍为 agent，不能当作人工签收。
+正式验收采用独立人工签核。此流程适用于冻结候选的公开 `development` 和 `holdout`，由独立审阅人完成两卷，再由负责人依据评分和审计材料签核。真实采集须先满足 T03 前置条件。 [交付首日记录](../planning/2026-11-09-delivery-day-1.md)
 
-## 1. 审阅对象
+## 1. 准备工作表
 
-| 分卷 | 答案数 | answered | refused | 引用数 | 工作表行数 |
-|---|---:|---:|---:|---:|---:|
-| development（`9907aca`） | 40 | 31 | 9 | 47 | 56 |
-| holdout（`9907aca`） | 20 | 18 | 2 | 28 | 30 |
-
-来源：
-
-- `eval-out/seed-v2-dev-9907aca/review.json`
-- `eval-out/seed-v2-holdout-9907aca/review.json`
-
-这些是公开合成集结果，不是私有盲测。不要用本工作表替代私有盲测。
-
-## 2. 生成工作表
+在冻结候选的检出目录运行。将示例运行 ID 改为本次 ID，并将公开采集产物放在对应目录。每卷需有 v2 原始 review 和生成该 review 的 predictions。
 
 ```powershell
-python scripts/prepare-citation-review.py
+$candidate = git rev-parse --verify HEAD
+$runId = "candidate-public-01"
+$public = "eval-out/$runId/public"
+$out = "eval-out/$runId/citation-review"
+$prepared = python scripts/prepare-citation-review.py --manual --out $out --run-id $runId --candidate-sha $candidate `
+  --development "$public/development.review.json" --development-predictions "$public/development.predictions.json" `
+  --holdout "$public/holdout.review.json" --holdout-predictions "$public/holdout.predictions.json"
+if ($LASTEXITCODE -ne 0) { throw "人审工作表准备失败" }
+$manifestSha = ($prepared | ConvertFrom-Json).manifest_sha256
+$prepared
 ```
 
-输出（不纳入版本库）：
+每卷的预测必须声明相同的冻结候选 SHA，review 中的预测哈希必须与对应预测文件一致。输出包含 `development.csv`、`holdout.csv` 和 `manifest.json`，行数按本次产物计算。准备人将候选 SHA、运行 ID 和命令输出的 `manifest_sha256` 单独交给负责人留存。后续校验使用这份记录。
 
-- `eval-out/citation-review-20261108/development.csv`
-- `eval-out/citation-review-20261108/holdout.csv`
-- `eval-out/citation-review-20261108/summary.json`
+## 2. 填写工作表
 
-## 3. CSV 字段与填写规则
+只编辑 UTF-8 CSV 的这五列，保留其余列、表头和行序。
 
-| 字段 | 说明 |
+| 字段 | 填写规则 |
 |---|---|
-| `answer` / `answer_sha256` | 待审答案与其哈希；审阅期间不得改动 |
-| `agent_support` | 机器判断，仅供对照，不作为人工结论 |
-| `claim` / `source_text` | 引用声明与对应原文片段 |
-| `human_support` | `supported` / `not_supported` / `uncertain`；refused 行填 `refusal_correct` / `refusal_incorrect` |
-| `human_citation` | `correct` / `incorrect` / `uncertain`；refused 行留空 |
-| `human_notes` | 判定理由；不可只写“ok” |
-| `reviewer` | 真实审阅者标识（不得使用 agent 前缀） |
-| `reviewed_at` | 带时区的 ISO 时间，例如 `2026-11-08T15:00:00+08:00` |
+| `review_support` | 回答填 `supported` 或 `not_supported`。拒答填 `refusal_correct` 或 `refusal_incorrect`。 |
+| `review_citation` | 逐条判断该行的 `claim` 是否由 `source_text` 支持，填 `correct` 或 `incorrect`。拒答留空。 |
+| `review_notes` | 每行记录判定依据，去除首尾空白后至少 10 个字符。 |
+| `reviewer` | 真实独立审阅者标识，禁止使用 `agent:` 前缀。 |
+| `reviewed_at` | 带时区的 ISO 时间，例如 `2026-11-09T15:00:00+08:00`，不得晚于校验时间。 |
 
-规则：
+同一问题的所有引用行使用同一答案支持度、审阅者和时间。证据暂不充分时，在备注记录缺项并留待复核。取得最终判断后再导出。保留所有原始预测、review 和语料。
 
-- 每条 answered 引用都要独立判断 claim 是否被 `source_text` 支持；不能只看答案整体。
-- refused 行判断“拒答是否合理”，引用列留空。
-- 不确定时填 `uncertain` 并在 notes 写明缺什么证据。
-- 不得修改 `review.json`、`predictions.json` 或原始材料。
+## 3. 校验、导出和评分
 
-## 4. 校验
+在新会话中，从独立留存的准备记录恢复 `$candidate` 和 `$manifestSha`，按上面的定义设置 `$public` 和 `$out`。校验命令读取原件并复核哈希、冻结候选和只读列。首次校验可省略 `--export`。
 
 ```powershell
-python scripts/validate-citation-review.py
+python scripts/validate-citation-review.py --manual --dir $out --candidate-sha $candidate --manifest-sha256 $manifestSha --export
+if ($LASTEXITCODE -ne 0) { throw "人审工作表未成功导出" }
 ```
 
-校验内容：
+`COMPLETE` 表示工作表完整。导出写入 `development.review.manual.json`、`holdout.review.manual.json` 和 `review-audit.json`，保留既有文件。审计文件记录清单、填好的 CSV 和导出文件的哈希。拒答意见和判定理由保留在 CSV，评分器按题集计算拒答指标。
 
-- 每一行都有 reviewer、reviewed_at、human_support；
-- answered 行都有 human_citation 与 notes；
-- refused 行的引用列必须为空；
-- 取值在允许集合内；
-- 输出覆盖率与计数；不完整时退出码非零。
+用本次公开评测的语料和已批准的门限配置离线重算。下列示例使用与公开预测同目录的 `*.gate.json`。T06 要求公开引用准确率至少 96%，其余指标按交付清单复核。 [交付验收清单](../planning/2026-11-09-delivery-execution-plan.md)
 
-校验通过后，负责人再决定是否生成独立的人工 review JSON 并重跑指标。生成新文件时不得覆盖原 `review.json`。
+```powershell
+$failed = @()
+foreach ($split in "development", "holdout") {
+  python evaluation/runner/runner.py --formal --split $split --dataset evaluation/data/seed-v2-reviewed `
+    --predictions "$public/$split.predictions.json" --quality-config "$public/$split.gate.json" `
+    --review "$out/$split.review.manual.json" --output "$out/$split.score.json"
+  if ($LASTEXITCODE -ne 0) { $failed += $split }
+}
+if ($failed.Count -gt 0) { throw "正式评分未通过 $($failed -join ', ')" }
+```
 
-## 5. 签字
+独立审阅人签核时记录候选 SHA、运行 ID、两卷覆盖率和结论、日期及证据路径。负责人留存准备记录、完整工作表、审计文件及两份评分报告。公开人审是公开质量证据的一部分，私有盲测、预算与三端消费签收继续按各自流程办理。
 
-| 分卷 | 审阅者 | 日期 | 覆盖 | 结论 | 证据路径 |
-|---|---|---|---|---|---|
-| development |  |  | 31 answered / 47 citations / 9 refused |  |  |
-| holdout |  |  | 18 answered / 28 citations / 2 refused |  |  |
+## 4. 离线复现
 
-签字栏为空，直到真实审阅完成。
+```powershell
+python -m unittest scripts.tests.test_manual_citation_review -v
+```
 
-## 6. 不能由本文件替代的事项
+临时目录中的合成夹具覆盖两卷生成、人工字段填写、拒绝缺项和篡改、导出及正式评分器读取。夹具故意给 holdout 留一条错误引用，以验证完整人审仍可产生评分失败。
 
-- 私有盲测（独立题集、独立评分、失败后换集）；
-- PRICE/POLICY 与预算签核；
-- M 线浏览器人工验收；
-- 三端完整消费签收与总体验收。
+2026-11-08 记录属于历史候选 `9907aca`。当时 development 有 40 个答案、47 条引用、56 行工作表，holdout 有 20 个答案、28 条引用、30 行工作表。历史原件及本次人工签核分别留存。

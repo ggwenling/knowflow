@@ -55,4 +55,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        from citation_review import validate_main
+        from quality_common import run_cli
+        raise SystemExit(run_cli(validate_main))
     raise SystemExit(main())

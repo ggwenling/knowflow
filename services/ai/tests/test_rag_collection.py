@@ -579,6 +579,77 @@ def test_budget_reservations_are_serialized_across_independent_connections(tmp_p
     assert sorted(results) == ["BUDGET_SOFT_STOP", "reserved", "reserved"]
 
 
+def test_run_budget_tracks_only_its_reservations_across_connections(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    reserve(budget.BudgetLedger(path), "legacy", tokens=3_307_520)
+    first = budget.BudgetLedger(path, run_id="round-1", run_limit_microyuan=4_000_000)
+    reserve(first, "attempt-1", tokens=3_000_000)
+    reopened = budget.BudgetLedger(path, run_id="round-1", run_limit_microyuan=4_000_000)
+    assert reserve(reopened, "attempt-2", tokens=1_000_000)["total_reserved_microyuan"] == 7_307_520
+    with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+        reserve(reopened, "over-round", tokens=1)
+    with pytest.raises(ValueError, match="BUDGET_RUN_LIMIT_MISMATCH"):
+        budget.BudgetLedger(path, run_id="round-1", run_limit_microyuan=4_000_001)
+
+    next_run = budget.BudgetLedger(path, run_id="round-2", run_limit_microyuan=4_000_000)
+    for request_id in ("legacy", "attempt-1"):
+        with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
+            reserve(next_run, request_id, tokens=1)
+    with pytest.raises(ValueError, match="BUDGET_SOFT_STOP"):
+        reserve(next_run, "over-project", tokens=692_481)
+    assert reserve(next_run, "new-round", tokens=692_480)["total_reserved_microyuan"] == 8_000_000
+
+
+def test_run_stops_are_scoped_and_preserve_older_project_stops(tmp_path):
+    path = tmp_path / "budget.sqlite3"
+    legacy = budget.BudgetLedger(path)
+    with closing(sqlite3.connect(path)) as db, db:
+        db.execute("INSERT INTO budget_stops (request_id, reason, reserved_microyuan, created_at) "
+                   "VALUES ('old-round', 'BUDGET_RUN_EXCEEDED', 0, 'legacy')")
+    first = budget.BudgetLedger(path, run_id="first", run_limit_microyuan=4_000_000)
+    second = budget.BudgetLedger(path, run_id="second", run_limit_microyuan=4_000_000)
+    assert first.stop_reason() is None
+    with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+        reserve(first, "first-over", tokens=4_000_001)
+    assert budget.BudgetLedger(path, run_id="first", run_limit_microyuan=4_000_000).stop_reason() == "BUDGET_RUN_EXCEEDED"
+    assert second.stop_reason() is None
+    assert legacy.stop_reason() is None
+    with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
+        reserve(legacy, "project-over", tokens=10_000_001)
+    with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+        reserve(second, "second-over", tokens=4_000_001)
+    assert first.stop_reason() == second.stop_reason() == legacy.stop_reason() == "BUDGET_EXCEEDED"
+
+
+@pytest.mark.parametrize("cross_run", [False, True])
+def test_run_budget_serializes_reservations_at_the_boundary(tmp_path, cross_run):
+    path = tmp_path / "budget.sqlite3"
+    barrier = Barrier(4)
+
+    def run(index):
+        run_id = "round-2" if cross_run and index == 3 else "round-1"
+        ledger = budget.BudgetLedger(path, run_id=run_id, run_limit_microyuan=4_000_000)
+        barrier.wait(timeout=5)
+        try:
+            reserve(ledger, f"attempt-{index}", tokens=2_000_000)
+            return "reserved"
+        except ValueError as exc:
+            return str(exc)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(run, range(4)))
+    if cross_run:
+        assert sorted(results[:3]) == ["BUDGET_RUN_EXCEEDED", "reserved", "reserved"]
+        assert results[3] == "reserved"
+    else:
+        assert sorted(results) == ["BUDGET_RUN_EXCEEDED"] * 2 + ["reserved"] * 2
+    first = budget.BudgetLedger(path, run_id="round-1", run_limit_microyuan=4_000_000)
+    second = budget.BudgetLedger(path, run_id="round-2", run_limit_microyuan=4_000_000)
+    assert first.stop_reason() == "BUDGET_RUN_EXCEEDED"
+    assert second.stop_reason() is None
+    assert first.summary()["reserved_microyuan"] == (6_000_000 if cross_run else 4_000_000)
+
+
 def test_budget_rejects_unknown_expired_or_wrong_model_prices(tmp_path):
     ledger = budget.BudgetLedger(tmp_path / "budget.sqlite3")
     with pytest.raises(ValueError, match="UNVERIFIED_PRICE"):
@@ -1028,9 +1099,11 @@ async def test_prediction_distinguishes_refusal_from_error_and_requires_trace(tm
             mappings=mappings, error_code="MODEL_TIMEOUT", latency_ms=30)
 
 
-def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_exempt(tmp_path):
+@pytest.mark.parametrize("run_id", [None, "round-1"])
+def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_exempt(tmp_path, run_id):
     path = tmp_path / "zero-budget.sqlite3"
-    ledger = budget.BudgetLedger(path, limit_microyuan=1)
+    run = {"run_id": run_id, "run_limit_microyuan": 1} if run_id else {}
+    ledger = budget.BudgetLedger(path, limit_microyuan=1, **run)
     quote = {"provider": "siliconflow", "model": "BAAI/bge-m3",
              "input_cny_per_million": "0", "output_cny_per_million": "0",
              "source_url": "https://siliconflow.cn/pricing", "verified_by": "reviewer",
@@ -1052,7 +1125,7 @@ def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_
     assert result == {"reserved_microyuan": 0, "total_reserved_microyuan": 0,
                       "remaining_microyuan": 1}
 
-    reopened = budget.BudgetLedger(path, limit_microyuan=1)
+    reopened = budget.BudgetLedger(path, limit_microyuan=1, **run)
     with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
         reopened.reserve("free-embedding", **arguments, allow_zero_price_embedding=True)
     with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
@@ -1068,6 +1141,12 @@ def test_verified_zero_price_embedding_is_persisted_deduplicated_and_not_budget_
     }
     with pytest.raises(ValueError, match="BUDGET_EXCEEDED"):
         reserve(reopened, "over-limit", tokens=1)
+    assert reopened.reserve("another-free-embedding", **arguments,
+                            allow_zero_price_embedding=True)["reserved_microyuan"] == 0
+    if run_id:
+        next_run = budget.BudgetLedger(path, limit_microyuan=1, run_id="round-2", run_limit_microyuan=1)
+        with pytest.raises(ValueError, match="DUPLICATE_REQUEST_ID"):
+            next_run.reserve("free-embedding", **arguments, allow_zero_price_embedding=True)
 
 
 @pytest.mark.asyncio

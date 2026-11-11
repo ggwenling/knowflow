@@ -2,6 +2,7 @@ import importlib.util
 from hashlib import sha256
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 
@@ -250,6 +251,106 @@ async def test_collect_dataset_stops_when_shared_ledger_records_a_budget_stop(tm
                 run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
                               "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
                 fetch_row=lambda *_args, **_kwargs: None, ledger=ledger)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["before_collection", "index", "final_question"])
+async def test_collect_dataset_reports_scoped_run_stop(tmp_path, monkeypatch, stage):
+    dataset = ROOT / "evaluation/data/seed-v1"
+    manifest, *_ = run.scorer._load_dataset(dataset)
+    path = tmp_path / "budget.sqlite3"
+    ledger = BudgetLedger(path, run_id="current", run_limit_microyuan=1)
+    provider = BudgetLedger(path, run_id="current", run_limit_microyuan=1)
+    previous = BudgetLedger(path, run_id="previous", run_limit_microyuan=1)
+    now = datetime.now(timezone.utc)
+    quote = {"provider": "synthetic", "model": "fake", "input_cny_per_million": "1",
+             "output_cny_per_million": "1", "source_url": "https://example.test/prices",
+             "verified_by": "test", "verified_at": (now - timedelta(hours=1)).isoformat(),
+             "valid_until": (now + timedelta(hours=1)).isoformat()}
+
+    def reject(writer, request_id):
+        with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+            writer.reserve(request_id, provider="synthetic", model="fake",
+                           input_tokens_upper=2, output_tokens_upper=0, quote=quote)
+
+    reject(previous, "previous")
+    if stage == "before_collection":
+        reject(provider, "current")
+    uploaded, cleaned = [], []
+
+    async def java_transport(request):
+        path = request.url.path
+        if request.method == "DELETE":
+            cleaned.append(path)
+            return httpx.Response(204)
+        assert stage != "before_collection"
+        if path == "/api/v1/knowledge-bases":
+            return httpx.Response(201, json={"id": "kb"})
+        if path.endswith("/documents"):
+            index = len(uploaded)
+            uploaded.append(manifest["documents"][index])
+            return httpx.Response(202, json={"document_id": str(index), "task_id": str(index)})
+        if path.startswith("/api/v1/tasks/"):
+            if stage == "index":
+                reject(provider, "current")
+                return httpx.Response(200, json={"status": "FAILED"})
+            return httpx.Response(200, json={"status": "SUCCEEDED"})
+        index = int(path.rsplit("/", 1)[1])
+        return httpx.Response(200, json={"status": "READY", "source_sha256": uploaded[index]["sha256"],
+                                        "active_index_version_id": str(index)})
+
+    async def collect_question(**_kwargs):
+        assert stage == "final_question"
+        reject(provider, "current")
+        raise ValueError("AI_PROCESSING_FAILED")
+
+    async def fetch(_sql, params):
+        return {"content_version_id": "content-" + params[0]}
+
+    monkeypatch.setattr(run.collector, "collect_question", collect_question)
+    output = tmp_path / "predictions.json"
+    async with httpx.AsyncClient(base_url="http://java.test", transport=httpx.MockTransport(java_transport)) as java:
+        with pytest.raises(ValueError, match="BUDGET_RUN_EXCEEDED"):
+            await run.collect_dataset(
+                java=java, ai=object(), dataset=dataset, split="development", output=output,
+                run_metadata={"code_sha": "a" * 40, "schema_sha256": "b" * 64,
+                              "config_sha256": "c" * 64, "prompt_sha256": "d" * 64, "model": "fake"},
+                fetch_row=fetch, ledger=ledger, limit=1)
+
+    status = json.loads(output.with_suffix(".status.json").read_text())
+    assert status["complete"] is False
+    assert {"code": "BUDGET_RUN_EXCEEDED"} in status["failures"]
+    assert len(uploaded) == {"before_collection": 0, "index": 1, "final_question": len(manifest["documents"])}[stage]
+    assert cleaned == ([] if stage == "before_collection" else ["/api/v1/knowledge-bases/kb"])
+
+
+@pytest.mark.asyncio
+async def test_collector_entrypoint_uses_configured_run_ledger(tmp_path, monkeypatch):
+    path = tmp_path / "budget.sqlite3"
+    monkeypatch.setenv("KNOWFLOW_BUDGET_LEDGER_PATH", str(path))
+    monkeypatch.setenv("KNOWFLOW_BUDGET_RUN_ID", "current")
+    monkeypatch.setenv("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", "17")
+    for name in ("KNOWFLOW_EVALUATION_ACCESS_TOKEN", "KNOWFLOW_INTERNAL_SHARED_SECRET",
+                 "KNOWFLOW_EVALUATION_CONTROL_SECRET"):
+        monkeypatch.setenv(name, "synthetic")
+    metadata = tmp_path / "metadata.json"
+    metadata.write_text("{}", encoding="utf-8")
+    args = SimpleNamespace(java_url="http://localhost:8080", ai_url="http://localhost:8000",
+                           dataset=None, split="development", output=None, run_metadata=metadata,
+                           limit=1, private_root=None)
+    scopes = []
+
+    async def collect(**kwargs):
+        ledger = kwargs["ledger"]
+        scopes.append((ledger.path, ledger.run_id, ledger.run_limit))
+
+    monkeypatch.setattr(run, "collect_dataset", collect)
+    await run.main_async(args)
+    assert scopes == [(path, "current", 17)]
+    monkeypatch.setenv("KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN", "18")
+    with pytest.raises(ValueError, match="BUDGET_RUN_LIMIT_MISMATCH"):
+        await run.main_async(args)
+    assert len(scopes) == 1
 
 
 @pytest.mark.asyncio

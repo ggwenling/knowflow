@@ -282,7 +282,7 @@ def create_real_app():
     try:
         wiring = _load_wiring()
         from knowflow_ai.budget import SOFT_STOP_MICROYUAN
-        ledger = wiring.BudgetLedger(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
+        ledger = wiring.BudgetLedger.from_environment(environment)
     except Exception:
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
     stop_reason = None
@@ -295,7 +295,7 @@ def create_real_app():
             or type(snapshot.get("reserved_microyuan")) is not int
             or snapshot["reserved_microyuan"] < 0
             or snapshot["reserved_microyuan"] >= SOFT_STOP_MICROYUAN
-            or stop_reason in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED")):
+            or stop_reason is not None):
         _not_ready("KNOWFLOW_BUDGET_LEDGER_PATH")
     _assert_shared_ledger_ready(environment["KNOWFLOW_BUDGET_LEDGER_PATH"])
     try:

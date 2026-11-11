@@ -16,7 +16,6 @@ from .budget import BudgetLedger, _instant
 def _reserve_provider_call(provider, model, payload, environ):
     try:
         env = os.environ if environ is None else environ
-        ledger_path = env["KNOWFLOW_BUDGET_LEDGER_PATH"]
         prices = json.loads(Path(env["KNOWFLOW_BUDGET_PRICE_FILE"]).read_text(encoding="utf-8"))
         policies = json.loads(Path(env["KNOWFLOW_BUDGET_POLICY_FILE"]).read_text(encoding="utf-8"))
         policy = policies[model]
@@ -34,13 +33,13 @@ def _reserve_provider_call(provider, model, payload, environ):
         output = payload.get("max_tokens", 0)
         if type(output) is not int or not 0 <= output <= policy["output_tokens_upper"]:
             raise ValueError("INVALID_OUTPUT_BOUND")
-        ledger = BudgetLedger(ledger_path)
+        ledger = BudgetLedger.from_environment(env)
         ledger.reserve("provider:" + uuid4().hex, provider=provider, model=model,
             input_tokens_upper=policy["input_tokens_upper"], output_tokens_upper=output,
             quote=prices[model], allow_zero_price_embedding=(provider == "siliconflow"))
     except (KeyError, TypeError, ValueError, OSError, sqlite3.Error) as error:
         reason = str(error) if isinstance(error, ValueError) else "BUDGET_CONFIGURATION_REQUIRED"
-        if reason not in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED"):
+        if reason not in ("BUDGET_SOFT_STOP", "BUDGET_EXCEEDED", "BUDGET_RUN_EXCEEDED"):
             reason = "BUDGET_CONFIGURATION_REQUIRED"
         logging.getLogger(__name__).warning("provider_budget_stopped reason=%s", reason)
         raise ProcessingError("AI_PROCESSING_FAILED", 503, retryable=False) from None

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,9 @@ HEADERS = [
 
 
 def main() -> int:
+    if any((OUT / f"{split}.csv").exists() for split in SOURCES):
+        print("worksheets already exist; refusing to overwrite", flush=True)
+        return 2
     OUT.mkdir(parents=True, exist_ok=True)
     summary: dict[str, dict[str, int]] = {}
     for split, path in SOURCES.items():
@@ -109,7 +113,7 @@ def main() -> int:
                 })
 
         target = OUT / f"{split}.csv"
-        with target.open("w", encoding="utf-8", newline="") as handle:
+        with target.open("x", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=HEADERS)
             writer.writeheader()
             writer.writerows(rows)
@@ -130,4 +134,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        from citation_review import prepare_main
+        from quality_common import run_cli
+        raise SystemExit(run_cli(prepare_main))
     raise SystemExit(main())
