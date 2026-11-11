@@ -68,6 +68,7 @@ export function DocumentList({
       <input
         ref={fileInput}
         type="file"
+        name="document-update"
         accept={acceptedFileTypes}
         aria-label="选择更新资料"
         hidden

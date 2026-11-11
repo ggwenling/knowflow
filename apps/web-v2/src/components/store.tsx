@@ -1,7 +1,7 @@
 "use client";
 
 import { configureStore, createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Provider, useDispatch, useSelector } from "react-redux";
 
 type UiState = {
@@ -47,7 +47,21 @@ export function useDraft() {
   return { draft, ...controls };
 }
 
+function DraftExitGuard() {
+  const dirty = useWorkspace((state) => Boolean(state.draft.trim()));
+  useEffect(() => {
+    if (!dirty) return;
+    const guard = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [dirty]);
+  return null;
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [store] = useState(makeStore);
-  return <Provider store={store}>{children}</Provider>;
+  return <Provider store={store}><DraftExitGuard />{children}</Provider>;
 }

@@ -146,6 +146,8 @@ export function ChatView() {
             <label className={styles.baseSelect} data-composite-field>
               <Layers size={16} aria-hidden="true" />
               <select
+                name="knowledge-base"
+                autoComplete="off"
                 aria-label="切换知识库"
                 value={knowledge.selectedBase}
                 onChange={(event) => {

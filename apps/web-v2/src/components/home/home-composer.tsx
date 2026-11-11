@@ -13,7 +13,7 @@ const HomeScope = memo(function HomeScope() {
     <label className={styles.scope}>
       <Layers size={16} strokeWidth={1.5} aria-hidden="true" />
       <span>提问知识库</span>
-      <select aria-label="选择知识库" value={knowledge.selectedBase} onChange={(event) => knowledge.selectBase(event.target.value)}>
+      <select name="knowledge-base" autoComplete="off" aria-label="选择知识库" value={knowledge.selectedBase} onChange={(event) => knowledge.selectBase(event.target.value)}>
         {knowledge.bases.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
       </select>
     </label>

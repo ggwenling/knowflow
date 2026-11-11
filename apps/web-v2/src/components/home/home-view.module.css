@@ -159,9 +159,11 @@
 }
 
 .ask > button:disabled {
-  border-color: var(--line);
-  background: var(--bg-muted);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
   color: var(--ink-3);
+  box-shadow: none;
 }
 
 .scope {
@@ -225,7 +227,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .shortcut:hover {
-    border-color: var(--line-strong);
+    border-color: var(--ink-3);
     background: var(--surface-raised);
   }
 }
@@ -254,7 +256,7 @@
 
 .shortcutArrow {
   flex: none;
-  color: var(--line-strong);
+  color: var(--ink-3);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -336,7 +338,7 @@
 
 .rowArrow {
   flex: none;
-  color: var(--line-strong);
+  color: var(--ink-3);
 }
 
 .rowIcon {
@@ -552,7 +554,7 @@
 }
 
 .ask {
-  border-color: var(--line-strong);
+  border-color: var(--ink-3);
   border-radius: 18px;
   box-shadow: var(--shadow-raised), var(--highlight);
   transition: transform var(--dur) var(--ease);
@@ -962,9 +964,11 @@
 }
 
 .askMain > button:disabled {
-  border-color: var(--line);
-  background: var(--bg-muted);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
   color: var(--ink-3);
+  box-shadow: none;
 }
 
 .askMain > button:active:not(:disabled) {
@@ -1001,6 +1005,7 @@
 
 .scope select {
   min-width: 0;
+  min-height: 28px;
   max-width: 220px;
   padding: 0 18px 0 0;
   color: var(--ink);
@@ -1150,17 +1155,24 @@
 }
 
 /* The wordmark is the lead; the loom and controls are already present beneath it. */
-.hero .eyebrow { text-transform: none; letter-spacing: .06em; color: var(--ink-3); }
-.hero > h1::after {
-  content: "";
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin: 0 0 9px 14px;
-  border-radius: 1px;
-  background: var(--accent);
-}
+.hero .eyebrow { text-transform: none; letter-spacing: .04em; color: var(--ink-2); font-size: 12px; }
 .panel { background: var(--surface-raised); box-shadow: none; }
 .panelHead h2 { font-family: var(--font-cjk-display); font-size: 17px; font-weight: 400; }
 .rowIcon { border-radius: 5px; background: var(--bg-subtle); }
 .empty img { width: 108px; height: 72px; object-fit: contain; mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 50%, transparent 74%); }
+
+.shortcutArrow, .rowArrow { color: var(--ink-3); }
+.askMain > button:disabled svg { opacity: .5; }
+@media (max-width: 760px) {
+  .header { height: 40px; }
+  .notifications summary { width: 40px; height: 40px; }
+  .panelHead > a, .empty button { min-height: 40px; }
+  .scope select { min-height: 40px; }
+  .notice > button:last-child { width: 40px; height: 40px; flex: none; }
+  .notice { flex-wrap: wrap; }
+}
+
+.header { gap: 8px; }
+.empty a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; color: var(--ink-2); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .empty a:hover { color: var(--ink); } }
+.notice > span { min-width: 0; overflow-wrap: anywhere; }

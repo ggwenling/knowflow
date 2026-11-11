@@ -513,3 +513,10 @@
 .step:last-child { background: var(--surface-sunken); }
 .step:last-child .stepNumber { color: var(--accent); }
 .workflowArtwork { mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+
+@media (max-width: 980px) {
+  .sectionNav a { display: flex; align-items: center; justify-content: center; min-height: 40px; }
+}
+@media (max-width: 760px) {
+  .step:not(:last-child)::after { content: "↓"; }
+}

@@ -36,6 +36,7 @@
 }
 
 .baseSelect select {
+  min-width: 0;
   max-width: 180px;
   padding: 8px 0;
   font-size: 12px;
@@ -413,7 +414,7 @@
 
 .markdown blockquote {
   margin: 12px 0;
-  border-left: 2px solid var(--line-strong);
+  border-left: 1px solid var(--line);
   color: var(--ink-2);
 }
 
@@ -522,7 +523,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .citation:hover {
-    border-color: var(--line-strong);
+    border-color: var(--control-line);
     background: var(--accent-soft);
   }
 }
@@ -657,9 +658,11 @@
 }
 
 .send:disabled {
-  border-color: var(--line);
-  background: var(--bg-muted);
+  border-color: var(--line-strong);
+  border-style: dashed;
+  background: transparent;
   color: var(--ink-3);
+  box-shadow: none;
 }
 
 .stop {
@@ -791,7 +794,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: var(--radius-sm);
   background: var(--bg-subtle);
   padding: 16px;
@@ -885,7 +888,7 @@
 
 .sourceQuote {
   margin: 14px 22px 0;
-  border-left: 3px solid var(--accent);
+  border-left: 1px solid var(--accent);
   background: var(--accent-soft);
   padding: 9px 12px;
   color: var(--ink-2);
@@ -1196,7 +1199,7 @@
 }
 
 .composer {
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: 11px;
   background: var(--surface-raised);
   box-shadow: var(--shadow-card);
@@ -1738,12 +1741,31 @@
 .chatMain { background: var(--surface-raised); }
 .markdown, .streamingText { color: var(--ink); line-height: 1.9; max-width: 70ch; }
 .questionMark { background: var(--surface-sunken); color: var(--ink-2); border-color: var(--line); border-radius: 3px; }
-.citation { border: 1px solid var(--line); border-left: 2px solid var(--line-strong); border-radius: 4px; background: var(--bg-subtle); }
+.citation { border: 1px solid var(--line); border-radius: 4px; background: var(--bg-subtle); }
 .citation + .citation { margin-top: 8px; }
-.citationIndex { color: var(--accent); border: 0; border-radius: 0; background: transparent; animation: gentle-fade 180ms var(--ease) backwards; }
-.sourceNumber { color: var(--accent); font-family: var(--font-mono); animation: gentle-fade 180ms var(--ease) backwards; }
+.citationIndex { color: var(--accent); border: 0; border-radius: 0; background: transparent; animation: none; }
+.sourceNumber { color: var(--accent); font-family: var(--font-mono); animation: none; }
 .currentSources { border-radius: 4px; background: var(--bg-subtle); }
 .currentSources button { border-bottom: 1px solid var(--line); }
 .emptyArtwork { filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
 .answerEmpty h2 { font-family: var(--font-cjk-display); font-weight: 400; font-size: 23px; }
 .composer::before { background: linear-gradient(to top, var(--surface-raised), transparent); }
+
+.baseSelect, .search, .newChat, .uploadChip { border-color: var(--control-line); }
+.send:disabled svg { opacity: .5; }
+@media (hover: hover) and (pointer: fine) {
+  .send:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+  .stop:hover { background: var(--danger-soft); border-color: var(--danger); }
+  .loadMore:hover, .docsLink:hover, .chatNotice button:hover { color: var(--ink); }
+}
+.citationBody > span, .sourceDescription, .docsHint, .streamingText { overflow-wrap: anywhere; }
+.sourceHead { padding-right: 62px; }
+@media (max-width: 760px) {
+  .newChat, .uploadChip, .iconAction, .sourceClose { width: 40px; height: 40px; }
+  .baseSelect select { min-height: 40px; }
+  .currentSources button, .docsLink, .loadMore, .answerEndActions button, .chatNotice button { min-height: 40px; }
+  .docsLink { align-items: center; }
+  .chatNotice { flex-wrap: wrap; }
+  .page { height: calc(100svh - 180px - env(safe-area-inset-top)); min-height: 560px; }
+}
+.citation, .examples button { border-color: var(--control-line); }

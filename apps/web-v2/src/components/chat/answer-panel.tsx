@@ -89,7 +89,7 @@ export function AnswerPanel({
           <StatusBadge status={answer.status} kind="question" />
           {answer.answer && (
             <button className={styles.iconAction} onClick={() => void copy()} aria-label="复制回答" title="复制回答">
-              <Clipboard size={16} />
+              <Clipboard size={16} aria-hidden="true" />
             </button>
           )}
           {answer.question_id && !processing && (

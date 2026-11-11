@@ -10,6 +10,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import styles from "./auth-view.module.css";
 import { DeferredVisual } from "@/components/ui/deferred-visual";
+import { BackgroundMotionToggle } from "@/components/ui/background-motion-toggle";
 
 const Ribbon = dynamic(() => import("@/components/login-ribbon"), { ssr: false });
 
@@ -22,6 +23,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetHelp, setResetHelp] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(false);
 
   useEffect(() => {
     if (session.user) router.replace("/");
@@ -46,12 +48,17 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
 
   return (
     <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
-      <Image className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} preload sizes="(max-width: 700px) 1px, 50vw" />
-      <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
-        <DeferredVisual><Ribbon /></DeferredVisual>
+      <div className={styles.artPanel} aria-hidden="true">
+        <Image className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} preload sizes="(max-width: 700px) 1px, 54vw" />
+        <div className={`loginFlow ${styles.ribbon}`}>
+          <DeferredVisual><Ribbon paused={motionPaused} /></DeferredVisual>
+        </div>
+      </div>
+      <div className={styles.motionControl}>
+        <BackgroundMotionToggle english paused={motionPaused} onToggle={() => setMotionPaused((paused) => !paused)} />
       </div>
       <section key={mode} className={styles.content}>
-        <div className={styles.brand}><BrandSeal size={32} />KnowFlow</div>
+        <div className={styles.brand} translate="no"><BrandSeal size={32} />KnowFlow</div>
         <div className={styles.intro} data-ink-settle>
           <h1>
             {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
@@ -73,6 +80,8 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
               placeholder="name@example.com"
               autoComplete="email"
               spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "auth-error" : undefined}
               required
               disabled={session.loading || busy}
               value={email}
@@ -88,6 +97,8 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 minLength={12}
                 maxLength={128}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? "auth-error" : mode === "register" ? "auth-password-hint" : undefined}
                 required
                 disabled={session.loading || busy}
                 value={password}
@@ -99,11 +110,11 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((value) => !value)}
               >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
               </button>
             </div>
-            {mode === "register" && <small className={styles.hint}>Use 12–128 characters.</small>}
-            {error && <p className={styles.error} lang="zh-CN" role="alert">{error}</p>}
+            {mode === "register" && <small id="auth-password-hint" className={styles.hint}>Use 12–128 characters.</small>}
+            {error && <p id="auth-error" className={styles.error} lang="zh-CN" role="alert">{error}</p>}
             <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
               {busy && <span className={styles.spinner} aria-hidden="true" />}
               {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}

@@ -15,7 +15,6 @@ export function RecentPanels({
   moreDocuments,
   history,
   loading,
-  onCreateBase,
   onFocusComposer,
 }: {
   bases: KnowledgeBase[];
@@ -24,7 +23,6 @@ export function RecentPanels({
   moreDocuments: boolean;
   history: QuestionHistory[];
   loading: boolean;
-  onCreateBase: () => void;
   onFocusComposer: () => void;
 }) {
   return (
@@ -65,7 +63,7 @@ export function RecentPanels({
           <div className={styles.empty}>
             <Image src="/atlas-empty-bases.webp" alt="" width={108} height={72} loading="lazy" />
             <p>这里还没有知识库。</p>
-            <button onClick={onCreateBase}>创建第一个知识库 <ArrowRight size={16} aria-hidden="true" /></button>
+            <Link href="/knowledge-bases?create=1">创建第一个知识库 <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
         )}
       </section>

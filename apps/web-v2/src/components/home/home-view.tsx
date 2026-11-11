@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { HomeComposer } from "./home-composer";
 import { DeferredVisual } from "@/components/ui/deferred-visual";
+import { BackgroundMotionToggle } from "@/components/ui/background-motion-toggle";
 import { useSessionContext, useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { ShortcutGrid } from "./shortcut-grid";
@@ -33,7 +33,6 @@ function ModelNotice() {
 }
 
 export function HomeView() {
-  const router = useRouter();
   const session = useSessionContext();
   const knowledge = useKnowledgeContext();
   const documents = useDocumentsContext();
@@ -41,6 +40,7 @@ export function HomeView() {
   const stream = useStreamControls();
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState("");
+  const [motionPaused, setMotionPaused] = useState(false);
 
   const docCount = knowledge.selectedBase && !documents.refreshing && !documents.hasMore
     ? documents.documents.length
@@ -60,13 +60,14 @@ export function HomeView() {
     <div className={styles.home}>
       <div className={styles.wave} aria-hidden="true">
         <div className={`home-art ${styles.art}`}>
-          <DeferredVisual><Wave /></DeferredVisual>
+          <DeferredVisual><Wave paused={motionPaused} /></DeferredVisual>
         </div>
       </div>
 
       <header className={styles.header}>
+        <BackgroundMotionToggle paused={motionPaused} onToggle={() => setMotionPaused((paused) => !paused)} />
         <details className={styles.notifications} data-popover>
-          <summary aria-label="通知"><Bell size={20} strokeWidth={1.5} /></summary>
+          <summary aria-label="通知"><Bell size={20} strokeWidth={1.5} aria-hidden="true" /></summary>
           <div className={styles.popover}>
             <strong>通知</strong>
             <p>暂无新通知。</p>
@@ -76,7 +77,7 @@ export function HomeView() {
 
       <section className={styles.hero} aria-labelledby="home-title">
         <p className={styles.eyebrow}>Retrieval-augmented workspace</p>
-        <h1 id="home-title" data-ink-settle="hero">KnowFlow</h1>
+        <h1 id="home-title" data-ink-settle="hero" translate="no">KnowFlow</h1>
         <p className={styles.lead}>基于 RAG 的智能知识管理与问答系统</p>
         <HomeComposer inputRef={inputRef} />
         <ModelNotice />
@@ -99,7 +100,6 @@ export function HomeView() {
         moreDocuments={documents.hasMore}
         history={questions.history}
         loading={knowledge.loading}
-        onCreateBase={() => router.push("/knowledge-bases?create=1")}
         onFocusComposer={() => inputRef.current?.focus()}
       />
 

@@ -1,9 +1,14 @@
 import type { ComponentProps } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import styles from "./button.module.css";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "text";
 type Size = "sm" | "md" | "lg";
+
+export function ButtonLink({ variant = "primary", size = "md", className, ...props }: ComponentProps<typeof Link> & { variant?: Variant; size?: Size }) {
+  return <Link className={cn(styles.button, styles[variant], styles[size], className)} {...props} />;
+}
 
 export function Button({
   variant = "primary",

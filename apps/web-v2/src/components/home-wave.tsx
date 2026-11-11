@@ -218,8 +218,13 @@ function makeNodes() {
   return geometry;
 }
 
-export default function HomeWave() {
+export default function HomeWave({ paused = false }: { paused?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+    host.current?.dispatchEvent(new Event("motionchange"));
+  }, [paused]);
 
   useEffect(() => {
     const element = host.current;
@@ -287,11 +292,11 @@ export default function HomeWave() {
       frame = 0;
       if (disposed || contextLost || !visible || document.hidden) return;
       // Clamp resumed frames, keeping the flow continuous after tab changes.
-      if (previousTime) elapsed += Math.min((now - previousTime) / 1000, .05);
+      if (previousTime && !pausedRef.current) elapsed += Math.min((now - previousTime) / 1000, .05);
       previousTime = now;
       uniforms.uTime.value = reducedMotion.matches ? 0 : elapsed;
       renderer.render(scene, camera);
-      if (!reducedMotion.matches) frame = requestAnimationFrame(render);
+      if (!reducedMotion.matches && !pausedRef.current) frame = requestAnimationFrame(render);
     }
     function restart() {
       cancelAnimationFrame(frame);
@@ -367,6 +372,7 @@ export default function HomeWave() {
     });
     intersectionObserver.observe(element);
     reducedMotion.addEventListener("change", restart);
+    element.addEventListener("motionchange", restart);
     document.addEventListener("visibilitychange", restart);
     resize();
 
@@ -376,6 +382,7 @@ export default function HomeWave() {
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       reducedMotion.removeEventListener("change", restart);
+      element.removeEventListener("motionchange", restart);
       document.removeEventListener("visibilitychange", restart);
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);

@@ -701,7 +701,7 @@
 }
 
 .content {
-  padding-top: 40px;
+  padding-top: var(--page-top);
 }
 
 @media (max-width: 760px) {
@@ -788,7 +788,7 @@
     min-height: 32px;
   }
   .content {
-    padding-top: 26px;
+    padding-top: var(--page-top);
   }
 }
 
@@ -948,9 +948,7 @@
   }
 }
 
-.mainColumn {
-  background: radial-gradient(ellipse 85% 320px at 40% 0, color-mix(in srgb, var(--bg-subtle) 70%, transparent), transparent);
-}
+.mainColumn { background: var(--bg); }
 
 @media (hover: hover) and (pointer: fine) {
   .sidebarToggle:hover {
@@ -995,7 +993,7 @@
     height: 20px;
   }
   :global(html[data-sidebar-collapsed="true"]) .navIndicator::before {
-    left: -13px;
+    left: 3px;
   }
   :global(html[data-sidebar-collapsed="true"]) .account {
     justify-content: center;
@@ -1083,9 +1081,7 @@
       transform: translateY(-4px) scale(.97);
     }
   }
-  .mainColumn {
-    background: linear-gradient(color-mix(in srgb, var(--bg-subtle) 55%, transparent), transparent 260px);
-  }
+  .mainColumn { background: var(--bg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1176,9 +1172,9 @@
 }
 
 /* The seal travels with the existing interruptible navigation indicator. */
-.sidebar { background: var(--bg-subtle) url('/paper-grain.svg'); }
+.sidebar { background: var(--bg-subtle); }
 .navIndicator { border-color: var(--line); background: var(--surface-raised); box-shadow: none; }
-.navIndicator::before { width: 6px; height: 6px; top: 15px; left: -11px; border-radius: 1px; }
+.navIndicator::before { width: 4px; height: 4px; top: 16px; left: 5px; border-radius: 1px; }
 .navActive { color: var(--ink); }
 .navActive > svg { color: var(--accent); }
 .account .avatar { border-radius: 6px; background: var(--surface-sunken); color: var(--ink-2); }
@@ -1186,3 +1182,26 @@
 @media (max-width: 760px) {
   .navIndicator::before { width: 6px; height: 3px; top: auto; bottom: -1px; left: calc(50% - 3px); }
 }
+
+@media (min-width: 761px) {
+  .navItem { padding-left: 18px; }
+}
+.historyItem { content-visibility: auto; contain-intrinsic-size: auto 58px; }
+@media (max-width: 760px) {
+  .sidebar { padding-top: calc(16px + env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  .navItem, .navIndicator { height: 40px; min-height: 40px; }
+  .accountMenu { top: calc(16px + env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); }
+  .accountMenu summary, .accountMenu summary .avatar { width: 40px; height: 40px; }
+  .brandRow { min-height: 40px; padding-right: 48px; }
+  .accountPopover { top: 48px; }
+  .baseItem { min-height: 40px; }
+  .sectionHead a { width: 40px; height: 40px; }
+  .createForm input, .createForm button { min-height: 40px; }
+  .createForm button { width: 40px; }
+  .accountPopover a, .accountPopover button, .errorToast button { min-height: 40px; }
+  .content { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+  .toasts { bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .errorToast { flex-wrap: wrap; }
+}
+.navIndicator { border-color: var(--control-line); }
+.errorToast > span { min-width: 0; overflow-wrap: anywhere; }

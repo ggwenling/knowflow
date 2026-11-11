@@ -70,7 +70,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .baseCard:hover {
-    border-color: var(--line-strong);
+    border-color: var(--control-line);
     background: var(--surface-raised);
   }
 }
@@ -111,7 +111,7 @@
 
 .baseCardArrow {
   flex: none;
-  color: var(--line-strong);
+  color: var(--control-line);
   transition: transform var(--dur) var(--ease);
 }
 
@@ -174,7 +174,7 @@
 .uploadZone {
   display: flex;
   align-items: center;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: var(--radius);
 }
 
@@ -207,7 +207,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--control-line);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   padding: 0 13px;
@@ -936,8 +936,8 @@
   top: 14px;
   right: 14px;
   z-index: 2;
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   background: var(--surface-overlay);
   border: 1px solid var(--line);
   color: var(--ink-2);
@@ -950,7 +950,7 @@
   flex-direction: column;
   gap: 10px;
   min-height: 232px;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: var(--radius);
   background: var(--bg-subtle);
   padding: 24px;
@@ -964,7 +964,7 @@
   width: 44px;
   height: 44px;
   margin-bottom: 6px;
-  border: 1px dashed var(--line-strong);
+  border: 1px dashed var(--control-line);
   border-radius: 12px;
   background: var(--surface-raised);
   color: var(--accent);
@@ -1034,7 +1034,7 @@
 .uploadZone {
   min-height: 116px;
   background: var(--bg-subtle);
-  border-color: var(--line-strong);
+  border-color: var(--control-line);
 }
 
 .uploadIcon {
@@ -1181,12 +1181,13 @@
 .baseCard:nth-child(-n+4) { animation: none; }
 
 /* Catalogue covers: a paper spine, contour plate and actual list position. */
-.baseCard { border-radius: 5px 10px 10px 5px; }
-.baseCardLink { border-left: 4px solid var(--line-strong); }
+.baseCard { border-radius: var(--radius); }
+.baseCardLink { border-left: 0; }
 .baseCover, .baseCover[data-tone="1"], .baseCover[data-tone="2"] {
   background: var(--surface-sunken);
 }
 .baseCover::after { opacity: .42; mix-blend-mode: multiply; }
+.baseCover { background-image: url('/paper-grain.svg'); }
 .baseCover[data-tone="1"]::after { filter: none; opacity: .6; }
 .baseCover[data-tone="2"] { background: var(--bg-subtle); }
 .callNumber {
@@ -1200,3 +1201,29 @@
 }
 .baseCardIcon { width: 32px; height: 32px; bottom: 14px; border-radius: 4px; }
 .baseCardText strong { font-weight: 600; }
+
+.search, .baseCardDelete { border-color: var(--control-line); }
+.back { min-height: 40px; margin-bottom: 16px; }
+.baseCardFoot > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.baseOpen { flex: none; }
+@media (hover: hover) and (pointer: fine) {
+  /* Stay hit-testable while hidden: the pointer is already over the card when it fades in. */
+  .baseCardDelete { opacity: 0; }
+  .baseCard:hover .baseCardDelete, .baseCard:focus-within .baseCardDelete { opacity: 1; }
+  .baseCardDelete:hover, .baseCardDelete:focus-visible { background: var(--danger-soft); color: var(--danger); border-color: var(--danger); }
+  .statusMessage button:hover, .loadMore:hover { color: var(--ink); }
+}
+@media (any-pointer: coarse) {
+  .baseCardDelete { opacity: 1; pointer-events: auto; }
+}
+@media (max-width: 760px) {
+  .search input, .filter, .filterIndicator { min-height: 40px; }
+  .filterIndicator { height: 40px; }
+  .uploadAction, .emptyUpload, .loadMore, .docMenuPanel button, .statusMessage button { min-height: 40px; }
+  .docMenu > button { width: 40px; height: 40px; }
+  .docCard { grid-template-columns: 34px minmax(0, 1fr) 40px; }
+  .docName strong { white-space: normal; overflow-wrap: anywhere; }
+  .statusMessage { flex-wrap: wrap; }
+}
+.filterIndicator { border-color: var(--control-line); }
+.docMenuPanel { overscroll-behavior: contain; }

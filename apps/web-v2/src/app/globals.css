@@ -2,20 +2,21 @@
 
 :root {
   color-scheme: light;
-  --on-ink: #fbf8f2;
+  --on-ink: #fdfbf6;
   --ink-hover: #302b22;
   --success-soft: #e8eddf;
   --warning-soft: #f2e7d2;
-  --danger-line: #d7b3a5;
+  --danger-line: #a16f60;
   --font-cjk-display: var(--font-noto-serif-sc), "Songti SC", "Noto Serif CJK SC", serif;
-  --bg: #f5f0e6;
-  --bg-subtle: #f1ebdf;
-  --bg-muted: #ede6d8;
+  --bg: #f7f4ed;
+  --bg-subtle: #f2eee5;
+  --bg-muted: #eae5da;
   --ink: #17150f;
   --ink-2: #575249;
-  --ink-3: #6b6459;
+  --ink-3: #655f55;
   --line: #dcd3c3;
   --line-strong: #c5b9a5;
+  --control-line: #8b8172;
   --accent: #ad402c;
   --accent-soft: #f2e4d9;
   --success: #647e61;
@@ -29,9 +30,9 @@
   --radius: 10px;
   --radius-lg: 14px;
   --radius-pill: 999px;
-  --surface-raised: #fbf8f2;
-  --surface-sunken: #ede6d8;
-  --surface-overlay: rgba(251, 248, 242, .98);
+  --surface-raised: #fdfbf6;
+  --surface-sunken: #eee9df;
+  --surface-overlay: rgba(253, 251, 246, .98);
   --shadow-card: 0 0 0 1px rgba(56, 43, 22, .015), 0 2px 3px rgba(56, 43, 22, .025), 0 8px 24px rgba(56, 43, 22, .025);
   --shadow-raised: 0 0 0 1px rgba(56, 43, 22, .025), 0 4px 8px rgba(56, 43, 22, .035), 0 16px 40px rgba(56, 43, 22, .055);
   --shadow-pop: 0 0 0 1px rgba(56, 43, 22, .04), 0 8px 16px rgba(56, 43, 22, .06), 0 24px 64px rgba(56, 43, 22, .1);
@@ -50,6 +51,8 @@
   --space-4: 16px;
   --space-6: 24px;
   --space-8: 32px;
+  --page-top: 40px;
+  --page-gap: 28px;
   --z-shell: 5;
   --z-popover: 20;
   --z-overlay: 40;
@@ -69,7 +72,7 @@
   --font-sans: var(--font-dm-sans, "DM Sans"), "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   --font-serif: var(--font-dm-serif, "DM Serif Display"), Georgia, "Songti SC", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --background: #f5f0e6;
+  --background: var(--bg);
   --foreground: var(--ink);
   --border: var(--line);
 }
@@ -192,8 +195,8 @@ a, button, summary {
 }
 
 @keyframes ink-settle {
-  from { opacity: 0; transform: translateY(5px); filter: blur(2px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes page-enter {
@@ -290,7 +293,7 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   min-width: 0;
   gap: 28px;
   min-height: 140px;
-  margin: 0 0 28px;
+  margin: 0 0 var(--page-gap);
   padding: 8px 0 24px;
   border-bottom: 1px solid var(--line);
 }
@@ -354,7 +357,7 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
     align-items: flex-end;
     min-height: 0;
     gap: 18px;
-    margin-bottom: 24px;
+    margin-bottom: var(--page-gap);
     padding-top: 0;
     padding-bottom: 22px;
   }
@@ -425,10 +428,7 @@ kbd {
   cursor: text;
 }
 
-/* Ink & Paper Atlas: static grain, no raster texture and no full-screen fixed layer. */
-body {
-  background-image: url("/paper-grain.svg");
-}
+/* Keep reading surfaces clean. Grain is confined to catalogue covers. */
 .lucide { stroke-width: 1.5; }
 [data-display-heading] {
   font-family: var(--font-cjk-display);
@@ -443,7 +443,7 @@ body {
 .workspace-header { animation: ink-settle 220ms var(--ease) backwards; }
 .workspace-header > div > p:first-child { text-transform: none; letter-spacing: .055em; }
 .workspace-header > div > p:first-child::before { width: 7px; height: 7px; border-radius: 1px; }
-[data-sonner-toast][data-styled=true] { border-left: 3px solid var(--accent) !important; }
+[data-sonner-toast][data-styled=true] { border-left: 1px solid var(--accent) !important; }
 @media (prefers-reduced-motion: reduce) {
   .workspace-header { animation: gentle-fade 120ms var(--ease) backwards !important; }
 }
@@ -455,3 +455,36 @@ body {
 }
 
 html[data-input="keyboard"] [data-ink-settle] { animation: none !important; }
+
+@media (pointer: fine) {
+  html { overscroll-behavior: none; }
+}
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+  scroll-margin-top: 24px;
+}
+select, option { background-color: var(--surface-raised); color: var(--ink); }
+@media (max-width: 760px) {
+  :root { --page-top: 26px; --page-gap: 24px; }
+}
+
+.background-motion-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.background-motion-toggle[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
+@media (hover: hover) and (pointer: fine) {
+  .background-motion-toggle:hover { background: var(--bg-muted); color: var(--ink); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .background-motion-toggle { display: none; }
+}

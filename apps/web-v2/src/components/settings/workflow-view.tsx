@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowRight, FileText, Quote, ScanSearch } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import styles from "./settings.module.css";
 
 const steps = [
@@ -13,8 +12,6 @@ const steps = [
 ];
 
 export function WorkflowView() {
-  const router = useRouter();
-
   return (
     <div className={styles.page}>
       <header className="workspace-header">
@@ -44,10 +41,10 @@ export function WorkflowView() {
           工作流功能暂未开放。你可以先创建知识库、上传资料，再在对话页逐条提问；每一步都会保留可核验的原文来源。
         </p>
         <div className={styles.actions}>
-          <Button onClick={() => router.push("/knowledge-bases")}>
+          <ButtonLink href="/knowledge-bases">
             前往知识库 <ArrowRight size={16} aria-hidden="true" />
-          </Button>
-          <Button variant="secondary" onClick={() => router.push("/conversations")}>开始提问</Button>
+          </ButtonLink>
+          <ButtonLink variant="secondary" href="/conversations">开始提问</ButtonLink>
         </div>
       </section>
     </div>

@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside id="workspace-sidebar" className={`${styles.sidebar} ${pathname === "/" ? styles.homeSidebar : ""} ${isChat ? styles.chatSidebar : ""}`}>
         <div className={styles.brandRow}>
-          <Link className={styles.brand} href="/" aria-label="KnowFlow 首页">
+          <Link className={styles.brand} href="/" aria-label="KnowFlow 首页" translate="no">
             <BrandSeal size={28} />
             <span>
               KnowFlow
@@ -190,9 +190,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className={styles.accountPopover}>
               <span className={styles.accountEmail}>{session.user?.email}</span>
               <Link href="/settings" onClick={() => { if (accountRef.current) accountRef.current.open = false; }}>
-                账户设置 <ArrowRight size={16} />
+                账户设置 <ArrowRight size={16} aria-hidden="true" />
               </Link>
-              <button onClick={signOut}>退出 <ArrowRight size={16} /></button>
+              <button onClick={signOut}>退出 <ArrowRight size={16} aria-hidden="true" /></button>
             </div>
           </details>
           <span className={styles.accountText}>

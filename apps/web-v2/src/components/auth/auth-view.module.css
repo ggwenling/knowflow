@@ -12,8 +12,7 @@
 
 .ribbon {
   position: absolute;
-  inset: 0 0 0 max(42%, min(43.9vw, calc(5.9vw + 450px)));
-  z-index: -1;
+  inset: 0;
   pointer-events: none;
 }
 
@@ -74,7 +73,7 @@
   position: absolute;
   inset: 0 10px 0 auto;
   display: grid;
-  width: 38px;
+  width: 40px;
   place-items: center;
   border: 0;
   border-radius: 8px;
@@ -190,10 +189,6 @@
   .break {
     display: none;
   }
-  .ribbon {
-    inset: 28px 0 auto 18%;
-    height: 26svh;
-  }
   .footnote {
     display: none;
   }
@@ -211,7 +206,7 @@
 
 .content h1 {
   font-size: clamp(52px, 5.8vw, 84px);
-  letter-spacing: -.045em;
+  letter-spacing: -.04em;
 }
 
 .lead {
@@ -233,7 +228,7 @@
   box-shadow: inset 0 1px 2px #382b1603;
 }
 
-.form input:focus {
+.form input:focus-visible {
   border-color: var(--accent);
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
@@ -373,31 +368,51 @@
   }
 }
 
-.page { background: var(--bg) url('/paper-grain.svg'); }
+.page { background: var(--bg); }
 .brand { display: flex; align-items: center; gap: 12px; }
+.artPanel {
+  position: absolute;
+  inset: 0 0 0 max(46%, calc(5.9vw + 490px));
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to right, transparent, #000 30%);
+}
 .atlasArt {
   position: absolute;
-  z-index: -2;
-  right: 0;
-  bottom: 0;
-  width: min(50vw, 720px);
-  height: auto;
-  max-height: 100%;
-  object-fit: contain;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   object-position: right bottom;
   mix-blend-mode: multiply;
-  filter: saturate(.4);
-  opacity: .65;
-  mask-image: linear-gradient(to right, transparent, #000 22%), linear-gradient(to top, #000 75%, transparent);
-  mask-composite: intersect;
-  pointer-events: none;
+  opacity: .48;
+  mask-image: linear-gradient(to bottom, transparent 8%, #000 45%);
 }
-.ribbon { opacity: .65; }
-.form input { background: var(--surface-raised); border-radius: 6px; border-color: var(--line-strong); }
+/* The live ribbon occupies the book's negative space, fading before the folios. */
+.ribbon {
+  opacity: .55;
+  mask-image: linear-gradient(to bottom, #000 36%, transparent 76%);
+}
+.form input { background: var(--surface-raised); border-radius: 6px; border-color: var(--control-line); }
 .submit { background: var(--ink); border-radius: 6px; }
 @media (hover: hover) and (pointer: fine) {
   .submit:hover:not(:disabled) { background: var(--accent); }
 }
 @media (max-width: 700px) {
+  .artPanel {
+    inset: 28px 0 auto 18%;
+    height: 26svh;
+    mask-image: linear-gradient(to bottom, #000 70%, transparent);
+  }
   .atlasArt { display: none; }
+  .ribbon { mask-image: none; }
+  .content { padding-top: calc(32px + env(safe-area-inset-top)); padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+  .links a, .links button { display: inline-flex; align-items: center; min-height: 40px; }
 }
+
+.motionControl { position: absolute; bottom: 16px; right: max(24px, env(safe-area-inset-right)); }
+@media (max-width: 700px) {
+  .motionControl { top: calc(82px + env(safe-area-inset-top)); bottom: auto; right: 16px; }
+}
+.error, .resetHelp { overflow-wrap: anywhere; }

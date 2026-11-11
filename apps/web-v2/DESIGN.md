@@ -1,15 +1,15 @@
-# KnowFlow Web v2 设计规范（精密编辑工具 · 视觉精修版）
+# KnowFlow Web v2 · 纸墨 / Ink & Paper Atlas
 
-适用范围：`apps/web-v2` 全部页面与状态。风格依据首页与登录页既有的黑白编辑感，工作区以墨黑、微冷纸白与克制的蓝灰强调色建立统一层级。
+适用范围：`apps/web-v2` 全部页面与状态。基于 Round A `9dc6fd7`，Round B 于 2026-11-11 完成源码与既有截图复审。工作区以墨黑、清洁的微暖纸面与小面积朱砂色建立统一层级；这是已有视觉世界的精修。
 
 ## 1. 设计立场
 
 像一本排版精确的产品手册，而不是通用后台。
 
 - 衬线大字建立记忆点，细线、序号与留白建立秩序。
-- 蓝灰强调色用于焦点、来源序号与小面积图标；其余颜色只用于状态与危险操作。
+- 朱砂强调色用于焦点、来源序号与小面积图标；其余颜色只用于状态与危险操作。
 - 首页与登录页保留既有 Three.js 波浪。其余动效为反馈、定位与状态服务，120–260ms，无弹跳。
-- 允许轻微环线 + 分层软阴影、抬起表面的 1px 内高光、英雄区极淡径向光。禁止重阴影、强玻璃、霓虹与多色卡片。浮层可用 96% 白色表面，不增加背景模糊。
+- 允许轻微环线 + 分层软阴影、抬起表面的 1px 内高光、英雄区极淡径向光。禁止重阴影、强玻璃、霓虹与多色卡片。浮层可用 96% 纸面表面，不增加背景模糊。
 - 工作区保持中文；登录/注册保留英文品牌语气。
 
 ## 2. 设计令牌
@@ -18,12 +18,12 @@
 
 | 类别 | 值 |
 |---|---|
-| 背景 / 下沉表面 | `--bg: #FFF`、`--bg-subtle: #F7F8F9`、`--bg-muted: #EEF0F2`、`--surface-sunken: #F3F5F7` |
-| 浮起 / 覆盖表面 | `--surface-raised: #FFF`、`--surface-overlay: rgba(255,255,255,.96)` |
-| 文字 | `--ink: #191C20`、`--ink-2: #555E68`、`--ink-3: #626C77` |
-| 边框 | `--line: #E4E7EB`、`--line-strong: #CBD1D8`，始终 1px |
-| 语义色 | 信息 / 焦点 `#506E83`（由原蓝灰收深以提高可读性），浅底 `#EDF3F7`、成功 `#5F8A73`、警告 `#B0804A`、危险 `#A05A50` |
-| 语义文字 | 成功 `#476A56`、警告 `#806039`；状态圆点保留原语义色 |
+| 背景 / 下沉表面 | `--bg: #F7F4ED`、`--bg-subtle: #F2EEE5`、`--bg-muted: #EAE5DA`、`--surface-sunken: #EEE9DF` |
+| 浮起 / 覆盖表面 | `--surface-raised: #FDFBF6`、`--surface-overlay: rgba(253,251,246,.98)` |
+| 文字 | `--ink: #17150F`、`--ink-2: #575249`、`--ink-3: #655F55` |
+| 边框 | 装饰分隔 `--line: #DCD3C3` / `--line-strong: #C5B9A5`；控件 `--control-line: #8B8172`，均为 1px |
+| 语义色 | 朱砂 / 焦点 `#AD402C`，浅底 `#F2E4D9`；成功点 `#647E61`、警告点 `#987139`、危险 `#A13C2D`，危险边界 `#A16F60` |
+| 语义文字 | 成功 `#426044`、警告 `#795521`；状态圆点保留原语义色 |
 | 圆角 | 6 / 9 / 14 / 20 / 999px |
 | 间距 | 4 的倍数；区块间距 18–30px；页面左右 24–52px |
 | 动效 | `--dur-fast: 120ms` / `--dur: 180ms` / `--dur-page: 220ms` / `--dur-slow: 260ms` |
@@ -33,7 +33,7 @@
 | 内高光 | `--highlight: inset 0 1px 0 rgba(255,255,255,.8)` |
 | 间距令牌 | `--space-1/2/3/4/6/8`: 4 / 8 / 12 / 16 / 24 / 32px |
 | 布局 | 侧栏展开 `248px`（≤1180px 为 226px）、收起 `64px`；内容最大宽度 `1280px` |
-| 字体 | `DM Sans` 正文；`DM Serif Display` 标题；中文回退 `PingFang SC` / `Microsoft YaHei` |
+| 字体 | `DM Sans` 正文；`DM Serif Display` 英文品牌 / auth 标题；中文编辑标题用本地 Noto Serif SC 子集；正文中文回退 `PingFang SC` / `Microsoft YaHei` |
 
 ## 3. 排版
 
@@ -44,11 +44,11 @@
 | 区块标题 | 13–15px / 600 | 无衬线，句子式大小写 |
 | 正文 | 13–15px / 1.7–1.9 | 无衬线 |
 | 辅助信息 | ≥12px | `--ink-3`；只有格式、大小、序号、ID、kbd 用系统等宽栈 |
-| 英文眉题 | 11px / 600 | 无衬线，`.12em` 字距；页面标题带 18×2px 引导线，避免细长的等宽大字距 |
+| 英文目录标签 | 11–12px / 600 | 无衬线，`.12em` 字距；页面标题带 7px 朱砂方印，避免细长的等宽大字距 |
 | 控件文字 | 不低于 12px | 按钮、标签、筛选 |
 | 数字 | `font-variant-numeric: tabular-nums` | 时间、计数、大小 |
 
-衬线字体只用于品牌字、页面 h1。弹层、回答标题用无衬线；来源序号用等宽。系统等宽栈为 `ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace`，不下载字体。
+衬线字体用于品牌、页面 h1、少量中文区块标题；动态知识库名称保持系统中文回退，避免未收录字形跳动。回答标题和弹层使用无衬线，来源序号用等宽。系统等宽栈为 `ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace`，不下载字体。
 
 字号角色令牌：`--type-display` 56–84、`--type-h1` 30–40、`--type-h2` 20、`--type-title` 15、`--type-body` 14、`--type-small` 12、`--type-micro` 12px。回答正文 15px / 1.8，最长约 70ch。移动输入统一不小于 16px，避免聚焦时浏览器放大。
 
@@ -62,7 +62,7 @@
 - 收起后隐藏品牌文字、库 / 历史 / 创建区域与账户文字；导航保留 aria-label，并在 hover / focus 展示可悬停、Esc 可关闭的 CSS tooltip。邮箱 tooltip 关联账户菜单说明。移动 ≤760px 不展示 toggle，不使用收起样式，保留顶栏账户菜单与原导航。
 - 偏好键为 `knowflow.sidebar.collapsed`。根布局的短内联脚本在绘制前设置 html data-sidebar-collapsed；仅 html 对该额外属性启用 suppressHydrationWarning，子树不抑制。SidebarToggle 独立 useSyncExternalStore 订阅，使用稳定的服务端快照；不向 AppShell / WorkspaceProvider 增加状态。支持 storage 事件与存储不可用时的当前页回退。
 - 新建知识库的所有聚焦入口先展开桌面侧栏，再打开快捷区并聚焦输入，移动创建不修改桌面偏好。
-- 主内容：使用 `<main id="main-content" tabIndex={-1}>`，最大 1280px 居中，上边距 40px；页面首个可聚焦元素是“跳到主要内容”。非首页使用统一 `workspace-header` 页头带：标题 / 一句说明 / 行动底部对齐、24px 下留白与发丝分隔线；移动自然换行，不省略说明。内容顶端只用极淡且宽的纸面光。
+- 主内容：使用 `<main id="main-content" tabIndex={-1}>`，最大 1280px 居中，上内边距由 `--page-top` 统一为桌面 40px / 移动 26px；页头规则线到工具栏或内容的间距由 `--page-gap` 统一为桌面 28px / 移动 24px。详情页返回链接单独占 40px 行及 16px 间隔；页面首个可聚焦元素是“跳到主要内容”。非首页使用统一 `workspace-header` 页头带：标题 / 一句说明 / 行动底部对齐、24px 底部留白与发丝分隔线；移动自然换行，不省略说明。大面积表面不叠加径向光或纸粒。
 - 导航、知识库卡片、历史记录必须是 `<a>`/`Link`，支持 Cmd/Ctrl+click、中键与新标签；创建、上传、提问、停止、删除等动作保持 `<button>`。
 - `≤1180px`：侧栏 226px，内容留白 28px，对话资料栏收窄。
 - `≤980px`：对话页隐藏独立历史栏与资料栏，改为“历史记录”“资料”抽屉。
@@ -74,18 +74,18 @@
 
 ### 5.1 首页 `/`
 
-- 衬线 `KnowFlow` + 一句定位语 + 单行提问框，下方 Three.js 波浪；无 WebGL 时回退 `home-wave.webp`。
+- 衬线 `KnowFlow`（不加浮动句点）+ 12px 深色英文目录标签 + 一句定位语 + 单行提问框，下方保留 Three.js loom；无 WebGL 时回退 `home-wave.webp`。
 - 单一提问外框由问题主行与底栏组成，知识库选择整合到底栏；不保留首页 ↵ 芯片。内部输入与 select 无边框 / 背景 / 阴影 / outline，外框以 focus-within 提供 2px 焦点环。模型模式文案作为英雄区的安静辅助文字。
 - 四个快捷操作：创建知识库、新建对话、上传文档、创建工作流；四项都落到真实路由或明确的占位页。创建知识库使用明确的墨色主卡，其余白底；每张都有独立图标瓷片、说明与 hover 箭头。桌面上下排版，移动双列紧凑横排。
 - “我的知识库”“最近问答”采用等宽两栏、相同的 76px 行基准；快捷卡、面板与主内容网格边线一致，英雄区提问框最长 800px 居中。窄屏单列面板、紧凑快捷卡；40px 行图标与 ≥12px 元数据，空态保留唯一下一步。
 - 通知与账户浮层使用原生 `details`，点击外部关闭；Esc 关闭并回到触发器。支持 `::details-content` 的浏览器保留离场过渡，旧浏览器直接关闭。
-- 初始数据未到时提问按钮禁用；没有 READY 资料时按钮禁用并给出原因。
+- 空问题、初始数据未到、没有 READY 资料或生成中均禁用发送。禁用按钮无填充、虚线边界、无阴影；箭头半透明。启用按钮为实心墨色。保留原生 disabled 与原提交校验。
 
 ### 5.2 登录 / 注册 `/login`、`/register`
 
-- 左侧表单，右侧 42% 起的 ribbon；`≤700px` ribbon 收为顶部窄带，无 WebGL 时回退 `login-ribbon.webp`。
-- 输入框桌面 58px / 移动 54px 高、12px 圆角；提交按钮 56px 高、11px 圆角。更紧的英文眉题、较轻的表单标签与清晰焦点，注册 / 登录分两个重叠节拍：标题与说明 200ms / 6px，表单与链接 180ms / 4px，延迟 40ms；品牌和 ribbon 保持静止，不等待旧页面退出。页脚用 12px / 600 无衬线与 .06em 字距。
-- 错误以红棕文字出现在表单内，`role="alert"`；提交中按钮显示 `Please wait…` 并禁用。
+- 左侧表单，右侧独立 artPanel 同时容纳 `atlas-auth.webp` 与 ribbon。整个容器左边缘渐隐 30%，插画顶部渐隐，ribbon 在插画 folio 上方渐隐，禁止横穿表单。`≤700px` 插画隐藏，ribbon 收为顶部窄带；保留 `.loginFlow`、`.loginCanvas` 与 `login-ribbon.webp` 回退。
+- 输入框桌面 58px / 移动 54px 高、6px 圆角；提交按钮 56px 高、6px 圆角。更紧的英文眉题、较轻的表单标签与清晰焦点，注册 / 登录分两个重叠节拍：标题与说明 220ms / 4px，表单与链接 180ms / 4px，延迟 40ms；品牌和 ribbon 保持静止，不等待旧页面退出。页脚用 12px / 600 无衬线与 .06em 字距。
+- 错误以朱砂文字出现在表单内，`role="alert"`；字段使用 aria-invalid / aria-describedby 关联错误，注册密码说明也关联字段；提交中按钮显示 `Please wait…` 并禁用。
 - 已登录访问 auth 页自动回到 `/`。
 
 ### 5.3 对话 `/conversations`、`/conversations/[questionId]`
@@ -101,15 +101,15 @@
 
 ### 5.4 知识库 `/knowledge-bases`
 
-- 页头：标题（有库为“我的知识库”，无库为“开始整理你的资料”）、说明、主行动“新建知识库”。桌面两列“档案封面”卡片：原生 SVG 石墨纹理、图标、真实名称 / 更新时间与“打开”入口；移动单列、封面压缩至 76px。网格内有虚线“新建知识库”按钮，进入同一展开 / 聚焦创建路径。
-- 搜索按名称过滤并写入 `?q=`；卡片为链接（细线 + 文件夹图标 + 名称 + 更新时间 + 箭头）；删除按钮低饱和红棕，点击进入确认对话。
+- 页头：标题（有库为“我的知识库”，无库为“开始整理你的资料”）、说明、主行动“新建知识库”。桌面两列“档案封面”卡片：SVG 等高线与 KF 列表序号、图标、真实名称 / 更新时间与“打开”入口。去掉 4px 假书脊，外框统一 1px；移动单列、封面压缩至 76px。网格内有虚线“新建知识库”按钮，进入同一展开 / 聚焦创建路径。
+- 搜索按名称过滤并写入 `?q=`；卡片为链接（细线 + 文件夹图标 + 名称 + 更新时间 + 箭头）；删除按钮保留包含知识库名称的 accessible name；细指针设备仅 hover / focus-within 显示，触屏 / 混合输入设备始终可见，40×40px。点击仍进入确认对话。
 - 空态：说明价值与下一步，主行动聚焦侧栏创建输入。
 - 列表接口不返回每个知识库的文档数，因此不展示编造的数量；文档数在详情页展示。
 
 ### 5.5 知识库详情 `/knowledge-bases/[baseId]`
 
 - 返回、标题、`N 份资料 · M 份可用于问答`、私有空间标识。其下是紧凑的全部 / 已就绪 / 处理中 / 失败计数带，完全复用已加载资料的实际状态；分页尚未加载完整时明确提示“已加载”口径。取消归入失败，与既有筛选口径一致。
-- 上传区：淡冷纸面、虚线细框与独立上传图标，支持拖拽与选择；TXT/MD/PDF，最大 8 MiB，PDF 200 页。拖入时虚线伪元素只做 opacity 呼吸、图标上移 3px；空闲时完全静止。用 drag depth 计数避免跨越子元素闪烁。
+- 上传区：浅色纸面、虚线细框与独立上传图标，支持拖拽与选择；TXT/MD/PDF，最大 8 MiB，PDF 200 页。拖入时虚线伪元素只做 opacity 呼吸、图标上移 3px；空闲时完全静止。用 drag depth 计数避免跨越子元素闪烁。
 - 筛选：全部 / 已就绪 / 处理中 / 失败，带等宽计数与同一滑动底板；筛选写入 `?status=`，非法值回退到“全部”。移动四等分，不横向滚动。
 - 文档行：格式徽标、名称、大小、状态点 + 文案、操作菜单（更新资料、重建索引、删除资料）。
 - 删除走确认对话；轮询 1.5s 起指数退避至 4s，切换知识库或卸载时判旧退出。
@@ -126,7 +126,7 @@
 ### 5.7 工作流 `/workflow`
 
 - 诚实的占位页：三步说明（上传资料 → 建立索引 → 带引用回答），明确“工作流功能暂未开放”，并提供前往知识库/对话的行动。
-- 三步共享同一纸面，以编号、连接方向与第三步的轻蓝灰落点呈现顺序，插画移到“当前可用能力”区域，避免移动端插画占据整个首屏；页头只保留轻量“开发中”标识。移动纵向排列。
+- 三步共享同一纸面，以编号、连接方向与第三步的较深纸面落点呈现顺序，插画移到“当前可用能力”区域，避免移动端插画占据整个首屏；页头只保留轻量“开发中”标识。移动纵向排列。
 - 不使用假开关、假进度或假运行记录。
 
 ### 5.8 全局状态
@@ -139,7 +139,7 @@
 
 | 组件 | 路径 | 规则 |
 |---|---|---|
-| Button | `ui/button.tsx` | primary / secondary / ghost / danger / text；高度 32/38/46；loading 显示小型指示并禁用、aria-busy |
+| Button | `ui/button.tsx` | primary / secondary / ghost / danger / text；桌面高度 32/38/46，移动至少 40px；loading 显示小型指示并禁用、aria-busy |
 | Dialog | `ui/dialog.tsx` | Radix；桌面居中、移动端底部抽屉；焦点陷阱与 Esc |
 | ConfirmDialog | `ui/confirm-dialog.tsx` | 危险操作；标题说明后果，主按钮“确认删除” |
 | EmptyState | `ui/empty-state.tsx` | 图标 + 一句标题 + 一句说明 + 唯一下一步 |
@@ -149,30 +149,27 @@
 
 按钮文字使用动词；同一动作在按钮、Toast、确认框中保持同名。导航用链接、动作用按钮；不要用 `div` 模拟控件。
 
-表单补 `name`、`autoComplete`、`spellCheck`；占位符以 `…` 结尾并展示示例格式。输入、选择器与 textarea 必须有可见焦点环。带外壳的复合字段统一标记 `data-composite-field`：内部控件在普通 / focus / focus-visible 下均无 border、background、box-shadow 与 outline；2px 焦点环放在外壳的 focus-within，不能内外叠加。独立的登录输入仍保留自身焦点环。kbd 只用等宽文字、无边框 / 底色 / 阴影，不伪装成按钮。
+表单补 `name`、`autoComplete`、`spellCheck`；占位符以 `…` 结尾并展示示例格式。输入、选择器与 textarea 必须有可见焦点环。带外壳的复合字段统一标记 `data-composite-field`：内部控件在普通 / focus / focus-visible 下均无 border、background、box-shadow 与 outline；2px 焦点环放在外壳的 focus-within，不能内外叠加。独立的登录输入仍保留自身焦点环。非空问题草稿在应用内路由切换时保存在 Redux，关闭 / 刷新窗口时提供原生 beforeunload 提示；guard 独立订阅 dirty 布尔值，不使外壳随输入重渲染。kbd 只用等宽文字、无边框 / 底色 / 阴影，不伪装成按钮。
 
 ## 7. 动效
 
-- 首页/登录：Three.js 波浪为唯一高光；页面不可见时暂停，减少动态效果时只绘制静态帧。
-- 页面进入：由 `(workspace)/template.tsx` 在客户端导航时重建路由内容，统一 220ms 淡入 + 6px 上移；外壳 / Store / WorkspaceProvider 留在 layout，不加导航状态，不做退出等待。
-- 一个容器只做一层进入：首页只随路由整体进入，不再二次 stagger 快捷卡。知识库列表模板容器静止，页头与首 4 张卡分别进入；卡片 180ms，延迟 0 / 40 / 70 / 95ms，总计 ≤275ms。其余长列表条目静止，避免 500 个同时合成的动画。搜索键盘路径无动画。
-- 侧栏宽度是本轮明确允许的布局过渡例外：shell grid-template-columns 使用 220ms Expo，使主内容真实获得空间；键盘触发和 reduced-motion 下即时完成。不能用纯 transform 假收起后仍占据原宽度。
-- 导航底板 220ms、筛选底板 180ms，CSS transform 过渡可中断。位置值写在指示器本身，不逐帧修改父级 CSS 变量。
-- 弹层桌面 220ms 进入 / 140ms 退出；遮罩 180 / 120ms；移动抽屉从底部 18px 进入，使用 drawer 曲线。浮层由触发点 180ms 进入，菜单行不再二次动画。
-- 键盘操作时，由 Providers 事件监听设置 DOM `data-input="keyboard"`，所有进入与交互过渡及延迟立即完成；不使用 React 状态，也不订阅草稿 / SSE。指针操作恢复常规动效。
-- 流式答案：50ms 缓冲刷新，避免逐字触发整棵树重渲染；完成后一次性解析 Markdown。
-- Hover 限 `@media (hover:hover) and (pointer:fine)` 内产生位移，最多 2px；按压 1px / 100–120ms，无缩放弹跳。边框 / 阴影采用静态状态切换，不逐帧插值重绘。
-- 骨架扫光 1800ms linear，用伪元素 transform；流式正文仅首次出现淡入 120ms，不逐字 stagger，保持 50ms 缓冲与一次完成解析。Sonner 260ms transform / 180ms opacity，不引入额外逐帧状态。
-- `prefers-reduced-motion: reduce` 下关闭位移、缩放、循环扫光与光标闪烁；页面 / 弹层保留 100–120ms 淡入淡出，路由保留 120ms 纯淡入、卡片取消 stagger，导航 / 筛选即刻到位，Three.js 保留原有静帧策略。
+- 仅页头 ink-settle 220ms / 4px、首页品牌 240ms；transform + opacity，取消 blur。默认内容可见，动画使用 backwards；列表与来源序号不重复进入。
+- Auth 标题遵循 ink-settle，表单 180ms / 4px，重叠 40ms；品牌与 artPanel 静止。
+- 键盘输入通过 DOM `data-input="keyboard"` 即时完成动画；不以 React 状态广播按键。减少动态效果时页头只淡入 120ms，无位移；Three.js 静帧，无循环。
+- 两个 Three.js 场景均提供原生暂停按钮与 aria-pressed。暂停保持当前画面及 canvas，只停止 rAF 调度；恢复不重建 renderer / geometry。后台标签页、离屏、context loss、卸载仍按原策略暂停 / 清理。
+- 导航底板 220ms、筛选底板 180ms，transform 过渡可中断；朱砂标记是导航底板的伪元素，一起移动。收起轨道中也放在底板内部。
+- 既有侧栏 `grid-template-columns` 220ms 是保留的布局过渡例外：它让阅读区真实获得空间，不是假收起。键盘及 reduced motion 即时完成。本轮没有新增布局动画。
+- 弹层进入 220ms / 退出 140ms；浮层从触发点 180ms / 100ms 退出，菜单行静止。hover 位移仅 fine pointer，最多 2px；按压 1px / 100–120ms。
+- 50ms SSE 缓冲与完成后一次 Markdown 解析保持不变；骨架 / 生成指示用于真实等待状态，reduced motion 下静止。
 
 ## 8. 可访问性
 
-- 焦点环统一 `2px var(--focus-ring)`（`#506E83`），偏移 3px。复合字段的焦点环由外框承载，内部 outline 为 none 是有意的等价焦点行为；内联创建框保留足够左右余量以免被侧栏裁切。
+- 焦点环统一 `2px var(--focus-ring)`（`#AD402C`），偏移 3px。复合字段的焦点环由外框承载，内部 outline 为 none 是有意的等价焦点行为；内联创建框保留足够左右余量以免被侧栏裁切。
 - 图标按钮必须有 `aria-label`；菜单使用 `role="menu"` / `role="menuitem"`。
 - 弹层使用 Radix Dialog：焦点陷阱、Esc 关闭、关闭后回到触发元素。
 - 流式答案容器 `aria-live="polite"`；加载/错误使用 `role="status"` / `role="alert"`。
 - 键盘可完成：登录、提问、打开引用、关闭弹层、切换知识库、打开移动抽屉。
-- 对比度：正文 `#191C20` / `#555E68` 于白底；辅助与状态文字在实际背景上达到普通文字 4.5:1，状态圆点可保留原语义色，不承载唯一状态信息。
+- 对比度：正文 `#17150F` / `#575249` 于三类纸面；辅助与状态文字在实际背景上达到普通文字 4.5:1，状态圆点可保留原语义色，不承载唯一状态信息。
 - 弹层与抽屉设置 `overscroll-behavior: contain`；可点区域设置 `touch-action: manipulation`；不要禁用缩放。
 - 历史列表超过 50 项使用 `content-visibility: auto` 与 `contain-intrinsic-size`，避免一次性布局全部行。
 
@@ -201,17 +198,18 @@ npx playwright test
 - `e2e/responsive.spec.ts`：390/768/1440 无横向溢出、移动抽屉、桌面三栏。
 - `e2e/a11y.spec.ts`：skip link、main 地标、链接导航、焦点环、URL 状态刷新恢复。
 - `scripts/acceptance.mjs`：真实栈登录/创建/上传/READY/问答/引用/截图/清理，产出 `eval-out/acceptance-20261108/manifest.json`；人工签字仍由负责人完成。
-- 视觉走查截图写入 `eval-out/design-v1/`，仅作验收产物，不入库。
+- Round B 复用 `/workspace/knowflow-polish/rA-*.png`，全部 20 张。沙箱不能启动 Chromium，因此不能声称修改后截图 / E2E / 动效观感已通过；实际本地命令结果见 VISUAL-POLISH.md。
 
-## 11. 素材与参考
+## 11. 素材与表面
 
-- 保留 `public/home-wave.webp`、`public/login-ribbon.webp` 与 PR #17 的 `home-wave.tsx`，不改三维场景。
-- `public/knowledge-contours.svg`：1,407 bytes、800×200，原生路径绘制的石墨等高线。用于知识库封面，仅装饰；三个中性色裁切方向 / 底色，不编造业务统计。无新增 AI 图片或依赖。
-- `public/archive-study.webp`：720×480、4,226 bytes，AI 生成的三张纸页与石墨连接线；用于知识库空态、对话空态与工作流。`next/image` 显式尺寸、`alt=""`，默认延迟加载。提示词与验证记录见 `VISUAL-POLISH.md`。
-- 参考研究：[Linear 的层级和对齐](https://linear.app/now/how-we-redesigned-the-linear-ui)、[Geist 系统](https://vercel.com/geist/introduction)、[Perplexity 的可追溯来源](https://www.perplexity.ai/help-center/en/articles/10352903-what-is-pro-search)。只借鉴原则，不复制版式、商标或产品能力。
+- 保留 `home-wave.tsx` loom 与 `login-ribbon.tsx` canvas、两张静态 webp 回退、现有渲染 / context loss 测试。本轮仅增加 pause 通道，不改变几何与 shader。
+- 沿用 Round A 的 `atlas-auth.webp`、`atlas-empty-{bases,documents,history}.webp`、`atlas-workflow.webp`、`atlas-recovery.webp`；无新图片、字体或依赖。图片均为装饰，空 alt 与明确尺寸。auth 图位于首屏并 preload，其余非关键装饰延迟加载。
+- `knowledge-contours.svg` 为封面几何线条。`paper-grain.svg` alpha 由 .035 降到 .008，仅用于封面；大面积 page / sidebar / auth / recovery 无 grain，无全局暖色滤镜。
+- 本地 CJK 标题字体是 Round A 提供的 `noto-serif-sc-headings-400.woff2`，包含许可与字形列表；不把任意用户内容强制设为子集字体。
 
-## 12. Round 3 补充验收
+## 12. Round B 验收边界
 
-- `e2e/sidebar-and-composer.spec.ts`：11 个用例覆盖 1440 / 900 侧栏、hover / focus / Esc tooltip、两种快捷键、reload 持久化、预绘制属性、390px 不受桌面偏好影响、账户菜单、创建自动展开、render probe、reduced-motion 三栏、内框移除与设置锚点。
-- `a11y.spec.ts` 与 `agent-acceptance.spec.ts` 的复合字段断言移到外框，仍验证 2px 焦点指示；内层明确验证 outline none。
-- 纸面色审查：全局仍为 #FFF / #F7F8F9 / #EEF0F2，没有新增全局米黄或滤镜。纸面光统一通过既有 bg-subtle 混合，保持色相一致；局部档案封面原有微暖灰保持原样。本轮没有真实浏览器原图可复现显示色偏，不另行改变调色板。
+- 全量 Vercel prefetched guidelines 源码审查；Impeccable critique / audit / polish 思路与 AI tells 手工审查；Emil ink-settle 复审。没有运行 Impeccable launcher、hooks、detector、安装器或子代理；这不是完整自动 critique 命令报告。
+- 390px 点击区域至少 40px，输入至少 16px；导航、账户、资料操作、弹层关闭、设置索引与 auth 辅助链接均覆盖。viewport-fit cover 与安全区域内边距配合；不禁用缩放。
+- `node scripts/contrast-audit.mjs` 读取当前 CSS token 并断言文本 ≥4.5、焦点 / 控件边界 ≥3。完整矩阵、例外说明与验证状态见 VISUAL-POLISH.md。
+- 预算文件不得修改；生产 JS 按原 `npm run perf:budget` 的每路由 +5% 上限验收。浏览器测试在可启动 Chromium 的环境运行。

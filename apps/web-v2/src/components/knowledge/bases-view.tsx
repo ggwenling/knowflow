@@ -83,7 +83,7 @@ export function BasesView() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        <span className={styles.toolbarMeta}>{filtered.length} 个结果</span>
+        <span className={styles.toolbarMeta} role="status">{filtered.length} 个结果</span>
       </div>
 
       {knowledge.loading && !knowledge.bases.length ? (
@@ -113,7 +113,7 @@ export function BasesView() {
                 title="删除知识库"
                 onClick={() => setPending(base)}
               >
-                <Trash2 size={16} />
+                <Trash2 size={16} aria-hidden="true" />
               </button>
             </article>
           ))}

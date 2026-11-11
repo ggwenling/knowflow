@@ -2,8 +2,13 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-export default function Flow() {
+export default function Flow({ paused = false }: { paused?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(paused);
+  useEffect(() => {
+    pausedRef.current = paused;
+    host.current?.dispatchEvent(new Event("motionchange"));
+  }, [paused]);
   useEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -89,12 +94,12 @@ export default function Flow() {
       if (reduce.matches) {
         uniforms.time.value = 0;
         uniforms.pointer.value.set(0, 0);
-      } else {
+      } else if (!pausedRef.current) {
         uniforms.time.value += dt * .28;
         uniforms.pointer.value.lerp(target, 1 - Math.exp(-dt * 3));
       }
       renderer.render(scene, camera);
-      if (!reduce.matches) frame = requestAnimationFrame(draw);
+      if (!reduce.matches && !pausedRef.current) frame = requestAnimationFrame(draw);
     };
     const resize = () => {
       if (disposed || contextLost) return;
@@ -140,6 +145,7 @@ export default function Flow() {
     window.addEventListener('pointermove', move, { passive: true });
     document.documentElement.addEventListener('pointerleave', reset);
     reduce.addEventListener('change', restart);
+    el.addEventListener('motionchange', restart);
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
@@ -152,6 +158,7 @@ export default function Flow() {
       window.removeEventListener('pointermove', move);
       document.documentElement.removeEventListener('pointerleave', reset);
       reduce.removeEventListener('change', restart);
+      el.removeEventListener('motionchange', restart);
       geometry.dispose();
       material.dispose();
       renderer.dispose();

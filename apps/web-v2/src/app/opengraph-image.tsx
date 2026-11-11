@@ -15,7 +15,7 @@ export default function OpenGraphImage() {
           height: "100%",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#f5f0e6",
+          background: "#f7f4ed",
           padding: "72px 80px",
           color: "#17150f",
           fontFamily: "Georgia, serif",
@@ -23,9 +23,9 @@ export default function OpenGraphImage() {
       >
         <svg width="600" height="540" viewBox="0 0 600 540" style={{ position: "absolute", right: 0, top: 0 }}>
           {Array.from({ length: 28 }, (_, index) => (
-            <path key={index} d={`M${90 + index * 7} 540 C${20 + index * 5} 280 ${510 - index * 3} 390 ${420 + index * 6} -40`} stroke="#6b6459" strokeWidth="0.8" opacity="0.25" fill="none" />
+            <path key={index} d={`M${90 + index * 7} 540 C${20 + index * 5} 280 ${510 - index * 3} 390 ${420 + index * 6} -40`} stroke="#655f55" strokeWidth="0.8" opacity="0.25" fill="none" />
           ))}
-          <path d="M536 0v64h64" stroke="#c5b9a5" strokeWidth="1" fill="#ede6d8" />
+          <path d="M536 0v64h64" stroke="#c5b9a5" strokeWidth="1" fill="#eee9df" />
         </svg>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <BrandSeal size={40} />

@@ -118,10 +118,14 @@
   }
 }
 
-.page { background: var(--bg, #f5f0e6) url('/paper-grain.svg'); color: var(--ink, #17150f); }
+.page { background: var(--bg, #f7f4ed); color: var(--ink, #17150f); }
 .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
 .artwork { display: block; width: 240px; max-width: 100%; height: auto; margin: 0 0 24px; mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
 .title { font-family: var(--font-cjk-display, "Songti SC", "Noto Serif CJK SC", serif); }
 .action { background: var(--ink, #17150f); border-color: var(--ink, #17150f); color: #fbf8f2; }
 .action:focus-visible { outline-color: #ad402c; }
 @media (hover: hover) and (pointer: fine) { .action:hover { background: #ad402c; } }
+
+@media (max-width: 760px) {
+  .page { padding: calc(32px + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+}
