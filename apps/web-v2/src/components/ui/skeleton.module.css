@@ -8,7 +8,7 @@
 .skeleton::after {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, #ffffffb8, transparent);
+  background: linear-gradient(90deg, transparent, var(--surface-raised), transparent);
   content: "";
   transform: translateX(-100%);
   animation: shimmer 1800ms linear infinite;

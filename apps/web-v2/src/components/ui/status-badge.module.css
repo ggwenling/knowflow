@@ -24,8 +24,8 @@
 
 .ready {
   color: var(--success-ink);
-  background: #f0f6f2;
-  border-color: #e2ece5;
+  background: var(--success-soft);
+  border-color: var(--line);
 }
 
 .ready .dot {
@@ -34,8 +34,8 @@
 
 .working {
   color: var(--warning-ink);
-  background: #fbf5ec;
-  border-color: #f0e5d5;
+  background: var(--warning-soft);
+  border-color: var(--line);
 }
 
 .working .dot {
@@ -45,7 +45,7 @@
 .failed {
   color: var(--danger);
   background: var(--danger-soft);
-  border-color: #f0dfda;
+  border-color: var(--danger-line);
 }
 
 .cancelled, .neutral {

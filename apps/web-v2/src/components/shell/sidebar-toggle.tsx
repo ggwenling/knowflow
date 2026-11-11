@@ -29,8 +29,8 @@ export function SidebarToggle() {
   return (
     <button type="button" className={styles.sidebarToggle} aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
       aria-expanded={!collapsed} aria-controls="workspace-sidebar" onClick={() => setSidebarCollapsed(!sidebarCollapsed())}>
-      <PanelLeftClose size={18} strokeWidth={1.6} className={styles.collapseIcon} aria-hidden="true" />
-      <PanelLeftOpen size={18} strokeWidth={1.6} className={styles.expandIcon} aria-hidden="true" />
+      <PanelLeftClose size={18} strokeWidth={1.5} className={styles.collapseIcon} aria-hidden="true" />
+      <PanelLeftOpen size={18} strokeWidth={1.5} className={styles.expandIcon} aria-hidden="true" />
     </button>
   );
 }

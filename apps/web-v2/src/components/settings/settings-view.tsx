@@ -28,7 +28,7 @@ export function SettingsView() {
       <header className="workspace-header">
         <div>
           <p className={styles.eyebrow}>Settings</p>
-          <h1>设置</h1>
+          <h1 data-display-heading>设置</h1>
           <p>管理当前账户与工作区。容量、计费与团队协作暂未开放。</p>
         </div>
       </header>
@@ -38,7 +38,7 @@ export function SettingsView() {
         <div className={styles.settingsContent}>
           <section id="settings-account" tabIndex={-1} className={styles.section} aria-labelledby="account-title">
             <div className={styles.sectionIntro}>
-              <h2 id="account-title"><span className={styles.sectionIndex}>01</span> 账户</h2>
+              <h2 data-display-heading id="account-title"><span className={styles.sectionIndex}>01</span> 账户</h2>
               <p>登录信息与个人空间。</p>
             </div>
             <dl className={styles.rows}>
@@ -49,14 +49,14 @@ export function SettingsView() {
             <div className={styles.dangerArea}>
               <div><h3>危险操作</h3><p>退出当前账户，返回登录页。</p></div>
               <Button variant="danger" size="sm" onClick={() => void session.signOut().then(() => router.replace("/login"))}>
-                <LogOut size={14} aria-hidden="true" /> 退出登录
+                <LogOut size={16} aria-hidden="true" /> 退出登录
               </Button>
             </div>
           </section>
 
           <section id="settings-model" tabIndex={-1} className={styles.section} aria-labelledby="model-title">
             <div className={styles.sectionIntro}>
-              <h2 id="model-title"><span className={styles.sectionIndex}>02</span> 模型与数据</h2>
+              <h2 data-display-heading id="model-title"><span className={styles.sectionIndex}>02</span> 模型与数据</h2>
               <p>当前模型模式、问答方式与资料范围。</p>
             </div>
             <dl className={styles.rows}>
@@ -65,14 +65,14 @@ export function SettingsView() {
               <div className={styles.row}><dt>资料范围</dt><dd>文档片段与问题仅发送给当前配置的模型服务</dd></div>
             </dl>
             <p className={styles.note}>
-              <ShieldCheck size={14} aria-hidden="true" />
+              <ShieldCheck size={16} aria-hidden="true" />
               合成模型只用于工程验证，不代表真实模型质量或费用；上传前请确认资料已获授权。
             </p>
           </section>
 
           <section id="settings-unavailable" tabIndex={-1} className={`${styles.section} ${styles.unavailableSection}`} aria-labelledby="unavailable-title">
             <div className={styles.sectionIntro}>
-              <h2 id="unavailable-title"><span className={styles.sectionIndex}>03</span> 暂未开放</h2>
+              <h2 data-display-heading id="unavailable-title"><span className={styles.sectionIndex}>03</span> 暂未开放</h2>
               <p>规划中的能力与支持渠道。</p>
             </div>
             <p className={styles.note}>自助找回密码、团队协作、用量账单与导出功能仍在规划中。如需协助，请联系空间管理员。</p>

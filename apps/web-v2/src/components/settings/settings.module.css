@@ -24,7 +24,7 @@
 .row {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid #f4f4f4;
+  border-bottom: 1px solid var(--line);
 }
 
 .row:last-child {
@@ -99,7 +99,7 @@
   margin-bottom: 20px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
   box-shadow: var(--shadow-card);
 }
 
@@ -505,3 +505,11 @@
     gap: 14px;
   }
 }
+
+.section { box-shadow: none; }
+.section h2, .step h2 { font-family: var(--font-cjk-display); font-weight: 400; font-size: 18px; }
+.sectionIndex { color: var(--ink-3); }
+.step svg { color: var(--ink-2); width: 20px; height: 20px; }
+.step:last-child { background: var(--surface-sunken); }
+.step:last-child .stepNumber { color: var(--accent); }
+.workflowArtwork { mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }

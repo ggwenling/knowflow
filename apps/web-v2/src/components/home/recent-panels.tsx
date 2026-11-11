@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Folder, MessageSquare } from "lucide-react";
 import type { KnowledgeBase, QuestionHistory } from "@/services/api";
@@ -30,9 +31,9 @@ export function RecentPanels({
     <div className={styles.overview}>
       <section className={styles.panel} aria-labelledby="base-preview">
         <div className={styles.panelHead}>
-          <h2 id="base-preview">我的知识库</h2>
+          <h2 data-display-heading id="base-preview">我的知识库</h2>
           <Link href="/knowledge-bases" aria-label="查看全部知识库">
-            查看全部 <ArrowRight size={15} aria-hidden="true" />
+            查看全部 <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
         {loading && !bases.length ? (
@@ -54,7 +55,7 @@ export function RecentPanels({
                       <small>{base.updated_at ? `更新于 ${relativeTime(base.updated_at)}` : "查看知识库文档"}</small>
                     </span>
                     {count && <span className={styles.count}>{count}</span>}
-                    <ArrowRight className={styles.rowArrow} size={15} strokeWidth={1.5} aria-hidden="true" />
+                    <ArrowRight className={styles.rowArrow} size={16} strokeWidth={1.5} aria-hidden="true" />
                   </Link>
                 </div>
               );
@@ -62,18 +63,18 @@ export function RecentPanels({
           </div>
         ) : (
           <div className={styles.empty}>
-            <Folder size={26} strokeWidth={1.4} aria-hidden="true" />
+            <Image src="/atlas-empty-bases.webp" alt="" width={108} height={72} loading="lazy" />
             <p>这里还没有知识库。</p>
-            <button onClick={onCreateBase}>创建第一个知识库 <ArrowRight size={14} aria-hidden="true" /></button>
+            <button onClick={onCreateBase}>创建第一个知识库 <ArrowRight size={16} aria-hidden="true" /></button>
           </div>
         )}
       </section>
 
       <section className={styles.panel} aria-labelledby="recent-preview">
         <div className={styles.panelHead}>
-          <h2 id="recent-preview">最近问答</h2>
+          <h2 data-display-heading id="recent-preview">最近问答</h2>
           <Link href="/conversations" aria-label="查看全部对话">
-            查看全部 <ArrowRight size={15} aria-hidden="true" />
+            查看全部 <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
         {history.length ? (
@@ -81,7 +82,7 @@ export function RecentPanels({
             {history.slice(0, 3).map((item) => (
               <Link className={styles.conversation} key={item.question_id} href={`/conversations/${item.question_id}`} prefetch={false}>
                 <span className={styles.rowIcon}>
-                  <MessageSquare size={19} strokeWidth={1.5} aria-hidden="true" />
+                  <MessageSquare size={20} strokeWidth={1.5} aria-hidden="true" />
                 </span>
                 <span className={styles.conversationText}>
                   <strong>{item.question}</strong>
@@ -93,9 +94,9 @@ export function RecentPanels({
           </div>
         ) : (
           <div className={styles.empty}>
-            <MessageSquare size={26} strokeWidth={1.4} aria-hidden="true" />
+            <Image src="/atlas-empty-history.webp" alt="" width={108} height={72} loading="lazy" />
             <p>还没有对话，开始提问吧。</p>
-            <button onClick={onFocusComposer}>向知识库提问 <ArrowRight size={14} aria-hidden="true" /></button>
+            <button onClick={onFocusComposer}>向知识库提问 <ArrowRight size={16} aria-hidden="true" /></button>
           </div>
         )}
       </section>

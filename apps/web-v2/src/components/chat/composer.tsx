@@ -78,11 +78,11 @@ export function Composer({ onAsk }: { onAsk: (question: string) => void }) {
         </span>
         {stream.busy ? (
           <button className={styles.stop} type="button" onClick={stream.cancel}>
-            <Square size={13} aria-hidden="true" /> 停止生成
+            <Square size={16} aria-hidden="true" /> 停止生成
           </button>
         ) : (
           <button className={styles.send} type="submit" aria-label="提问" disabled={!ready || !draft.trim()}>
-            提问 <ArrowUp size={15} aria-hidden="true" />
+            提问 <ArrowUp size={16} aria-hidden="true" />
           </button>
         )}
       </div>

@@ -36,7 +36,7 @@ export function UploadZone({
       onDrop={drop}
     >
       <span className={styles.uploadIcon}>
-        <Upload size={19} strokeWidth={1.5} aria-hidden="true" />
+        <Upload size={20} strokeWidth={1.5} aria-hidden="true" />
       </span>
       <div className={styles.uploadText}>
         <strong>{busy ? "正在上传并建立索引…" : "拖拽文件到这里，或选择文件"}</strong>

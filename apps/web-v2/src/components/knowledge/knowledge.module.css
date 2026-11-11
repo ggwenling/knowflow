@@ -65,13 +65,13 @@
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .baseCard:hover {
-    border-color: #c9c9c9;
-    background: #fdfdfd;
+    border-color: var(--line-strong);
+    background: var(--surface-raised);
   }
 }
 
@@ -111,7 +111,7 @@
 
 .baseCardArrow {
   flex: none;
-  color: #bdbdbd;
+  color: var(--line-strong);
   transition: transform var(--dur) var(--ease);
 }
 
@@ -209,7 +209,7 @@
   justify-content: center;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 13px;
   color: var(--ink);
   font-size: 12px;
@@ -280,11 +280,11 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 12px;
-  border: 1px solid #ecd9c4;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fffaf3;
+  background: var(--warning-soft);
   padding: 9px 12px;
-  color: #7d5a32;
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -300,7 +300,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .docCard {
@@ -308,7 +308,7 @@
   contain-intrinsic-size: auto 58px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #f4f4f4;
+  border-bottom: 1px solid var(--line);
 }
 
 .docCard:last-child {
@@ -508,7 +508,7 @@
 }
 
 .baseCardIcon {
-  border: 1px solid #dfe7ed;
+  border: 1px solid var(--line);
 }
 
 .baseCardText small {
@@ -694,7 +694,7 @@
     transform: translateX(2px);
   }
   .docCard:hover {
-    background: #fafbfd;
+    background: var(--surface-raised);
   }
 }
 
@@ -853,7 +853,7 @@
   min-height: 106px;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
-  background: #eef1f4;
+  background: var(--surface-sunken);
 }
 
 .baseCover::after {
@@ -865,7 +865,7 @@
 }
 
 .baseCover[data-tone="1"] {
-  background: #293139;
+  background: var(--ink-hover);
 }
 
 .baseCover[data-tone="1"]::after {
@@ -875,7 +875,7 @@
 }
 
 .baseCover[data-tone="2"] {
-  background: #f5f5f2;
+  background: var(--bg-subtle);
 }
 
 .baseCover[data-tone="2"]::after {
@@ -891,9 +891,9 @@
   width: 40px;
   height: 40px;
   color: var(--ink-2);
-  background: #ffffffed;
-  border-color: #ffffffb3;
-  box-shadow: 0 2px 8px #191c2008;
+  background: var(--surface-overlay);
+  border-color: var(--line);
+  box-shadow: 0 2px 8px #382b1608;
 }
 
 .baseCardText {
@@ -938,8 +938,8 @@
   z-index: 2;
   width: 30px;
   height: 30px;
-  background: #ffffffed;
-  border: 1px solid #ffffffb3;
+  background: var(--surface-overlay);
+  border: 1px solid var(--line);
   color: var(--ink-2);
 }
 
@@ -952,7 +952,7 @@
   min-height: 232px;
   border: 1px dashed var(--line-strong);
   border-radius: var(--radius);
-  background: #f7f9fa80;
+  background: var(--bg-subtle);
   padding: 24px;
   color: var(--ink-2);
   text-align: center;
@@ -966,7 +966,7 @@
   margin-bottom: 6px;
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--accent);
 }
 
@@ -1033,14 +1033,14 @@
 
 .uploadZone {
   min-height: 116px;
-  background: #f8fafc;
-  border-color: #d0d9e1;
+  background: var(--bg-subtle);
+  border-color: var(--line-strong);
 }
 
 .uploadIcon {
   width: 48px;
   height: 48px;
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--accent);
 }
 
@@ -1064,13 +1064,6 @@
   }
   to {
     opacity: .8;
-  }
-}
-
-@keyframes folioEnter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
   }
 }
 
@@ -1161,9 +1154,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where(.baseCard:nth-child(-n+4)) {
-    animation: gentle-fade 120ms var(--ease) both !important;
-  }
   .uploadDragging::after {
     animation: none;
     opacity: .7;
@@ -1188,6 +1178,25 @@
   border-radius: var(--radius) var(--radius) 0 0;
 }
 
-.baseCard:nth-child(-n+4) {
-  animation: folioEnter 180ms var(--ease) backwards;
+.baseCard:nth-child(-n+4) { animation: none; }
+
+/* Catalogue covers: a paper spine, contour plate and actual list position. */
+.baseCard { border-radius: 5px 10px 10px 5px; }
+.baseCardLink { border-left: 4px solid var(--line-strong); }
+.baseCover, .baseCover[data-tone="1"], .baseCover[data-tone="2"] {
+  background: var(--surface-sunken);
 }
+.baseCover::after { opacity: .42; mix-blend-mode: multiply; }
+.baseCover[data-tone="1"]::after { filter: none; opacity: .6; }
+.baseCover[data-tone="2"] { background: var(--bg-subtle); }
+.callNumber {
+  position: absolute;
+  top: 19px;
+  left: 22px;
+  z-index: 1;
+  color: var(--ink-2);
+  font: 12px/1 var(--font-mono);
+  letter-spacing: .08em;
+}
+.baseCardIcon { width: 32px; height: 32px; bottom: 14px; border-radius: 4px; }
+.baseCardText strong { font-weight: 600; }

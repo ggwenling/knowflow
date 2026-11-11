@@ -233,7 +233,7 @@ export default function HomeWave() {
     } catch {
       return;
     }
-    renderer.setClearColor(0xffffff, 0);
+    renderer.setClearColor(0xf5f0e6, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
@@ -251,8 +251,8 @@ export default function HomeWave() {
       uComposer: { value: new THREE.Vector4(-10000, -10000, 1, 1) },
       uScope: { value: new THREE.Vector4(-10000, -10000, 1, 1) },
       uWordmark: { value: new THREE.Vector4(600, 140, 240, 65) },
-      uInk: { value: new THREE.Color(tokens.getPropertyValue("--ink-2").trim() || "#666666") },
-      uAccent: { value: new THREE.Color(tokens.getPropertyValue("--accent").trim() || "#5c7a8f") },
+      uInk: { value: new THREE.Color(tokens.getPropertyValue("--ink-2").trim() || "#575249") },
+      uAccent: { value: new THREE.Color(tokens.getPropertyValue("--accent").trim() || "#ad402c") },
     };
     const filamentGeometry = makeFilaments();
     const particleGeometry = makeParticles();

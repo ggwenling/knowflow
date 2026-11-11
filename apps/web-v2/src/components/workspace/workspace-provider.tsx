@@ -74,7 +74,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     <main id="main-content" tabIndex={-1} className={styles.gate}>
       <div className={styles.gateCard} role="alert">
         <p className={styles.gateEyebrow}>连接中断</p>
-        <h1>暂时无法连接工作区</h1>
+        <h1 data-display-heading>暂时无法连接工作区</h1>
         <p className={styles.gateText}>{session.error}</p>
         <Button onClick={session.retry}>重试连接</Button>
       </div>

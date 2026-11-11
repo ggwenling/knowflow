@@ -8,6 +8,7 @@ import { ArrowRight, Folder, Home, Layers, MessageSquare, Settings, Workflow } f
 import { useSessionContext, useKnowledgeContext, useQuestionsContext } from "@/components/workspace/workspace-provider";
 import { questionStatusLabel } from "@/lib/format";
 import { allowSidebarTooltip, revealSidebarForCreate } from "@/lib/sidebar-preference";
+import { BrandSeal } from "@/components/ui/brand-seal";
 import { SidebarToggle } from "./sidebar-toggle";
 import styles from "./app-shell.module.css";
 
@@ -77,12 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside id="workspace-sidebar" className={`${styles.sidebar} ${pathname === "/" ? styles.homeSidebar : ""} ${isChat ? styles.chatSidebar : ""}`}>
         <div className={styles.brandRow}>
           <Link className={styles.brand} href="/" aria-label="KnowFlow 首页">
-            <svg viewBox="0 0 28 28" width="24" height="24" fill="currentColor" aria-hidden="true">
-              <rect x="3" y="5" width="16" height="6" rx="2" transform="rotate(-45 11 8)" />
-              <rect x="9" y="16" width="16" height="6" rx="2" transform="rotate(-45 17 19)" />
-              <rect x="2" y="17" width="9" height="5" rx="2" transform="rotate(-45 6.5 19.5)" />
-              <rect x="17" y="6" width="9" height="5" rx="2" transform="rotate(-45 21.5 8.5)" />
-            </svg>
+            <BrandSeal size={28} />
             <span>
               KnowFlow
               <small>知识工作台</small>
@@ -103,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onPointerEnter={allowSidebarTooltip}
               aria-current={match(pathname) ? "page" : undefined}
             >
-              <Icon size={18} strokeWidth={1.6} aria-hidden="true" />
+              <Icon size={18} strokeWidth={1.5} aria-hidden="true" />
               <span className={styles.navLabel}>{label}</span>
               <span className={styles.railTooltip} role="tooltip" aria-label={label}>{label}</span>
             </Link>
@@ -116,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className={styles.sectionHead}>
               <span>我的知识库</span>
               <Link href="/knowledge-bases" aria-label="打开全部知识库">
-                <ArrowRight size={14} aria-hidden="true" />
+                <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
             <div className={styles.baseList}>
@@ -127,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   href={`/knowledge-bases/${base.id}`}
                   prefetch={false}
                 >
-                  <Folder size={15} strokeWidth={1.6} aria-hidden="true" />
+                  <Folder size={16} strokeWidth={1.5} aria-hidden="true" />
                   <span>{base.name}</span>
                 </Link>
               ))}
@@ -158,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className={styles.sectionHead}>
                   <span>最近问答</span>
                   <Link href="/conversations" aria-label="查看全部问答">
-                    <ArrowRight size={14} aria-hidden="true" />
+                    <ArrowRight size={16} aria-hidden="true" />
                   </Link>
                 </div>
                 <div className={styles.historyScroll}>
@@ -194,9 +190,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className={styles.accountPopover}>
               <span className={styles.accountEmail}>{session.user?.email}</span>
               <Link href="/settings" onClick={() => { if (accountRef.current) accountRef.current.open = false; }}>
-                账户设置 <ArrowRight size={14} />
+                账户设置 <ArrowRight size={16} />
               </Link>
-              <button onClick={signOut}>退出 <ArrowRight size={14} /></button>
+              <button onClick={signOut}>退出 <ArrowRight size={16} /></button>
             </div>
           </details>
           <span className={styles.accountText}>

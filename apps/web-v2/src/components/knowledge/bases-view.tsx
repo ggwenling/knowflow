@@ -28,6 +28,8 @@ export function BasesView() {
     return value ? knowledge.bases.filter((base) => base.name.toLowerCase().includes(value)) : knowledge.bases;
   }, [knowledge.bases, query]);
 
+  const catalogue = useMemo(() => new Map(knowledge.bases.map((base, index) => [base.id, `KF-${String(index + 1).padStart(3, "0")}`])), [knowledge.bases]);
+
   const hasBases = knowledge.bases.length > 0;
 
   function focusCreate() {
@@ -56,7 +58,7 @@ export function BasesView() {
       <header className="workspace-header">
         <div>
           <p className={styles.eyebrow}>Knowledge bases</p>
-          <h1>{hasBases ? "我的知识库" : "开始整理你的资料"}</h1>
+          <h1 data-display-heading>{hasBases ? "我的知识库" : "开始整理你的资料"}</h1>
           <p className={styles.pageLead}>
             {hasBases
               ? `共 ${knowledge.bases.length} 个知识库 · ${questions.history.length} 条问答记录。选择一个知识库查看资料与索引状态。`
@@ -64,13 +66,13 @@ export function BasesView() {
           </p>
         </div>
         <Button onClick={focusCreate}>
-          <Plus size={15} aria-hidden="true" /> 新建知识库
+          <Plus size={16} aria-hidden="true" /> 新建知识库
         </Button>
       </header>
 
       <div className={styles.toolbar}>
         <label className={styles.search} data-composite-field>
-          <Search size={14} aria-hidden="true" />
+          <Search size={16} aria-hidden="true" />
           <input
             aria-label="搜索知识库"
             name="q"
@@ -88,12 +90,13 @@ export function BasesView() {
         <SkeletonRows rows={4} />
       ) : filtered.length ? (
         <div className={styles.baseGrid}>
-          {filtered.map((base, index) => (
-            <article className={styles.baseCard} key={base.id} style={index < 4 ? { animationDelay: `${[0, 40, 70, 95][index]}ms` } : undefined}>
+          {filtered.map((base) => (
+            <article className={styles.baseCard} key={base.id}>
               <Link className={styles.baseCardLink} href={`/knowledge-bases/${base.id}`} prefetch={false}>
                 <span className={styles.baseCover} data-tone={Array.from(base.id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 3} aria-hidden="true">
+                  <span className={styles.callNumber}>{catalogue.get(base.id)}</span>
                   <span className={styles.baseCardIcon}>
-                    <Folder size={19} strokeWidth={1.5} aria-hidden="true" />
+                    <Folder size={20} strokeWidth={1.5} aria-hidden="true" />
                   </span>
                 </span>
                 <span className={styles.baseCardText}>
@@ -101,7 +104,7 @@ export function BasesView() {
                 </span>
                 <span className={styles.baseCardFoot}>
                   <span>{base.updated_at ? `更新于 ${relativeTime(base.updated_at)}` : "查看资料与索引状态"}</span>
-                  <span className={styles.baseOpen}>打开 <ArrowRight size={15} className={styles.baseCardArrow} aria-hidden="true" /></span>
+                  <span className={styles.baseOpen}>打开 <ArrowRight size={16} className={styles.baseCardArrow} aria-hidden="true" /></span>
                 </span>
               </Link>
               <button
@@ -110,12 +113,12 @@ export function BasesView() {
                 title="删除知识库"
                 onClick={() => setPending(base)}
               >
-                <Trash2 size={14} />
+                <Trash2 size={16} />
               </button>
             </article>
           ))}
           {!query && <button className={styles.baseCreate} aria-label="在网格中新建知识库" onClick={focusCreate}>
-            <span className={styles.createTile} aria-hidden="true"><Plus size={24} strokeWidth={1.4} /></span>
+            <span className={styles.createTile} aria-hidden="true"><Plus size={20} strokeWidth={1.5} /></span>
             <strong>新建知识库</strong>
             <span>为下一组资料留一个位置</span>
           </button>}

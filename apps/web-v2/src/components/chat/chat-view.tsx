@@ -29,10 +29,10 @@ function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, docum
       <div className={styles.docsHead}>
         <div>
           <p className={styles.eyebrow}>Documents</p>
-          <h2>资料 <span>{documents.documents.length}</span></h2>
+          <h2 data-display-heading>资料 <span>{documents.documents.length}</span></h2>
         </div>
         <FilePicker label="上传资料" className={styles.uploadChip} disabled={!knowledge.selectedBase || documents.working} onPick={(file) => void documents.upload(file)}>
-          <Plus size={15} aria-hidden="true" />
+          <Plus size={16} aria-hidden="true" />
         </FilePicker>
       </div>
 
@@ -56,7 +56,7 @@ function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, docum
         </div>
       ) : (
         <div className={styles.docsEmpty}>
-          <FileText size={22} strokeWidth={1.4} aria-hidden="true" />
+          <FileText size={20} strokeWidth={1.5} aria-hidden="true" />
           <p>还没有资料</p>
           <span>支持 TXT、Markdown 与可读取文本的 PDF，最大 8 MiB。</span>
         </div>
@@ -69,13 +69,13 @@ function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, docum
       )}
 
       <div className={styles.privacy}>
-        <CircleHelp size={14} aria-hidden="true" />
+        <CircleHelp size={16} aria-hidden="true" />
         <p>资料只对当前账户可见。索引显示“已就绪”后才会参与问答。</p>
       </div>
 
       {selected && (
         <Link className={styles.docsLink} href={`/knowledge-bases/${selected.id}`}>
-          <FolderOpen size={14} aria-hidden="true" /> 打开知识库管理
+          <FolderOpen size={16} aria-hidden="true" /> 打开知识库管理
         </Link>
       )}
     </div>
@@ -136,7 +136,7 @@ export function ChatView() {
       <header className="workspace-header">
         <div className={styles.chatTitle}>
           <p className={styles.eyebrow}>Conversations</p>
-          <h1>对话</h1>
+          <h1 data-display-heading>对话</h1>
           <p className={styles.chatMeta}>
             {selected ? selected.name : "选择一个知识库开始"} · {readyDocuments.length} 份资料可用于问答
           </p>
@@ -144,7 +144,7 @@ export function ChatView() {
         <div className={styles.chatActions} data-header-actions>
           {knowledge.bases.length > 1 && (
             <label className={styles.baseSelect} data-composite-field>
-              <Layers size={14} aria-hidden="true" />
+              <Layers size={16} aria-hidden="true" />
               <select
                 aria-label="切换知识库"
                 value={knowledge.selectedBase}
@@ -159,13 +159,13 @@ export function ChatView() {
             </label>
           )}
           <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("history")}>
-            <PanelLeft size={14} aria-hidden="true" /> 历史记录
+            <PanelLeft size={16} aria-hidden="true" /> 历史记录
           </Button>
           <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("docs")}>
-            <PanelRight size={14} aria-hidden="true" /> 资料
+            <PanelRight size={16} aria-hidden="true" /> 资料
           </Button>
           <Button variant="secondary" size="sm" onClick={newChat}>
-            <Plus size={14} aria-hidden="true" /> 新对话
+            <Plus size={16} aria-hidden="true" /> 新对话
           </Button>
         </div>
       </header>

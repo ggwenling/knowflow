@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { sans, serif } from "./fonts";
+import { sans, serif, cjkDisplay } from "./fonts";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { sidebarBootstrap } from "@/lib/sidebar-preference";
@@ -27,13 +27,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#f5f0e6",
   colorScheme: "light",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
+    <html lang="zh-CN" className={`${sans.variable} ${serif.variable} ${cjkDisplay.variable}`} suppressHydrationWarning>
       <head>
         <script id="sidebar-preference" dangerouslySetInnerHTML={{ __html: sidebarBootstrap }} />
       </head>

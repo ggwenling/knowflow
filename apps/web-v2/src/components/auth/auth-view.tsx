@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { BrandSeal } from "@/components/ui/brand-seal";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -44,12 +46,13 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
 
   return (
     <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
+      <Image className={styles.atlasArt} src="/atlas-auth.webp" alt="" width={720} height={1080} preload sizes="(max-width: 700px) 1px, 50vw" />
       <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
         <DeferredVisual><Ribbon /></DeferredVisual>
       </div>
       <section key={mode} className={styles.content}>
-        <div className={styles.brand}>KnowFlow</div>
-        <div className={styles.intro}>
+        <div className={styles.brand}><BrandSeal size={32} />KnowFlow</div>
+        <div className={styles.intro} data-ink-settle>
           <h1>
             {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
           </h1>

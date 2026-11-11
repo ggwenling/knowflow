@@ -117,7 +117,7 @@
   align-items: center;
   gap: 14px;
   margin: 0 auto;
-  border: 1px solid #e6e6e6;
+  border: 1px solid var(--line);
 }
 
 .ask > svg {
@@ -149,19 +149,19 @@
   border: 1px solid var(--ink);
   border-radius: 13px;
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .ask > button:hover:not(:disabled) {
-    background: #333;
+    background: var(--ink-hover);
   }
 }
 
 .ask > button:disabled {
-  border-color: #e4e4e4;
-  background: #f0f0f0;
-  color: #b9b9b9;
+  border-color: var(--line);
+  background: var(--bg-muted);
+  color: var(--ink-3);
 }
 
 .scope {
@@ -186,11 +186,11 @@
   width: fit-content;
   max-width: 100%;
   margin: 14px auto 0;
-  border: 1px solid #ead9c6;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fffaf3;
+  background: var(--warning-soft);
   padding: 8px 12px;
-  color: #7d5a32;
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -217,7 +217,7 @@
   align-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--surface-overlay);
   color: var(--ink);
   text-align: left;
   text-decoration: none;
@@ -225,8 +225,8 @@
 
 @media (hover: hover) and (pointer: fine) {
   .shortcut:hover {
-    border-color: #c9c9c9;
-    background: #fff;
+    border-color: var(--line-strong);
+    background: var(--surface-raised);
   }
 }
 
@@ -254,7 +254,7 @@
 
 .shortcutArrow {
   flex: none;
-  color: #bdbdbd;
+  color: var(--line-strong);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -271,7 +271,7 @@
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--surface-overlay);
 }
 
 .panelHead {
@@ -317,7 +317,7 @@
 }
 
 .baseRow + .baseRow, .conversation + .conversation {
-  border-top: 1px solid #f2f2f2;
+  border-top: 1px solid var(--line);
 }
 
 .baseLink {
@@ -336,7 +336,7 @@
 
 .rowArrow {
   flex: none;
-  color: #bdbdbd;
+  color: var(--line-strong);
 }
 
 .rowIcon {
@@ -552,7 +552,7 @@
 }
 
 .ask {
-  border-color: #d8dfe5;
+  border-color: var(--line-strong);
   border-radius: 18px;
   box-shadow: var(--shadow-raised), var(--highlight);
   transition: transform var(--dur) var(--ease);
@@ -560,7 +560,7 @@
 
 .ask:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px #506e830d, var(--shadow-raised);
+  box-shadow: 0 0 0 4px #ad402c0d, var(--shadow-raised);
 }
 
 .ask input:focus-visible {
@@ -756,7 +756,7 @@
 .shortcut:first-child {
   background: var(--ink);
   border-color: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   box-shadow: inset 0 1px 0 #ffffff26, var(--shadow-card);
 }
 
@@ -767,11 +767,11 @@
 }
 
 .shortcut:first-child .shortcutIcon, .shortcut:first-child .shortcutArrow {
-  color: #e3eaf0;
+  color: var(--on-ink);
 }
 
 .shortcut:first-child .shortcutText small {
-  color: #ccd5dd;
+  color: #dfd5c3;
 }
 
 .panelHead {
@@ -823,14 +823,14 @@
 
 @media (hover: hover) and (pointer: fine) {
   .shortcut:first-child:hover {
-    background: #282e35;
-    border-color: #282e35;
+    background: var(--ink-hover);
+    border-color: var(--ink-hover);
   }
   .shortcut:hover .shortcutArrow {
     transform: translateX(3px);
   }
   .baseLink:hover, .conversation:hover {
-    background: #f2f5f8;
+    background: var(--bg-subtle);
   }
   .baseLink:hover .rowArrow {
     color: var(--accent);
@@ -957,7 +957,7 @@
   border: 1px solid var(--ink);
   border-radius: 11px;
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   transition: transform var(--dur-fast) var(--ease);
 }
 
@@ -1066,7 +1066,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .askMain > button:hover:not(:disabled) {
-    background: #343a41;
+    background: var(--accent);
   }
 }
 
@@ -1148,3 +1148,19 @@
     transform: none;
   }
 }
+
+/* The wordmark is the lead; the loom and controls are already present beneath it. */
+.hero .eyebrow { text-transform: none; letter-spacing: .06em; color: var(--ink-3); }
+.hero > h1::after {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin: 0 0 9px 14px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.panel { background: var(--surface-raised); box-shadow: none; }
+.panelHead h2 { font-family: var(--font-cjk-display); font-size: 17px; font-weight: 400; }
+.rowIcon { border-radius: 5px; background: var(--bg-subtle); }
+.empty img { width: 108px; height: 72px; object-fit: contain; mix-blend-mode: multiply; mask-image: radial-gradient(ellipse, #000 50%, transparent 74%); }

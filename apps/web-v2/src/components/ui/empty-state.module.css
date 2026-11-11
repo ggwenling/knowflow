@@ -8,7 +8,7 @@
   padding: 40px 24px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(ellipse at 50% 10%, #fff, var(--bg-subtle));
+  background: radial-gradient(ellipse at 50% 10%, var(--surface-raised), var(--bg-subtle));
   text-align: center;
 }
 
@@ -25,7 +25,7 @@
   margin-bottom: 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--accent);
   box-shadow: var(--shadow-card);
 }
@@ -58,3 +58,7 @@
   mix-blend-mode: multiply;
   margin: -16px 0 8px;
 }
+
+.empty { background: var(--bg-subtle); border-color: var(--line); box-shadow: none; }
+.title { font-family: var(--font-cjk-display); font-size: 20px; font-weight: 400; }
+.illustration { height: auto; aspect-ratio: 3 / 2; object-fit: contain; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }

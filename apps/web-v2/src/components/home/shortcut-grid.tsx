@@ -20,13 +20,13 @@ export function ShortcutGrid({ uploadHref }: { uploadHref: string }) {
           aria-label={title}
         >
           <span className={styles.shortcutTile} aria-hidden="true">
-            <Icon className={styles.shortcutIcon} size={22} strokeWidth={1.5} />
+            <Icon className={styles.shortcutIcon} size={20} strokeWidth={1.5} />
           </span>
           <span className={styles.shortcutText}>
             <strong>{title}</strong>
             <small>{description}</small>
           </span>
-          <ArrowRight className={styles.shortcutArrow} size={17} strokeWidth={1.6} aria-hidden="true" />
+          <ArrowRight className={styles.shortcutArrow} size={18} strokeWidth={1.5} aria-hidden="true" />
         </Link>
       ))}
     </div>

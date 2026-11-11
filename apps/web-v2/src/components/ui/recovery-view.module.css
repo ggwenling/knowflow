@@ -3,7 +3,7 @@
   min-height: 100svh;
   place-items: center;
   padding: 32px 20px;
-  color: var(--ink, #191c20);
+  color: var(--ink, #17150f);
   font-family: var(--font-sans, "DM Sans", "PingFang SC", "Microsoft YaHei", sans-serif);
 }
 
@@ -21,7 +21,7 @@
 
 .code {
   margin: 0 0 12px;
-  color: var(--accent, #506e83);
+  color: var(--accent, #ad402c);
   font: 12px/1.5 ui-monospace, monospace;
   text-transform: uppercase;
 }
@@ -36,7 +36,7 @@
 
 .description {
   margin: 18px 0 26px;
-  color: var(--ink-2, #555e68);
+  color: var(--ink-2, #575249);
   font-size: 14px;
   line-height: 1.85;
   overflow-wrap: anywhere;
@@ -47,11 +47,11 @@
   min-height: 40px;
   align-items: center;
   gap: 12px;
-  border: 1px solid #191c20;
+  border: 1px solid #17150f;
   border-radius: 9px;
-  background: #191c20;
+  background: #17150f;
   padding: 0 16px;
-  color: #fff;
+  color: var(--on-ink);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -61,20 +61,20 @@
 }
 
 .action:focus-visible {
-  outline: 2px solid #506e83;
+  outline: 2px solid #ad402c;
   outline-offset: 3px;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .action:hover {
-    background: #343a41;
+    background: var(--accent);
   }
 }
 
 /* Quiet editorial recovery, without a radial cloud or floating-card chrome. */
 
 .page {
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .card {
@@ -90,7 +90,7 @@
 }
 
 .code {
-  border-top: 1px solid var(--line, #e4e7eb);
+  border-top: 1px solid var(--line, #dcd3c3);
   padding-top: 24px;
   font-family: var(--font-sans, "DM Sans", "PingFang SC", sans-serif);
   font-size: 12px;
@@ -117,3 +117,11 @@
     margin-bottom: 40px;
   }
 }
+
+.page { background: var(--bg, #f5f0e6) url('/paper-grain.svg'); color: var(--ink, #17150f); }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+.artwork { display: block; width: 240px; max-width: 100%; height: auto; margin: 0 0 24px; mix-blend-mode: multiply; filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.title { font-family: var(--font-cjk-display, "Songti SC", "Noto Serif CJK SC", serif); }
+.action { background: var(--ink, #17150f); border-color: var(--ink, #17150f); color: #fbf8f2; }
+.action:focus-visible { outline-color: #ad402c; }
+@media (hover: hover) and (pointer: fine) { .action:hover { background: #ad402c; } }

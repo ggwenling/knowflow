@@ -95,7 +95,7 @@ export function BaseDetailView() {
   return (
     <div className={styles.page}>
       <Link className={styles.back} href="/knowledge-bases">
-        <ArrowLeft size={14} aria-hidden="true" /> 全部知识库
+        <ArrowLeft size={16} aria-hidden="true" /> 全部知识库
       </Link>
 
       {error ? (
@@ -113,7 +113,7 @@ export function BaseDetailView() {
               </p>
             </div>
             <span className={styles.detailBadge} data-header-tag>
-              <Layers size={14} aria-hidden="true" /> 私有空间
+              <Layers size={16} aria-hidden="true" /> 私有空间
             </span>
           </header>
 
@@ -175,7 +175,7 @@ export function BaseDetailView() {
             />
           ) : (
             <EmptyState
-              illustration={!documents.documents.length}
+              illustration={!documents.documents.length ? "documents" : false}
               icon={<FileText size={20} strokeWidth={1.5} />}
               title={documents.documents.length ? "这个筛选下没有资料" : "还没有资料"}
               description={documents.documents.length

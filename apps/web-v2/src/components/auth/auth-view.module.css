@@ -5,7 +5,7 @@
   grid-template-columns: minmax(0, 1fr);
   isolation: isolate;
   overflow: clip;
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink);
   font-family: var(--font-sans);
 }
@@ -52,7 +52,7 @@
   width: 100%;
   height: 58px;
   padding: 0 18px;
-  border: 1px solid #d1d1d1;
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
   color: var(--ink);
   font-size: 16px;
@@ -110,7 +110,7 @@
   justify-content: center;
   gap: 10px;
   margin-top: 28px;
-  color: #fff;
+  color: var(--on-ink);
   font-weight: 700;
 }
 
@@ -118,7 +118,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
+  border-top-color: var(--surface-raised);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -131,7 +131,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .submit:hover:not(:disabled) {
-    background: #333;
+    background: var(--ink-hover);
   }
 }
 
@@ -150,7 +150,7 @@
   border: 0;
   background: none;
   padding: 0;
-  color: #333;
+  color: var(--ink-hover);
   font-size: 14px;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -229,15 +229,15 @@
 
 .form input {
   border-color: var(--line-strong);
-  background: #ffffffed;
-  box-shadow: inset 0 1px 2px #191c2003;
+  background: var(--surface-overlay);
+  box-shadow: inset 0 1px 2px #382b1603;
 }
 
 .form input:focus {
   border-color: var(--accent);
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
-  box-shadow: 0 0 0 5px #506e8308;
+  box-shadow: 0 0 0 5px #ad402c08;
 }
 
 .form input::placeholder {
@@ -253,8 +253,8 @@
   border: 1px solid var(--ink);
   border-radius: 11px;
   font-size: 15px;
-  background: linear-gradient(180deg, #2c3035, var(--ink));
-  box-shadow: inset 0 1px 0 #ffffff20, 0 2px 3px #191c2012;
+  background: linear-gradient(180deg, var(--ink-hover), var(--ink));
+  box-shadow: inset 0 1px 0 #ffffff20, 0 2px 3px #382b1612;
   transition: transform var(--dur-fast) var(--ease);
 }
 
@@ -288,7 +288,7 @@
 }
 
 .error {
-  border: 1px solid #ecd8d2;
+  border: 1px solid var(--danger-line);
   border-radius: 8px;
   background: var(--danger-soft);
   padding: 10px 12px;
@@ -371,4 +371,33 @@
   .intro, .formGroup {
     animation: authFade 120ms var(--ease) both !important;
   }
+}
+
+.page { background: var(--bg) url('/paper-grain.svg'); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.atlasArt {
+  position: absolute;
+  z-index: -2;
+  right: 0;
+  bottom: 0;
+  width: min(50vw, 720px);
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: right bottom;
+  mix-blend-mode: multiply;
+  filter: saturate(.4);
+  opacity: .65;
+  mask-image: linear-gradient(to right, transparent, #000 22%), linear-gradient(to top, #000 75%, transparent);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+.ribbon { opacity: .65; }
+.form input { background: var(--surface-raised); border-radius: 6px; border-color: var(--line-strong); }
+.submit { background: var(--ink); border-radius: 6px; }
+@media (hover: hover) and (pointer: fine) {
+  .submit:hover:not(:disabled) { background: var(--accent); }
+}
+@media (max-width: 700px) {
+  .atlasArt { display: none; }
 }

@@ -66,7 +66,7 @@ export function HomeView() {
 
       <header className={styles.header}>
         <details className={styles.notifications} data-popover>
-          <summary aria-label="通知"><Bell size={21} strokeWidth={1.6} /></summary>
+          <summary aria-label="通知"><Bell size={20} strokeWidth={1.5} /></summary>
           <div className={styles.popover}>
             <strong>通知</strong>
             <p>暂无新通知。</p>
@@ -76,7 +76,7 @@ export function HomeView() {
 
       <section className={styles.hero} aria-labelledby="home-title">
         <p className={styles.eyebrow}>Retrieval-augmented workspace</p>
-        <h1 id="home-title">KnowFlow</h1>
+        <h1 id="home-title" data-ink-settle="hero">KnowFlow</h1>
         <p className={styles.lead}>基于 RAG 的智能知识管理与问答系统</p>
         <HomeComposer inputRef={inputRef} />
         <ModelNotice />

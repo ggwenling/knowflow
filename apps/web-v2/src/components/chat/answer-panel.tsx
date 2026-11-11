@@ -37,13 +37,13 @@ export function AnswerPanel({
   if (!answer) {
     return (
       <div className={styles.answerEmpty}>
-        <Image className={styles.emptyArtwork} src="/archive-study.webp" alt="" width={240} height={160} />
-        <h2>从一个具体问题开始</h2>
+        <Image className={styles.emptyArtwork} src="/atlas-empty-history.webp" alt="" width={240} height={160} loading="lazy" />
+        <h2 data-display-heading>从一个具体问题开始</h2>
         <p>回答会附上可打开的原文来源，方便你核对关键事实。每次提问独立检索，不会把上一轮回答当作上下文。</p>
         <div className={styles.examples}>
           {["这份资料的核心结论是什么？", "有哪些必须满足的前提条件？", "请给出原文中对应的依据。"].map((example) => (
             <button key={example} onClick={() => onEditQuestion(example)}>
-              <Sparkles size={13} aria-hidden="true" />
+              <Sparkles size={16} aria-hidden="true" />
               {example}
             </button>
           ))}
@@ -89,7 +89,7 @@ export function AnswerPanel({
           <StatusBadge status={answer.status} kind="question" />
           {answer.answer && (
             <button className={styles.iconAction} onClick={() => void copy()} aria-label="复制回答" title="复制回答">
-              <Clipboard size={14} />
+              <Clipboard size={16} />
             </button>
           )}
           {answer.question_id && !processing && (
@@ -132,7 +132,7 @@ export function AnswerPanel({
           <p>此问答状态：{questionStatusLabel(answer.status)}。可在历史记录中查看。</p>
           <div className={styles.answerEndActions}>
             <button onClick={() => onEditQuestion(answer.question)}>
-              <SquarePen size={13} aria-hidden="true" /> 重新编辑问题
+              <SquarePen size={16} aria-hidden="true" /> 重新编辑问题
             </button>
             {knowledge.selectedBase && (
               <button onClick={() => void stream.ask(answer.question, knowledge.selectedBase)}>重试提问</button>

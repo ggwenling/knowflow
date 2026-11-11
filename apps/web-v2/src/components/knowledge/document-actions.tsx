@@ -41,7 +41,7 @@ export function DocumentActions(props: DocumentActionsProps) {
         if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); void show(event.key === "ArrowUp" ? "last" : "first"); }
         if (event.key === "Escape") { intent.current++; setLoading(false); }
       }}>
-        <MoreHorizontal size={17} aria-hidden="true" />
+        <MoreHorizontal size={18} aria-hidden="true" />
       </button>
       {error && <span role="alert">操作菜单未能载入，请重试。</span>}
     </div>

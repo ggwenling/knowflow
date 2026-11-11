@@ -1,35 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #ffffff;
-  --bg-subtle: #f7f8f9;
-  --bg-muted: #eef0f2;
-  --ink: #191c20;
-  --ink-2: #555e68;
-  --ink-3: #626c77;
-  --line: #e4e7eb;
-  --line-strong: #cbd1d8;
-  --accent: #506e83;
-  --accent-soft: #edf3f7;
-  --success: #5f8a73;
-  --warning: #b0804a;
-  --success-ink: #476a56;
-  --warning-ink: #806039;
-  --danger: #a05a50;
-  --danger-soft: #fbf4f2;
-  --radius-xs: 6px;
-  --radius-sm: 9px;
-  --radius: 14px;
-  --radius-lg: 20px;
+  color-scheme: light;
+  --on-ink: #fbf8f2;
+  --ink-hover: #302b22;
+  --success-soft: #e8eddf;
+  --warning-soft: #f2e7d2;
+  --danger-line: #d7b3a5;
+  --font-cjk-display: var(--font-noto-serif-sc), "Songti SC", "Noto Serif CJK SC", serif;
+  --bg: #f5f0e6;
+  --bg-subtle: #f1ebdf;
+  --bg-muted: #ede6d8;
+  --ink: #17150f;
+  --ink-2: #575249;
+  --ink-3: #6b6459;
+  --line: #dcd3c3;
+  --line-strong: #c5b9a5;
+  --accent: #ad402c;
+  --accent-soft: #f2e4d9;
+  --success: #647e61;
+  --warning: #987139;
+  --success-ink: #426044;
+  --warning-ink: #795521;
+  --danger: #a13c2d;
+  --danger-soft: #f5e5dc;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
   --radius-pill: 999px;
-  --surface-raised: #fff;
-  --surface-sunken: #f3f5f7;
-  --surface-overlay: rgba(255, 255, 255, .96);
-  --shadow-card: 0 0 0 1px rgba(25, 28, 32, .015), 0 2px 3px rgba(25, 28, 32, .025), 0 8px 24px rgba(25, 28, 32, .025);
-  --shadow-raised: 0 0 0 1px rgba(25, 28, 32, .025), 0 4px 8px rgba(25, 28, 32, .035), 0 16px 40px rgba(25, 28, 32, .055);
-  --shadow-pop: 0 0 0 1px rgba(25, 28, 32, .04), 0 8px 16px rgba(25, 28, 32, .06), 0 24px 64px rgba(25, 28, 32, .1);
+  --surface-raised: #fbf8f2;
+  --surface-sunken: #ede6d8;
+  --surface-overlay: rgba(251, 248, 242, .98);
+  --shadow-card: 0 0 0 1px rgba(56, 43, 22, .015), 0 2px 3px rgba(56, 43, 22, .025), 0 8px 24px rgba(56, 43, 22, .025);
+  --shadow-raised: 0 0 0 1px rgba(56, 43, 22, .025), 0 4px 8px rgba(56, 43, 22, .035), 0 16px 40px rgba(56, 43, 22, .055);
+  --shadow-pop: 0 0 0 1px rgba(56, 43, 22, .04), 0 8px 16px rgba(56, 43, 22, .06), 0 24px 64px rgba(56, 43, 22, .1);
   --highlight: inset 0 1px 0 rgba(255, 255, 255, .8);
-  --focus-ring: #506e83;
+  --focus-ring: #ad402c;
   --type-display: clamp(56px, 5.6vw, 84px);
   --type-h1: clamp(30px, 3.2vw, 40px);
   --type-h2: 20px;
@@ -62,7 +69,7 @@
   --font-sans: var(--font-dm-sans, "DM Sans"), "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
   --font-serif: var(--font-dm-serif, "DM Serif Display"), Georgia, "Songti SC", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --background: #ffffff;
+  --background: #f5f0e6;
   --foreground: var(--ink);
   --border: var(--line);
 }
@@ -121,8 +128,8 @@ a, button, summary {
 }
 
 ::selection {
-  background: #e4e4e4;
-  color: #111;
+  background: var(--accent-soft);
+  color: var(--ink);
 }
 
 :focus-visible {
@@ -137,10 +144,12 @@ a, button, summary {
 }
 
 .loginFlow:not(:has(canvas)) {
+  mix-blend-mode: multiply;
   background: url("/login-ribbon.webp") center / 100% 100% no-repeat;
 }
 
 .home-art:not(:has(canvas)) {
+  mix-blend-mode: multiply;
   background: url("/home-wave.webp") center / 100% 100% no-repeat;
 }
 
@@ -159,12 +168,12 @@ a, button, summary {
   border: 3px solid transparent;
   border-radius: var(--radius-pill);
   background-clip: content-box;
-  background-color: #d8d8d8;
+  background-color: var(--line-strong);
 }
 
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar-thumb:hover {
-    background-color: #bdbdbd;
+    background-color: var(--ink-3);
   }
 }
 
@@ -176,10 +185,15 @@ a, button, summary {
   font-variant-numeric: tabular-nums;
 }
 
-/* A single entrance per page; no exit hold or nested content choreography. */
+/* Page fallbacks fade/rise; the route itself stays still behind the heading. */
 
 .page-enter {
   animation: page-enter var(--dur-page) var(--ease) backwards;
+}
+
+@keyframes ink-settle {
+  from { opacity: 0; transform: translateY(5px); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
 }
 
 @keyframes page-enter {
@@ -267,7 +281,6 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
 
 .workspace-route {
   min-width: 0;
-  animation: page-enter var(--dur-page) var(--ease) backwards;
 }
 
 .workspace-header {
@@ -328,15 +341,12 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   flex-shrink: 0;
 }
 
-/* Curated cards and the header enter as siblings, never inside a moving parent. */
+/* Searchable catalogue content stays still while its heading settles. */
 
 .workspace-route:has([data-entrance="cards"]) {
   animation: none;
 }
 
-.workspace-route [data-entrance="cards"] > .workspace-header {
-  animation: page-enter var(--dur-page) var(--ease) backwards;
-}
 
 @media (max-width: 760px) {
   .workspace-header {
@@ -363,14 +373,6 @@ html[data-input="keyboard"] *, html[data-input="keyboard"] *::before, html[data-
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :where(.workspace-route, .workspace-route [data-entrance="cards"] > .workspace-header) {
-    animation: gentle-fade 120ms var(--ease) backwards !important;
-  }
-  .workspace-route:has([data-entrance="cards"]) {
-    animation: none !important;
-  }
-}
 
 .workspace-header > [data-header-actions] {
   flex: 0 1 auto;
@@ -422,3 +424,34 @@ kbd {
   color: var(--ink-2);
   cursor: text;
 }
+
+/* Ink & Paper Atlas: static grain, no raster texture and no full-screen fixed layer. */
+body {
+  background-image: url("/paper-grain.svg");
+}
+.lucide { stroke-width: 1.5; }
+[data-display-heading] {
+  font-family: var(--font-cjk-display);
+  font-weight: 400;
+  letter-spacing: .015em;
+}
+.workspace-header h1[data-display-heading] {
+  font-family: var(--font-cjk-display);
+  letter-spacing: -.025em;
+  line-height: 1.35;
+}
+.workspace-header { animation: ink-settle 220ms var(--ease) backwards; }
+.workspace-header > div > p:first-child { text-transform: none; letter-spacing: .055em; }
+.workspace-header > div > p:first-child::before { width: 7px; height: 7px; border-radius: 1px; }
+[data-sonner-toast][data-styled=true] { border-left: 3px solid var(--accent) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .workspace-header { animation: gentle-fade 120ms var(--ease) backwards !important; }
+}
+
+:root [data-ink-settle] { animation: ink-settle 220ms var(--ease) backwards; }
+:root [data-ink-settle="hero"] { animation-duration: 240ms; }
+@media (prefers-reduced-motion: reduce) {
+  :root [data-ink-settle] { animation: gentle-fade 120ms var(--ease) backwards !important; }
+}
+
+html[data-input="keyboard"] [data-ink-settle] { animation: none !important; }

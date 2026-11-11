@@ -1,0 +1,26 @@
+[
+  {
+    "key": "auth",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Asset: tall auth side-panel art. One long folded paper ribbon meanders between a small stack of index cards and a precise open archival folio, suggesting information finding its place. Portrait 2:3 composition, objects in lower two-thirds, generous negative space. Minimal pencil study, not photorealistic."
+  },
+  {
+    "key": "empty-bases",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Graphite lines must be neutral charcoal, not sepia or brown. No botanical decorations. Small object centered with ample blank margins. Landscape 3:2. Asset: no knowledge bases empty state. An empty archival index-card box, its lid open, a single blank tab waiting inside. Precise folded ivory paper construction, very simple silhouette."
+  },
+  {
+    "key": "empty-history",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Graphite lines must be neutral charcoal, not sepia or brown. No botanical decorations. Small object centered with ample blank margins. Landscape 3:2. Asset: no conversations empty state. Two blank index cards, one lying flat and one gently raised, a single fine graphite thread connecting their corners, suggesting a question awaiting an answer. No speech bubble icons."
+  },
+  {
+    "key": "empty-documents",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Graphite lines must be neutral charcoal, not sepia or brown. No botanical decorations. Small object centered with ample blank margins. Landscape 3:2. Asset: no documents empty state. An open paper folder holding one empty translucent sheet, small folded corner and delicate graphite contour rules along the folder edge."
+  },
+  {
+    "key": "recovery",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Graphite lines must be neutral charcoal, not sepia or brown. No botanical decorations. Small object centered with ample blank margins. Landscape 3:2. Asset: 404 and error illustration. A folded paper atlas opened to blank pages, a fine graphite path ends at a small gap between pages, one loose bookmark lies beside it. No symbols or numerals."
+  },
+  {
+    "key": "workflow",
+    "prompt": "Use case: stylized-concept. Ink & Paper Atlas, a coherent archival knowledge-workspace illustration family. Warm uncoated paper ground exactly #F5F0E6, fine dry graphite etched linework, ivory folded paper, soft warm contact shadows, one tiny unlettered vermilion square #B5452F, quiet editorial composition, delicate tactile details. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into uniform paper ground. Graphite lines must be neutral charcoal, not sepia or brown. No botanical decorations. Small object centered with ample blank margins. Landscape 3:2. Asset: workflow placeholder illustration. Three small folded paper folios arranged from left to right, joined by one continuous graphite thread passing through their edges, a small vermilion square at the final folio. Simple architectural pencil study."
+  }
+]

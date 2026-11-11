@@ -21,3 +21,13 @@ export const serif = localFont({
   adjustFontFallback: "Times New Roman",
   fallback: ["Georgia", "Songti SC", "serif"],
 });
+
+export const cjkDisplay = localFont({
+  src: "./fonts/noto-serif-sc-headings-400.woff2",
+  variable: "--font-noto-serif-sc",
+  weight: "400",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+  fallback: ["Songti SC", "Noto Serif CJK SC", "serif"],
+});

@@ -59,7 +59,7 @@ export function DocumentList({
         ))}
         {!documents.length && (
           <div className={styles.docEmptyRow}>
-            <FileText size={18} strokeWidth={1.4} aria-hidden="true" />
+            <FileText size={18} strokeWidth={1.5} aria-hidden="true" />
             <span>没有符合条件的资料。</span>
           </div>
         )}

@@ -21,7 +21,7 @@ export default function DocumentActionsMenu({ document, busy, onUpdate, onRebuil
     <DropdownMenu.Root open={open} onOpenChange={onOpenChange}>
       <div className={styles.docMenu}>
         <DropdownMenu.Trigger asChild>
-          <button type="button" aria-label={`${document.original_name} 操作`} disabled={busy}><MoreHorizontal size={17} aria-hidden="true" /></button>
+          <button type="button" aria-label={`${document.original_name} 操作`} disabled={busy}><MoreHorizontal size={18} aria-hidden="true" /></button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content ref={content} className={styles.docMenuPanel} align="end" sideOffset={4}>

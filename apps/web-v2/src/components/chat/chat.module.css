@@ -30,7 +30,7 @@
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 8px;
   color: var(--ink-2);
 }
@@ -58,11 +58,11 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
-  border: 1px solid #ecd9c4;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fffaf3;
+  background: var(--warning-soft);
   padding: 9px 12px;
-  color: #7d5a32;
+  color: var(--warning-ink);
   font-size: 12px;
 }
 
@@ -112,7 +112,7 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink-2);
 }
 
@@ -230,7 +230,7 @@
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .answerScroll {
@@ -285,7 +285,7 @@
   align-items: center;
   gap: 6px;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink-2);
 }
 
@@ -364,7 +364,7 @@
 
 .streamingText {
   margin: 0;
-  color: #28323a;
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.9;
   white-space: pre-wrap;
@@ -381,7 +381,7 @@
 }
 
 .markdown {
-  color: #28323a;
+  color: var(--ink);
   font-size: 14.5px;
   line-height: 1.9;
   overflow-wrap: anywhere;
@@ -438,7 +438,7 @@
   margin: 12px 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fbfbfb;
+  background: var(--bg-subtle);
   padding: 12px 14px;
   font-family: ui-monospace, "Cascadia Code", monospace;
   font-size: 12px;
@@ -522,7 +522,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .citation:hover {
-    border-color: #b9c9d3;
+    border-color: var(--line-strong);
     background: var(--accent-soft);
   }
 }
@@ -651,15 +651,15 @@
   border-radius: var(--radius-xs);
   background: var(--ink);
   padding: 0 12px;
-  color: #fff;
+  color: var(--on-ink);
   font-size: 12px;
   font-weight: 600;
 }
 
 .send:disabled {
-  border-color: #e4e4e4;
-  background: #f1f1f1;
-  color: #b9b9b9;
+  border-color: var(--line);
+  background: var(--bg-muted);
+  color: var(--ink-3);
 }
 
 .stop {
@@ -667,9 +667,9 @@
   min-height: 32px;
   align-items: center;
   gap: 6px;
-  border: 1px solid #e0cec9;
+  border: 1px solid var(--danger-line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 0 11px;
   color: var(--danger);
   font-size: 12px;
@@ -719,7 +719,7 @@
   place-items: center;
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--ink-2);
   cursor: pointer;
 }
@@ -750,7 +750,7 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 48px;
   align-items: center;
-  border-bottom: 1px solid #f4f4f4;
+  border-bottom: 1px solid var(--line);
 }
 
 .docBadge {
@@ -904,7 +904,7 @@
   overflow: auto;
   margin: 12px 0 0;
   padding: 0 22px 22px;
-  color: #33404a;
+  color: var(--ink-2);
   font: 12px/1.9 ui-monospace, "Cascadia Code", monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1027,7 +1027,7 @@
 }
 
 .search {
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .search input {
@@ -1060,8 +1060,8 @@
 }
 
 .historyActive {
-  background: #fff;
-  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px #191c2005;
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 1px var(--line), 0 1px 2px #382b1605;
 }
 
 .railFoot {
@@ -1097,7 +1097,7 @@
   height: 26px;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid #dfe8ee;
+  border: 1px solid var(--line);
 }
 
 .questionActions {
@@ -1117,7 +1117,7 @@
 .markdown, .streamingText {
   font-size: 15px;
   line-height: 1.8;
-  color: #303943;
+  color: var(--ink);
 }
 
 .markdown h1, .markdown h2, .markdown h3 {
@@ -1158,7 +1158,7 @@
 .citation {
   gap: 12px;
   padding: 13px 12px;
-  background: #fcfdfe;
+  background: var(--surface-raised);
 }
 
 .citationIndex {
@@ -1168,7 +1168,7 @@
   flex: none;
   place-items: center;
   padding: 0;
-  border: 1px solid #dce6ed;
+  border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--accent-soft);
   font: 12px var(--font-mono);
@@ -1198,13 +1198,13 @@
 .composer {
   border: 1px solid var(--line-strong);
   border-radius: 11px;
-  background: #fff;
+  background: var(--surface-raised);
   box-shadow: var(--shadow-card);
 }
 
 .composer:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px #506e830b, var(--shadow-card);
+  box-shadow: 0 0 0 3px #ad402c0b, var(--shadow-card);
 }
 
 .composer textarea {
@@ -1266,7 +1266,7 @@
 .docBadge {
   grid-row: 1 / 3;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-raised);
   font: 12px var(--font-mono);
   height: 34px;
 }
@@ -1437,7 +1437,7 @@
     font-size: 20px;
   }
   .sheet .docs {
-    background: #fff;
+    background: var(--surface-raised);
   }
 }
 
@@ -1459,7 +1459,7 @@
 .currentSources {
   margin-bottom: 14px;
   padding: 12px 10px;
-  border: 1px solid #dce6ed;
+  border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--accent-soft);
   flex-shrink: 0;
@@ -1554,7 +1554,7 @@
   right: -8px;
   top: -25px;
   height: 24px;
-  background: linear-gradient(to top, #fff, #ffffff00);
+  background: linear-gradient(to top, var(--surface-raised), #ffffff00);
   pointer-events: none;
 }
 
@@ -1733,3 +1733,17 @@
     min-height: 300px;
   }
 }
+
+/* Answers are a reading surface; source entries follow the catalogue language. */
+.chatMain { background: var(--surface-raised); }
+.markdown, .streamingText { color: var(--ink); line-height: 1.9; max-width: 70ch; }
+.questionMark { background: var(--surface-sunken); color: var(--ink-2); border-color: var(--line); border-radius: 3px; }
+.citation { border: 1px solid var(--line); border-left: 2px solid var(--line-strong); border-radius: 4px; background: var(--bg-subtle); }
+.citation + .citation { margin-top: 8px; }
+.citationIndex { color: var(--accent); border: 0; border-radius: 0; background: transparent; animation: gentle-fade 180ms var(--ease) backwards; }
+.sourceNumber { color: var(--accent); font-family: var(--font-mono); animation: gentle-fade 180ms var(--ease) backwards; }
+.currentSources { border-radius: 4px; background: var(--bg-subtle); }
+.currentSources button { border-bottom: 1px solid var(--line); }
+.emptyArtwork { filter: saturate(.55); mask-image: radial-gradient(ellipse, #000 45%, transparent 73%); }
+.answerEmpty h2 { font-family: var(--font-cjk-display); font-weight: 400; font-size: 23px; }
+.composer::before { background: linear-gradient(to top, var(--surface-raised), transparent); }

@@ -14,7 +14,7 @@
   border-radius: var(--radius-sm);
   background: var(--ink);
   padding: 10px 14px;
-  color: #fff;
+  color: var(--on-ink);
   font-size: 12px;
   text-decoration: none;
   transform: translateY(-160%);
@@ -102,7 +102,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .navItem:hover {
-    background: #f1f1f1;
+    background: var(--bg-muted);
     color: var(--ink);
   }
 }
@@ -157,7 +157,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .sectionHead button:hover, .sectionHead a:hover {
-    background: #ededed;
+    background: var(--bg-muted);
     color: var(--ink);
   }
 }
@@ -199,7 +199,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .baseItem:hover {
-    background: #f1f1f1;
+    background: var(--bg-muted);
     color: var(--ink);
   }
 }
@@ -252,12 +252,12 @@
 
 @media (hover: hover) and (pointer: fine) {
   .createForm button:hover:not(:disabled) {
-    border-color: #bdbdbd;
+    border-color: var(--line-strong);
   }
 }
 
 .createForm button:disabled {
-  color: #bdbdbd;
+  color: var(--line-strong);
 }
 
 .historyScroll {
@@ -281,7 +281,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .historyItem:hover {
-    background: #f1f1f1;
+    background: var(--bg-muted);
   }
 }
 
@@ -325,7 +325,7 @@
   place-items: center;
   border-radius: 50%;
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   font-size: 12px;
   font-weight: 700;
 }
@@ -445,9 +445,9 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  border: 1px solid #e8d3cd;
+  border: 1px solid var(--danger-line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--surface-raised);
   padding: 12px 14px;
   box-shadow: var(--shadow-pop);
   color: var(--danger);
@@ -510,7 +510,7 @@
     flex: none;
     max-width: 72vw;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--surface-raised);
     padding: 0 9px;
   }
   .baseActive {
@@ -524,7 +524,7 @@
   }
   .createForm button {
     border-color: var(--ink);
-    color: #fff;
+    color: var(--on-ink);
   }
   .historyScroll {
     max-height: 92px;
@@ -540,7 +540,7 @@
 
 .sidebar {
   padding-top: 24px;
-  background: linear-gradient(180deg, #f7f8f9, #f4f5f7);
+  background: linear-gradient(180deg, var(--bg-subtle), var(--bg-subtle));
 }
 
 .brandRow {
@@ -589,10 +589,10 @@
   left: 0;
   right: 0;
   height: 38px;
-  border: 1px solid #dce1e6;
+  border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: #fff;
-  box-shadow: 0 1px 3px #191c2006;
+  background: var(--surface-raised);
+  box-shadow: 0 1px 3px #382b1606;
   transform: translateY(0);
   transition: transform 220ms var(--ease);
   pointer-events: none;
@@ -641,7 +641,7 @@
 }
 
 .baseActive {
-  background: #fff;
+  background: var(--surface-raised);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
@@ -674,9 +674,9 @@
 .account .avatar {
   width: 32px;
   height: 32px;
-  background: #e8edf1;
+  background: var(--bg-muted);
   color: var(--accent);
-  border: 1px solid #dbe3e9;
+  border: 1px solid var(--line);
 }
 
 .accountText small {
@@ -1020,7 +1020,7 @@
     border-radius: 6px;
     background: var(--ink);
     box-shadow: var(--shadow-card);
-    color: #fff;
+    color: var(--on-ink);
     font: 500 12px/1.6 var(--font-sans);
     opacity: 0;
     visibility: hidden;
@@ -1066,7 +1066,7 @@
   .accountMenu .avatar {
     border: 0;
     background: var(--ink);
-    color: #fff;
+    color: var(--on-ink);
   }
   .accountPopover {
     top: 36px;
@@ -1173,4 +1173,16 @@
     left: -12px;
     width: 12px;
   }
+}
+
+/* The seal travels with the existing interruptible navigation indicator. */
+.sidebar { background: var(--bg-subtle) url('/paper-grain.svg'); }
+.navIndicator { border-color: var(--line); background: var(--surface-raised); box-shadow: none; }
+.navIndicator::before { width: 6px; height: 6px; top: 15px; left: -11px; border-radius: 1px; }
+.navActive { color: var(--ink); }
+.navActive > svg { color: var(--accent); }
+.account .avatar { border-radius: 6px; background: var(--surface-sunken); color: var(--ink-2); }
+.content { background: transparent; }
+@media (max-width: 760px) {
+  .navIndicator::before { width: 6px; height: 3px; top: auto; bottom: -1px; left: calc(50% - 3px); }
 }
