@@ -20,6 +20,7 @@ from .embedding import EmbeddingSettings
 from .langchain_answer import CustomModel, LangChainAnswerModel
 from .java_client import JavaGateway
 from .provider_probe import ProviderReadiness
+from .provider_runtime import ProviderRuntime, ModelCallContext, model_busy, is_model_busy, BUSY_MESSAGE
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
 ID_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
@@ -49,19 +50,31 @@ class ClosingStreamingResponse(StreamingResponse):
                     self.on_close()
 
 
+class QuestionLease:
+    def __init__(self, admission, custom):
+        self.admission, self.custom, self.closed = admission, custom, False
+
+    def release(self):
+        if not self.closed:
+            self.closed = True
+            self.admission.active -= 1
+            self.admission.custom_active -= int(self.custom)
+
+
 class QuestionAdmission:
-    def __init__(self, limit: int):
+    def __init__(self, limit: int, custom_limit=2):
         self.limit = limit
-        self.active = 0
+        self.custom_limit = min(custom_limit, limit - 1)
+        self.active = self.custom_active = 0
 
-    def try_acquire(self) -> bool:
+    def try_acquire(self, custom=False):
         if self.active >= self.limit:
-            return False
+            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        if custom and self.custom_active >= self.custom_limit:
+            raise model_busy()
         self.active += 1
-        return True
-
-    def release(self) -> None:
-        self.active -= 1
+        self.custom_active += int(custom)
+        return QuestionLease(self, custom)
 
 
 async def await_answer_or_disconnect(request: Request, operation):
@@ -85,7 +98,7 @@ def failure(request_id, status, code, *, headers=None, retryable=None):
     # Messages are constants. Never serialize exception text or validation inputs.
     if retryable is None:
         retryable = status in (502, 504)
-    payload = ErrorBody(request_id=request_id, code=code, message=code,
+    payload = ErrorBody(request_id=request_id, code=code, message=BUSY_MESSAGE if status == 429 and code == "RESOURCE_LIMIT" else code,
                         retryable=retryable).model_dump()
     return JSONResponse(payload, status_code=status, headers=headers)
 
@@ -136,8 +149,10 @@ class BoundaryMiddleware:
 
 
 def create_app(settings: Settings | None = None, *, worker_factory=None,
-               answer_service_factory=None, provider_readiness_factory=None) -> FastAPI:
+               answer_service_factory=None, provider_readiness_factory=None, provider_runtime_factory=None) -> FastAPI:
     settings = settings or Settings.from_environment()
+    limits = settings.provider_limits()
+    runtime = (provider_runtime_factory or ProviderRuntime)(limits)
     contract = ContractConsumer(settings.contract_path)
     worker_factory = worker_factory if worker_factory is not None else IndexWorker
     use_langchain = answer_service_factory is None
@@ -163,7 +178,8 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     app = FastAPI(title='KnowFlow internal AI', docs_url=None, redoc_url=None,
                   openapi_url=None, lifespan=lifespan)
     app.state.contract = contract
-    app.state.question_admission = QuestionAdmission(settings.max_concurrent_questions)
+    app.state.question_admission = QuestionAdmission(settings.max_concurrent_questions, limits.custom_requests)
+    app.state.provider_runtime = runtime
     app.state.provider_readiness = (
         provider_readiness_factory() if provider_readiness_factory is not None
         else ProviderReadiness.from_environment())
@@ -187,7 +203,7 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
 
     @app.exception_handler(ProcessingError)
     async def processing_error(request: Request, exc: ProcessingError):
-        code = {400: 'INVALID_REQUEST', 504: 'PROCESSING_TIMEOUT'}.get(
+        code = 'RESOURCE_LIMIT' if is_model_busy(exc) else {400: 'INVALID_REQUEST', 504: 'PROCESSING_TIMEOUT'}.get(
             exc.status, 'AI_PROCESSING_FAILED')
         return failure(request.state.request_id, exc.status, code, retryable=exc.retryable)
 
@@ -250,7 +266,15 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
             "llm_model_profile_id": f"custom:{custom.id}" if custom is not None else llm_settings.model,
         }}
         if use_langchain or custom is not None:
-            options['llm_factory'] = lambda: LangChainAnswerModel(llm_settings)
+            def llm_factory():
+                try:
+                    owner = uuid.UUID(payload['scope']['owner_id'])
+                except (ValueError, TypeError, AttributeError):
+                    raise ProcessingError('INVALID_REQUEST', 400, retryable=False) from None
+                return LangChainAnswerModel(
+                    llm_settings, runtime=runtime, call_context=ModelCallContext(
+                        request.state.request_id, owner, custom.id if custom is not None else None))
+            options['llm_factory'] = llm_factory
         return answer_service_factory(settings.ai_database_url, contract, **options)
 
     def require_custom():
@@ -260,18 +284,16 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     async def execute_answer(request, payload, custom=None):
         service = build_answer(request, payload, custom)
         admission = request.app.state.question_admission
-        if not admission.try_acquire():
-            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        lease = admission.try_acquire(custom=custom is not None)
         try:
             return await await_answer_or_disconnect(request, lambda: service.answer(payload))
         finally:
-            admission.release()
+            lease.release()
 
     async def execute_stream(request, payload, custom=None):
         service = build_answer(request, payload, custom)
         admission = request.app.state.question_admission
-        if not admission.try_acquire():
-            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        lease = admission.try_acquire(custom=custom is not None)
 
         async def frames():
             async with aclosing(service.stream(payload)) as events:
@@ -280,7 +302,7 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
                     yield f"event: {event['event']}\ndata: {data}\n\n"
 
         return ClosingStreamingResponse(frames(), media_type='text/event-stream',
-                                        on_close=admission.release,
+                                        on_close=lease.release,
                                         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
     @app.post('/internal/v1/answers')
@@ -310,22 +332,33 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     async def probe_model(request: Request, payload: CustomModel):
         require_custom()
         admission = request.app.state.question_admission
-        if not admission.try_acquire():
-            raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=True)
+        try:
+            owners = request.headers.getlist('X-KnowFlow-Owner-ID')
+            if len(owners) != 1:
+                raise ValueError
+            owner = uuid.UUID(owners[0])
+        except (ValueError, AttributeError):
+            raise ProcessingError('INVALID_REQUEST', 400, retryable=False) from None
+        lease = admission.try_acquire(custom=True)
+        route_deadline = runtime.clock() + 10
 
         async def probe():
-            model = LangChainAnswerModel(payload, probe=True)
+            model = None
             try:
-                async with asyncio.timeout(10):
-                    return {'supports_tools': await model.probe_capabilities()}
+                model = LangChainAnswerModel(payload, probe=True, runtime=runtime,
+                                             call_context=ModelCallContext(request.state.request_id, owner,
+                                                                           payload.id, 'probe'))
+                return {'supports_tools': await runtime.deadline_runner.run(
+                    model.probe_capabilities, deadline=route_deadline, timeout_kind='total_timeout')}
             except TimeoutError:
                 raise ProcessingError('PROCESSING_TIMEOUT', 504) from None
             finally:
-                await model.aclose()
+                if model is not None:
+                    await model.aclose()
 
         try:
             return await await_answer_or_disconnect(request, probe)
         finally:
-            admission.release()
+            lease.release()
 
     return app

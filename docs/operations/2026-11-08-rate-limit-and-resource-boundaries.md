@@ -42,3 +42,7 @@
 | Linux 解析资源边界 |  |  |  |
 
 签字栏为空，直到真实配置与压测证据到位。
+
+## LangChain 调用隔离
+
+已增加 connect / 首内容 / total deadline、用户与模型并发 cap、custom + probe 的 built-in 容量预留及进程内熔断。配置、默认值、取最小值公式和单 worker 约束见 [LangChain 调用边界运维](langchain-provider-hardening.md)。

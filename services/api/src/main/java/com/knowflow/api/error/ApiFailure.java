@@ -57,6 +57,10 @@ public final class ApiFailure extends RuntimeException {
                 "The uploaded file is not supported.");
     }
 
+    public static ApiFailure modelBusy() {
+        return new ApiFailure(HttpStatus.TOO_MANY_REQUESTS, "RESOURCE_LIMIT", "模型请求繁忙，请稍后重试。", true);
+    }
+
     public static ApiFailure resourceLimit() {
         return new ApiFailure(HttpStatus.PAYLOAD_TOO_LARGE, "RESOURCE_LIMIT",
                 "The uploaded file exceeds a configured limit.");

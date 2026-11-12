@@ -32,13 +32,15 @@ public class LlmModelService {
     private final JdbcTemplate jdbc;
     private final AiAnswerClient ai;
     private final SecretKeySpec encryptionKey;
+    private final ModelRequestAdmission admission;
     private final SecureRandom random = new SecureRandom();
 
-    public LlmModelService(JdbcTemplate jdbc, AiAnswerClient ai,
+    public LlmModelService(JdbcTemplate jdbc, AiAnswerClient ai, ModelRequestAdmission admission,
             @Value("${KNOWFLOW_CUSTOM_LLM_ENABLED:false}") boolean enabled,
             @Value("${KNOWFLOW_CUSTOM_LLM_ENCRYPTION_KEY:}") String encodedKey) {
         this.jdbc = jdbc;
         this.ai = ai;
+        this.admission = admission;
         if (!enabled) {
             encryptionKey = null;
             return;
@@ -63,7 +65,7 @@ public class LlmModelService {
         return new Catalog(true, models);
     }
 
-    Model save(UUID owner, UUID id, Input input) {
+    Model save(UUID owner, UUID id, Input input, String requestId) {
         requireEnabled();
         Stored previous = id == null ? null : find(owner, id);
         UUID modelId = id == null ? UUID.randomUUID() : id;
@@ -80,7 +82,10 @@ public class LlmModelService {
         }
         if (key == null || !key.matches("[!-~]{1,2048}")) throw ApiFailure.invalidRequest();
         reserveProbe(owner);
-        boolean tools = ai.probeModel(new Connection(modelId, url, protocol, model, key, false));
+        boolean tools;
+        try (ModelRequestAdmission.Lease lease = admission.tryAcquire(true)) {
+            tools = ai.probeModel(owner, new Connection(modelId, url, protocol, model, key, false), requestId);
+        }
         byte[] encrypted = encrypt(owner, modelId, key);
         UUID revision = UUID.randomUUID();
         try {

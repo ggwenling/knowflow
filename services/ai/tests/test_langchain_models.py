@@ -10,7 +10,8 @@ import pytest
 
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.answering import AnswerService, LlmSettings
-from knowflow_ai.langchain_answer import CustomModel, LangChainAnswerModel
+from knowflow_ai.langchain_answer import CustomModel
+from provider_test_helpers import LangChainAnswerModel
 from knowflow_ai.provider_retry import ProviderRetryPolicy
 from knowflow_ai import langchain_answer, model_egress
 

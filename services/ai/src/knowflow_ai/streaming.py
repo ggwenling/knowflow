@@ -8,6 +8,7 @@ import time
 import httpx
 
 from .adapters import ProcessingError
+from .provider_runtime import is_model_busy, BUSY_MESSAGE
 from .config import ConfigurationError
 from .provider_retry import retry_after_seconds, retry_delay
 from .protocol import CONTRACT_VERSION
@@ -400,10 +401,10 @@ async def answer_events(service, request):
         terminal = event("cancelled")
     except (TimeoutError, ProcessingError, ConfigurationError) as exc:
         timeout = isinstance(exc, TimeoutError) or getattr(exc, "status", None) == 504
-        code = "PROCESSING_TIMEOUT" if timeout else "AI_PROCESSING_FAILED"
+        code = "RESOURCE_LIMIT" if is_model_busy(exc) else "PROCESSING_TIMEOUT" if timeout else "AI_PROCESSING_FAILED"
         _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=%s",
                         request["request_id"], code)
-        terminal = event("error", code=code, message=code,
+        terminal = event("error", code=code, message=BUSY_MESSAGE if is_model_busy(exc) else code,
                          retryable=timeout or getattr(exc, "retryable", False))
     except Exception:
         _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=AI_PROCESSING_FAILED",

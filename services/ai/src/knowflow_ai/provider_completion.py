@@ -1,5 +1,6 @@
 """Validate bounded provider wire responses before an SDK can discard metadata."""
 import json
+import re
 
 from .adapters import ProcessingError
 
@@ -9,22 +10,99 @@ def _require(condition):
         raise ValueError
 
 
+class SSEFramer:
+    """Incremental bounded framing, shared by observation and final validation."""
+    def __init__(self):
+        self.buffer = b""
+        self.data = []
+        self.size = 0
+
+    def feed(self, chunk):
+        self.size += len(chunk)
+        _require(self.size <= 1024 * 1024)
+        self.buffer += chunk
+        events = []
+        while True:
+            match = re.search(rb"\r\n|\r(?!$)|\n", self.buffer)
+            if match is None:
+                break
+            line = self.buffer[:match.start()].decode("utf-8")
+            self.buffer = self.buffer[match.end():]
+            if not line:
+                if self.data:
+                    events.append("\n".join(self.data))
+                    self.data.clear()
+            elif line.startswith("data:"):
+                self.data.append(line[5:].removeprefix(" "))
+            else:
+                _require(line.startswith((":", "event:", "id:", "retry:")))
+        return events
+
+    def finish(self):
+        # A final lone CR is also a line delimiter.
+        events = self.feed(b"\n") if self.buffer.endswith(b"\r") else []
+        _require(not self.buffer and not self.data)
+        return events
+
+
 def _events(body):
-    # Require a dispatched final event, including its blank-line delimiter.
-    text = body.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
-    lines = text.split("\n")
-    _require(not lines[-1])
-    data = []
-    for line in lines[:-1]:
-        if not line:
-            if data:
-                yield "\n".join(data)
-                data.clear()
-        elif line.startswith("data:"):
-            data.append(line[5:].removeprefix(" "))
-        else:
-            _require(line.startswith((":", "event:", "id:", "retry:")))
-    _require(not data)
+    framer = SSEFramer()
+    yield from framer.feed(body)
+    yield from framer.finish()
+
+
+class CompletionObserver:
+    def __init__(self, *, protocol, streaming, state):
+        self.protocol, self.streaming, self.state = protocol, streaming, state
+        self.framer = SSEFramer() if streaming else None
+        state.first_token_observation = "content_event" if streaming else "body_byte"
+
+    def feed(self, chunk):
+        if not chunk:
+            return
+        if not self.streaming:
+            self.state.observe_content()
+            return
+        try:
+            self._observe_events(self.framer.feed(chunk))
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
+
+    def _observe_events(self, events):
+        for event in events:
+            if event != "[DONE]" and self._has_content(json.loads(event)):
+                self.state.observe_content()
+
+    def finish(self):
+        if self.framer is not None:
+            try:
+                self._observe_events(self.framer.finish())
+            except (ValueError, TypeError, KeyError, AttributeError):
+                raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
+
+    def _has_content(self, value):
+        if self.protocol in ("deepseek", "chat_completions"):
+            for choice in value.get("choices", []):
+                delta = choice.get("delta", {})
+                if delta.get("content") or delta.get("refusal"):
+                    return True
+                for call in delta.get("tool_calls", []):
+                    function = call.get("function", {})
+                    if function.get("name") or function.get("arguments"):
+                        return True
+            return False
+        if self.protocol == "anthropic_messages":
+            delta = value.get("delta", {})
+            block = value.get("content_block", {})
+            return bool(delta.get("text") or delta.get("partial_json") or delta.get("refusal")
+                        or block.get("text") or block.get("name"))
+        if self.protocol == "responses":
+            return bool((value.get("type") in ("response.output_text.delta", "response.refusal.delta",
+                                               "response.function_call_arguments.delta") and value.get("delta"))
+                        or (value.get("type") == "response.output_item.added"
+                            and value.get("item", {}).get("type") == "function_call"
+                            and (value["item"].get("name") or value["item"].get("arguments"))))
+        return False
 
 
 def _chat_choice(body, model_id, allow_tools, *, streaming):

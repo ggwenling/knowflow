@@ -37,6 +37,15 @@ class Settings:
                 or not 1 <= self.max_concurrent_questions <= 32):
             raise ConfigurationError('QUESTION_CONCURRENCY_INVALID')
 
+    def provider_limits(self, environ=None):
+        # Import locally: provider policy uses the same safe configuration error.
+        from .provider_limits import ProviderLimits
+        env = os.environ if environ is None else environ
+        limits = ProviderLimits.from_environment(env)
+        limits.validate_isolation(custom_enabled=str(env.get('KNOWFLOW_CUSTOM_LLM_ENABLED', '')).lower() == 'true',
+                                  question_total=self.max_concurrent_questions)
+        return limits
+
     @classmethod
     def from_environment(cls):
         kwargs = {'internal_secret': os.environ.get('KNOWFLOW_INTERNAL_SHARED_SECRET', '')}

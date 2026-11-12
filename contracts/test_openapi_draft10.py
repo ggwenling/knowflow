@@ -76,6 +76,17 @@ class OpenApiDraft10Test(unittest.TestCase):
                 if path == "/health/live" or path.startswith("/internal/") and not path.startswith("/internal/v1/tasks/"):
                     self.assertEqual(operation["servers"][0]["url"], "http://localhost:8000", path)
 
+    def test_probe_owner_and_busy_are_documented(self):
+        operation = self.spec["paths"]["/internal/v1/llm-models/probe"]["post"]
+        owners = [p for p in operation["parameters"] if p["name"] == "X-KnowFlow-Owner-ID"]
+        self.assertEqual(len(owners), 1)
+        self.assertTrue(owners[0]["required"])
+        self.assertEqual(owners[0]["schema"]["format"], "uuid")
+        for path in ("/internal/v1/answers", "/internal/v1/custom-answers", "/internal/v1/llm-models/probe"):
+            busy = self.spec["paths"][path]["post"]["responses"]["429"]
+            self.assertIn("RESOURCE_LIMIT", busy["description"])
+            self.assertIn("模型请求繁忙，请稍后重试。", busy["description"])
+
     def test_public_stream_and_source_locators_use_shared_closed_schema(self):
         schemas = self.spec["components"]["schemas"]
         self.assertEqual(

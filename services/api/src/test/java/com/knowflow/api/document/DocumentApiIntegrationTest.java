@@ -954,6 +954,63 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    void busyResponseDoesNotViolateQuestionFailureCodeConstraint() throws Exception {
+        JsonNode owner = register("question-model-busy@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "AI unavailable");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Local evidence text.",
+                "ai-unavailable-index");
+        AI_HTTP_STATUS.set(429);
+
+        var result = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion(
+                                "What is the evidence?"))))
+                .andReturn();
+        result = dispatchAsync(result);
+
+        assertThat(result.getResponse().getStatus()).isEqualTo(429);
+        JsonNode error = objectMapper.readTree(result.getResponse().getContentAsByteArray());
+        assertThat(error.path("code").asText()).isEqualTo("RESOURCE_LIMIT");
+        assertThat(error.path("retryable").asBoolean()).isTrue();
+        assertThat(result.getResponse().getContentAsString())
+                .doesNotContain("UPSTREAM_PRIVATE_MARKER");
+        assertThat(AI_HANDLER_FAILURE.get()).isNull();
+        var failedQuestion = jdbc.queryForMap("""
+                SELECT status, failure_code FROM knowflow.questions
+                 ORDER BY created_at DESC LIMIT 1
+                """);
+        assertThat(failedQuestion.get("status")).isEqualTo("FAILED");
+        assertThat(failedQuestion.get("failure_code")).isEqualTo("AI_PROCESSING_FAILED");
+    }
+
+    @Test
+    void busyStreamUsesAllowedHistoryFailureCode() throws Exception {
+        JsonNode owner = register("question-stream-busy@example.test");
+        String token = owner.path("access_token").asText();
+        String knowledgeBaseId = createKnowledgeBase(token, "Stream busy");
+        publishDocument(token, knowledgeBaseId, "evidence.txt", "Local evidence text.", "stream-busy-index");
+        AI_HTTP_STATUS.set(429);
+        var initial = mockMvc.perform(post(
+                        "/api/v1/knowledge-bases/{knowledgeBaseId}/questions/stream", knowledgeBaseId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content(objectMapper.writeValueAsBytes(new com.knowflow.api.answer.PublicQuestion("Question?"))))
+                .andReturn();
+        var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
+        assertThat(result.getResponse().getStatus()).isEqualTo(200);
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).contains("event:started", "event:error", "RESOURCE_LIMIT", "模型请求繁忙，请稍后重试。")
+                .doesNotContain("UPSTREAM_PRIVATE_MARKER", "event:delta");
+        assertSseContractFrames(body);
+        assertThat(jdbc.queryForObject("SELECT status || ':' || failure_code FROM knowflow.questions WHERE request_id=?",
+                String.class, AI_RECEIVED_REQUEST_ID.get())).isEqualTo("FAILED:AI_PROCESSING_FAILED");
+    }
+
+    @Test
     void pythonAnswerTimeoutMapsToRetryableGatewayTimeoutAndMarksQuestionFailed() throws Exception {
         JsonNode owner = register("question-ai-timeout@example.test");
         String token = owner.path("access_token").asText();
@@ -2348,6 +2405,11 @@ class DocumentApiIntegrationTest {
                 return;
             }
             AI_RESPONSE_GATE.get().await();
+            if (AI_HTTP_STATUS.get() == 429) {
+                respond(exchange, 429, AI_MAPPER.writeValueAsString(new ApiError(
+                        ApiError.CONTRACT_VERSION, requestId, "RESOURCE_LIMIT", "UPSTREAM_PRIVATE_MARKER", true)));
+                return;
+            }
             if (AI_HTTP_STATUS.get() != 200) {
                 respond(exchange, AI_HTTP_STATUS.get(), "{\"message\":\"UPSTREAM_PRIVATE_MARKER\"}");
                 return;

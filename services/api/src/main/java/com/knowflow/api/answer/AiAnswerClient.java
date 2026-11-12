@@ -1,6 +1,7 @@
 package com.knowflow.api.answer;
 
 import java.time.Duration;
+import java.util.UUID;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -40,7 +41,7 @@ public final class AiAnswerClient {
                 .bodyValue(model == null ? request : new CustomAnswer(request, model))
                 .exchangeToMono(result -> {
                     if (!result.statusCode().is2xxSuccessful()) {
-                        return result.createException().flatMap(Mono::error);
+                        return upstreamFailure(result, request.requestId()).flatMap(Mono::error);
                     }
                     return result.bodyToMono(AiAnswerResponse.class);
                 })
@@ -71,6 +72,7 @@ public final class AiAnswerClient {
                 .accept(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(model == null ? request : new CustomAnswer(request, model))
                 .retrieve()
+                .onStatus(status -> !status.is2xxSuccessful(), result -> upstreamFailure(result, request.requestId()))
                 .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {})
                 .timeout(remainingBudget)
                 .takeUntilOther(Mono.delay(remainingBudget).flatMap(ignored ->
@@ -90,17 +92,40 @@ public final class AiAnswerClient {
         });
     }
 
-    boolean probeModel(LlmModelService.Connection model) {
-        ModelProbe response = client.post().uri("/internal/v1/llm-models/probe").bodyValue(model)
+    boolean probeModel(UUID owner, LlmModelService.Connection model, String requestId) {
+        ModelProbe response = client.post().uri("/internal/v1/llm-models/probe")
+                .header("X-KnowFlow-Owner-ID", owner.toString())
+                .header(RequestIdFilter.HEADER, requestId).bodyValue(model)
                 .exchangeToMono(result -> result.statusCode().is2xxSuccessful()
-                        ? result.bodyToMono(ModelProbe.class) : Mono.empty())
+                        ? result.bodyToMono(ModelProbe.class)
+                        : upstreamFailure(result, requestId).flatMap(Mono::error))
                 .timeout(Duration.ofSeconds(12))
-                .onErrorResume(failure -> Mono.empty()).block();
+                .onErrorResume(failure -> failure instanceof ApiFailure apiFailure
+                        && "RESOURCE_LIMIT".equals(apiFailure.code()) ? Mono.error(failure) : Mono.empty()).block();
         if (response == null) {
             throw new ApiFailure(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "LLM_MODEL_PROBE_FAILED",
                     "The configured model could not complete a connection test.");
         }
         return response.supportsTools();
+    }
+
+    private Mono<? extends Throwable> upstreamFailure(
+            org.springframework.web.reactive.function.client.ClientResponse response, String requestId) {
+        if (response.statusCode().value() != 429) return response.createException();
+        return response.bodyToMono(String.class).defaultIfEmpty("").map(body -> {
+            try {
+                com.fasterxml.jackson.databind.JsonNode value = mapper.readTree(body);
+                if (value != null && value.isObject() && value.size() == 5
+                        && ApiError.CONTRACT_VERSION.equals(value.path("contract_version").asText())
+                        && requestId.equals(value.path("request_id").asText())
+                        && "RESOURCE_LIMIT".equals(value.path("code").asText())
+                        && value.path("message").isTextual() && value.path("retryable").isBoolean()
+                        && value.path("retryable").booleanValue()) return ApiFailure.modelBusy();
+            } catch (IOException invalid) {
+                // Provider bodies never become public error text.
+            }
+            return new IllegalStateException("AI request failed");
+        });
     }
 
     private record CustomAnswer(TrustedAnswerRequest request, LlmModelService.Connection model) {}

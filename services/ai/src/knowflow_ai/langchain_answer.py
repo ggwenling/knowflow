@@ -1,6 +1,8 @@
 """LangChain model execution inside the existing trusted answer boundary."""
 import asyncio
 from contextlib import aclosing
+from contextvars import ContextVar
+from dataclasses import replace
 from functools import cached_property
 import json
 import logging
@@ -27,7 +29,8 @@ from .adapters import ProcessingError
 from .answering import LlmSettings, answer_messages
 from .http_client import build_async_client
 from .provider_budget import reserve_provider_call
-from .provider_completion import validate_completion
+from .provider_completion import validate_completion, CompletionObserver
+from .provider_runtime import run_attempt, timeout_error
 from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
 from .streaming import IncrementalAnswerParser
 
@@ -59,8 +62,9 @@ class CustomModel(BaseModel):
 
 
 class _BoundedResponse(httpx.AsyncByteStream, httpx2.AsyncByteStream):
-    def __init__(self, stream):
+    def __init__(self, stream, observer=None):
         self.stream = stream
+        self.observer = observer
 
     async def __aiter__(self):
         size = 0
@@ -68,7 +72,11 @@ class _BoundedResponse(httpx.AsyncByteStream, httpx2.AsyncByteStream):
             size += len(chunk)
             if size > MAX_BYTES:
                 raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
+            if self.observer is not None:
+                self.observer.feed(chunk)
             yield chunk
+        if self.observer is not None:
+            self.observer.finish()
 
     async def aclose(self):
         await self.stream.aclose()
@@ -80,11 +88,18 @@ class _ProxiedAnthropic(ChatAnthropic):
 
     @cached_property
     def _async_client(self):
-        return anthropic.AsyncAnthropic(**self._client_params, http_client=self._http)
+        return anthropic.AsyncAnthropic(**{**self._client_params, "timeout": self._http.timeout}, http_client=self._http)
 
 
 class LangChainAnswerModel:
-    def __init__(self, settings: LlmSettings | CustomModel, *, transport=None, probe=False):
+    def __init__(self, settings: LlmSettings | CustomModel, *, runtime, call_context, transport=None, probe=False):
+        self.runtime, self.call_context = runtime, call_context
+        if (call_context.custom_id is None) != isinstance(settings, LlmSettings):
+            raise ValueError("INVALID_MODEL_CALL_CONTEXT")
+        if call_context.custom_id is not None and call_context.custom_id != settings.id:
+            raise ValueError("INVALID_MODEL_CALL_CONTEXT")
+        self._attempt = ContextVar("provider_attempt")
+        self._running = False
         self.settings = settings
         self.default = isinstance(settings, LlmSettings)
         self.protocol = "deepseek" if self.default else settings.protocol
@@ -92,10 +107,14 @@ class LangChainAnswerModel:
         self.supports_tools = self.default or settings.supports_tools
         self.search = None
         self.last_usage = None
-        self.request_id = "probe"
         self.retry_policy = ProviderRetryPolicy.from_environment() if self.default else None
         self.probe = probe
-        timeout = 5 if probe else 25
+        self.profile = runtime.limits.timeout_profile(custom=not self.default, probe=probe)
+        self.model_key = runtime.model_key(call_context, protocol=self.protocol, endpoint=settings.base_url,
+                                           model=self.model_id, key=settings.api_key if self.default
+                                           else settings.api_key.get_secret_value())
+        library = httpx2 if self.protocol == "anthropic_messages" else httpx
+        timeout = library.Timeout(self.profile.total, connect=self.profile.connect)
         options = {"event_hooks": {"request": [self._before_request], "response": [self._on_response]},
                    "headers": {"Accept-Encoding": "identity"}}
         if self.default and transport is None:
@@ -112,7 +131,7 @@ class LangChainAnswerModel:
         key = settings.api_key if self.default else settings.api_key.get_secret_value()
         self.sync_http = None
         shared = dict(model=self.model_id, api_key=key, base_url=settings.base_url, max_retries=0,
-                      streaming=True, timeout=timeout)
+                      streaming=True, timeout=self.profile.total if self.protocol == "anthropic_messages" else timeout)
         if self.protocol == "anthropic_messages":
             self.model = _ProxiedAnthropic(**shared, max_tokens=64 if probe else OUTPUT_TOKENS)
             self.model._http = self.http
@@ -132,8 +151,9 @@ class LangChainAnswerModel:
                 self.model = ChatOpenAI(**shared, use_responses_api=False, stream_usage=False)
 
     async def _before_request(self, request):
+        self._attempt.get().dispatch()
         if request.method != "POST":
-            raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
+            raise ProcessingError("AI_PROCESSING_FAILED", retryable=False, retry_reason="local_input")
         request.headers["Accept-Encoding"] = "identity"
         if self.protocol == "anthropic_messages":
             # Messages-compatible gateways commonly use the original API-key header.
@@ -142,14 +162,31 @@ class LangChainAnswerModel:
         if self.default:
             payload = json.loads(request.content)
             if payload.get("max_tokens") != OUTPUT_TOKENS:
-                raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
-            await reserve_provider_call("deepseek", self.model_id, payload)
+                raise ProcessingError("AI_PROCESSING_FAILED", retryable=False, retry_reason="local_input")
+            try:
+                await reserve_provider_call("deepseek", self.model_id, payload)
+            except ProcessingError as error:
+                error.retry_reason = "local_budget"
+                raise
 
     async def _on_response(self, response):
         if response.is_redirect or response.headers.get("content-encoding", "identity").lower() != "identity":
             await response.aclose()
             raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
-        response.stream = _BoundedResponse(response.stream)
+        if response.is_stream_consumed and len(response.content) > MAX_BYTES:
+            await response.aclose()
+            raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False)
+        payload = json.loads(response.request.content)
+        observer = CompletionObserver(protocol=self.protocol, streaming=payload.get("stream", False),
+                                      state=self._attempt.get()) if response.is_success else None
+        if observer is not None and response.is_stream_consumed:
+            try:
+                observer.feed(response.content)
+                observer.finish()
+            except BaseException:
+                await response.aclose()
+                raise
+        response.stream = _BoundedResponse(response.stream, observer)
         if response.is_success:
             # SDKs may stop reading at a terminator and discard the rest. Read
             # within MAX_BYTES first so missing terminators and trailing junk
@@ -168,6 +205,11 @@ class LangChainAnswerModel:
                                     allow_tools=bool(payload.get("tools")) and payload.get("tool_choice") != "none")
             finally:
                 await response.aclose()
+        else:
+            try:
+                await response.aread()
+            finally:
+                await response.aclose()
 
     def set_search(self, search):
         self.search = search
@@ -178,30 +220,64 @@ class LangChainAnswerModel:
             self.sync_http.close()
 
     async def _invoke(self, operation):
-        async def run():
-            try:
-                with tracing_context(enabled=False):
-                    return await operation()
-            except (openai.APIError, anthropic.APIError, httpx.HTTPError, httpx2.HTTPError) as error:
-                status = getattr(error, "status_code", None)
-                response = getattr(error, "response", None)
-                timed_out = isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError,
-                                               httpx.TimeoutException, httpx2.TimeoutException))
-                transient = status in (408, 429, 500, 502, 503, 504) or timed_out or isinstance(
-                    error, (openai.APIConnectionError, anthropic.APIConnectionError, httpx.TransportError))
-                raise ProcessingError("AI_PROCESSING_FAILED", 504 if timed_out else 502,
-                                      retryable=self.default and transient, provider_status=status,
-                                      retry_after=retry_after_seconds(response.headers.get("Retry-After"))
-                                      if response is not None else None) from None
-            except (openai.OpenAIError, anthropic.AnthropicError, ValueError):
-                # Includes SDK length/content-filter and structured-output
-                # parse errors. Their payloads can contain the full completion.
-                raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
+        if self._running:
+            raise RuntimeError("MODEL_TURN_ALREADY_RUNNING")
+        self._running = True
+        try:
+            async with self.runtime.turn(self.call_context, self.model_key, self.profile) as turn:
+                async def run():
+                    state = turn.new_attempt()
+                    token = self._attempt.set(state)
+                    self.last_usage = None
+                    try:
+                        with tracing_context(enabled=False):
+                            result = await run_attempt(operation, state)
+                            state.observe_usage(getattr(result, "usage_metadata", None))
+                            for message in getattr(result, "result", []):
+                                state.observe_usage(getattr(message, "usage_metadata", None))
+                            if state.usage:
+                                self.last_usage = state.usage
+                            return result
+                    except ProcessingError as error:
+                        state.failure_category = error.retry_reason or "completion_validation"
+                        raise
+                    except (openai.APIError, anthropic.APIError, httpx.HTTPError, httpx2.HTTPError) as error:
+                        status = getattr(error, "status_code", None)
+                        response = getattr(error, "response", None)
+                        timed_out = isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError,
+                                                       httpx.TimeoutException, httpx2.TimeoutException))
+                        cause = error
+                        connect = False
+                        while cause is not None:
+                            connect |= isinstance(cause, (httpx.ConnectTimeout, httpx2.ConnectTimeout))
+                            cause = cause.__cause__
+                        if timed_out:
+                            state.failure_category = "connect_timeout" if connect else "total_timeout"
+                            raise timeout_error(state.failure_category) from None
+                        state.failure_category = "provider_http" if status is not None else "network_error"
+                        transient = status in (408, 429, 500, 502, 503, 504) or isinstance(
+                            error, (openai.APIConnectionError, anthropic.APIConnectionError, httpx.TransportError))
+                        raise ProcessingError("AI_PROCESSING_FAILED", 502,
+                                              retryable=self.default and transient, provider_status=status,
+                                              retry_after=retry_after_seconds(response.headers.get("Retry-After"))
+                                              if response is not None else None) from None
+                    except (openai.OpenAIError, anthropic.AnthropicError, ValueError):
+                        state.failure_category = "sdk_parse"
+                        raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
+                    finally:
+                        self._attempt.reset(token)
 
-        if self.default:
-            return await run_provider_with_retry(run, policy=self.retry_policy, request_id=self.request_id,
-                                                 provider="deepseek")
-        return await run()
+                async def execute():
+                    if self.default:
+                        policy = replace(self.retry_policy, max_attempts=1) if turn.token.half_open else self.retry_policy
+                        return await run_provider_with_retry(run, policy=policy,
+                                                             request_id=self.call_context.request_id, provider="deepseek")
+                    return await run()
+
+                return await self.runtime.deadline_runner.run(execute, deadline=turn.deadline,
+                                                              timeout_kind="total_timeout")
+        finally:
+            self._running = False
 
     async def _agent(self, messages):
         used = False
@@ -227,7 +303,7 @@ class LangChainAnswerModel:
         return result["messages"][-1]
 
     async def _generate(self, question, evidence, request_id, previous_answer=None):
-        self.request_id = request_id
+        self.call_context = replace(self.call_context, purpose="repair" if previous_answer is not None else "answer")
         messages = answer_messages(question, evidence, previous_answer=previous_answer)
         started = time.monotonic()
         outcome = "failed"
@@ -243,6 +319,7 @@ class LangChainAnswerModel:
                     async with aclosing(self.model.astream(messages)) as stream:
                         async for chunk in stream:
                             attempt_parser.feed(chunk.text)
+                            self._attempt.get().observe_usage(chunk.usage_metadata)
                             if chunk.usage_metadata:
                                 self.last_usage = chunk.usage_metadata
                     return attempt_parser

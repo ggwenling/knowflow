@@ -5,9 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import java.lang.reflect.Field;
 import java.util.UUID;
-import java.util.concurrent.Semaphore;
 
 import com.knowflow.api.config.QuestionProperties;
 import com.knowflow.api.error.ApiFailure;
@@ -21,9 +19,12 @@ class QuestionAdmissionTest {
     void synchronousOverloadIsRejectedBeforeDatabaseOrAiWork() throws Exception {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         AiAnswerClient client = mock(AiAnswerClient.class);
-        QuestionService service = service(jdbc, client);
-        Semaphore permits = permits(service);
-        int acquired = permits.drainPermits();
+        QuestionProperties properties = new QuestionProperties();
+        properties.setMaxConcurrentRequests(1);
+        ModelRequestAdmission admission = new ModelRequestAdmission(properties);
+        QuestionService service = new QuestionService(jdbc, mock(TransactionTemplate.class), client,
+                properties, null, admission);
+        var occupied = admission.tryAcquire(false);
 
         ApiFailure failure = assertThrows(ApiFailure.class, () -> service.ask(user(),
                 UUID.randomUUID(), new PublicQuestion("question"), System.nanoTime(),
@@ -31,16 +32,19 @@ class QuestionAdmissionTest {
 
         assertEquals("AI_PROCESSING_FAILED", failure.code());
         verifyNoInteractions(jdbc, client);
-        permits.release(acquired);
+        occupied.close();
     }
 
     @Test
     void streamOverloadEmitsRetryableFailureWithoutCreatingQuestion() throws Exception {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         AiAnswerClient client = mock(AiAnswerClient.class);
-        QuestionService service = service(jdbc, client);
-        Semaphore permits = permits(service);
-        int acquired = permits.drainPermits();
+        QuestionProperties properties = new QuestionProperties();
+        properties.setMaxConcurrentRequests(1);
+        ModelRequestAdmission admission = new ModelRequestAdmission(properties);
+        QuestionService service = new QuestionService(jdbc, mock(TransactionTemplate.class), client,
+                properties, null, admission);
+        var occupied = admission.tryAcquire(false);
 
         PublicAnswerStreamEvent event = service.stream(user(), UUID.randomUUID(),
                 new PublicQuestion("question"), new QuestionCancellation(), null,
@@ -52,18 +56,7 @@ class QuestionAdmissionTest {
         assertEquals("AI_PROCESSING_FAILED", event.code());
         assertEquals(true, event.retryable());
         verifyNoInteractions(jdbc, client);
-        permits.release(acquired);
-    }
-
-    private static QuestionService service(JdbcTemplate jdbc, AiAnswerClient client) {
-        return new QuestionService(jdbc, mock(TransactionTemplate.class), client,
-                new QuestionProperties());
-    }
-
-    private static Semaphore permits(QuestionService service) throws Exception {
-        Field field = QuestionService.class.getDeclaredField("questionPermits");
-        field.setAccessible(true);
-        return (Semaphore) field.get(service);
+        occupied.close();
     }
 
     private static AuthenticatedUser user() {

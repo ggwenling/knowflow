@@ -1,6 +1,8 @@
 package com.knowflow.api.answer;
 
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletRequest;
+import com.knowflow.api.security.RequestIdFilter;
 
 import com.knowflow.api.security.AuthenticatedUser;
 import org.springframework.context.annotation.Profile;
@@ -26,14 +28,14 @@ class LlmModelController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     LlmModelService.Model create(@AuthenticationPrincipal AuthenticatedUser user,
-                                 @RequestBody LlmModelService.Input input) {
-        return models.save(user.id(), null, input);
+                                 @RequestBody LlmModelService.Input input, HttpServletRequest request) {
+        return models.save(user.id(), null, input, (String) request.getAttribute(RequestIdFilter.ATTRIBUTE));
     }
 
     @PutMapping("/{id}")
     LlmModelService.Model edit(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID id,
-                               @RequestBody LlmModelService.Input input) {
-        return models.save(user.id(), id, input);
+                               @RequestBody LlmModelService.Input input, HttpServletRequest request) {
+        return models.save(user.id(), id, input, (String) request.getAttribute(RequestIdFilter.ATTRIBUTE));
     }
 
     @DeleteMapping("/{id}")

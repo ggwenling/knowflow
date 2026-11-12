@@ -16,6 +16,23 @@ public class QuestionProperties {
     @Max(32)
     private int maxConcurrentRequests = 4;
 
+    @Min(1)
+    @Max(32)
+    private int customMaxConcurrentRequests = 2;
+    private boolean customEnabled;
+
+    public int getCustomMaxConcurrentRequests() { return customMaxConcurrentRequests; }
+    public void setCustomMaxConcurrentRequests(int value) { customMaxConcurrentRequests = value; }
+    public boolean isCustomEnabled() { return customEnabled; }
+    public void setCustomEnabled(boolean value) { customEnabled = value; }
+
+    @jakarta.validation.constraints.AssertTrue(message = "LLM_ISOLATION_CONFIGURATION_INVALID")
+    public boolean isIsolationValid() { return !customEnabled || maxConcurrentRequests >= 2; }
+
+    public void validateIsolation() {
+        if (!isIsolationValid()) throw new IllegalStateException("LLM_ISOLATION_CONFIGURATION_INVALID");
+    }
+
     public int getTotalBudgetSeconds() {
         return totalBudgetSeconds;
     }

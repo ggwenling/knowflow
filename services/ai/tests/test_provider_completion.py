@@ -11,7 +11,7 @@ import pytest
 
 from knowflow_ai.adapters import ProcessingError
 from knowflow_ai.answering import AnswerService, LlmSettings
-from knowflow_ai.langchain_answer import LangChainAnswerModel
+from provider_test_helpers import LangChainAnswerModel
 from knowflow_ai.provider_completion import validate_completion
 from test_answering import FakeRetriever, _contract, _evidence, _request
 from test_langchain_models import model_config
@@ -288,6 +288,7 @@ async def recorded_http(client, model, *, stream=False):
     from test_service import SECRET
 
     payload = _request()
+    payload['scope']['owner_id'] = str(model.call_context.owner_id)
     path = '/internal/v1/answers'
     if not model.default:
         path = '/internal/v1/custom-answers'
