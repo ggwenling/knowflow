@@ -47,4 +47,34 @@ breaker 按逻辑 turn 的最终结果计连续失败：默认 3 次后 OPEN，�
 
 built-in key 独立；custom key 通过进程随机盐 HMAC 覆盖 protocol / endpoint / model / key。更换配置后使用新的健康状态，稳定 UUID 并发上限仍有效。状态表最多 1024 项，空闲 600 秒可清理；未结束请求、未到冷却时间的 OPEN 和 HALF_OPEN 不会被驱逐。没有可回收条目时返回 busy。以上两项是内部资源常量。
 
-排障先检查配置组合、custom 总 lane、用户 / 模型名额及冷却时间。不要记录或复制 provider 原始响应、密钥、完整 URL、prompt 或 completion。后续步骤将补充重试矩阵与日志字段。
+排障先检查配置组合、custom 总 lane、用户 / 模型名额及冷却时间。不要记录或复制 provider 原始响应、密钥、完整 URL、prompt 或 completion。重试矩阵见下节；后续步骤将补充日志字段。
+
+## 共享重试分类
+
+LangChain、旧 DeepSeek adapter、embedding 与旧 streaming 共用标量分类函数。SDK 内置重试始终为 `max_retries=0`，只有 built-in 进入有界重试；custom 三种协议始终只有一次普通调用，不提供重试开关。probe 的一次能力协商降级不是 transient retry。
+
+| 失败（尚无模型内容） | built-in 自动 retry | 对外映射 |
+|---|---|---|
+| HTTP 429 | 是，遵守剩余预算内的 `Retry-After` | 502 |
+| HTTP 500..599，含 501 / 505 / 599 | 是 | 502 |
+| connect failure、connection reset、读写连接中断 | 是 | 502 |
+| connect / first-token / read timeout，total 尚有剩余 | 是 | 504 |
+| HTTP 400..499 除 429，含 400 / 401 / 403 / 404 / **408** / 422 | 否 | 502 |
+| HTTP 3xx | 否，不跟随重定向 | 502 |
+| completion validation、wrong model、parse、garbage、size、encoding | 否 | 502 |
+| filter、refusal、length truncation | 否 | 502 |
+| invalid URL、unsupported protocol、预算 soft stop、admission、breaker | 否 | 保留原错误映射 |
+| turn total / 外层 deadline 耗尽 | 否 | 504 |
+| cancellation | 直接传播并收尾 | 保留取消语义 |
+
+底层已收到有意义 provider 内容（`output_started`）或已交付 model 内容（`client_output_started`）时，无论 429、5xx、reset、timeout 都禁止下一 attempt。headers、SSE `started` 元数据、heartbeat 不算 model 内容。每次退避前及退避结束后重新检查输出、取消和剩余时间。未知 transport / 本地协议 / 解码错误不会笼统视为连接失败；旧 streaming 仍保留 emitted 防线。
+
+| 环境变量 | 默认 | 范围 |
+|---|---:|---|
+| `KNOWFLOW_PROVIDER_RETRY_MAX_ATTEMPTS` | 3 | 整数 1..5 |
+| `KNOWFLOW_PROVIDER_RETRY_BASE_SECONDS` | 0.5 | 有限秒数 0..5 |
+| `KNOWFLOW_PROVIDER_RETRY_TOTAL_SECONDS` | 25 | 有限秒数 0..60 |
+
+退避为指数增长，429 的合法 `Retry-After` 优先。effective retry cutoff 为 `min(turn_deadline, retry_started + retry_total_seconds)`；等待等于或超出剩余时间直接放弃，不裁成短延迟继续请求。`retry_total_seconds=0` 允许第一次 attempt，但不允许第二次。retry cutoff 只约束下一次调度，Step 2 的 total deadline 继续包住整个 turn（包含正在执行的 attempt 与退避），不会因重试重新开始或延长；所有 turn 仍受问答外层 28 秒限制。
+
+每个实际 built-in POST 独立预留一次预算，失败也计入 ledger，soft stop 立即结束。breaker 的 half-open probe 无论重试默认值如何均只有一个物理 attempt；busy / breaker 快速拒绝不预留预算。

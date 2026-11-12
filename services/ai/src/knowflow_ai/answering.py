@@ -26,7 +26,10 @@ from .citation_verify import (
 )
 from .embedding import EmbeddingSettings, SiliconFlowEmbeddingAdapter
 from .http_client import build_async_client
-from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
+from .provider_retry import (
+    ProviderRetryPolicy, classify_provider_failure, transport_failure_kind,
+    retry_after_seconds, run_provider_with_retry,
+)
 from .protocol import CONTRACT_VERSION, InvalidMessage
 from .repair_gate import (
     REPAIR_GATE_REASONS,
@@ -290,7 +293,7 @@ class DeepSeekAdapter:
                     status = response.status_code
                     raise ProcessingError(
                         "MODEL_FAILURE", 502,
-                        retryable=status == 429 or status >= 500,
+                        retryable=classify_provider_failure(status=status).retryable,
                         provider_status=status,
                         retry_after=(retry_after_seconds(response.headers.get("retry-after"))
                                      if status == 429 else None),
@@ -303,13 +306,17 @@ class DeepSeekAdapter:
                                               retry_reason="RESPONSE_TOO_LARGE")
         except ProcessingError:
             raise
-        except httpx.TimeoutException:
-            raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True,
+        except httpx.TimeoutException as error:
+            raise ProcessingError("MODEL_TIMEOUT", 504,
+                                  retryable=classify_provider_failure(
+                                      failure_kind=transport_failure_kind(error)).retryable,
                                   retry_reason="TIMEOUT") from None
         except asyncio.CancelledError:
             raise
-        except httpx.HTTPError:
-            raise ProcessingError("MODEL_FAILURE", 502, retryable=True,
+        except httpx.HTTPError as error:
+            raise ProcessingError("MODEL_FAILURE", 502,
+                                  retryable=classify_provider_failure(
+                                      failure_kind=transport_failure_kind(error)).retryable,
                                   retry_reason="TRANSPORT") from None
         except Exception:
             raise ProcessingError("MODEL_FAILURE", 502, retryable=False,

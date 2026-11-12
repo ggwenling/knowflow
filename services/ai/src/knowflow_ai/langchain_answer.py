@@ -30,8 +30,11 @@ from .answering import LlmSettings, answer_messages
 from .http_client import build_async_client
 from .provider_budget import reserve_provider_call
 from .provider_completion import validate_completion, CompletionObserver
-from .provider_runtime import run_attempt, timeout_error
-from .provider_retry import ProviderRetryPolicy, retry_after_seconds, run_provider_with_retry
+from .provider_runtime import run_attempt
+from .provider_retry import (
+    ProviderRetryPolicy, classify_provider_failure, transport_failure_kind,
+    retry_after_seconds, run_provider_with_retry,
+)
 from .streaming import IncrementalAnswerParser
 
 OUTPUT_TOKENS = 1024
@@ -225,7 +228,10 @@ class LangChainAnswerModel:
         self._running = True
         try:
             async with self.runtime.turn(self.call_context, self.model_key, self.profile) as turn:
+                state = None
+
                 async def run():
+                    nonlocal state
                     state = turn.new_attempt()
                     token = self._attempt.set(state)
                     self.last_usage = None
@@ -237,30 +243,44 @@ class LangChainAnswerModel:
                                 state.observe_usage(getattr(message, "usage_metadata", None))
                             if state.usage:
                                 self.last_usage = state.usage
+                            state.mark_client_output_started()
                             return result
                     except ProcessingError as error:
-                        state.failure_category = error.retry_reason or "completion_validation"
+                        decision = classify_provider_failure(
+                            status=error.provider_status,
+                            failure_kind=error.retry_reason or "completion_validation",
+                            output_started=state.output_started,
+                            client_output_started=state.client_output_started)
+                        state.failure_category = decision.reason
+                        # Never upgrade a controlled non-retryable completion or budget failure.
+                        error.retryable = error.retryable and self.default and decision.retryable
                         raise
-                    except (openai.APIError, anthropic.APIError, httpx.HTTPError, httpx2.HTTPError) as error:
-                        status = getattr(error, "status_code", None)
+                    except (openai.APIError, anthropic.APIError, httpx.HTTPError, httpx2.HTTPError,
+                            httpx.InvalidURL, httpx2.InvalidURL) as error:
                         response = getattr(error, "response", None)
+                        status = getattr(error, "status_code", None)
+                        if status is None and response is not None:
+                            status = response.status_code
                         timed_out = isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError,
                                                        httpx.TimeoutException, httpx2.TimeoutException))
-                        cause = error
-                        connect = False
-                        while cause is not None:
-                            connect |= isinstance(cause, (httpx.ConnectTimeout, httpx2.ConnectTimeout))
-                            cause = cause.__cause__
-                        if timed_out:
-                            state.failure_category = "connect_timeout" if connect else "total_timeout"
-                            raise timeout_error(state.failure_category) from None
-                        state.failure_category = "provider_http" if status is not None else "network_error"
-                        transient = status in (408, 429, 500, 502, 503, 504) or isinstance(
-                            error, (openai.APIConnectionError, anthropic.APIConnectionError, httpx.TransportError))
-                        raise ProcessingError("AI_PROCESSING_FAILED", 502,
-                                              retryable=self.default and transient, provider_status=status,
-                                              retry_after=retry_after_seconds(response.headers.get("Retry-After"))
-                                              if response is not None else None) from None
+                        kind = transport_failure_kind(error)
+                        if kind == "unknown" and error.__cause__ is None:
+                            if isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError)):
+                                kind = "read_timeout"
+                            elif isinstance(error, (openai.APIConnectionError, anthropic.APIConnectionError)):
+                                kind = "connect_failure"
+                        decision = classify_provider_failure(
+                            status=status, failure_kind=kind,
+                            output_started=state.output_started,
+                            client_output_started=state.client_output_started)
+                        state.failure_category = decision.reason
+                        raise ProcessingError(
+                            "PROCESSING_TIMEOUT" if timed_out else "AI_PROCESSING_FAILED",
+                            504 if timed_out else 502,
+                            retryable=self.default and decision.retryable, provider_status=status,
+                            retry_reason=kind if timed_out else decision.reason,
+                            retry_after=retry_after_seconds(response.headers.get("Retry-After"))
+                            if status == 429 and response is not None else None) from None
                     except (openai.OpenAIError, anthropic.AnthropicError, ValueError):
                         state.failure_category = "sdk_parse"
                         raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
@@ -270,8 +290,11 @@ class LangChainAnswerModel:
                 async def execute():
                     if self.default:
                         policy = replace(self.retry_policy, max_attempts=1) if turn.token.half_open else self.retry_policy
-                        return await run_provider_with_retry(run, policy=policy,
-                                                             request_id=self.call_context.request_id, provider="deepseek")
+                        return await run_provider_with_retry(
+                            run, policy=policy, request_id=self.call_context.request_id, provider="deepseek",
+                            clock=self.runtime.clock, outer_deadline=turn.deadline,
+                            output_started=lambda: state is not None and state.output_started,
+                            client_output_started=lambda: state is not None and state.client_output_started)
                     return await run()
 
                 return await self.runtime.deadline_runner.run(execute, deadline=turn.deadline,
