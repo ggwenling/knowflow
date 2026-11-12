@@ -74,7 +74,7 @@ test("shows accurate URL key and model rejection reasons", async ({ page }) => {
   await form(page);
   for (const code of codes) {
     await page.getByRole("button", { name: "测试并保存" }).click();
-    await expect(page.getByRole("alert")).toHaveText(modelErrorMessage(code));
+    await expect(page.getByRole("alert").filter({ hasText: modelErrorMessage(code) })).toHaveText(modelErrorMessage(code));
     await expect(page.getByLabel("API 密钥", { exact: true })).toHaveValue("fixture-key");
     await expect(page.getByLabel("模型 ID", { exact: true })).toHaveValue("new-model");
     await expect(page.getByText("连接测试通过，模型已保存。", { exact: true })).toHaveCount(0);
@@ -95,7 +95,7 @@ test("failed edit retains the existing catalog entry", async ({ page }) => {
   await page.getByRole("button", { name: "编辑", exact: true }).click();
   await page.getByLabel("模型 ID", { exact: true }).fill("rejected-edit");
   await page.getByRole("button", { name: "测试并保存" }).click();
-  await expect(page.getByRole("alert")).toHaveText(modelErrorMessage("LLM_MODEL_AUTH_FAILED"));
+  await expect(page.getByRole("alert").filter({ hasText: modelErrorMessage("LLM_MODEL_AUTH_FAILED") })).toHaveText(modelErrorMessage("LLM_MODEL_AUTH_FAILED"));
   await expect(page.getByText("existing-model", { exact: true })).toBeVisible();
   await expect(page.getByText(/支持补充检索/)).toBeVisible();
   await expect(page.locator("time")).toHaveAttribute("datetime", stored.last_probe_at);
