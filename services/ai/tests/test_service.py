@@ -485,3 +485,28 @@ def test_answer_without_model_credential_does_not_construct_service(monkeypatch,
     assert 'answer' not in response.json()
     assert constructed == []
     assert 'unused.invalid' not in response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protocol', ['deepseek', 'chat_completions', 'anthropic_messages', 'responses'])
+async def test_recorded_normal_completion_reaches_answer_route(protocol, monkeypatch):
+    import httpx
+    from test_provider_completion import (
+        fixture_case, forbid_wire_network, recorded_app, recorded_http, recorded_model,
+    )
+
+    forbid_wire_network(monkeypatch)
+    case = fixture_case(protocol, 'normal_stream', True)
+    async with recorded_model(case) as (model, calls):
+        # Exercise direct generation; agent search roundtrips have separate coverage.
+        model.supports_tools = False
+        app = recorded_app(monkeypatch, model)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:
+            response = await recorded_http(client, model)
+        assert response.status_code == 200
+        from test_answering import _contract
+        _contract().validate('AnswerResponse', response.json())
+        assert response.json()['answer'] == case['expected_result']['answer']
+        assert response.json()['has_answer'] is True
+        assert len(response.json()['sources']) == 1
+        assert len(calls) == 1 and app.state.question_admission.active == 0

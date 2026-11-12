@@ -777,3 +777,28 @@ async def test_http_answer_rejects_when_shared_capacity_is_full(monkeypatch):
         assert response.status_code == 200
         assert 'event: error' in response.text
     assert app.state.question_admission.active == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protocol', ['deepseek', 'chat_completions', 'anthropic_messages', 'responses'])
+async def test_recorded_normal_wire_emits_one_complete_answer(protocol, monkeypatch):
+    from test_provider_completion import (
+        fixture_case, forbid_wire_network, recorded_app, recorded_http, recorded_model,
+    )
+
+    forbid_wire_network(monkeypatch)
+    case = fixture_case(protocol, 'normal_stream', True)
+    async with recorded_model(case) as (model, calls):
+        model.supports_tools = False
+        app = recorded_app(monkeypatch, model)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:
+            response = await recorded_http(client, model, stream=True)
+        assert response.status_code == 200
+        events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith('data: ')]
+        assert [event['event'] for event in events] == ['started', 'delta', 'sources', 'completed']
+        assert events[1]['delta'] == case['expected_result']['answer']
+        assert events[2]['has_answer'] is True and len(events[2]['sources']) == 1
+        assert [event['sequence'] for event in events] == [1, 2, 3, 4]
+        for event in events:
+            _contract().validate('AnswerStreamEvent', event)
+        assert len(calls) == 1 and app.state.question_admission.active == 0

@@ -455,3 +455,75 @@ async def test_proxy_checks_all_answers_and_dials_the_checked_numeric_ip(monkeyp
     records[:] = ["8.8.8.8"]
     await model_egress.connect_public("public.example.com", ())
     assert connects == [("8.8.8.8", 443, socket.AI_NUMERICHOST)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protocol', ['deepseek', 'chat_completions', 'anthropic_messages', 'responses'])
+async def test_recorded_normal_stream_survives_crlf_and_three_byte_fragments(protocol, monkeypatch):
+    from test_provider_completion import fixture_case, forbid_wire_network, recorded_model
+
+    forbid_wire_network(monkeypatch)
+    reservations = []
+
+    async def reserve(*args):
+        reservations.append(args)
+
+    monkeypatch.setattr(langchain_answer, 'reserve_provider_call', reserve)
+    case = fixture_case(protocol, 'normal_stream', True)
+    async with recorded_model(case, fragment_size=3, crlf=True) as (model, calls):
+        assert await model.generate('索引何时可检索？', [], request_id='fragmented-fixture') == case['expected_result']
+        assert {key: model.last_usage[key] for key in case['expected_usage']} == case['expected_usage']
+        assert len(calls) == 1
+        assert len(reservations) == (1 if model.default else 0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protocol', ['deepseek', 'chat_completions', 'anthropic_messages', 'responses'])
+@pytest.mark.parametrize('fault', ['redirect', 'compressed', 'oversized'])
+async def test_recorded_protocol_transport_boundary_is_fail_closed(protocol, fault, monkeypatch, caplog):
+    import gzip
+    from test_provider_completion import fixture_case, forbid_wire_network, wire_bytes
+
+    forbid_wire_network(monkeypatch)
+    case = fixture_case(protocol, 'normal_stream', True)
+    library = httpx2 if protocol == 'anthropic_messages' else httpx
+    calls = []
+    sentinel = f'WIRE_PRIVATE_BOUNDARY_{protocol}_{fault}'
+
+    async def reserve(*args):
+        pass
+
+    monkeypatch.setattr(langchain_answer, 'reserve_provider_call', reserve)
+
+    class Wire(library.AsyncByteStream):
+        async def __aiter__(self):
+            yield body
+
+    body = wire_bytes(case)
+    headers = {'content-type': 'text/event-stream'}
+    status = 200
+    if fault == 'redirect':
+        status = 307
+        headers['location'] = 'https://redirect.example.com/'
+        body = sentinel.encode()
+    elif fault == 'compressed':
+        headers['content-encoding'] = 'gzip'
+        body = gzip.compress(body + sentinel.encode())
+    else:
+        body += sentinel.encode() + b'x' * langchain_answer.MAX_BYTES
+
+    def handle(request):
+        calls.append(request)
+        return library.Response(status, headers=headers, stream=Wire())
+
+    config = LlmSettings(api_key='a' * 32) if protocol == 'deepseek' else model_config(protocol)
+    model = LangChainAnswerModel(config, transport=library.MockTransport(handle))
+    try:
+        with pytest.raises(ProcessingError) as caught:
+            await model.generate('fixture question', [], request_id='bounded-fixture')
+        assert (caught.value.status, caught.value.retryable) == (502, False)
+        assert str(caught.value) == 'AI_PROCESSING_FAILED'
+        assert sentinel not in caplog.text
+        assert len(calls) == 1
+    finally:
+        await model.aclose()
