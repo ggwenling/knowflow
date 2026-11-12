@@ -5,9 +5,21 @@ import re
 from .adapters import ProcessingError
 
 
-def _require(condition):
+class _InvalidCompletion(ValueError):
+    def __init__(self, reason):
+        self.reason = reason
+
+
+def _require(condition, reason="completion_validation"):
     if not condition:
-        raise ValueError
+        raise _InvalidCompletion(reason)
+
+
+def _finish_reason(reason):
+    if reason in ("length", "max_tokens", "max_output_tokens"):
+        raise _InvalidCompletion("length_truncation")
+    if reason in ("content_filter", "refusal"):
+        raise _InvalidCompletion("content_filter")
 
 
 class SSEFramer:
@@ -106,7 +118,7 @@ class CompletionObserver:
 
 
 def _chat_choice(body, model_id, allow_tools, *, streaming):
-    _require(body.get("model") == model_id)
+    _require(body.get("model") == model_id, "model_mismatch")
     choices = body.get("choices")
     if streaming and choices == []:
         _require(isinstance(body.get("usage"), dict))
@@ -116,15 +128,18 @@ def _chat_choice(body, model_id, allow_tools, *, streaming):
     _require(choice.get("index") == 0)
     message = choice["delta" if streaming else "message"]
     _require(isinstance(message, dict))
-    _require(not message.get("refusal"))
+    _require(not message.get("refusal"), "content_filter")
     _require(allow_tools or not (message.get("tool_calls") or message.get("function_call")))
     reason = choice.get("finish_reason")
+    _finish_reason(reason)
     _require(reason in (None, "stop") or (allow_tools and reason == "tool_calls"))
     return reason, bool(message.get("tool_calls"))
 
 
 def _responses_complete(body, model_id, allow_tools):
-    _require(body.get("model") == model_id and body.get("status") == "completed")
+    _require(body.get("model") == model_id, "model_mismatch")
+    _finish_reason((body.get("incomplete_details") or {}).get("reason"))
+    _require(body.get("status") == "completed")
     _require(not body.get("error") and not body.get("incomplete_details"))
     output = body["output"]
     _require(isinstance(output, list) and output)
@@ -137,6 +152,7 @@ def _responses_complete(body, model_id, allow_tools):
             content = item["content"]
             _require(isinstance(content, list) and content)
             for block in content:
+                _require(block.get("type") != "refusal", "content_filter")
                 _require(block.get("type") == "output_text")
                 _require(isinstance(block.get("text"), str))
                 usable |= bool(block["text"])
@@ -172,18 +188,20 @@ def _validate_stream(body, protocol, model_id, allow_tools):
                 finished = True
         elif protocol == "responses":
             kind = event["type"]
+            if "response" in event:
+                _finish_reason((event["response"].get("incomplete_details") or {}).get("reason"))
             _require(kind not in ("error", "response.failed", "response.incomplete"))
-            _require(not kind.startswith("response.refusal."))
+            _require(not kind.startswith("response.refusal."), "content_filter")
             _require(allow_tools or not kind.startswith("response.function_call_arguments."))
             if "item" in event:
-                _require(event["item"].get("type") != "refusal")
+                _require(event["item"].get("type") != "refusal", "content_filter")
                 _require(allow_tools or event["item"].get("type") != "function_call")
                 _require(all(block.get("type") != "refusal"
-                             for block in event["item"].get("content", [])))
+                             for block in event["item"].get("content", [])), "content_filter")
             if "part" in event:
-                _require(event["part"].get("type") != "refusal")
+                _require(event["part"].get("type") != "refusal", "content_filter")
             if "response" in event:
-                _require(event["response"].get("model") == model_id)
+                _require(event["response"].get("model") == model_id, "model_mismatch")
                 _require(event["response"].get("status") not in ("failed", "incomplete", "cancelled"))
                 _require(not event["response"].get("error")
                          and not event["response"].get("incomplete_details"))
@@ -195,17 +213,19 @@ def _validate_stream(body, protocol, model_id, allow_tools):
             _require(kind != "error")
             _require(not finished or kind == "message_stop")
             if kind == "message_start":
-                _require(not started and event["message"].get("model") == model_id)
+                _require(event["message"].get("model") == model_id, "model_mismatch")
+                _require(not started)
                 started = True
             else:
                 _require(started)
             if kind == "content_block_start":
                 block_type = event["content_block"].get("type")
-                _require(block_type != "refusal")
+                _require(block_type != "refusal", "content_filter")
                 _require(allow_tools or block_type != "tool_use")
                 tools |= block_type == "tool_use"
             if kind == "message_delta":
                 reason = event["delta"].get("stop_reason")
+                _finish_reason(reason)
                 _require(reason == "end_turn" or (allow_tools and tools and reason == "tool_use"))
                 _require(not finished)
                 finished = True
@@ -229,11 +249,14 @@ def validate_completion(body, *, protocol, model_id, streaming, allow_tools):
             elif protocol == "responses":
                 _responses_complete(result, model_id, allow_tools)
             elif protocol == "anthropic_messages":
-                _require(result.get("model") == model_id)
+                _require(result.get("model") == model_id, "model_mismatch")
                 reason = result.get("stop_reason")
-                _require(all(item.get("type") != "refusal" for item in result["content"]))
+                _finish_reason(reason)
+                _require(all(item.get("type") != "refusal" for item in result["content"]), "content_filter")
                 tools = any(item.get("type") == "tool_use" for item in result["content"])
                 _require(allow_tools or not tools)
                 _require(reason == "end_turn" or (allow_tools and tools and reason == "tool_use"))
+    except _InvalidCompletion as error:
+        raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False, retry_reason=error.reason) from None
     except (ValueError, TypeError, KeyError, AttributeError, UnicodeDecodeError):
-        raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False) from None
+        raise ProcessingError("AI_PROCESSING_FAILED", 502, retryable=False, retry_reason="completion_validation") from None

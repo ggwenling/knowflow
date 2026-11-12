@@ -47,7 +47,7 @@ breaker 按逻辑 turn 的最终结果计连续失败：默认 3 次后 OPEN，�
 
 built-in key 独立；custom key 通过进程随机盐 HMAC 覆盖 protocol / endpoint / model / key。更换配置后使用新的健康状态，稳定 UUID 并发上限仍有效。状态表最多 1024 项，空闲 600 秒可清理；未结束请求、未到冷却时间的 OPEN 和 HALF_OPEN 不会被驱逐。没有可回收条目时返回 busy。以上两项是内部资源常量。
 
-排障先检查配置组合、custom 总 lane、用户 / 模型名额及冷却时间。不要记录或复制 provider 原始响应、密钥、完整 URL、prompt 或 completion。重试矩阵见下节；后续步骤将补充日志字段。
+排障先检查配置组合、custom 总 lane、用户 / 模型名额及冷却时间。不要记录或复制 provider 原始响应、密钥、完整 URL、prompt 或 completion。重试矩阵和结构化日志字段见下节。
 
 ## 共享重试分类
 
@@ -78,3 +78,32 @@ LangChain、旧 DeepSeek adapter、embedding 与旧 streaming 共用标量分类
 退避为指数增长，429 的合法 `Retry-After` 优先。effective retry cutoff 为 `min(turn_deadline, retry_started + retry_total_seconds)`；等待等于或超出剩余时间直接放弃，不裁成短延迟继续请求。`retry_total_seconds=0` 允许第一次 attempt，但不允许第二次。retry cutoff 只约束下一次调度，Step 2 的 total deadline 继续包住整个 turn（包含正在执行的 attempt 与退避），不会因重试重新开始或延长；所有 turn 仍受问答外层 28 秒限制。
 
 每个实际 built-in POST 独立预留一次预算，失败也计入 ledger，soft stop 立即结束。breaker 的 half-open probe 无论重试默认值如何均只有一个物理 attempt；busy / breaker 快速拒绝不预留预算。
+
+
+## 安全结构化调用日志
+
+仅使用 Python stdlib logging；没有 metrics stack、exporter、`/metrics` 或新增遥测依赖。`knowflow_ai.provider_observability` 在 INFO 级别输出单行 JSON：
+
+```json
+{"event":"llm_call","request_id":"request-123","protocol":"chat_completions","model_id":"example-model","duration_ms":1420,"first_token_latency_ms":180,"first_token_observation":"content_event","token_usage":{"input_tokens":80,"output_tokens":24,"total_tokens":104},"outcome":"success","failure_category":null,"call_id":"02897053b3a8438598c95694979c96e0","attempt":1,"purpose":"answer","provider_called":true}
+```
+
+一次物理 SDK attempt 对应一条记录：agent 工具下一轮、probe fallback / 工具结果下一轮各产生新的 `call_id`；同一 turn 的 retry 共用 `call_id`，`attempt` 从 1 递增。`purpose` 为 `answer` / `repair` / `probe`。probe 保留真实内部请求 id。构造、URL 配置校验、入口 / runtime busy 和 circuit 拒绝没有访问 provider，记录 `attempt=0,provider_called=false`。每次 built-in POST 的预算拒绝也按未调用处理。`ai_stage` / `provider_retry` 诊断继续保留，不计为额外 model attempt。
+
+`duration_ms` 来自 monotonic，包含本 attempt 的读取与 SDK 解析，不含其他 attempt 或退避；`first_token_latency_ms` 从 dispatch 至底层首内容观测，流式为 `content_event`，非流式为 `body_byte`。完整缓冲后的 SDK callback 不作为首 token。没有收到内容时两个首内容字段均为 null；没有 usage 时 `token_usage=null`，不是伪造的 0。usage 只复制当前 attempt SDK metadata 中非负整数 `input_tokens` / `output_tokens` / `total_tokens`；嵌套 metadata、布尔值、负数和字符串均不输出。`last_usage` 使用相同白名单。
+
+成功的 `outcome=success,failure_category=null`；取消为 `outcome=failure,failure_category=cancelled`。失败类别为封闭枚举，分类不包含 provider 的错误原文，也不改变公开错误码或重试策略：
+
+| 类别 | 含义 |
+|---|---|
+| `http_4xx`, `auth`, `rate_limited`, `http_5xx` | 普通 provider 4xx、401/403、429、5xx |
+| `connect_failure`, `connection_reset` | 连接失败、读写中断 |
+| `connect_timeout`, `first_token_timeout`, `read_timeout`, `total_timeout` | 连接、首内容、SDK 读、整体期限耗尽 |
+| `invalid_completion`, `model_mismatch`, `length_truncation`, `content_filter` | 协议 / SDK 解析失败、模型不符、长度截断、过滤 / refusal |
+| `redirect`, `response_too_large` | 重定向、响应超过 1 MiB |
+| `busy`, `circuit_open`, `cancelled` | 本地名额拒绝、熔断拒绝、主动取消 |
+| `configuration`, `budget`, `unknown` | 配置 / 本地输入拒绝、预算拒绝、未识别错误 |
+
+不输出 key、Authorization / x-api-key、任何 base URL / proxy URL、prompt、evidence、tool args、completion、provider error message、异常对象 / traceback 或配置 fingerprint。model id 最多 160 字符；含不可打印字符、userinfo / URL / key 形状或与当前 key 重合时使用 `[redacted]`。JSON 转义保证一行。请求 id 使用内部同一字符 / 长度规则，不合法值使用 `[redacted]`。
+
+app 和模型初始化在真实 SDK / HTTP 日志源安装丢弃 filter：`openai._base_client`、response parser、`anthropic._base_client` / response parser / tracing diagnostics、`httpx` / `httpx2`，以及 `httpcore` / `httpcore2` 的 `connection`、`http11`、`http2`、`proxy`、`socks`。即使 DEBUG 开启也丢弃原始记录，不依赖字符串替换；父 logger 的 filter 不能替代这些源 filter。`knowflow_ai.*` 安全事件保留。LangChain agent、probe 和失败调用继续使用 `tracing_context(enabled=False)`。排障按 request id / call id、固定 category、attempt、耗时与 usage 关联，不打开原始请求 / 响应日志。

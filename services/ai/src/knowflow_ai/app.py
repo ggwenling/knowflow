@@ -7,6 +7,7 @@ import os
 import re
 import uuid
 from typing import Any
+from types import SimpleNamespace
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict
@@ -19,6 +20,7 @@ from .answering import AnswerService, LlmSettings
 from .embedding import EmbeddingSettings
 from .langchain_answer import CustomModel, LangChainAnswerModel
 from .java_client import JavaGateway
+from .provider_observability import emit_call, install_safe_logging, new_call_id
 from .provider_probe import ProviderReadiness
 from .provider_runtime import ProviderRuntime, ModelCallContext, model_busy, is_model_busy, BUSY_MESSAGE
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
@@ -150,6 +152,7 @@ class BoundaryMiddleware:
 
 def create_app(settings: Settings | None = None, *, worker_factory=None,
                answer_service_factory=None, provider_readiness_factory=None, provider_runtime_factory=None) -> FastAPI:
+    install_safe_logging()
     settings = settings or Settings.from_environment()
     limits = settings.provider_limits()
     runtime = (provider_runtime_factory or ProviderRuntime)(limits)
@@ -281,10 +284,26 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
         if os.environ.get('KNOWFLOW_CUSTOM_LLM_ENABLED', '').lower() != 'true':
             raise ProcessingError('AI_PROCESSING_FAILED', 503, retryable=False)
 
+    def admit_model_request(request, custom=None, *, purpose='answer'):
+        try:
+            return request.app.state.question_admission.try_acquire(custom=custom is not None)
+        except ProcessingError:
+            # Route capacity rejection precedes construction of a model/runtime turn.
+            # Logging failure must not change the existing public admission error.
+            try:
+                config = custom if custom is not None else LlmSettings.from_environment()
+                emit_call(context=SimpleNamespace(request_id=request.state.request_id, purpose=purpose),
+                          protocol=custom.protocol if custom is not None else 'deepseek',
+                          model_id=custom.model_id if custom is not None else config.model,
+                          key=custom.api_key.get_secret_value() if custom is not None else config.api_key,
+                          call_id=new_call_id(), category='busy')
+            except Exception:
+                pass
+            raise
+
     async def execute_answer(request, payload, custom=None):
         service = build_answer(request, payload, custom)
-        admission = request.app.state.question_admission
-        lease = admission.try_acquire(custom=custom is not None)
+        lease = admit_model_request(request, custom)
         try:
             return await await_answer_or_disconnect(request, lambda: service.answer(payload))
         finally:
@@ -292,8 +311,7 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
 
     async def execute_stream(request, payload, custom=None):
         service = build_answer(request, payload, custom)
-        admission = request.app.state.question_admission
-        lease = admission.try_acquire(custom=custom is not None)
+        lease = admit_model_request(request, custom)
 
         async def frames():
             async with aclosing(service.stream(payload)) as events:
@@ -331,7 +349,6 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     @app.post('/internal/v1/llm-models/probe')
     async def probe_model(request: Request, payload: CustomModel):
         require_custom()
-        admission = request.app.state.question_admission
         try:
             owners = request.headers.getlist('X-KnowFlow-Owner-ID')
             if len(owners) != 1:
@@ -339,7 +356,7 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
             owner = uuid.UUID(owners[0])
         except (ValueError, AttributeError):
             raise ProcessingError('INVALID_REQUEST', 400, retryable=False) from None
-        lease = admission.try_acquire(custom=True)
+        lease = admit_model_request(request, payload, purpose='probe')
         route_deadline = runtime.clock() + 10
 
         async def probe():

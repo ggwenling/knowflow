@@ -12,6 +12,7 @@ from uuid import UUID
 
 from .adapters import ProcessingError
 from .provider_limits import ProviderLimits, TimeoutProfile
+from .provider_observability import normalize_usage
 
 BUSY_MESSAGE = '模型请求繁忙，请稍后重试。'
 BREAKER_CAPACITY = 1024
@@ -59,6 +60,7 @@ class CallState:
     started: float
     dispatched_at: float | None = None
     first_content_at: float | None = None
+    provider_called: bool = False
     output_started: bool = False
     client_output_started: bool = False
     usage: dict | None = None
@@ -78,9 +80,9 @@ class CallState:
             self.first_content.set()
 
     def observe_usage(self, metadata):
-        if isinstance(metadata, dict):
-            self.usage = {k: v for k, v in metadata.items()
-                          if k in ('input_tokens', 'output_tokens', 'total_tokens') and type(v) is int and v >= 0}
+        usage = normalize_usage(metadata)
+        if usage is not None:
+            self.usage = usage
 
     def mark_client_output_started(self):
         self.client_output_started = True
