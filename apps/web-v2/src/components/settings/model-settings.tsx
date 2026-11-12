@@ -3,17 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { defaultModelName, protocols, useLlmModels, type LlmInput, type LlmModel } from "@/components/workspace/llm-models";
-import type { ApiError } from "@/services/api";
+import { modelErrorMessage } from "@/lib/model-errors";
 import styles from "./settings.module.css";
 
 const empty: LlmInput = { model_id: "", base_url: "", protocol: "chat_completions", api_key: "" };
-const errors: Record<string, string> = {
-  INVALID_REQUEST: "请检查模型 ID、密钥和 HTTPS 地址。更改地址或协议时需要重新输入密钥。",
-  LLM_MODEL_PROBE_FAILED: "连接测试失败。请检查地址、密钥、协议和模型 ID。",
-  LLM_MODEL_PROBE_LIMIT: "连接测试过于频繁，请一分钟后再试。",
-  LLM_MODEL_CONFLICT: "模型已存在或已在其他页面修改。请刷新后重试。",
-  LLM_MODELS_DISABLED: "当前部署未启用自定义模型。",
-};
+
 
 export function ModelSettings() {
   const models = useLlmModels();
@@ -34,6 +28,7 @@ export function ModelSettings() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setError("");
     setNotice("");
@@ -43,7 +38,7 @@ export function ModelSettings() {
       setInput(empty);
       setNotice("连接测试通过，模型已保存。");
     } catch (failure) {
-      setError(errors[(failure as ApiError).code ?? ""] ?? "暂时无法保存模型，请稍后重试。");
+      setError(modelErrorMessage((failure as { code?: unknown } | null)?.code));
     } finally {
       setPending(false);
     }
@@ -74,7 +69,7 @@ export function ModelSettings() {
       {models.catalog?.enabled && <>
         {models.catalog.models.map((model) => (
           <div className={styles.modelRow} key={model.id}>
-            <div><strong>{model.model_id}</strong><p>{new URL(model.base_url).hostname} · {protocols[model.protocol]} · {model.supports_tools ? "支持补充检索" : "基础问答"}</p></div>
+            <div><strong>{model.model_id}</strong><p>{new URL(model.base_url).hostname} · {protocols[model.protocol]} · {model.supports_tools ? "支持补充检索" : "基础问答"}</p><p>{model.last_probe_status === "success" && model.last_probe_at && Number.isFinite(Date.parse(model.last_probe_at)) ? <>最近通过检测：<time dateTime={model.last_probe_at}>{new Date(model.last_probe_at).toLocaleString("zh-CN")}</time></> : "尚无检测记录"}</p></div>
             <div className={styles.actions}>
               {confirmDelete === model.id ? <>
                 <Button variant="danger" size="sm" disabled={pending} onClick={() => void remove(model.id)}>确认删除</Button>

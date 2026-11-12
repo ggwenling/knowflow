@@ -107,3 +107,27 @@ LangChain、旧 DeepSeek adapter、embedding 与旧 streaming 共用标量分类
 不输出 key、Authorization / x-api-key、任何 base URL / proxy URL、prompt、evidence、tool args、completion、provider error message、异常对象 / traceback 或配置 fingerprint。model id 最多 160 字符；含不可打印字符、userinfo / URL / key 形状或与当前 key 重合时使用 `[redacted]`。JSON 转义保证一行。请求 id 使用内部同一字符 / 长度规则，不合法值使用 `[redacted]`。
 
 app 和模型初始化在真实 SDK / HTTP 日志源安装丢弃 filter：`openai._base_client`、response parser、`anthropic._base_client` / response parser / tracing diagnostics、`httpx` / `httpx2`，以及 `httpcore` / `httpcore2` 的 `connection`、`http11`、`http2`、`proxy`、`socks`。即使 DEBUG 开启也丢弃原始记录，不依赖字符串替换；父 logger 的 filter 不能替代这些源 filter。`knowflow_ai.*` 安全事件保留。LangChain agent、probe 和失败调用继续使用 `tracing_context(enabled=False)`。排障按 request id / call id、固定 category、attempt、耗时与 usage 关联，不打开原始请求 / 响应日志。
+
+## 保存前连接测试与成功记录
+
+自定义模型始终在能力测试全部通过后保存，没有绕过测试的保存入口。保存时使用固定短文本，可能产生少量费用；不携带用户问题或证据。此流程由 `model_probe.py` 编排，与 `/health/ready` 的 `provider_probe.py` 独立，不额外请求 GET `/models`。复用可信 owner header、admission、超时和每次物理调用的 `llm_call` 日志；Python route 总预算 10 秒，Java 等待 12 秒，内部调用使用已有 probe profile。custom 不做普通失败重试。
+
+| 公开错误码 | 判断依据与公开 HTTP |
+| --- | --- |
+| `LLM_MODEL_URL_INVALID` | 本地 URL 拒绝；400 |
+| `LLM_MODEL_AUTH_FAILED` | provider 401/403；422，不触发本站登录失效 |
+| `LLM_MODEL_NOT_FOUND` | 明确 `model_not_found` / `invalid_model` 或 `param=model`；422 |
+| `LLM_MODEL_ENDPOINT_NOT_FOUND` | 404/405 无明确模型证据；422 |
+| `LLM_MODEL_UNREACHABLE` | DNS、TLS、connect、中断、出口拒绝、redirect；422 |
+| `LLM_MODEL_TIMEOUT` | connect / first-content / total 或 route deadline；422 |
+| `LLM_MODEL_RATE_LIMITED` | provider 429；公开 422 |
+| `LLM_MODEL_PROTOCOL_ERROR` | 成功响应的 wire、返回模型或工具格式不符；422 |
+| `LLM_MODEL_PROBE_FAILED` | 5xx、模糊 4xx、未知异常、Java→AI 通信或契约失败；422 |
+
+本站 `LLM_MODEL_PROBE_LIMIT` 仍是每用户每分钟 5 次的 429，区别于 provider 限流。容量不足保留 `RESOURCE_LIMIT` / 429 的固定繁忙提示。HTTP 错误最多读取 1 MiB，只提取白名单 `error.code/type/param` 的已知机器值；不从 message 猜测，不回显 body、密钥或 URL。Anthropic `not_found_error` 和裸 404 都不能证明模型不存在。Java 同样限制 1 MiB，拒绝未知代码、不匹配的 envelope、缺失 boolean/status/UTC 时间的成功结果，使用固定失败原因。
+
+只有 400/422 的 `param=tools` / `param=tool_choice` 才允许一次纯文本能力降级；501 还必须有 `not_implemented` / `unsupported_capability` 的机器 code/type，并明确指向 tools。先排除模型等明确错误。普通 400/422/501 或文字 “unsupported tools” 不触发降级；降级失败立即拒绝。降级成功允许 `supports_tools=false`。支持工具时验证 report_ready 的 id/name/空 args、tool-result 后最终非空文本及完整协议结束。
+
+V10 只增加 nullable `last_probe_at` / `last_probe_status`。旧记录两列均 null，界面显示“尚无检测记录”；新成功保存将工具能力、UTC 检测时间、`success`、AES-GCM 密文和 revision 一起写入 INSERT / CAS UPDATE。失败新建无模型记录；失败编辑不改变旧配置、密文、工具能力、检测记录或 revision。尝试仍计入限流表。URL/协议改变必须重新输入密钥。公开 list/save 不含凭证；运行时 Connection 只含原六个字段，检测元数据不会进入 Python CustomModel。
+
+排障使用界面固定原因与 request id 对照安全日志。核对选定协议、Base URL 和模型 ID；密钥/权限到服务商后台核对。模糊 404 使用组合提示，不能据此认定 key 或 model。不要打开 SDK 原始 DEBUG 日志或记录 provider body；无需新增 metrics stack。HTTPS 公网域名、443、无 userinfo/query/fragment、无 redirects、proxy fail-closed、全部 DNS 答案检查和 numeric-IP 拨号保持不变。

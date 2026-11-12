@@ -36,6 +36,7 @@ from .provider_retry import (
     retry_after_seconds, run_provider_with_retry,
 )
 from .streaming import IncrementalAnswerParser
+from .model_probe import machine_evidence, tools_rejected
 
 OUTPUT_TOKENS = 1024
 MAX_BYTES = 1024 * 1024
@@ -56,7 +57,7 @@ class CustomModel(BaseModel):
             parsed = urlsplit(self.base_url)
             if (parsed.scheme != "https" or not DOMAIN.fullmatch(parsed.hostname or "")
                     or parsed.port not in (443, None) or parsed.username is not None
-                    or parsed.query or parsed.fragment or not re.fullmatch(r"[!-~]{1,2048}",
+                    or "?" in self.base_url or "#" in self.base_url or not re.fullmatch(r"[!-~]{1,2048}",
                                                                          self.api_key.get_secret_value())):
                 raise ValueError
         except ValueError:
@@ -137,7 +138,7 @@ class LangChainAnswerModel:
                 settings.validate_destination()
             proxy = os.environ.get("KNOWFLOW_CUSTOM_LLM_PROXY")
             if transport is None and not proxy:
-                raise ProcessingError("AI_PROCESSING_FAILED", 503, retryable=False)
+                raise ProcessingError("AI_PROCESSING_FAILED", 503, retryable=False, retry_reason="proxy_unavailable")
             http_client = httpx2.AsyncClient if self.protocol == "anthropic_messages" else httpx.AsyncClient
             self.http = http_client(timeout=timeout, trust_env=False, follow_redirects=False,
                                     proxy=proxy if transport is None else None, transport=transport, **options)
@@ -223,7 +224,16 @@ class LangChainAnswerModel:
                 await response.aclose()
         else:
             try:
-                await response.aread()
+                body = await response.aread()
+                if self.probe:
+                    error = ProcessingError("AI_PROCESSING_FAILED", retryable=False,
+                                            provider_status=response.status_code, retry_reason="http_status")
+                    error.provider_evidence = machine_evidence(body)
+                    raise error
+            except ProcessingError as error:
+                if self.probe:
+                    error.provider_status = response.status_code
+                raise
             finally:
                 await response.aclose()
 
@@ -276,6 +286,17 @@ class LangChainAnswerModel:
                         raise
                     except (openai.APIError, anthropic.APIError, httpx.HTTPError, httpx2.HTTPError,
                             httpx.InvalidURL, httpx2.InvalidURL) as error:
+                        if self.probe:
+                            # SDKs may wrap hook failures as connection errors. Preserve
+                            # only our controlled, already-sanitized boundary exception.
+                            cause, seen = error.__cause__, set()
+                            while cause is not None and id(cause) not in seen:
+                                seen.add(id(cause))
+                                if isinstance(cause, ProcessingError):
+                                    category = failure_category(cause, kind=cause.retry_reason)
+                                    state.failure_category = cause.retry_reason
+                                    raise cause from None
+                                cause = cause.__cause__
                         response = getattr(error, "response", None)
                         status = getattr(error, "status_code", None)
                         if status is None and response is not None:
@@ -283,6 +304,14 @@ class LangChainAnswerModel:
                         timed_out = isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError,
                                                        httpx.TimeoutException, httpx2.TimeoutException))
                         kind = transport_failure_kind(error)
+                        if self.probe and kind == "unknown":
+                            cause, seen = error, set()
+                            while cause is not None and id(cause) not in seen:
+                                seen.add(id(cause))
+                                if isinstance(cause, (httpx.ProxyError, httpx2.ProxyError)):
+                                    kind = "connect_failure"
+                                    break
+                                cause = cause.__cause__
                         if kind == "unknown" and error.__cause__ is None:
                             if isinstance(error, (openai.APITimeoutError, anthropic.APITimeoutError)):
                                 kind = "read_timeout"
@@ -409,9 +438,13 @@ class LangChainAnswerModel:
         try:
             result = await probe(self.model.bind_tools([report_ready]))
         except ProcessingError as error:
-            if error.provider_status not in (400, 422, 501):
+            if not tools_rejected(error):
                 raise
             result = await probe(self.model)
+        if result.invalid_tool_calls or (result.tool_calls and not all(
+                call.get("name") == "report_ready" and call.get("args") == {} and call.get("id")
+                for call in result.tool_calls)):
+            raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
         supports_tools = bool(result.tool_calls) and all(
             call["name"] == "report_ready" and not call["args"] and call["id"] for call in result.tool_calls)
         if supports_tools:
@@ -419,6 +452,6 @@ class LangChainAnswerModel:
             messages.extend({"role": "tool", "tool_call_id": call["id"], "content": "READY"}
                             for call in result.tool_calls)
             result = await probe(self.model)
-        if not result.text.strip():
+        if result.tool_calls or result.invalid_tool_calls or not result.text.strip():
             raise ProcessingError("AI_PROCESSING_FAILED", retryable=False)
         return supports_tools

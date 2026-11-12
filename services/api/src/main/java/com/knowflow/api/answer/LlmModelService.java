@@ -7,6 +7,8 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -59,7 +61,7 @@ public class LlmModelService {
     Catalog list(UUID owner) {
         if (encryptionKey == null) return new Catalog(false, List.of());
         List<Model> models = jdbc.query("""
-                SELECT id, base_url, protocol, model_id, supports_tools FROM knowflow.llm_models
+                SELECT id, base_url, protocol, model_id, supports_tools, last_probe_at, last_probe_status FROM knowflow.llm_models
                 WHERE owner_user_id = ? ORDER BY model_id, base_url, id
                 """, (row, index) -> model(row), owner);
         return new Catalog(true, models);
@@ -82,9 +84,9 @@ public class LlmModelService {
         }
         if (key == null || !key.matches("[!-~]{1,2048}")) throw ApiFailure.invalidRequest();
         reserveProbe(owner);
-        boolean tools;
+        AiAnswerClient.ModelProbe probe;
         try (ModelRequestAdmission.Lease lease = admission.tryAcquire(true)) {
-            tools = ai.probeModel(owner, new Connection(modelId, url, protocol, model, key, false), requestId);
+            probe = ai.probeModel(owner, new Connection(modelId, url, protocol, model, key, false), requestId);
         }
         byte[] encrypted = encrypt(owner, modelId, key);
         UUID revision = UUID.randomUUID();
@@ -92,19 +94,22 @@ public class LlmModelService {
             if (previous == null) {
                 jdbc.update("""
                         INSERT INTO knowflow.llm_models
-                            (id, owner_user_id, base_url, protocol, model_id, encrypted_key, supports_tools, revision)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """, modelId, owner, url, protocol, model, encrypted, tools, revision);
+                            (id, owner_user_id, base_url, protocol, model_id, encrypted_key, supports_tools, revision,
+                             last_probe_at, last_probe_status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, modelId, owner, url, protocol, model, encrypted, probe.supportsTools(), revision,
+                        Timestamp.from(probe.checkedAt()), probe.status());
             } else if (jdbc.update("""
                     UPDATE knowflow.llm_models SET base_url=?, protocol=?, model_id=?, encrypted_key=?,
-                        supports_tools=?, revision=? WHERE id=? AND owner_user_id=? AND revision=?
-                    """, url, protocol, model, encrypted, tools, revision, modelId, owner, previous.revision()) == 0) {
+                        supports_tools=?, revision=?, last_probe_at=?, last_probe_status=? WHERE id=? AND owner_user_id=? AND revision=?
+                    """, url, protocol, model, encrypted, probe.supportsTools(), revision, Timestamp.from(probe.checkedAt()),
+                            probe.status(), modelId, owner, previous.revision()) == 0) {
                 throw conflict();
             }
         } catch (DuplicateKeyException duplicate) {
             throw conflict();
         }
-        return new Model(modelId, url, protocol, model, tools);
+        return new Model(modelId, url, protocol, model, probe.supportsTools(), probe.checkedAt(), probe.status());
     }
 
     void delete(UUID owner, UUID id) {
@@ -124,7 +129,7 @@ public class LlmModelService {
 
     private Stored find(UUID owner, UUID id) {
         return jdbc.query("""
-                SELECT id, base_url, protocol, model_id, supports_tools, encrypted_key, revision
+                SELECT id, base_url, protocol, model_id, supports_tools, last_probe_at, last_probe_status, encrypted_key, revision
                 FROM knowflow.llm_models WHERE id=? AND owner_user_id=?
                 """, (row, index) -> new Stored(model(row), row.getBytes("encrypted_key"),
                         row.getObject("revision", UUID.class)), id, owner).stream().findFirst()
@@ -133,7 +138,9 @@ public class LlmModelService {
 
     private static Model model(ResultSet row) throws SQLException {
         return new Model(row.getObject("id", UUID.class), row.getString("base_url"), row.getString("protocol"),
-                row.getString("model_id"), row.getBoolean("supports_tools"));
+                row.getString("model_id"), row.getBoolean("supports_tools"),
+                row.getTimestamp("last_probe_at") == null ? null : row.getTimestamp("last_probe_at").toInstant(),
+                row.getString("last_probe_status"));
     }
 
     private void reserveProbe(UUID owner) {
@@ -160,7 +167,7 @@ public class LlmModelService {
     }
 
     static String normalizeUrl(String value) {
-        if (value == null || value.length() > 1024) throw ApiFailure.invalidRequest();
+        if (value == null || value.length() > 1024) throw AiAnswerClient.probeFailure("LLM_MODEL_URL_INVALID");
         try {
             URI uri = URI.create(value.strip());
             String host = uri.getHost();
@@ -168,11 +175,11 @@ public class LlmModelService {
                     || uri.getRawQuery() != null || uri.getRawFragment() != null
                     || (uri.getPort() != -1 && uri.getPort() != 443)
                     || !host.matches("(?i)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z][a-z0-9-]{0,62}")) {
-                throw ApiFailure.invalidRequest();
+                throw AiAnswerClient.probeFailure("LLM_MODEL_URL_INVALID");
             }
             return "https://" + host.toLowerCase(Locale.ROOT) + uri.normalize().getRawPath().replaceFirst("/+$", "");
         } catch (IllegalArgumentException invalid) {
-            throw ApiFailure.invalidRequest();
+            throw AiAnswerClient.probeFailure("LLM_MODEL_URL_INVALID");
         }
     }
 
@@ -207,7 +214,8 @@ public class LlmModelService {
     record Input(String baseUrl, String protocol, String modelId, String apiKey) {
         @Override public String toString() { return "LlmModelInput"; }
     }
-    record Model(UUID id, String baseUrl, String protocol, String modelId, boolean supportsTools) {}
+    record Model(UUID id, String baseUrl, String protocol, String modelId, boolean supportsTools,
+                 Instant lastProbeAt, String lastProbeStatus) {}
     record Catalog(boolean enabled, List<Model> models) {}
     private record Stored(Model model, byte[] encryptedKey, UUID revision) {}
     record Connection(UUID id, String baseUrl, String protocol, String modelId, String apiKey, boolean supportsTools) {

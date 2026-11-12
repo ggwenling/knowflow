@@ -367,7 +367,7 @@ async def test_probe_falls_back_to_text_when_provider_rejects_tools():
     async def handle(request):
         calls.append(json.loads(request.content))
         if len(calls) == 1:
-            return httpx.Response(400, json={"error": {"message": "unsupported tools"}})
+            return httpx.Response(400, json={"error": {"message": "unsupported tools", "param": "tools", "code": "unsupported_parameter"}})
         return chat({"content": "READY"})
 
     model = LangChainAnswerModel(model_config(), transport=httpx.MockTransport(handle), probe=True)

@@ -17,6 +17,8 @@ export type LlmModel = {
   base_url: string;
   protocol: keyof typeof protocols;
   supports_tools: boolean;
+  last_probe_at?: string | null;
+  last_probe_status?: "success" | null;
 };
 
 export type LlmInput = Pick<LlmModel, "model_id" | "base_url" | "protocol"> & { api_key: string };

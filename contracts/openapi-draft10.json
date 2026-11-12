@@ -17,44 +17,164 @@
         "responses": {
           "200": {
             "description": "自定义模型开关和当前账号的配置",
-            "content": {"application/json": {"schema": {
-              "type": "object", "required": ["enabled", "models"], "properties": {
-                "enabled": {"type": "boolean"}, "models": {"type": "array", "items": {"$ref": "#/components/schemas/LlmModel"}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "enabled",
+                    "models"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LlmModel"
+                      }
+                    }
+                  }
+                }
               }
-            }}}
+            }
           },
-          "default": {"$ref": "#/components/responses/Error"}
+          "default": {
+            "$ref": "#/components/responses/LlmModelError"
+          }
         }
       },
       "post": {
         "summary": "测试并添加自定义模型",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {
-          "allOf": [{"$ref": "#/components/schemas/LlmModelInput"}, {"required": ["api_key"]}]
-        }}}},
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LlmModelInput"
+                  },
+                  {
+                    "required": [
+                      "api_key"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
-          "201": {"description": "已保存", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModel"}}}},
-          "default": {"$ref": "#/components/responses/Error"},
-          "429": {"description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal.", "content": {"application/json": {"schema": {"$ref": "./schemas/protocol.schema.json#/$defs/Error"}}}}
+          "201": {
+            "description": "已保存",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModel"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "429": {
+            "description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelError"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "422": {
+            "$ref": "#/components/responses/LlmModelError"
+          }
         }
       }
     },
     "/api/v1/llm-models/{id}": {
       "put": {
         "summary": "测试并更新自定义模型",
-        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModelInput"}}}},
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmModelInput"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"description": "已更新", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmModel"}}}},
-          "default": {"$ref": "#/components/responses/Error"},
-          "429": {"description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal.", "content": {"application/json": {"schema": {"$ref": "./schemas/protocol.schema.json#/$defs/Error"}}}}
+          "200": {
+            "description": "已更新",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModel"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "429": {
+            "description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelError"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "422": {
+            "$ref": "#/components/responses/LlmModelError"
+          }
         }
       },
       "delete": {
         "summary": "删除当前账号的自定义模型",
-        "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
-          "204": {"description": "已删除"},
-          "default": {"$ref": "#/components/responses/Error"}
+          "204": {
+            "description": "已删除"
+          },
+          "default": {
+            "$ref": "#/components/responses/LlmModelError"
+          }
         }
       }
     },
@@ -1374,17 +1494,79 @@
     },
     "/internal/v1/llm-models/probe": {
       "post": {
-        "parameters": [{"name": "X-KnowFlow-Owner-ID", "in": "header", "required": true, "description": "Trusted owner UUID supplied by Java after authentication. Internal Bearer authentication is required before validation; browser-supplied owner fields are not accepted.", "schema": {"type": "string", "format": "uuid"}}],
+        "parameters": [
+          {
+            "name": "X-KnowFlow-Owner-ID",
+            "in": "header",
+            "required": true,
+            "description": "Trusted owner UUID supplied by Java after authentication. Internal Bearer authentication is required before validation; browser-supplied owner fields are not accepted.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Request-ID",
+            "in": "header",
+            "required": true,
+            "description": "Safe request ID forwarded by Java RequestIdFilter.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            }
+          }
+        ],
         "summary": "验证自定义模型的文本和工具能力",
-        "security": [{"internalBearer": []}],
-        "servers": [{"url": "http://localhost:8000"}],
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LlmConnection"}}}},
+        "security": [
+          {
+            "internalBearer": []
+          }
+        ],
+        "servers": [
+          {
+            "url": "http://localhost:8000"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmConnection"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {"description": "通过测试", "content": {"application/json": {"schema": {
-            "type": "object", "required": ["supports_tools"], "properties": {"supports_tools": {"type": "boolean"}}
-          }}}},
-          "default": {"$ref": "#/components/responses/Error"},
-          "429": {"description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal. Existing save-time probe rate limit also returns 429 (LLM_MODEL_PROBE_LIMIT).", "content": {"application/json": {"schema": {"$ref": "./schemas/protocol.schema.json#/$defs/Error"}}}}
+          "200": {
+            "description": "通过测试",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProbeResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "429": {
+            "description": "Model capacity is full: RESOURCE_LIMIT, retryable=true, message: 模型请求繁忙，请稍后重试。 No provider request is queued. An already-started SSE response emits one error terminal. Existing save-time probe rate limit also returns 429 (LLM_MODEL_PROBE_LIMIT).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelError"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/LlmModelError"
+          },
+          "422": {
+            "$ref": "#/components/responses/LlmModelError"
+          }
         }
       }
     },
@@ -1537,6 +1719,16 @@
       }
     },
     "responses": {
+      "LlmModelError": {
+        "description": "Safe model error envelope. Provider authentication/rate limits are public 422; site probe limit is 429. Unknown failures use LLM_MODEL_PROBE_FAILED.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/LlmModelError"
+            }
+          }
+        }
+      },
       "Error": {
         "description": "错误体包含错误码、可重试性与请求 ID",
         "content": {
@@ -1566,20 +1758,163 @@
         }
       },
       "LlmModel": {
-        "type": "object", "required": ["id", "base_url", "protocol", "model_id", "supports_tools"],
+        "type": "object",
+        "required": [
+          "id",
+          "base_url",
+          "protocol",
+          "model_id",
+          "supports_tools"
+        ],
         "properties": {
-          "id": {"type": "string", "format": "uuid"},
-          "base_url": {"type": "string", "format": "uri"},
-          "protocol": {"enum": ["chat_completions", "responses", "anthropic_messages"]},
-          "model_id": {"type": "string"},
-          "supports_tools": {"type": "boolean"}
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "protocol": {
+            "enum": [
+              "chat_completions",
+              "responses",
+              "anthropic_messages"
+            ]
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "supports_tools": {
+            "type": "boolean"
+          },
+          "last_probe_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Last successful save-time probe, UTC RFC3339; absent/null for legacy records."
+          },
+          "last_probe_status": {
+            "enum": [
+              "success",
+              null
+            ]
+          }
+        }
+      },
+      "ModelProbeResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "supports_tools",
+          "status",
+          "checked_at"
+        ],
+        "properties": {
+          "supports_tools": {
+            "type": "boolean"
+          },
+          "status": {
+            "const": "success"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "Z$"
+          }
+        }
+      },
+      "LlmModelError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contract_version",
+          "request_id",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "properties": {
+          "contract_version": {
+            "$ref": "./schemas/protocol.schema.json#/$defs/ContractVersion"
+          },
+          "request_id": {
+            "$ref": "./schemas/protocol.schema.json#/$defs/Identifier"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "LLM_MODEL_URL_INVALID",
+              "LLM_MODEL_AUTH_FAILED",
+              "LLM_MODEL_NOT_FOUND",
+              "LLM_MODEL_ENDPOINT_NOT_FOUND",
+              "LLM_MODEL_UNREACHABLE",
+              "LLM_MODEL_TIMEOUT",
+              "LLM_MODEL_RATE_LIMITED",
+              "LLM_MODEL_PROTOCOL_ERROR",
+              "INVALID_REQUEST",
+              "LLM_MODEL_PROBE_FAILED",
+              "LLM_MODEL_PROBE_LIMIT",
+              "LLM_MODEL_CONFLICT",
+              "LLM_MODELS_DISABLED",
+              "RESOURCE_LIMIT",
+              "UNAUTHENTICATED",
+              "SCOPE_DENIED",
+              "RESOURCE_NOT_FOUND",
+              "INTERNAL_ERROR",
+              "AI_PROCESSING_FAILED"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "retryable": {
+            "type": "boolean"
+          }
         }
       },
       "LlmConnection": {
-        "allOf": [
-          {"$ref": "#/components/schemas/LlmModel"},
-          {"type": "object", "required": ["api_key"], "properties": {"api_key": {"type": "string", "writeOnly": true}}}
-        ]
+        "type": "object",
+        "required": [
+          "id",
+          "base_url",
+          "protocol",
+          "model_id",
+          "supports_tools",
+          "api_key"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "protocol": {
+            "enum": [
+              "chat_completions",
+              "responses",
+              "anthropic_messages"
+            ]
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "supports_tools": {
+            "type": "boolean"
+          },
+          "api_key": {
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false
       },
       "CustomAnswerRequest": {
         "type": "object", "additionalProperties": false, "required": ["request", "model"],

@@ -87,6 +87,38 @@ class OpenApiDraft10Test(unittest.TestCase):
             self.assertIn("RESOURCE_LIMIT", busy["description"])
             self.assertIn("模型请求繁忙，请稍后重试。", busy["description"])
 
+    def test_model_probe_contract_and_connection_isolation(self):
+        schemas = self.spec["components"]["schemas"]
+        result = schemas["ModelProbeResult"]
+        self.assertEqual(set(result["required"]), {"supports_tools", "status", "checked_at"})
+        self.assertEqual(result["properties"]["status"]["const"], "success")
+        self.assertEqual(result["properties"]["checked_at"]["format"], "date-time")
+        model = schemas["LlmModel"]["properties"]
+        self.assertEqual(model["last_probe_status"]["enum"], ["success", None])
+        self.assertIn("null", model["last_probe_at"]["type"])
+        connection = schemas["LlmConnection"]
+        self.assertNotIn("allOf", connection)
+        self.assertFalse(connection["additionalProperties"])
+        self.assertEqual(set(connection["properties"]),
+                         {"id", "base_url", "protocol", "model_id", "api_key", "supports_tools"})
+        error = schemas["LlmModelError"]
+        self.assertNotIn("allOf", error)
+        self.assertEqual(set(error["properties"]), set(self.definitions["Error"]["properties"]))
+        codes = set(error["properties"]["code"]["enum"])
+        self.assertTrue({"LLM_MODEL_" + code for code in (
+            "URL_INVALID", "AUTH_FAILED", "NOT_FOUND", "ENDPOINT_NOT_FOUND", "UNREACHABLE", "TIMEOUT",
+            "RATE_LIMITED", "PROTOCOL_ERROR", "PROBE_FAILED", "PROBE_LIMIT", "CONFLICT")} <= codes)
+        self.assertIn("LLM_MODELS_DISABLED", codes)
+        for path, operations in self.spec["paths"].items():
+            if "llm-models" in path:
+                for operation in operations.values():
+                    self.assertEqual(operation["responses"]["default"]["$ref"],
+                                     "#/components/responses/LlmModelError")
+        probe = self.spec["paths"]["/internal/v1/llm-models/probe"]["post"]
+        self.assertEqual(probe["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+                         "#/components/schemas/ModelProbeResult")
+        self.assertTrue(next(p for p in probe["parameters"] if p["name"] == "X-Request-ID")["required"])
+
     def test_public_stream_and_source_locators_use_shared_closed_schema(self):
         schemas = self.spec["components"]["schemas"]
         self.assertEqual(

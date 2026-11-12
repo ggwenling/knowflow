@@ -92,21 +92,75 @@ public final class AiAnswerClient {
         });
     }
 
-    boolean probeModel(UUID owner, LlmModelService.Connection model, String requestId) {
-        ModelProbe response = client.post().uri("/internal/v1/llm-models/probe")
-                .header("X-KnowFlow-Owner-ID", owner.toString())
-                .header(RequestIdFilter.HEADER, requestId).bodyValue(model)
-                .exchangeToMono(result -> result.statusCode().is2xxSuccessful()
-                        ? result.bodyToMono(ModelProbe.class)
-                        : upstreamFailure(result, requestId).flatMap(Mono::error))
-                .timeout(Duration.ofSeconds(12))
-                .onErrorResume(failure -> failure instanceof ApiFailure apiFailure
-                        && "RESOURCE_LIMIT".equals(apiFailure.code()) ? Mono.error(failure) : Mono.empty()).block();
-        if (response == null) {
-            throw new ApiFailure(org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "LLM_MODEL_PROBE_FAILED",
-                    "The configured model could not complete a connection test.");
+    static final java.util.Map<String, String> PROBE_MESSAGES = java.util.Map.ofEntries(
+            java.util.Map.entry("LLM_MODEL_URL_INVALID", "服务地址不符合要求，请使用不含账号密码的公网 HTTPS 地址。"),
+            java.util.Map.entry("LLM_MODEL_AUTH_FAILED", "服务拒绝了密钥或访问权限，请检查 API 密钥及其模型权限。"),
+            java.util.Map.entry("LLM_MODEL_NOT_FOUND", "模型不存在或当前密钥无权使用，请核对模型 ID 和模型权限。"),
+            java.util.Map.entry("LLM_MODEL_ENDPOINT_NOT_FOUND", "接口路径或模型不可用，请检查 Base URL、接口协议和模型 ID。"),
+            java.util.Map.entry("LLM_MODEL_UNREACHABLE", "无法连接到服务，请检查公网 HTTPS 地址和网络可达性。"),
+            java.util.Map.entry("LLM_MODEL_TIMEOUT", "连接测试超时，请稍后重试或检查服务响应速度。"),
+            java.util.Map.entry("LLM_MODEL_RATE_LIMITED", "模型服务暂时限流，请稍后再试。"),
+            java.util.Map.entry("LLM_MODEL_PROTOCOL_ERROR", "服务返回与所选协议或模型 ID 不匹配，请检查配置。"),
+            java.util.Map.entry("LLM_MODEL_PROBE_FAILED", "连接测试失败。请检查地址、密钥、协议和模型 ID。"));
+
+    static ApiFailure probeFailure(String code) {
+        String safeCode = code != null && PROBE_MESSAGES.containsKey(code) ? code : "LLM_MODEL_PROBE_FAILED";
+        return new ApiFailure("LLM_MODEL_URL_INVALID".equals(safeCode)
+                ? org.springframework.http.HttpStatus.BAD_REQUEST : org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                safeCode, PROBE_MESSAGES.get(safeCode));
+    }
+
+    ModelProbe probeModel(UUID owner, LlmModelService.Connection model, String requestId) {
+        try {
+            ModelProbe response = client.post().uri("/internal/v1/llm-models/probe")
+                    .header("X-KnowFlow-Owner-ID", owner.toString())
+                    .header(RequestIdFilter.HEADER, requestId).bodyValue(model)
+                    .exchangeToMono(result -> org.springframework.core.io.buffer.DataBufferUtils.join(
+                            result.bodyToFlux(org.springframework.core.io.buffer.DataBuffer.class), 1024 * 1024)
+                        .map(buffer -> {
+                            byte[] bytes = new byte[buffer.readableByteCount()];
+                            try { buffer.read(bytes); }
+                            finally { org.springframework.core.io.buffer.DataBufferUtils.release(buffer); }
+                            try {
+                                var value = mapper.readTree(bytes);
+                                if (result.statusCode().is2xxSuccessful()) {
+                                    if (value == null || !value.isObject() || value.size() != 3
+                                            || !value.path("supports_tools").isBoolean()
+                                            || !"success".equals(value.path("status").asText())
+                                            || !value.path("checked_at").isTextual()
+                                            || !value.path("checked_at").asText().endsWith("Z")) {
+                                        throw probeFailure("LLM_MODEL_PROBE_FAILED");
+                                    }
+                                    return new ModelProbe(value.path("supports_tools").booleanValue(), "success",
+                                            java.time.Instant.parse(value.path("checked_at").asText()));
+                                }
+                                if (value != null && value.isObject() && value.size() == 5
+                                        && ApiError.CONTRACT_VERSION.equals(value.path("contract_version").asText())
+                                        && requestId.equals(value.path("request_id").asText())
+                                        && value.path("message").isTextual() && !value.path("message").asText().isEmpty()
+                                        && value.path("message").asText().length() <= 512
+                                        && value.path("code").isTextual() && value.path("retryable").isBoolean()) {
+                                    String code = value.path("code").asText();
+                                    if (result.statusCode().value() == 429 && "RESOURCE_LIMIT".equals(code)
+                                            && value.path("retryable").booleanValue()) throw ApiFailure.modelBusy();
+                                    int expected = "LLM_MODEL_URL_INVALID".equals(code) ? 400 : 422;
+                                    if (PROBE_MESSAGES.containsKey(code) && result.statusCode().value() == expected
+                                            && !value.path("retryable").booleanValue()) throw probeFailure(code);
+                                }
+                            } catch (IOException invalid) {
+                                // Only the fixed allowlist may cross this boundary.
+                            }
+                            throw probeFailure("LLM_MODEL_PROBE_FAILED");
+                        }))
+                    .timeout(Duration.ofSeconds(12)).block();
+            if (response == null) throw probeFailure("LLM_MODEL_PROBE_FAILED");
+            return response;
+        } catch (ApiFailure safe) {
+            if ("RESOURCE_LIMIT".equals(safe.code()) && safe.status().value() == 429) throw ApiFailure.modelBusy();
+            throw probeFailure(safe.code());
+        } catch (Exception invalid) {
+            throw probeFailure("LLM_MODEL_PROBE_FAILED");
         }
-        return response.supportsTools();
     }
 
     private Mono<? extends Throwable> upstreamFailure(
@@ -129,7 +183,7 @@ public final class AiAnswerClient {
     }
 
     private record CustomAnswer(TrustedAnswerRequest request, LlmModelService.Connection model) {}
-    private record ModelProbe(boolean supportsTools) {}
+    record ModelProbe(boolean supportsTools, String status, java.time.Instant checkedAt) {}
 
     private AiAnswerStreamEvent decodeStreamEvent(String data) {
         if (data == null) {

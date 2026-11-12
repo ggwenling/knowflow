@@ -22,6 +22,7 @@ from .langchain_answer import CustomModel, LangChainAnswerModel
 from .java_client import JavaGateway
 from .provider_observability import emit_call, install_safe_logging, new_call_id
 from .provider_probe import ProviderReadiness
+from .model_probe import ModelProbeError, MESSAGES, run_model_probe, utc_now
 from .provider_runtime import ProviderRuntime, ModelCallContext, model_busy, is_model_busy, BUSY_MESSAGE
 from .worker import IndexWorker, WorkerUnavailable, validate_runtime_profile
 
@@ -151,7 +152,8 @@ class BoundaryMiddleware:
 
 
 def create_app(settings: Settings | None = None, *, worker_factory=None,
-               answer_service_factory=None, provider_readiness_factory=None, provider_runtime_factory=None) -> FastAPI:
+               answer_service_factory=None, provider_readiness_factory=None, provider_runtime_factory=None,
+               probe_clock=utc_now) -> FastAPI:
     install_safe_logging()
     settings = settings or Settings.from_environment()
     limits = settings.provider_limits()
@@ -198,11 +200,22 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
+        if (request.url.path == '/internal/v1/llm-models/probe'
+                and any(error['loc'] == ('body', 'base_url') for error in exc.errors())):
+            return await probe_error(request, ModelProbeError('LLM_MODEL_URL_INVALID'))
         return failure(request.state.request_id, 400, 'INVALID_REQUEST')
 
     @app.exception_handler(InvalidMessage)
     async def invalid_contract_message(request: Request, exc: InvalidMessage):
         return failure(request.state.request_id, 400, 'INVALID_REQUEST')
+
+    @app.exception_handler(ModelProbeError)
+    async def probe_error(request: Request, exc: ModelProbeError):
+        if request.url.path != '/internal/v1/llm-models/probe':
+            return failure(request.state.request_id, 502, 'AI_PROCESSING_FAILED')
+        return JSONResponse({'contract_version': CONTRACT_VERSION, 'request_id': request.state.request_id,
+                             'code': exc.code, 'message': MESSAGES[exc.code], 'retryable': False},
+                            status_code=exc.status)
 
     @app.exception_handler(ProcessingError)
     async def processing_error(request: Request, exc: ProcessingError):
@@ -360,18 +373,10 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
         route_deadline = runtime.clock() + 10
 
         async def probe():
-            model = None
-            try:
-                model = LangChainAnswerModel(payload, probe=True, runtime=runtime,
-                                             call_context=ModelCallContext(request.state.request_id, owner,
-                                                                           payload.id, 'probe'))
-                return {'supports_tools': await runtime.deadline_runner.run(
-                    model.probe_capabilities, deadline=route_deadline, timeout_kind='total_timeout')}
-            except TimeoutError:
-                raise ProcessingError('PROCESSING_TIMEOUT', 504) from None
-            finally:
-                if model is not None:
-                    await model.aclose()
+            return await run_model_probe(
+                lambda: LangChainAnswerModel(payload, probe=True, runtime=runtime,
+                    call_context=ModelCallContext(request.state.request_id, owner, payload.id, 'probe')),
+                runner=runtime.deadline_runner, deadline=route_deadline, clock=probe_clock)
 
         try:
             return await await_answer_or_disconnect(request, probe)

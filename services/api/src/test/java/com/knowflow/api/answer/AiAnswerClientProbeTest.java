@@ -21,8 +21,8 @@ class AiAnswerClientProbeTest {
 
     @Test void forwardsTrustedOwnerAndRequestId() {
         AtomicReference<ClientRequest> sent = new AtomicReference<>();
-        AiAnswerClient client = client(HttpStatus.OK, "{\"supports_tools\":true}", sent);
-        assertTrue(client.probeModel(owner, model, "safe-filtered-id"));
+        AiAnswerClient client = client(HttpStatus.OK, "{\"supports_tools\":true,\"status\":\"success\",\"checked_at\":\"2026-11-12T01:02:03Z\"}", sent);
+        assertTrue(client.probeModel(owner, model, "safe-filtered-id").supportsTools());
         assertEquals(owner.toString(), sent.get().headers().getFirst("X-KnowFlow-Owner-ID"));
         assertEquals("safe-filtered-id", sent.get().headers().getFirst("X-Request-ID"));
     }
@@ -42,6 +42,48 @@ class AiAnswerClientProbeTest {
         assertEquals("LLM_MODEL_PROBE_FAILED", assertThrows(ApiFailure.class,
                 () -> client(HttpStatus.SERVICE_UNAVAILABLE, envelope("RESOURCE_LIMIT"), new AtomicReference<>())
                         .probeModel(owner, model, "request")).code());
+    }
+
+    @Test void mapsAllowedProbeErrorsWithoutProviderText() {
+        for (String code : AiAnswerClient.PROBE_MESSAGES.keySet()) {
+            HttpStatus status = code.equals("LLM_MODEL_URL_INVALID") ? HttpStatus.BAD_REQUEST : HttpStatus.UNPROCESSABLE_ENTITY;
+            String body = envelope(code).replace("true", "false");
+            var failure = assertThrows(ApiFailure.class,
+                    () -> client(status, body, new AtomicReference<>()).probeModel(owner, model, "request"));
+            assertEquals(code, failure.code());
+            assertEquals(status, failure.status());
+            assertEquals(AiAnswerClient.PROBE_MESSAGES.get(code), failure.getMessage());
+            assertNull(failure.getCause());
+            assertFalse(failure.getMessage().contains("provider-secret"));
+        }
+    }
+
+    @Test void rejectsMalformedSuccessAndUnknownErrorCode() {
+        for (String body : new String[]{"", "null", "{}", "[]", "provider-secret", "{\"supports_tools\":false}",
+                "{\"supports_tools\":true,\"status\":\"failed\",\"checked_at\":\"2026-11-12T01:02:03Z\"}",
+                "{\"status\":\"success\",\"checked_at\":\"2026-11-12T01:02:03Z\"}",
+                "{\"supports_tools\":\"false\",\"status\":\"success\",\"checked_at\":\"2026-11-12T01:02:03Z\"}",
+                "{\"supports_tools\":false,\"status\":\"success\",\"checked_at\":\"invalid\"}",
+                "x".repeat(1024 * 1024 + 1)}) {
+            var failure = assertThrows(ApiFailure.class,
+                    () -> client(HttpStatus.OK, body, new AtomicReference<>()).probeModel(owner, model, "request"));
+            assertEquals("LLM_MODEL_PROBE_FAILED", failure.code());
+        }
+        for (String body : new String[]{envelope("UNKNOWN_SECRET_CODE").replace("true", "false"),
+                envelope("LLM_MODEL_AUTH_FAILED").replace("true", "false").replace("request", "different"), "not-json"}) {
+            assertEquals("LLM_MODEL_PROBE_FAILED", assertThrows(ApiFailure.class,
+                    () -> client(HttpStatus.UNPROCESSABLE_ENTITY, body, new AtomicReference<>())
+                            .probeModel(owner, model, "request")).code());
+        }
+        var broken = new AiAnswerClient(WebClient.builder().exchangeFunction(request -> Mono.error(
+                new IllegalStateException("provider-secret"))).build(), new ObjectMapper());
+        assertEquals("LLM_MODEL_PROBE_FAILED", assertThrows(ApiFailure.class,
+                () -> broken.probeModel(owner, model, "request")).code());
+        var unsafe = new AiAnswerClient(WebClient.builder().exchangeFunction(request -> Mono.error(
+                new ApiFailure(HttpStatus.BAD_GATEWAY, "UNKNOWN_CODE", "provider-secret"))).build(), new ObjectMapper());
+        var safe = assertThrows(ApiFailure.class, () -> unsafe.probeModel(owner, model, "request"));
+        assertEquals("LLM_MODEL_PROBE_FAILED", safe.code());
+        assertFalse(safe.getMessage().contains("provider-secret"));
     }
 
     @Test void answerAndStreamPreserveOnlyExplicitBusy() {

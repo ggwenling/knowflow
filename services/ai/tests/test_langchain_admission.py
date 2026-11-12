@@ -236,7 +236,7 @@ async def test_probe_turns_share_route_deadline(monkeypatch):
             await asyncio.wait_for(entered[2].wait(), 2)
             await runtime.deadline_runner.advance(2)
             result = await asyncio.wait_for(task, 2)
-            assert result.status_code == 504 and result.json()['code'] == 'PROCESSING_TIMEOUT'
+            assert result.status_code == 422 and result.json()['code'] == 'LLM_MODEL_TIMEOUT'
             assert finished.is_set() and app.state.question_admission.active == 0
             assert not runtime.users and not runtime.models and not runtime.deadline_runner.pending
         finally:

@@ -147,7 +147,8 @@ async def test_one_call_log_per_attempt_including_tools_retry_repair_and_probe(c
             calls.append(json.loads(request.content))
             if len(calls) == 1:
                 if not tools:
-                    return httpx.Response(400, json={'error': {'message': SECRETS[5]}})
+                    return httpx.Response(400, json={'error': {'message': SECRETS[5],
+                                                             'param': 'tools', 'code': 'unsupported_parameter'}})
                 return chat({'tool_calls': [{'index': 0, 'id': 'ready-1', 'type': 'function',
                              'function': {'name': 'report_ready', 'arguments': '{}'}}]}, 'tool_calls')
             return chat({'content': 'READY'})
