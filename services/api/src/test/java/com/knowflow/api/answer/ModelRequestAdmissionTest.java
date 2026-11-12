@@ -11,8 +11,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.http.HttpStatus;
 import reactor.core.publisher.Mono;
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,14 +44,23 @@ class ModelRequestAdmissionTest {
                 assertEquals(429, busy.status().value());
                 assertEquals("RESOURCE_LIMIT", busy.code());
                 assertEquals("模型请求繁忙，请稍后重试。", busy.getMessage());
+                var mapper = new ObjectMapper().setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+                var strategies = ExchangeStrategies.builder().codecs(codecs -> {
+                    codecs.defaultCodecs().jackson2JsonEncoder(
+                            new Jackson2JsonEncoder(mapper, MediaType.APPLICATION_JSON));
+                    codecs.defaultCodecs().jackson2JsonDecoder(
+                            new Jackson2JsonDecoder(mapper, MediaType.APPLICATION_JSON));
+                }).build();
                 var client = new AiAnswerClient(WebClient.builder().baseUrl("http://unused.test")
+                        .exchangeStrategies(strategies)
                         .exchangeFunction(request -> {
                             assertEquals("/internal/v1/answers", request.url().getPath());
-                            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            // Mock responses need the same codecs as the WebClient.
+                            return Mono.just(ClientResponse.create(HttpStatus.OK, strategies)
                                     .header("Content-Type", "application/json")
                                     .body("{\"contract_version\":\"0.2.0\",\"request_id\":\"builtin-replay\","
                                             + "\"answer\":\"builtin replay\",\"has_answer\":false,\"sources\":[]}").build());
-                        }).build(), new ObjectMapper().setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE));
+                        }).build(), mapper);
                 try (var builtin = admission.tryAcquire(false)) {
                     var request = new TrustedAnswerRequest("0.2.0", "builtin-replay", "question",
                             new TrustedAnswerRequest.TrustedScope(UUID.randomUUID(), UUID.randomUUID(),
