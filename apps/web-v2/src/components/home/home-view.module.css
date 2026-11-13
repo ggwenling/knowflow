@@ -522,15 +522,7 @@
   transition: transform var(--dur) var(--ease);
 }
 
-.ask:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.051), var(--shadow-raised);
-}
-
-.ask input:focus-visible {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.ask:focus-within:not(:has(.askMain :focus)) {
   outline: none;
 }
 
@@ -935,6 +927,29 @@
   border-radius: 0 0 18px 18px;
   background: var(--bg-subtle);
   padding: 8px 20px;
+}
+
+.ask[data-composite-field] .modelSelect {
+  min-width: 0;
+  max-width: min(100%, 240px);
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.ask .modelSelect:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.askOptions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
 }
 
 .scope {

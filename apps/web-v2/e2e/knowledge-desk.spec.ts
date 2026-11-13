@@ -96,6 +96,9 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const password = "KnowFlow-e2e-only-2026!";
   await page.goto("/");
   await page.getByRole("link", { name: "Create an account" }).click();
+  await expect(page).toHaveURL(/\/register$/);
+  // The login and registration forms share their inputs during navigation.
+  await expect(page.getByRole("heading", { name: "Create your account." })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Create account", exact: true }).click();
@@ -257,6 +260,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const secondEmail = `other-${randomUUID()}@example.test`;
   await secondPage.goto("/");
   await secondPage.getByRole("link", { name: "Create an account" }).click();
+  await expect(secondPage.getByRole("heading", { name: "Create your account." })).toBeVisible();
   await secondPage.getByLabel("Email").fill(secondEmail);
   await secondPage.getByLabel("Password", { exact: true }).fill(password);
   await secondPage.getByRole("button", { name: "Create account", exact: true }).click();

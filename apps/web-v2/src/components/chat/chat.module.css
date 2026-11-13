@@ -617,6 +617,21 @@
   color: var(--ink-3);
 }
 
+.composer .modelSelect {
+  min-width: 0;
+  max-width: min(100%, 220px);
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.composer .modelSelect:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .send {
   display: inline-flex;
   min-height: 32px;
@@ -1577,15 +1592,20 @@
     outline: none;
   }
   .composerFoot {
-    grid-column: 2;
-    grid-row: 1;
-    padding: 0;
-    gap: 0;
+    display: contents;
+  }
+  .composer .modelSelect {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+    max-width: 100%;
   }
   .composerHint {
     display: none;
   }
   .send, .stop {
+    grid-column: 2;
+    grid-row: 1;
     min-height: 40px;
     padding-inline: 10px;
   }

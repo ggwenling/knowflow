@@ -485,3 +485,45 @@ def test_answer_without_model_credential_does_not_construct_service(monkeypatch,
     assert 'answer' not in response.json()
     assert constructed == []
     assert 'unused.invalid' not in response.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('protocol', ['deepseek', 'chat_completions', 'anthropic_messages', 'responses'])
+async def test_recorded_normal_completion_reaches_answer_route(protocol, monkeypatch):
+    import httpx
+    from test_provider_completion import (
+        fixture_case, forbid_wire_network, recorded_app, recorded_http, recorded_model,
+    )
+
+    forbid_wire_network(monkeypatch)
+    case = fixture_case(protocol, 'normal_stream', True)
+    async with recorded_model(case) as (model, calls):
+        # Exercise direct generation; agent search roundtrips have separate coverage.
+        model.supports_tools = False
+        app = recorded_app(monkeypatch, model)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://test') as client:
+            response = await recorded_http(client, model)
+        assert response.status_code == 200
+        from test_answering import _contract
+        _contract().validate('AnswerResponse', response.json())
+        assert response.json()['answer'] == case['expected_result']['answer']
+        assert response.json()['has_answer'] is True
+        assert len(response.json()['sources']) == 1
+        assert len(calls) == 1 and app.state.question_admission.active == 0
+
+
+@pytest.mark.asyncio
+async def test_probe_metadata_is_not_accepted_as_connection_input(monkeypatch):
+    import httpx
+    from uuid import uuid4
+    from test_langchain_models import model_config
+    monkeypatch.setenv('KNOWFLOW_CUSTOM_LLM_ENABLED', 'true')
+    app = create_app(Settings(SECRET))
+    payload = {**model_config().model_dump(mode='json'), 'api_key': 'fixture-key',
+               'last_probe_at': '2026-11-12T01:02:03Z', 'last_probe_status': 'success'}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://local') as client:
+        response = await client.post('/internal/v1/llm-models/probe', json=payload,
+            headers={**AUTH, 'X-Request-ID': 'metadata-test', 'X-KnowFlow-Owner-ID': str(uuid4())})
+    assert response.status_code == 400
+    assert response.json()['code'] == 'INVALID_REQUEST'
+    assert 'fixture-key' not in response.text

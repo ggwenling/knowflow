@@ -62,6 +62,51 @@
   color: var(--ink-3);
 }
 
+.modelSettings {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  justify-items: start;
+}
+
+.modelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: 100%;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.modelRow p, .modelRow > span {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.modelForm {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 480px);
+}
+
+.modelForm label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.modelForm input, .modelForm select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius-xs);
+}
+
 .stepNumber {
   display: block;
   font-family: var(--font-sans);

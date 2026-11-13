@@ -1,4 +1,4 @@
-"""KF2-016: byte inputs only. No OCR, URL fetch, filesystem access or state writes."""
+"""KF2-016: byte inputs and page-preserving text extraction."""
 from dataclasses import dataclass, field
 from hashlib import sha256
 from io import BytesIO
@@ -11,6 +11,7 @@ _pdf_logger = logging.getLogger('pypdf')
 _pdf_logger.addHandler(logging.NullHandler())
 _pdf_logger.propagate = False
 PARSER_PROFILE = 'text-v1+pypdf-6.21.4'
+OCR_PARSER_PROFILE = 'text-v2+pypdf-6.21.4+ocr'
 IDENTIFIER = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
 
 
@@ -54,7 +55,7 @@ class ParsedDocument:
 
 
 def parse_document(data: bytes, *, format: str, document_id: str, content_version_id: str,
-                   file_id: str, limits: ParseLimits | None = None) -> ParsedDocument:
+                   file_id: str, limits: ParseLimits | None = None, ocr_page=None) -> ParsedDocument:
     limits = limits or ParseLimits()
     if not all(isinstance(x,str) and IDENTIFIER.fullmatch(x) for x in (document_id,content_version_id,file_id)):
         raise ParseFailure('INVALID_SOURCE_IDENTITY')
@@ -91,9 +92,14 @@ def parse_document(data: bytes, *, format: str, document_id: str, content_versio
         pages = len(reader.pages)
         if pages > limits.max_pdf_pages:
             raise ParseFailure('PDF_PAGE_LIMIT')
-        blocks = []; empty = []; characters = 0
+        blocks = []; empty = []; characters = 0; ocr_pages = 0
         for page_number, page in enumerate(reader.pages, 1):
             text = page.extract_text() or ''
+            if not text.strip() and ocr_page is not None and len(page.images):
+                ocr_pages += 1
+                if ocr_pages > 20:
+                    raise ParseFailure('PDF_OCR_PAGE_LIMIT')
+                text = ocr_page(data, page_number)
             characters += len(text)
             if characters > limits.max_characters:
                 raise ParseFailure('TEXT_TOO_LARGE')
@@ -104,8 +110,9 @@ def parse_document(data: bytes, *, format: str, document_id: str, content_versio
         if not blocks:
             raise ParseFailure('PDF_NO_TEXT')
         return ParsedDocument(document_id,content_version_id,file_id,sha256(data).hexdigest(),format,
-                              tuple(blocks),characters,pages,tuple(empty))
-    except ParseFailure:
+                              tuple(blocks),characters,pages,tuple(empty),
+                              OCR_PARSER_PROFILE if ocr_pages else PARSER_PROFILE)
+    except (ParseFailure, MemoryError):
         raise
     except Exception:
         raise ParseFailure('INVALID_PDF') from None

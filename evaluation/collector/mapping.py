@@ -30,7 +30,7 @@ def map_retrieval(question_id, rows, mappings):
     the reviewed dataset document/version IDs, exact UTF-8 source bytes and
     the independently pinned SHA-256. This is not a production API.
     """
-    if not isinstance(rows, list) or len(rows) > 10 or not isinstance(mappings, dict):
+    if not isinstance(rows, list) or len(rows) > 15 or not isinstance(mappings, dict):
         raise ValueError("INVALID_TRACE")
     result, seen = [], set()
     for row in rows:

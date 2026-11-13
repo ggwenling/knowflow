@@ -66,7 +66,9 @@ def main():
             raise RuntimeError("EXTERNAL_NETWORK_DISABLED_IN_FAKE_SERVICE")
         return await original(self, request)
     httpx.AsyncHTTPTransport.handle_async_request = loopback_only
-    uvicorn.run(create_fake_app(), host="127.0.0.1", port=8000, log_level="warning", access_log=False)
+    uvicorn.run(create_fake_app(), host="127.0.0.1",
+                port=int(os.environ.get("KNOWFLOW_EVALUATION_AI_PORT", "8000")),
+                log_level="warning", access_log=False)
 
 
 if __name__ == "__main__":

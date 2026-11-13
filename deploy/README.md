@@ -1,5 +1,11 @@
 # deploy/ — 部署草案（#15）
 
+## 自定义问答模型
+
+生产形态 Compose 使用 Web v2。内置模型继续从部署环境读取 DeepSeek 凭证。自定义模型默认关闭，启用前给 Java 配置持久保存的 `KNOWFLOW_CUSTOM_LLM_ENCRYPTION_KEY`（32 个随机字节的 Base64）。完成数据库备份、V9 迁移和默认模型冒烟后，将 `KNOWFLOW_CUSTOM_LLM_ENABLED` 设为 `true`，并在启动命令加 `--profile custom-llm`。重建 Web 或 AI 后执行 `docker compose restart edge`，让 Nginx 重新解析上游地址。回滚时关闭开关，保留 V9 数据和加密密钥。
+
+自定义 HTTPS 端点由 `model-egress` 解析并直接连接到经检查的公网地址。部署时通过 `KNOWFLOW_CUSTOM_LLM_DENY_CIDRS` 加入本环境使用的公网回流地址和网段。代理所在网络需能解析实际公网地址，并能访问公网 TCP 443。使用虚拟地址的本机 DNS 会被代理拒绝。`llm_call` 日志按协议记录耗时与结果，Java SSE 生命周期日志记录已校验首帧及取消状态。
+
 - 分支：`agent/deploy-prep`（从 `local@84681d4` 拉出）
 - 性质：**草案**。本目录只放文档与只读脚本，**未改动任何业务代码、依赖清单或现有 `infra/` 配置**。
 - 状态：`DRAFT / NOT EXECUTED`。没有任何一条步骤在真实生产环境跑过。已执行的只有 `infra/` 下两套隔离 Compose 的备份恢复演练。

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import socket
 import subprocess
 import sys
 import tempfile
@@ -53,10 +54,21 @@ def assert_fake_evaluation_success(payload, scorer_result, expected_samples):
             raise RuntimeError("DETERMINISTIC_FAKE_ANSWER_MISMATCH")
 
 
-def run(output):
-    for port in (55432, 59000, 59001, 8000, 8080):
-        if not recovery.local.can_bind(port):
-            raise RuntimeError("EVALUATION_SMOKE_PORT_IN_USE")
+def run(output, real_split=None, *, offline_quality=False):
+    quality = real_split or offline_quality
+    if real_split and any(not os.environ.get(name) for name in (
+            "KNOWFLOW_LLM_API_KEY", "KNOWFLOW_EMBEDDING_API_KEY", "KNOWFLOW_BUDGET_PRICE_FILE",
+            "KNOWFLOW_BUDGET_POLICY_FILE")):
+        raise RuntimeError("REAL_EVALUATION_CONFIGURATION_REQUIRED")
+    listeners = [socket.socket() for _ in range(5)]
+    try:
+        for listener in listeners:
+            listener.bind(("127.0.0.1", 0))
+        postgres, minio, console, ai_port, java_port = [listener.getsockname()[1] for listener in listeners]
+    finally:
+        for listener in listeners:
+            listener.close()
+    ai_url, java_url = f"http://127.0.0.1:{ai_port}", f"http://127.0.0.1:{java_port}"
     project = "knowflow-eval-" + uuid4().hex[:12]
     if any(resource_counts(project).values()):
         raise RuntimeError("EVALUATION_PROJECT_ALREADY_EXISTS")
@@ -72,6 +84,8 @@ def run(output):
         compose_text = (ROOT / "services/api/compose.dev.yml").read_text(encoding="utf-8")
         compose_text = compose_text.replace("knowflow-api-dev-postgres", project + "-postgres")
         compose_text = compose_text.replace("knowflow-api-dev-minio", project + "-minio")
+        for old, port in ((55432, postgres), (59000, minio), (59001, console)):
+            compose_text = compose_text.replace(f"127.0.0.1:{old}:", f"127.0.0.1:{port}:")
         compose_file.write_text(compose_text, encoding="utf-8")
         compose = ["docker", "compose", "--project-name", project, "--project-directory", str(ROOT / "services/api"),
                    "-f", str(compose_file), "--env-file", str(env_file)]
@@ -81,25 +95,50 @@ def run(output):
             subprocess.run(compose + ["up", "-d", "--wait", "--wait-timeout", "120"],
                            stdout=log, stderr=log, check=True, timeout=150)
             java_env, python_env, database_url = recovery.local.make_environment(values, temp / "marker")
+            database_url = database_url.replace(":55432/", f":{postgres}/")
             java_env.update({"SPRING_PROFILES_ACTIVE": "database,storage,db-migrate",
-                             "KNOWFLOW_DATABASE_MIGRATION_URL": "jdbc:postgresql://127.0.0.1:55432/knowflow",
+                             "SERVER_PORT": str(java_port), "KNOWFLOW_AI_BASE_URL": ai_url,
+                             "KNOWFLOW_STORAGE_ENDPOINT": f"http://127.0.0.1:{minio}",
+                             "KNOWFLOW_DATABASE_URL": f"jdbc:postgresql://127.0.0.1:{postgres}/knowflow",
+                             "KNOWFLOW_DATABASE_MIGRATION_URL": f"jdbc:postgresql://127.0.0.1:{postgres}/knowflow",
                              "KNOWFLOW_DATABASE_MIGRATION_USERNAME": "knowflow_migrator",
                              "KNOWFLOW_DATABASE_MIGRATION_PASSWORD": values["KNOWFLOW_DEV_MIGRATOR_PASSWORD"]})
             python_env.update({"KNOWFLOW_BUDGET_LEDGER_PATH": str(temp / "budget.sqlite3"),
+                               "KNOWFLOW_EVALUATION_AI_PORT": str(ai_port), "KNOWFLOW_JAVA_BASE_URL": java_url,
+                               "KNOWFLOW_AI_DATABASE_URL": python_env["KNOWFLOW_AI_DATABASE_URL"].replace(
+                                   ":55432/", f":{postgres}/"),
                                "KNOWFLOW_EVALUATION_CONTROL_SECRET": secrets.token_hex(32)})
+            if real_split:
+                python_env.update({"KNOWFLOW_EMBEDDING_KEY_ENV": "KNOWFLOW_EMBEDDING_API_KEY",
+                                   "KNOWFLOW_LLM_KEY_ENV": "KNOWFLOW_LLM_API_KEY",
+                                   "KNOWFLOW_LLM_MODEL": "deepseek-flash",
+                                   "KNOWFLOW_EMBEDDING_MODEL": "BAAI/bge-m3",
+                                   "KNOWFLOW_EMBEDDING_DIMENSIONS": "1024"})
+            if offline_quality:
+                python_env["KNOWFLOW_OFFLINE_QUALITY"] = "1"
             harness = recovery.RecoveryHarness(SimpleNamespace(maven_settings=None), values, "knowflow",
                                                database_url, java_env, python_env, log)
             harness.start_java()
             harness.python_process = subprocess.Popen(
-                [sys.executable, str(ROOT / "evaluation/collector/fake_service.py")], cwd=ROOT,
+                [sys.executable, str(ROOT / "evaluation/collector" /
+                                     ("quality_service.py" if quality else "fake_service.py"))], cwd=ROOT,
                 env=python_env, stdout=log, stderr=log)
-            recovery.local.wait_ready(harness.python_process, "http://127.0.0.1:8000", "/health/live")
+            recovery.local.wait_ready(harness.python_process, ai_url, "/health/live")
             harness.create_owner()
             collector = load(ROOT / "evaluation/collector/run.py")
             metadata = {"code_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                         "schema_sha256": sha256((ROOT / "contracts/schemas/protocol.schema.json").read_bytes()).hexdigest(),
                         "model": "fake", "config_sha256": sha256(b"fake-evaluation-smoke-v1").hexdigest(),
                         "prompt_sha256": sha256(b"fake-deterministic-answer-v1").hexdigest()}
+            dataset = ROOT / "evaluation/data" / ("seed-v2-reviewed" if quality else "seed-v1")
+            predictions = output.with_suffix(".predictions.json") if quality else temp / "predictions.json"
+            split = real_split or ("holdout" if offline_quality else "development")
+            if real_split:
+                ai_source = ROOT / "services/ai/src/knowflow_ai"
+                metadata.update(model="deepseek-flash",
+                                config_sha256=sha256(b"deepseek-flash|BAAI/bge-m3|sse|serial").hexdigest(),
+                                prompt_sha256=sha256(b"".join((ai_source / name).read_bytes() for name in
+                                    ("answering.py", "langchain_answer.py", "streaming.py"))).hexdigest())
             async def collect():
                 from psycopg.rows import dict_row
                 def query(sql, params):
@@ -107,24 +146,43 @@ def run(output):
                         return db.execute(sql, params).fetchone()
                 async def fetch(sql, params):
                     return await asyncio.to_thread(query, sql, params)
-                async with collector.httpx.AsyncClient(base_url="http://127.0.0.1:8080", timeout=40, trust_env=False,
+                async with collector.httpx.AsyncClient(base_url=java_url, timeout=40, trust_env=False,
                         headers={"Authorization": "Bearer " + harness.token}) as java:
-                    async with collector.httpx.AsyncClient(base_url="http://127.0.0.1:8000", timeout=40, trust_env=False,
+                    async with collector.httpx.AsyncClient(base_url=ai_url, timeout=40, trust_env=False,
                             headers={"Authorization": "Bearer " + values["KNOWFLOW_INTERNAL_SHARED_SECRET"],
                                      "X-Evaluation-Secret": python_env["KNOWFLOW_EVALUATION_CONTROL_SECRET"]}) as ai:
-                        return await collector.collect_dataset(java=java, ai=ai, dataset=ROOT / "evaluation/data/seed-v1",
-                            split="development", output=temp / "predictions.json", run_metadata=metadata,
-                            fetch_row=fetch, ledger=collector.BudgetLedger(temp / "budget.sqlite3"))
+                        return await collector.collect_dataset(java=java, ai=ai, dataset=dataset,
+                            split=split, output=predictions, run_metadata=metadata,
+                            fetch_row=fetch, ledger=collector.BudgetLedger(temp / "budget.sqlite3"),
+                            streaming=bool(quality))
             payload = asyncio.run(collect())
-            scorer = collector.scorer.evaluate(temp / "predictions.json", dataset_root=ROOT / "evaluation/data/seed-v1")
-            _manifest, expected_questions, _documents, _sources, _fingerprint = collector.scorer._load_dataset(
-                ROOT / "evaluation/data/seed-v1")
-            expected_samples = sum(question["split"] == "development" for question in expected_questions)
-            assert_fake_evaluation_success(payload, scorer, expected_samples)
+            if quality:
+                scorer = load(ROOT / "evaluation/runner/runner_v2.py")
+                scored = scorer.evaluate(predictions, dataset_root=dataset, split=split, allow_followup=bool(real_split))
+                if scored["metrics"]["execution_error_count"] or scored["sample_count"] != (20 if split == "holdout" else 40):
+                    raise RuntimeError("REAL_EVALUATION_INCOMPLETE")
+                metrics = scored["metrics"]
+                report.update(metrics=metrics, run=metadata)
+                if offline_quality:
+                    for metric, minimum in {"recall_at_5": .85, "mrr_at_10": .75,
+                            "cited_gold_span_overlap_rate": .96, "unanswerable_refusal_rate": 1,
+                            "answerable_answer_rate": .90}.items():
+                        if metrics[metric] is None or metrics[metric] < minimum:
+                            raise RuntimeError("OFFLINE_QUALITY_GATE_FAILED:" + metric)
+                else:
+                    review = scorer.prepare_review(predictions, dataset, split, allow_followup=True)
+                    output.with_suffix(".review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
+                    report["real_provider_calls"] = None
+            else:
+                scorer = collector.scorer.evaluate(predictions, dataset_root=dataset)
+                _manifest, expected_questions, _documents, _sources, _fingerprint = collector.scorer._load_dataset(dataset)
+                expected_samples = sum(question["split"] == split for question in expected_questions)
+                assert_fake_evaluation_success(payload, scorer, expected_samples)
+                report.update(scorer_samples=scorer["sample_count"])
             recovery._wait_cleanup(database_url)
             harness.logout()
             report.update(passed=True, predictions=len(payload["predictions"]),
-                          scorer_samples=scorer["sample_count"], fake_budget=collector.BudgetLedger(temp / "budget.sqlite3").summary())
+                          budget=collector.BudgetLedger(temp / "budget.sqlite3").summary())
         except Exception as error:
             report["failure_type"] = type(error).__name__
             # Logs contain only generated credentials, but keep even these local.
@@ -152,10 +210,14 @@ def run(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--real-split", choices=("development", "holdout"))
+    modes.add_argument("--offline-quality", action="store_true")
     args = parser.parse_args()
     try:
-        run(args.output)
-    except Exception:
-        print("EVALUATION_SMOKE_FAILED")
+        run(args.output, args.real_split, offline_quality=args.offline_quality)
+    except Exception as error:
+        print("EVALUATION_SMOKE_FAILED:", type(error).__name__,
+              str(error) if str(error).startswith(("OFFLINE_QUALITY_GATE_FAILED:", "REAL_EVALUATION_")) else "")
         raise SystemExit(1)
     print("EVALUATION_SMOKE_PASSED")

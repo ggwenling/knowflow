@@ -1,0 +1,1 @@
+{"id": "msg_recorded_1", "type": "message", "model": "test-model", "role": "assistant", "content": [{"type": "tool_use", "id": "call_search_1", "name": "search_knowledge_base", "input": {"query": "索引 READY"}}], "stop_reason": "tool_use", "stop_sequence": null, "usage": {"input_tokens": 10, "output_tokens": 5}}

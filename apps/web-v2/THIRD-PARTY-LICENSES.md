@@ -2,7 +2,7 @@
 
 - 生成时间：2026-11-08T06:42:04.759Z
 - 作用域：`npm ls --omit=dev --all` 解析到的运行时依赖闭包（不含 devDependencies）
-- 条目：221；许可证未知：0
+- npm 条目：221；许可证未知：0
 - 性质：发行证据清单，不构成法律意见。许可证原文仍需在发行前随镜像分发。
 - 说明：根 `THIRD-PARTY-LICENSES.md` 仍只覆盖 `apps/web`；合并前需扩展 `scripts/audit-dependencies.py` 的 Node 作用域。
 

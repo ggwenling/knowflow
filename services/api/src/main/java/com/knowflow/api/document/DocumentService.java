@@ -157,9 +157,15 @@ public class DocumentService {
         }
     }
 
-    public DocumentUploadAccepted rebuild(AuthenticatedUser user, UUID documentId) {
+    public DocumentUploadAccepted rebuild(AuthenticatedUser user, UUID documentId, UUID requestKey) {
         return transactions.execute(status -> {
             DocumentState document = lockOwnedDocument(user, documentId);
+            if (requestKey != null) {
+                DocumentUploadAccepted replay = rebuildReceipt(document.ownerId(), documentId, requestKey);
+                if (replay != null) {
+                    return replay;
+                }
+            }
             if (document.pendingContentId() != null) {
                 throw ApiFailure.documentUnavailable();
             }
@@ -172,14 +178,37 @@ public class DocumentService {
                     """, (row, index) -> new DocumentUploadAccepted(ApiError.CONTRACT_VERSION,
                     documentId, row.getObject("id", UUID.class), "QUEUED"),
                     documentId, document.currentContentId(), indexingProperties.getPipelineProfileId());
-            if (!existing.isEmpty()) {
-                return existing.getFirst();
-            }
-            if (hasActiveTask(documentId)) {
+            if (existing.isEmpty() && hasActiveTask(documentId)) {
                 throw ApiFailure.documentUnavailable();
             }
-            return enqueue(document, document.currentContentId());
+            DocumentUploadAccepted accepted = existing.isEmpty()
+                    ? enqueue(document, document.currentContentId()) : existing.getFirst();
+            if (requestKey != null && jdbc.update("""
+                    INSERT INTO knowflow.document_rebuild_requests
+                        (owner_user_id, request_key, document_id, task_id) VALUES (?, ?, ?, ?)
+                    ON CONFLICT (owner_user_id, request_key) DO NOTHING
+                    """, document.ownerId(), requestKey, documentId, accepted.taskId()) == 0) {
+                return rebuildReceipt(document.ownerId(), documentId, requestKey);
+            }
+            return accepted;
         });
+    }
+
+    private DocumentUploadAccepted rebuildReceipt(UUID owner, UUID documentId, UUID requestKey) {
+        return jdbc.query("""
+                SELECT document_id, task_id FROM knowflow.document_rebuild_requests
+                 WHERE owner_user_id = ? AND request_key = ?
+                """, rows -> {
+            if (!rows.next()) {
+                return null;
+            }
+            if (!documentId.equals(rows.getObject("document_id", UUID.class))) {
+                throw new ApiFailure(org.springframework.http.HttpStatus.CONFLICT,
+                        "DOCUMENT_REBUILD_CONFLICT", "The rebuild key belongs to another document.");
+            }
+            return new DocumentUploadAccepted(ApiError.CONTRACT_VERSION, documentId,
+                    rows.getObject("task_id", UUID.class), "QUEUED");
+        }, owner, requestKey);
     }
 
     private DocumentUploadAccepted enqueue(DocumentState document, UUID contentId) {

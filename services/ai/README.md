@@ -53,3 +53,5 @@ The offline runner reports evidence Recall@5, MRR@10, answerability and latency,
 报告中的源码 SHA-256 按运行时工作区的原始字节计算；Git 行尾转换可能使其他检出或 Git blob 的字节哈希不同。需要复核时，应对运行时工作区文件计算哈希，或在目标检出中重跑验证。契约 Schema 的 LF 字节由 `.gitattributes` 固定。
 
 依赖使用 `uv.lock` 精确锁定；`requirements.lock` 是无开发依赖、带哈希的 pip 导出。PDF 解析使用 pypdf，TXT/MD 严格按 UTF-8 读取；解析、分段、定位说明分别见 `docs/parsing.md` 和 `docs/chunking.md`。模型和数据政策见仓库 `evaluation/smoke/provider-profile.md`。
+
+保存前 `POST /internal/v1/llm-models/probe` 由 `model_probe.py` 编排，独立于 readiness：固定短文本经实际选定协议与返回模型校验后测试工具能力。成功返回 `supports_tools`、`status=success`、UTC `checked_at`，由 Java 与凭证及 revision 原子保存；旧记录不伪造时间。失败返回固定 model 专用错误 envelope；裸 404（含 Anthropic `not_found_error`）只报告接口路径或模型不可用，机器字段明确指向 model 时才细分。provider 401/403、429 均映射公开 422。仅有明确工具机器证据时允许一次纯文本降级，不增加 custom retry。详情见[调用层加固运维说明](../../docs/operations/langchain-provider-hardening.md)。

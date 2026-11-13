@@ -1,6 +1,8 @@
 """Bound parser work in a killable child process."""
 import asyncio
 import json
+import os
+import signal
 import sys
 
 from .parsing import ParseFailure, ParseLimits, ParsedDocument, TextBlock
@@ -13,9 +15,19 @@ MAX_PARSER_INPUT_BYTES = 8 * 1024 * 1024
 
 async def _stop(process, communication):
     if process.returncode is None:
-        process.kill()
+        _kill(process)
     await asyncio.gather(communication, return_exceptions=True)
     await process.wait()
+
+
+def _kill(process):
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+    except ProcessLookupError:
+        pass
 
 
 async def _write_request(process, request):
@@ -33,7 +45,7 @@ async def _communicate_bounded(process, request):
     try:
         while chunk := await process.stdout.read(64 * 1024):
             if len(output) + len(chunk) > MAX_PARSER_OUTPUT_BYTES:
-                process.kill()
+                _kill(process)
                 while await process.stdout.read(64 * 1024):
                     pass
                 await process.wait()
@@ -45,7 +57,7 @@ async def _communicate_bounded(process, request):
         return bytes(output)
     except BaseException:
         if process.returncode is None:
-            process.kill()
+            _kill(process)
         try:
             while await process.stdout.read(64 * 1024):
                 pass
@@ -59,6 +71,7 @@ async def _communicate_bounded(process, request):
 async def parse_document_isolated(data: bytes, *, format: str, document_id: str,
                                   content_version_id: str, file_id: str,
                                   limits: ParseLimits | None = None,
+                                  enable_ocr: bool = True,
                                   timeout_seconds: float = PARSER_TIMEOUT_SECONDS) -> ParsedDocument:
     limits = limits or ParseLimits()
     if not isinstance(data, bytes):
@@ -71,6 +84,7 @@ async def parse_document_isolated(data: bytes, *, format: str, document_id: str,
         "document_id": document_id,
         "content_version_id": content_version_id,
         "file_id": file_id,
+        "enable_ocr": enable_ocr,
         "limits": {"max_file_bytes": limits.max_file_bytes,
                    "max_pdf_pages": limits.max_pdf_pages,
                    "max_characters": limits.max_characters},
@@ -84,7 +98,7 @@ async def parse_document_isolated(data: bytes, *, format: str, document_id: str,
             sys.executable, "-I", "-m", "knowflow_ai.parser_worker",
             str(PARSER_MEMORY_LIMIT_BYTES), str(MAX_PARSER_INPUT_BYTES),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL)
+            stderr=asyncio.subprocess.DEVNULL, start_new_session=os.name == "posix")
     except OSError:
         raise ParseFailure("PARSER_UNAVAILABLE") from None
 

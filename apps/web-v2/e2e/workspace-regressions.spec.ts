@@ -12,6 +12,13 @@ function json(route: Route, body: unknown) {
   return route.fulfill({ json: body });
 }
 
+function mockWorkspaceApi(page: Page, handler: (route: Route) => Promise<unknown>) {
+  return page.route("**/api/v1/**", (route) =>
+    pagePath(route) === "llm-models" && route.request().method() === "GET"
+      ? json(route, { enabled: false, models: [] })
+      : handler(route));
+}
+
 async function signIn(page: Page, email: string) {
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -34,7 +41,7 @@ test("switching accounts never shows the previous account's knowledge bases", as
     }).observe(document.documentElement, { subtree: true, childList: true, characterData: true });
   });
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") {
@@ -92,7 +99,7 @@ test("a create that finishes after an account switch neither reports success nor
   await page.setViewportSize({ width: 1280, height: 900 });
   let current: Account | null = accountA;
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") {
@@ -147,7 +154,7 @@ test("a create that finishes after an account switch neither reports success nor
 test("a failed question history load is surfaced with a working retry", async ({ page }) => {
   let failing = true;
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);
@@ -185,7 +192,7 @@ test("a failed question history load is surfaced with a working retry", async ({
 });
 
 test("opening a stored answer stops the running stream and frees the composer", async ({ page }) => {
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);
@@ -257,7 +264,7 @@ test("opening a stored answer stops the running stream and frees the composer", 
 });
 
 test("a failed document delete reports the failure instead of success", async ({ page }) => {
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);
@@ -302,7 +309,7 @@ test("an upload that outlives the account switch reports nothing to the next acc
   await page.setViewportSize({ width: 1280, height: 900 });
   let current: Account | null = accountA;
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") {
@@ -372,7 +379,7 @@ test("an upload that outlives the account switch reports nothing to the next acc
 });
 
 test("a rejected upload still reports failure", async ({ page }) => {
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);
@@ -404,7 +411,7 @@ test("an accepted upload survives a list snapshot requested before it", async ({
   let releaseList: () => void = () => {};
   const listReleased = new Promise<void>((resolve) => { releaseList = resolve; });
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);
@@ -461,7 +468,7 @@ test("generated answers never request remote images", async ({ page }) => {
     if (request.url().startsWith("https://attacker.example/")) external.push(request.url());
   });
 
-  await page.route("**/api/v1/**", async (route) => {
+  await mockWorkspaceApi(page, async (route) => {
     const path = pagePath(route);
     const method = route.request().method();
     if (path === "me") return json(route, accountA);

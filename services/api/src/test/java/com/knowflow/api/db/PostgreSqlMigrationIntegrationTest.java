@@ -72,10 +72,13 @@ class PostgreSqlMigrationIntegrationTest {
         assertThat(v7Flyway.migrate().migrationsExecuted).isEqualTo(7);
         assertThat(v7Flyway.info().current().getVersion().getVersion()).isEqualTo("7");
         verifyQuestionSourceRetentionUpgrade();
+        insertV9ModelBeforeProbeMigration();
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
+            assertThat(queryLong("SELECT count(*) FROM knowflow.questions WHERE selected_llm_model_id IS NULL"))
+                    .isEqualTo(1L);
             assertThat(queryLong("""
                     SELECT count(*) FROM information_schema.columns
                      WHERE table_schema = 'knowflow' AND table_name = 'questions'
@@ -94,6 +97,7 @@ class PostgreSqlMigrationIntegrationTest {
             assertThat(extensionVersion).isEqualTo("0.8.1");
 
             try (Connection app = connect("knowflow_app", APP_PASSWORD)) {
+                verifyModelProbeMigration(app);
                 assertConstraintViolation(app, """
                         INSERT INTO knowflow.content_versions
                             (id, document_id, version_no, source_sha256, source_format, object_key, byte_size, original_name)
@@ -220,6 +224,50 @@ class PostgreSqlMigrationIntegrationTest {
         });
     }
 
+    private static void insertV9ModelBeforeProbeMigration() {
+        Flyway v9 = migrationFlyway("9");
+        assertThat(v9.migrate().migrationsExecuted).isEqualTo(1);
+        try (Connection app = connect("knowflow_app", APP_PASSWORD)) {
+            execute(app, """
+                    INSERT INTO knowflow.llm_models
+                        (id, owner_user_id, base_url, protocol, model_id, encrypted_key, supports_tools, revision)
+                    VALUES ('00000000-0000-4000-8000-000000000901',
+                            '00000000-0000-0000-0000-000000000001',
+                            'https://provider.example.test', 'responses', 'legacy', decode('aabb', 'hex'), false,
+                            '00000000-0000-4000-8000-000000000902')
+                    """);
+        } catch (SQLException invalid) { throw new AssertionError(invalid); }
+    }
+
+    private static void verifyModelProbeMigration(Connection app) throws SQLException {
+        String id = "00000000-0000-4000-8000-000000000901";
+        assertThat(queryLong(app, "SELECT count(*) FROM knowflow.llm_models WHERE last_probe_at IS NULL "
+                + "AND last_probe_status IS NULL")).isEqualTo(1L);
+        for (String fields : new String[]{"last_probe_at=now()", "last_probe_status='success'",
+                "last_probe_at=now(), last_probe_status='failed'",
+                "last_probe_at=now(), last_probe_status='unknown'"}) {
+            assertConstraintViolation(app, "UPDATE knowflow.llm_models SET " + fields + " WHERE id='" + id + "'", "23514");
+        }
+        execute(app, "UPDATE knowflow.llm_models SET supports_tools=true, last_probe_at='2026-11-12T01:02:03Z', "
+                + "last_probe_status='success', revision='00000000-0000-4000-8000-000000000903' WHERE id='" + id + "' "
+                + "AND owner_user_id='00000000-0000-0000-0000-000000000001' "
+                + "AND revision='00000000-0000-4000-8000-000000000902'");
+        assertThat(queryLong(app, "SELECT count(*) FROM knowflow.llm_models WHERE supports_tools=true "
+                + "AND last_probe_status='success' AND last_probe_at='2026-11-12T01:02:03Z'")).isEqualTo(1L);
+        // Owner predicates and CAS leave a successful result untouched on rejection.
+        execute(app, "UPDATE knowflow.llm_models SET supports_tools=false WHERE id='" + id + "' "
+                + "AND owner_user_id='00000000-0000-0000-0000-000000000099'");
+        execute(app, "UPDATE knowflow.llm_models SET supports_tools=false WHERE id='" + id + "' "
+                + "AND revision='00000000-0000-4000-8000-000000000902'");
+        assertThat(queryLong(app, "SELECT count(*) FROM knowflow.llm_models WHERE supports_tools=true")).isEqualTo(1L);
+        assertConstraintViolation(app, "UPDATE knowflow.llm_models SET last_probe_at=NULL WHERE id='" + id + "'", "23514");
+        assertConstraintViolation(app, "UPDATE knowflow.llm_models SET last_probe_status=NULL WHERE id='" + id + "'", "23514");
+        try (Connection ai = connect("knowflow_ai", AI_PASSWORD)) {
+            assertPermissionDenied(ai, "SELECT encrypted_key, last_probe_at FROM knowflow.llm_models");
+            assertPermissionDenied(ai, "UPDATE knowflow.llm_models SET last_probe_at=now()");
+        }
+    }
+
     private static void verifyQuestionSourceRetentionUpgrade() {
         try (Connection app = connect("knowflow_app", APP_PASSWORD)) {
             insertValidKnowledgeGraph(app);
@@ -227,7 +275,7 @@ class PostgreSqlMigrationIntegrationTest {
             insertQuestionSource(app, "00000000-0000-0000-0000-000000000501",
                     null, null, null, null, "retained quote with missing locator");
 
-            Flyway flyway = migrationFlyway(null);
+            Flyway flyway = migrationFlyway("8");
             assertThatThrownBy(flyway::migrate).isInstanceOf(FlywayException.class);
             assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
             assertThat(queryLong(app, """

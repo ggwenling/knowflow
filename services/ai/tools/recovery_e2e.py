@@ -396,7 +396,7 @@ class RecoveryHarness:
         self.java_process = subprocess.Popen(
             [java, "-jar", str(jar)], cwd=REPO, env=self.java_env,
             stdout=self.log, stderr=self.log)
-        _wait_http_ready(self.java_process, "http://127.0.0.1:8080", "/actuator/health")
+        _wait_http_ready(self.java_process, self.java_url(), "/actuator/health")
 
     def stop_java(self):
         local.stop(self.java_process)
@@ -428,8 +428,11 @@ class RecoveryHarness:
         self.python_process = None
 
     def client(self, timeout=15):
-        return httpx.Client(base_url="http://127.0.0.1:8080", timeout=timeout,
+        return httpx.Client(base_url=self.java_url(), timeout=timeout,
                             trust_env=False)
+
+    def java_url(self):
+        return "http://127.0.0.1:" + self.java_env.get("SERVER_PORT", "8080")
 
     def create_owner(self):
         email = f"recovery-{self.run_id}@example.test"

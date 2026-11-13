@@ -1,0 +1,1 @@
+{"id": "msg_recorded_1", "type": "message", "model": "test-model", "role": "assistant", "content": [{"type": "text", "text": "{\"answer\": \"WIRE_PRIVATE_anthropic_messages_content_filter_non_stream\", \"has_answer\": true, \"source_ids\": [\"src-evidence-1\"]}"}], "stop_reason": "refusal", "stop_sequence": null, "usage": {"input_tokens": 10, "output_tokens": 5}}

@@ -6,6 +6,7 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { useSessionContext, useKnowledgeContext } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { SettingsNav } from "./settings-nav";
+import { ModelSettings } from "./model-settings";
 import styles from "./settings.module.css";
 
 export function SettingsView() {
@@ -68,6 +69,7 @@ export function SettingsView() {
               <ShieldCheck size={16} aria-hidden="true" />
               合成模型只用于工程验证，不代表真实模型质量或费用；上传前请确认资料已获授权。
             </p>
+            <ModelSettings />
           </section>
 
           <section id="settings-unavailable" tabIndex={-1} className={`${styles.section} ${styles.unavailableSection}`} aria-labelledby="unavailable-title">

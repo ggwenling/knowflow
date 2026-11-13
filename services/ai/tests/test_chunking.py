@@ -13,6 +13,21 @@ ROOT = Path(__file__).resolve().parents[3]
 IDS = {"document_id": "doc-1", "content_version_id": "content-1", "file_id": "file-1"}
 
 
+def test_maximum_text_size_keeps_contiguous_order_and_original_offsets():
+    text = "长段落🙂甲" * 40_000
+    parsed = parse_document(text.encode("utf-8"), format="txt", **IDS)
+    chunks = chunk_document(parsed, ChunkingConfig())
+    assert chunks[0].locator["start"] == 0
+    assert chunks[-1].locator["end"] == len(text)
+    for sequence, chunk in enumerate(chunks):
+        start, end = chunk.locator["start"], chunk.locator["end"]
+        assert chunk.sequence == sequence
+        assert chunk.text == text[start:end]
+        assert end - start <= 800
+        if sequence:
+            assert start < chunks[sequence - 1].locator["end"] < end
+
+
 @pytest.mark.parametrize("format", ["txt", "md"])
 def test_ranges_reproduce_original_unicode_source_and_ids_are_stable(format):
     text = "\ufeff# 标题🙂\r\n\r\n第一段有中文。" + "甲乙丙丁" * 260 + "\r\n\r\n## 下一节\r\n内容保持原样。"

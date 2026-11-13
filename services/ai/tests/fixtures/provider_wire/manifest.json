@@ -1,0 +1,1150 @@
+{
+  "schema_version": 1,
+  "source": "synthetic recordings; no live provider captures",
+  "cases": [
+    {
+      "id": "deepseek-normal_stream-stream",
+      "fixture_id": "normal_stream",
+      "protocol": "deepseek",
+      "path": "deepseek/normal_stream_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "deepseek-normal_non_stream-non_stream",
+      "fixture_id": "normal_non_stream",
+      "protocol": "deepseek",
+      "path": "deepseek/normal_non_stream_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "deepseek-tool_call-stream",
+      "fixture_id": "tool_call",
+      "protocol": "deepseek",
+      "path": "deepseek/tool_call_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "deepseek-tool_call-non_stream",
+      "fixture_id": "tool_call",
+      "protocol": "deepseek",
+      "path": "deepseek/tool_call_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "deepseek-missing_terminator-stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "deepseek",
+      "path": "deepseek/missing_terminator_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_missing_terminator_stream"
+    },
+    {
+      "id": "deepseek-missing_terminator-non_stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "deepseek",
+      "path": "deepseek/missing_terminator_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_missing_terminator_non_stream"
+    },
+    {
+      "id": "deepseek-wrong_model_id-stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "deepseek",
+      "path": "deepseek/wrong_model_id_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_wrong_model_id_stream"
+    },
+    {
+      "id": "deepseek-wrong_model_id-non_stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "deepseek",
+      "path": "deepseek/wrong_model_id_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_wrong_model_id_non_stream"
+    },
+    {
+      "id": "deepseek-length_truncation-stream",
+      "fixture_id": "length_truncation",
+      "protocol": "deepseek",
+      "path": "deepseek/length_truncation_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_length_truncation_stream"
+    },
+    {
+      "id": "deepseek-length_truncation-non_stream",
+      "fixture_id": "length_truncation",
+      "protocol": "deepseek",
+      "path": "deepseek/length_truncation_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_length_truncation_non_stream"
+    },
+    {
+      "id": "deepseek-content_filter-stream",
+      "fixture_id": "content_filter",
+      "protocol": "deepseek",
+      "path": "deepseek/content_filter_stream.sse",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_content_filter_stream"
+    },
+    {
+      "id": "deepseek-content_filter-non_stream",
+      "fixture_id": "content_filter",
+      "protocol": "deepseek",
+      "path": "deepseek/content_filter_non_stream.json",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_content_filter_non_stream"
+    },
+    {
+      "id": "deepseek-garbage_body-stream",
+      "fixture_id": "garbage_body",
+      "protocol": "deepseek",
+      "path": "deepseek/garbage_body_stream.txt",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_garbage_body_stream"
+    },
+    {
+      "id": "deepseek-garbage_body-non_stream",
+      "fixture_id": "garbage_body",
+      "protocol": "deepseek",
+      "path": "deepseek/garbage_body_non_stream.txt",
+      "endpoint": "/chat/completions",
+      "model_id": "deepseek-flash",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_deepseek_garbage_body_non_stream"
+    },
+    {
+      "id": "chat_completions-normal_stream-stream",
+      "fixture_id": "normal_stream",
+      "protocol": "chat_completions",
+      "path": "chat_completions/normal_stream_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "chat_completions-normal_non_stream-non_stream",
+      "fixture_id": "normal_non_stream",
+      "protocol": "chat_completions",
+      "path": "chat_completions/normal_non_stream_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "chat_completions-tool_call-stream",
+      "fixture_id": "tool_call",
+      "protocol": "chat_completions",
+      "path": "chat_completions/tool_call_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "chat_completions-tool_call-non_stream",
+      "fixture_id": "tool_call",
+      "protocol": "chat_completions",
+      "path": "chat_completions/tool_call_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "chat_completions-missing_terminator-stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "chat_completions",
+      "path": "chat_completions/missing_terminator_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_missing_terminator_stream"
+    },
+    {
+      "id": "chat_completions-missing_terminator-non_stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "chat_completions",
+      "path": "chat_completions/missing_terminator_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_missing_terminator_non_stream"
+    },
+    {
+      "id": "chat_completions-wrong_model_id-stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "chat_completions",
+      "path": "chat_completions/wrong_model_id_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_wrong_model_id_stream"
+    },
+    {
+      "id": "chat_completions-wrong_model_id-non_stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "chat_completions",
+      "path": "chat_completions/wrong_model_id_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_wrong_model_id_non_stream"
+    },
+    {
+      "id": "chat_completions-length_truncation-stream",
+      "fixture_id": "length_truncation",
+      "protocol": "chat_completions",
+      "path": "chat_completions/length_truncation_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_length_truncation_stream"
+    },
+    {
+      "id": "chat_completions-length_truncation-non_stream",
+      "fixture_id": "length_truncation",
+      "protocol": "chat_completions",
+      "path": "chat_completions/length_truncation_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_length_truncation_non_stream"
+    },
+    {
+      "id": "chat_completions-content_filter-stream",
+      "fixture_id": "content_filter",
+      "protocol": "chat_completions",
+      "path": "chat_completions/content_filter_stream.sse",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_content_filter_stream"
+    },
+    {
+      "id": "chat_completions-content_filter-non_stream",
+      "fixture_id": "content_filter",
+      "protocol": "chat_completions",
+      "path": "chat_completions/content_filter_non_stream.json",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_content_filter_non_stream"
+    },
+    {
+      "id": "chat_completions-garbage_body-stream",
+      "fixture_id": "garbage_body",
+      "protocol": "chat_completions",
+      "path": "chat_completions/garbage_body_stream.txt",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_garbage_body_stream"
+    },
+    {
+      "id": "chat_completions-garbage_body-non_stream",
+      "fixture_id": "garbage_body",
+      "protocol": "chat_completions",
+      "path": "chat_completions/garbage_body_non_stream.txt",
+      "endpoint": "/prefix/chat/completions",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_chat_completions_garbage_body_non_stream"
+    },
+    {
+      "id": "anthropic_messages-normal_stream-stream",
+      "fixture_id": "normal_stream",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/normal_stream_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "anthropic_messages-normal_non_stream-non_stream",
+      "fixture_id": "normal_non_stream",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/normal_non_stream_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "anthropic_messages-tool_call-stream",
+      "fixture_id": "tool_call",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/tool_call_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "anthropic_messages-tool_call-non_stream",
+      "fixture_id": "tool_call",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/tool_call_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "anthropic_messages-missing_terminator-stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/missing_terminator_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_missing_terminator_stream"
+    },
+    {
+      "id": "anthropic_messages-missing_terminator-non_stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/missing_terminator_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_missing_terminator_non_stream"
+    },
+    {
+      "id": "anthropic_messages-wrong_model_id-stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/wrong_model_id_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_wrong_model_id_stream"
+    },
+    {
+      "id": "anthropic_messages-wrong_model_id-non_stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/wrong_model_id_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_wrong_model_id_non_stream"
+    },
+    {
+      "id": "anthropic_messages-length_truncation-stream",
+      "fixture_id": "length_truncation",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/length_truncation_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_length_truncation_stream"
+    },
+    {
+      "id": "anthropic_messages-length_truncation-non_stream",
+      "fixture_id": "length_truncation",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/length_truncation_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_length_truncation_non_stream"
+    },
+    {
+      "id": "anthropic_messages-content_filter-stream",
+      "fixture_id": "content_filter",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/content_filter_stream.sse",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_content_filter_stream"
+    },
+    {
+      "id": "anthropic_messages-content_filter-non_stream",
+      "fixture_id": "content_filter",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/content_filter_non_stream.json",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_content_filter_non_stream"
+    },
+    {
+      "id": "anthropic_messages-garbage_body-stream",
+      "fixture_id": "garbage_body",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/garbage_body_stream.txt",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_garbage_body_stream"
+    },
+    {
+      "id": "anthropic_messages-garbage_body-non_stream",
+      "fixture_id": "garbage_body",
+      "protocol": "anthropic_messages",
+      "path": "anthropic_messages/garbage_body_non_stream.txt",
+      "endpoint": "/prefix/v1/messages",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_anthropic_messages_garbage_body_non_stream"
+    },
+    {
+      "id": "responses-normal_stream-stream",
+      "fixture_id": "normal_stream",
+      "protocol": "responses",
+      "path": "responses/normal_stream_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "responses-normal_non_stream-non_stream",
+      "fixture_id": "normal_non_stream",
+      "protocol": "responses",
+      "path": "responses/normal_non_stream_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "success",
+      "expected_status": 200,
+      "expected_result": {
+        "answer": "索引 READY 后才可检索[src-evidence-1]。",
+        "has_answer": true,
+        "source_ids": [
+          "src-evidence-1"
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "responses-tool_call-stream",
+      "fixture_id": "tool_call",
+      "protocol": "responses",
+      "path": "responses/tool_call_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "responses-tool_call-non_stream",
+      "fixture_id": "tool_call",
+      "protocol": "responses",
+      "path": "responses/tool_call_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": true,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "tool_call",
+      "expected_status": 200,
+      "expected_result": {
+        "tool_calls": [
+          {
+            "id": "call_search_1",
+            "name": "search_knowledge_base",
+            "args": {
+              "query": "索引 READY"
+            }
+          }
+        ]
+      },
+      "expected_usage": {
+        "input_tokens": 10,
+        "output_tokens": 5,
+        "total_tokens": 15
+      },
+      "sentinel": null
+    },
+    {
+      "id": "responses-missing_terminator-stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "responses",
+      "path": "responses/missing_terminator_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_missing_terminator_stream"
+    },
+    {
+      "id": "responses-missing_terminator-non_stream",
+      "fixture_id": "missing_terminator",
+      "protocol": "responses",
+      "path": "responses/missing_terminator_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_missing_terminator_non_stream"
+    },
+    {
+      "id": "responses-wrong_model_id-stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "responses",
+      "path": "responses/wrong_model_id_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_wrong_model_id_stream"
+    },
+    {
+      "id": "responses-wrong_model_id-non_stream",
+      "fixture_id": "wrong_model_id",
+      "protocol": "responses",
+      "path": "responses/wrong_model_id_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_wrong_model_id_non_stream"
+    },
+    {
+      "id": "responses-length_truncation-stream",
+      "fixture_id": "length_truncation",
+      "protocol": "responses",
+      "path": "responses/length_truncation_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_length_truncation_stream"
+    },
+    {
+      "id": "responses-length_truncation-non_stream",
+      "fixture_id": "length_truncation",
+      "protocol": "responses",
+      "path": "responses/length_truncation_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_length_truncation_non_stream"
+    },
+    {
+      "id": "responses-content_filter-stream",
+      "fixture_id": "content_filter",
+      "protocol": "responses",
+      "path": "responses/content_filter_stream.sse",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_content_filter_stream"
+    },
+    {
+      "id": "responses-content_filter-non_stream",
+      "fixture_id": "content_filter",
+      "protocol": "responses",
+      "path": "responses/content_filter_non_stream.json",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_content_filter_non_stream"
+    },
+    {
+      "id": "responses-garbage_body-stream",
+      "fixture_id": "garbage_body",
+      "protocol": "responses",
+      "path": "responses/garbage_body_stream.txt",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": true,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_garbage_body_stream"
+    },
+    {
+      "id": "responses-garbage_body-non_stream",
+      "fixture_id": "garbage_body",
+      "protocol": "responses",
+      "path": "responses/garbage_body_non_stream.txt",
+      "endpoint": "/prefix/responses",
+      "model_id": "test-model",
+      "streaming": false,
+      "allow_tools": false,
+      "http_status": 200,
+      "content_type": "application/json",
+      "expected_category": "invalid_completion",
+      "expected_status": 502,
+      "expected_result": null,
+      "expected_usage": null,
+      "sentinel": "WIRE_PRIVATE_responses_garbage_body_non_stream"
+    }
+  ]
+}

@@ -8,8 +8,11 @@ import time
 import httpx
 
 from .adapters import ProcessingError
+from .provider_runtime import is_model_busy, BUSY_MESSAGE
 from .config import ConfigurationError
-from .provider_retry import retry_after_seconds, retry_delay
+from .provider_retry import (
+    classify_provider_failure, transport_failure_kind, retry_after_seconds, retry_delay,
+)
 from .protocol import CONTRACT_VERSION
 
 _logger = logging.getLogger(__name__)
@@ -213,7 +216,10 @@ async def provider_content(adapter, question, evidence, *, request_id):
         except ProcessingError as exc:
             retryable = bool(getattr(exc, "retryable", False))
             # Once bytes have been delivered a retry would duplicate output.
-            if emitted or not retryable:
+            if emitted or not retryable or not classify_provider_failure(
+                    status=exc.provider_status,
+                    failure_kind={"TIMEOUT": "read_timeout", "TRANSPORT": "connection_reset"}.get(exc.retry_reason),
+                    client_output_started=emitted).retryable:
                 raise
             if attempt >= policy.max_attempts:
                 _logger.warning(
@@ -258,7 +264,7 @@ async def _provider_content_once(adapter, payload, *, request_id):
                 status = response.status_code
                 raise ProcessingError(
                     "MODEL_FAILURE", 502,
-                    retryable=status == 429 or status >= 500,
+                    retryable=classify_provider_failure(status=status).retryable,
                     provider_status=status,
                     retry_after=(retry_after_seconds(response.headers.get("retry-after"))
                                  if status == 429 else None),
@@ -324,11 +330,15 @@ async def _provider_content_once(adapter, payload, *, request_id):
                 raise _model_failure()
     except ProcessingError:
         raise
-    except httpx.TimeoutException:
-        raise ProcessingError("MODEL_TIMEOUT", 504, retryable=True,
+    except httpx.TimeoutException as error:
+        raise ProcessingError("MODEL_TIMEOUT", 504,
+                              retryable=classify_provider_failure(
+                                  failure_kind=transport_failure_kind(error)).retryable,
                               retry_reason="TIMEOUT") from None
-    except httpx.HTTPError:
-        raise ProcessingError("MODEL_FAILURE", 502, retryable=True,
+    except (httpx.HTTPError, httpx.InvalidURL) as error:
+        raise ProcessingError("MODEL_FAILURE", 502,
+                              retryable=classify_provider_failure(
+                                  failure_kind=transport_failure_kind(error)).retryable,
                               retry_reason="TRANSPORT") from None
     except (ValueError, TypeError, KeyError, UnicodeDecodeError):
         raise _model_failure() from None
@@ -366,7 +376,7 @@ async def answer_events(service, request):
                          request["request_id"], round((time.monotonic() - retrieval_started) * 1000),
                          len(evidence))
             if evidence:
-                model = service._llm_factory()
+                model = service._generation_model(request, evidence, deadline)
                 generation_started = time.monotonic()
                 parser = IncrementalAnswerParser()
                 try:
@@ -400,10 +410,10 @@ async def answer_events(service, request):
         terminal = event("cancelled")
     except (TimeoutError, ProcessingError, ConfigurationError) as exc:
         timeout = isinstance(exc, TimeoutError) or getattr(exc, "status", None) == 504
-        code = "PROCESSING_TIMEOUT" if timeout else "AI_PROCESSING_FAILED"
+        code = "RESOURCE_LIMIT" if is_model_busy(exc) else "PROCESSING_TIMEOUT" if timeout else "AI_PROCESSING_FAILED"
         _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=%s",
                         request["request_id"], code)
-        terminal = event("error", code=code, message=code,
+        terminal = event("error", code=code, message=BUSY_MESSAGE if is_model_busy(exc) else code,
                          retryable=timeout or getattr(exc, "retryable", False))
     except Exception:
         _logger.warning("ai_stage request_id=%s stage=request outcome=failed code=AI_PROCESSING_FAILED",

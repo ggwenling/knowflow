@@ -17,7 +17,7 @@ public class IndexingProperties {
     private int chunkMaxCodepoints = 800;
     private int overlapCodepoints = 100;
     private int embeddingMaxBatchItems = 16;
-    private String pipelineProfileId = "knowflow-index-v1";
+    private String pipelineProfileId = "knowflow-index-v2-ocr";
     private String runtimeProfileId = "runtime-default";
     private boolean schedulerEnabled;
 
@@ -57,7 +57,7 @@ public class IndexingProperties {
                 || chunkMaxCodepoints < 1 || chunkMaxCodepoints > 800
                 || overlapCodepoints < 0 || overlapCodepoints >= chunkMaxCodepoints
                 || embeddingMaxBatchItems < 1 || embeddingMaxBatchItems > 16
-                || ("knowflow-index-v1".equals(pipelineProfileId)
+                || (("knowflow-index-v1".equals(pipelineProfileId) || "knowflow-index-v2-ocr".equals(pipelineProfileId))
                 && (chunkMaxCodepoints != 800 || overlapCodepoints != 100))
                 || !validProfileId(pipelineProfileId) || !validProfileId(runtimeProfileId)) {
             throw new IllegalStateException("Indexing settings are invalid");

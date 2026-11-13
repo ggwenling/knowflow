@@ -11,7 +11,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.Semaphore;
 import java.util.regex.Pattern;
 
 import com.knowflow.api.error.ApiError;
@@ -44,15 +43,24 @@ public class QuestionService {
     private final TransactionTemplate transactions;
     private final AiAnswerClient client;
     private final QuestionProperties properties;
-    private final Semaphore questionPermits;
+    private final ModelRequestAdmission admission;
+    private final LlmModelService models;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions,
-                           AiAnswerClient client, QuestionProperties properties) {
+                           AiAnswerClient client, QuestionProperties properties, LlmModelService models,
+                           ModelRequestAdmission admission) {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.client = client;
         this.properties = properties;
-        this.questionPermits = new Semaphore(properties.getMaxConcurrentRequests());
+        this.models = models;
+        this.admission = admission;
+    }
+
+    QuestionService(JdbcTemplate jdbc, TransactionTemplate transactions, AiAnswerClient client,
+                    QuestionProperties properties) {
+        this(jdbc, transactions, client, properties, null, new ModelRequestAdmission(properties));
     }
 
     public AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input) {
@@ -90,23 +98,25 @@ public class QuestionService {
                                          String idempotencyKey, long requestStartedAt,
                                          String requestId) {
         return Flux.defer(() -> {
-            if (!questionPermits.tryAcquire()) {
+            ModelRequestAdmission.Lease lease;
+            try {
+                lease = admission.tryAcquire(input != null && input.llmModelId() != null);
+            } catch (ApiFailure failure) {
                 return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
-                        requestId, 1, "error", null, null, null, "AI_PROCESSING_FAILED",
-                        "The AI service could not complete the request.", true));
+                        requestId, 1, "error", null, null, null, failure.code(), failure.getMessage(), true));
             }
             try {
                 String question = validateQuestion(input);
                 QuestionSnapshot snapshot;
                 try {
                     snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                            requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey));
+                            requestStartedAt, cancellation, parseIdempotencyKey(idempotencyKey), input.llmModelId());
                 } catch (ApiFailure failure) {
                     if ("QUESTION_REQUEST_CONFLICT".equals(failure.code())) {
                         return Flux.just(new PublicAnswerStreamEvent(ApiError.CONTRACT_VERSION,
                                 requestId, 1, "error", null, null, null, failure.code(),
                                 failure.getMessage(), false))
-                                .doFinally(signal -> questionPermits.release());
+                                .doFinally(signal -> lease.close());
                     }
                     throw failure;
                 }
@@ -116,8 +126,10 @@ public class QuestionService {
                         .map(index -> new TrustedAnswerRequest.IndexScope(index.documentId(),
                                 index.contentVersionId(), index.indexVersionId())).toList()));
                 StreamState state = new StreamState(requestId, snapshot, requestStartedAt, cancellation);
-                Flux<PublicAnswerStreamEvent> upstream = client.stream(request,
-                                remainingBudget(requestStartedAt))
+                Duration remaining = remainingBudget(requestStartedAt);
+                Flux<AiAnswerStreamEvent> events = snapshot.model() == null ? client.stream(request, remaining)
+                        : client.stream(request, remaining, snapshot.model());
+                Flux<PublicAnswerStreamEvent> upstream = events
                         .publishOn(Schedulers.boundedElastic())
                         .concatMap(event -> state.handle(event, user, request));
                 return Flux.concat(Mono.fromCallable(() -> {
@@ -129,9 +141,9 @@ public class QuestionService {
                             state.cancel();
                         })
                         .onErrorResume(failure -> state.error(failure))
-                        .doFinally(signal -> questionPermits.release());
+                        .doFinally(signal -> lease.close());
             } catch (RuntimeException | Error failure) {
-                questionPermits.release();
+                lease.close();
                 throw failure;
             }
         }).subscribeOn(Schedulers.boundedElastic());
@@ -145,14 +157,9 @@ public class QuestionService {
     AnswerResponse ask(AuthenticatedUser user, UUID knowledgeBaseId, PublicQuestion input,
                        long requestStartedAt, QuestionCancellation cancellation,
                        UUID idempotencyKey) {
-        if (!questionPermits.tryAcquire()) {
-            throw ApiFailure.aiProcessingFailed();
-        }
-        try {
+        try (ModelRequestAdmission.Lease lease = admission.tryAcquire(input != null && input.llmModelId() != null)) {
             return askAdmitted(user, knowledgeBaseId, input, requestStartedAt,
                     cancellation, idempotencyKey);
-        } finally {
-            questionPermits.release();
         }
     }
 
@@ -165,7 +172,7 @@ public class QuestionService {
         QuestionSnapshot snapshot;
         try {
             snapshot = createSnapshot(user, knowledgeBaseId, question, requestId,
-                    requestStartedAt, cancellation, idempotencyKey);
+                    requestStartedAt, cancellation, idempotencyKey, input.llmModelId());
         } catch (RuntimeException failure) {
             if (cancellation.reason() == QuestionCancellation.Reason.TIMEOUT
                     || isTimeout(failure)) {
@@ -197,7 +204,9 @@ public class QuestionService {
             if (cancellation.reason() != null) {
                 throw new CancellationException("Question request was cancelled");
             }
-            response = client.answer(request, remainingBudget(requestStartedAt));
+            Duration remaining = remainingBudget(requestStartedAt);
+            response = snapshot.model() == null ? client.answer(request, remaining)
+                    : client.answer(request, remaining, snapshot.model());
             LOGGER.info("question_stage request_id={} stage=ai_answer duration_ms={} outcome=success",
                     requestId, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - aiStartedAt));
             validateAnswer(response);
@@ -218,6 +227,9 @@ public class QuestionService {
             }
             boolean timeout = isTimeout(failure);
             markFailed(snapshot.questionId(), timeout ? "PROCESSING_TIMEOUT" : "AI_PROCESSING_FAILED");
+            if (failure instanceof ApiFailure apiFailure && "RESOURCE_LIMIT".equals(apiFailure.code())) {
+                throw ApiFailure.modelBusy();
+            }
             throw timeout ? ApiFailure.processingTimeout() : ApiFailure.aiProcessingFailed();
         }
 
@@ -273,7 +285,7 @@ public class QuestionService {
                                             String question, String requestId,
                                             long requestStartedAt,
                                             QuestionCancellation cancellation,
-                                            UUID idempotencyKey) {
+                                            UUID idempotencyKey, UUID modelId) {
         QuestionSnapshot snapshot = transactions.execute(status -> {
             registerDeadlineCheck(requestStartedAt, cancellation);
             setStatementTimeout(requestStartedAt, cancellation);
@@ -340,6 +352,11 @@ public class QuestionService {
             if (inserted.isEmpty()) {
                 throw ApiFailure.questionRequestConflict();
             }
+            LlmModelService.Connection model = null;
+            if (modelId != null) {
+                model = models.resolve(user.id(), modelId);
+                jdbc.update("UPDATE knowflow.questions SET selected_llm_model_id=? WHERE id=?", modelId, questionId);
+            }
             for (IndexRef index : indexes) {
                 setStatementTimeout(requestStartedAt, cancellation);
                 jdbc.update("""
@@ -351,7 +368,7 @@ public class QuestionService {
                         index.contentVersionId(), index.indexVersionId());
             }
             return new QuestionSnapshot(questionId, snapshotId, user.id(), knowledgeBaseId,
-                    List.copyOf(indexes));
+                    List.copyOf(indexes), model);
         });
         if (snapshot == null) {
             throw new IllegalStateException("Question snapshot transaction returned no result");
@@ -554,14 +571,20 @@ public class QuestionService {
                 });
     }
 
+    static String historyFailureCode(String code) {
+        return "PROCESSING_TIMEOUT".equals(code) || "DOCUMENT_UNAVAILABLE".equals(code)
+                ? code : "AI_PROCESSING_FAILED";
+    }
+
     private void markFailed(UUID questionId, String failureCode) {
+        String storedCode = historyFailureCode(failureCode);
         boundedCleanup(() -> jdbc.update("""
                 UPDATE knowflow.questions
                    SET status = 'FAILED', failure_code = ?, answer_text = NULL,
                        has_answer = NULL, finished_at = CURRENT_TIMESTAMP,
                        updated_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND status = 'PROCESSING'
-                """, failureCode, questionId));
+                """, storedCode, questionId));
     }
 
     private AnswerResponse cancelQuestion(UUID questionId, QuestionCancellation cancellation) {
@@ -686,7 +709,7 @@ public class QuestionService {
 
     private record IndexRef(UUID documentId, UUID contentVersionId, UUID indexVersionId) {}
     private record QuestionSnapshot(UUID questionId, UUID snapshotId, UUID ownerId,
-                                    UUID knowledgeBaseId, List<IndexRef> indexes) {}
+                                    UUID knowledgeBaseId, List<IndexRef> indexes, LlmModelService.Connection model) {}
     private record StoredChunk(String text, AiAnswerResponse.Locator locator) {}
 
     private final class StreamState {
@@ -766,7 +789,8 @@ public class QuestionService {
                     }
                     boolean timeout = cancellation.reason() == QuestionCancellation.Reason.TIMEOUT;
                     String code = timeout ? "PROCESSING_TIMEOUT" : event.code();
-                    String message = timeout ? code : event.message();
+                    String message = timeout ? code : "RESOURCE_LIMIT".equals(code)
+                            ? ApiFailure.modelBusy().getMessage() : event.message();
                     markFailed(snapshot.questionId(), code);
                     yield Flux.just(errorEvent(code, message, timeout || event.retryable()));
                 }
@@ -784,7 +808,8 @@ public class QuestionService {
             AiAnswerResponse response = new AiAnswerResponse(ApiError.CONTRACT_VERSION, requestId,
                     answer.toString(), event.hasAnswer(), sources, modelProfile);
             validateAnswer(response);
-            citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId).collect(java.util.stream.Collectors.toSet()));
+            String trailingLiteral = citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId)
+                    .collect(java.util.stream.Collectors.toSet()));
             return Mono.fromCallable(() -> transactions.execute(status -> {
                         registerDeadlineCheck(requestStartedAt, cancellation);
                         setStatementTimeout(requestStartedAt, cancellation);
@@ -794,7 +819,7 @@ public class QuestionService {
                     .switchIfEmpty(Mono.error(new IllegalStateException(
                             "Question stream persistence did not return a response")))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .map(saved -> {
+                    .flatMapMany(saved -> {
                         assertVisible();
                         pendingAnswer = response;
                         sourcesPrepared = true;
@@ -802,8 +827,10 @@ public class QuestionService {
                                 .map(source -> new AnswerStreamSource(source.sourceId(), source.documentId(),
                                         source.contentVersionId(), source.indexVersionId(), source.chunkId(),
                                         source.locator(), source.quote())).toList();
-                        return sourcesEvent(saved.hasAnswer(), publicSources);
-                    }).flux();
+                        return trailingLiteral.isEmpty()
+                                ? Flux.just(sourcesEvent(saved.hasAnswer(), publicSources))
+                                : Flux.just(deltaEvent(trailingLiteral), sourcesEvent(saved.hasAnswer(), publicSources));
+                    });
         }
 
         private Flux<PublicAnswerStreamEvent> error(Throwable failure) {
@@ -818,6 +845,9 @@ public class QuestionService {
                     && "DOCUMENT_UNAVAILABLE".equals(apiFailure.code())
                     ? "DOCUMENT_UNAVAILABLE" : "AI_PROCESSING_FAILED";
             markFailed(snapshot.questionId(), code);
+            if (failure instanceof ApiFailure apiFailure && "RESOURCE_LIMIT".equals(apiFailure.code())) {
+                return Flux.just(errorEvent("RESOURCE_LIMIT", ApiFailure.modelBusy().getMessage(), true));
+            }
             return Flux.just(errorEvent(code, code,
                     timeout || "AI_PROCESSING_FAILED".equals(code)));
         }

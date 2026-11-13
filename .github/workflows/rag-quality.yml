@@ -1,0 +1,186 @@
+name: RAG quality review
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      baseline_sha:
+        description: Reviewed local baseline commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scope:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      required: ${{ steps.scope.outputs.required }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          paths=$(git diff --name-only "$BASE...$HEAD")
+          if grep -Eq '^(services/(ai|api)/|contracts/|evaluation/|deploy/|infra/|scripts/(e2e-evaluation|check-rag|wait-rag)|\.github/workflows/rag-quality)' <<< "$paths"; then
+            echo 'required=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'required=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  collect:
+    needs: scope
+    if: needs.scope.outputs.required == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: rag-quality
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Collect current merge candidate
+        env:
+          KNOWFLOW_LLM_API_KEY: ${{ secrets.KNOWFLOW_LLM_API_KEY }}
+          KNOWFLOW_EMBEDDING_API_KEY: ${{ secrets.KNOWFLOW_EMBEDDING_API_KEY }}
+          RAG_PRICE_JSON: ${{ vars.RAG_PRICE_JSON }}
+          RAG_POLICY_JSON: ${{ vars.RAG_POLICY_JSON }}
+          RAG_CALIBRATE: ${{ vars.RAG_CALIBRATE }}
+          KNOWFLOW_BUDGET_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN: ${{ vars.RAG_RUN_LIMIT_MICROYUAN }}
+        run: |
+          test -n "$RAG_PRICE_JSON" && test -n "$RAG_POLICY_JSON"
+          test -n "$KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN"
+          export KNOWFLOW_BUDGET_PRICE_FILE="$RUNNER_TEMP/rag-price.json"
+          export KNOWFLOW_BUDGET_POLICY_FILE="$RUNNER_TEMP/rag-policy.json"
+          printf '%s' "$RAG_PRICE_JSON" > "$KNOWFLOW_BUDGET_PRICE_FILE"
+          printf '%s' "$RAG_POLICY_JSON" > "$KNOWFLOW_BUDGET_POLICY_FILE"
+          if [ ! -f evaluation/data/rag-latency-baseline.json ]; then
+            test "$RAG_CALIBRATE" = 1 || { echo 'RAG latency baseline required'; exit 1; }
+            for run in 1 2 3; do
+              uv run --project services/ai --frozen python scripts/e2e-evaluation.py --real-split holdout \
+                --output "$RUNNER_TEMP/rag-baseline/$run/report.json"
+            done
+            python scripts/make-rag-baseline.py "$RUNNER_TEMP/rag-baseline"
+            echo 'Commit the calibrated baseline to the PR before merging'
+            exit 1
+          fi
+          uv run --project services/ai --frozen python scripts/e2e-evaluation.py --real-split holdout --output "$RUNNER_TEMP/rag-live/report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rag-live
+          path: |
+            ${{ runner.temp }}/rag-live/
+            ${{ runner.temp }}/rag-baseline/rag-latency-baseline.json
+
+  verify:
+    name: Reviewed real RAG quality
+    if: always() && github.event_name == 'pull_request'
+    needs: [scope, collect]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Require a successful capture when in scope
+        env:
+          SCOPE: ${{ needs.scope.outputs.required }}
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          COLLECT_RESULT: ${{ needs.collect.result }}
+        run: |
+          test "$SCOPE_RESULT" = success
+          test "$SCOPE" = false || test "$COLLECT_RESULT" = success
+      - uses: actions/checkout@v4
+        if: needs.scope.outputs.required == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        if: needs.scope.outputs.required == 'true'
+        with:
+          name: rag-live
+          path: ${{ runner.temp }}/rag-live
+      - name: Bind a maintainer review to the captured predictions
+        if: needs.scope.outputs.required == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          live="$RUNNER_TEMP/rag-live"
+          python scripts/wait-rag-review.py "$live/report.review.json" "$live/review.json"
+          python scripts/check-rag-quality.py --candidate "$GITHUB_SHA" --baseline evaluation/data/rag-latency-baseline.json \
+            --predictions "$live/report.predictions.json" --review "$live/review.json" --output "$live/score.json"
+      - uses: actions/upload-artifact@v4
+        if: always() && needs.scope.outputs.required == 'true'
+        with:
+          name: rag-score
+          path: ${{ runner.temp }}/rag-live/score*.json
+
+  calibrate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: rag-quality
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.baseline_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a reviewed commit reachable from local
+        env:
+          BASELINE: ${{ inputs.baseline_sha }}
+        run: |
+          [[ "$BASELINE" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$BASELINE"
+          git merge-base --is-ancestor "$BASELINE" origin/local
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Collect three holdout baselines
+        env:
+          KNOWFLOW_LLM_API_KEY: ${{ secrets.KNOWFLOW_LLM_API_KEY }}
+          KNOWFLOW_EMBEDDING_API_KEY: ${{ secrets.KNOWFLOW_EMBEDDING_API_KEY }}
+          RAG_PRICE_JSON: ${{ vars.RAG_PRICE_JSON }}
+          RAG_POLICY_JSON: ${{ vars.RAG_POLICY_JSON }}
+          KNOWFLOW_BUDGET_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN: ${{ vars.RAG_RUN_LIMIT_MICROYUAN }}
+        run: |
+          test -n "$KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN"
+          export KNOWFLOW_BUDGET_PRICE_FILE="$RUNNER_TEMP/rag-price.json"
+          export KNOWFLOW_BUDGET_POLICY_FILE="$RUNNER_TEMP/rag-policy.json"
+          printf '%s' "$RAG_PRICE_JSON" > "$KNOWFLOW_BUDGET_PRICE_FILE"
+          printf '%s' "$RAG_POLICY_JSON" > "$KNOWFLOW_BUDGET_POLICY_FILE"
+          for run in 1 2 3; do
+            uv run --project services/ai --frozen python scripts/e2e-evaluation.py --real-split holdout \
+              --output "$RUNNER_TEMP/rag-baseline/$run/report.json"
+          done
+          python scripts/make-rag-baseline.py "$RUNNER_TEMP/rag-baseline"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rag-latency-baseline
+          path: ${{ runner.temp }}/rag-baseline/

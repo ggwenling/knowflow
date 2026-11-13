@@ -51,4 +51,6 @@ knowflow:
     secret-key: ${KNOWFLOW_STORAGE_SECRET_KEY:}
     request-timeout: ${KNOWFLOW_STORAGE_REQUEST_TIMEOUT:10s}
   questions:
+    custom-enabled: ${KNOWFLOW_CUSTOM_LLM_ENABLED:false}
+    custom-max-concurrent-requests: ${KNOWFLOW_CUSTOM_LLM_MAX_CONCURRENT_REQUESTS:2}
     max-concurrent-requests: ${KNOWFLOW_QUESTION_MAX_CONCURRENT:4}

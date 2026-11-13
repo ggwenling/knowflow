@@ -1,3 +1,7 @@
 package com.knowflow.api.answer;
 
-public record PublicQuestion(String question) {}
+import java.util.UUID;
+
+public record PublicQuestion(String question, UUID llmModelId) {
+    public PublicQuestion(String question) { this(question, null); }
+}

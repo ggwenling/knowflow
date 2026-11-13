@@ -5,12 +5,13 @@ import { memo, type FormEvent, type RefObject } from "react";
 import { ArrowRight, Layers, Sparkles } from "lucide-react";
 import { useDraft } from "@/components/store";
 import { useDocumentsContext, useKnowledgeContext, useStreamControls } from "@/components/workspace/workspace-provider";
+import { ModelSelect, useLlmModels } from "@/components/workspace/llm-models";
 import styles from "./home-view.module.css";
 
 const HomeScope = memo(function HomeScope() {
   const knowledge = useKnowledgeContext();
   return knowledge.bases.length > 1 ? (
-    <label className={styles.scope}>
+    <label className={styles.scope} data-composite-field>
       <Layers size={16} strokeWidth={1.5} aria-hidden="true" />
       <span>提问知识库</span>
       <select name="knowledge-base" autoComplete="off" aria-label="选择知识库" value={knowledge.selectedBase} onChange={(event) => knowledge.selectBase(event.target.value)}>
@@ -26,13 +27,14 @@ export function HomeComposer({ inputRef }: { inputRef: RefObject<HTMLInputElemen
   const knowledge = useKnowledgeContext();
   const { readyDocuments } = useDocumentsContext();
   const stream = useStreamControls();
+  const { selected } = useLlmModels();
   function ask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const question = draft.trim();
     if (!question || !knowledge.selectedBase || !readyDocuments.length || stream.busy) return;
     clearDraft();
     router.push("/conversations");
-    void stream.ask(question, knowledge.selectedBase);
+    void stream.ask(question, knowledge.selectedBase, selected);
   }
   return (
     <form className={styles.ask} data-composite-field onSubmit={ask}>
@@ -45,7 +47,10 @@ export function HomeComposer({ inputRef }: { inputRef: RefObject<HTMLInputElemen
       </div>
       <div className={styles.askFoot}>
         <HomeScope />
-        <span className={styles.askHelper}>每次提问独立检索</span>
+        <div className={styles.askOptions}>
+          <span className={styles.askHelper}>每次提问独立检索</span>
+          <ModelSelect className={styles.modelSelect} disabled={stream.busy} />
+        </div>
       </div>
     </form>
   );
