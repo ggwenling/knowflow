@@ -33,7 +33,7 @@ test("skip link reaches the main landmark and primary navigation uses links", as
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockWorkspace(page);
   await page.goto("/");
-  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
 
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "跳到主要内容" });
