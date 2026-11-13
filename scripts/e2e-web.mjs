@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -87,6 +87,20 @@ try {
   secrets = env.split("\n").map((line) => line.split("=")[1]).filter((value) => /^[0-9a-f]{64}$/.test(value));
   await writeFile(envFile, env, { mode: 0o600 });
   run("docker", [...compose, "up", "--build", "--wait", "--wait-timeout", "240"]);
+  if (candidate) {
+    const scanned = await readFile(resolve(root, "services/ai/tests/fixtures/pdf/image-only.pdf"));
+    const verifyOcr = [
+      "import asyncio, sys",
+      "from knowflow_ai.parser_process import parse_document_isolated",
+      "parsed = asyncio.run(parse_document_isolated(sys.stdin.buffer.read(), format='pdf', document_id='ocr-doc', content_version_id='ocr-version', file_id='ocr-file'))",
+      "assert len(parsed.blocks) == 1 and parsed.blocks[0].page == 1",
+      "assert 'scanned content' in parsed.blocks[0].text.lower()",
+      "print('PASS: scanned PDF OCR and page locator')",
+    ].join("\n");
+    run("docker", [...compose, "exec", "-T", "ai", "python", "-c", verifyOcr], {
+      input: scanned, stdio: ["pipe", "inherit", "inherit"], timeout: 25_000,
+    });
+  }
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForWeb(baseUrl);
   const cli = resolve(root, webApp, "node_modules/@playwright/test/cli.js");
