@@ -12,20 +12,21 @@ const shortcuts = [
 export function ShortcutGrid({ uploadHref }: { uploadHref: string }) {
   return (
     <div className={styles.shortcuts} aria-label="快捷操作">
-      {shortcuts.map(({ title, description, Icon, href }, index) => (
+      {shortcuts.map(({ title, description, Icon, href }) => (
         <Link
           key={title}
           className={styles.shortcut}
           href={href || uploadHref}
           aria-label={title}
-          style={{ animationDelay: `${80 + index * 45}ms` }}
         >
-          <Icon className={styles.shortcutIcon} size={26} strokeWidth={1.5} aria-hidden="true" />
+          <span className={styles.shortcutTile} aria-hidden="true">
+            <Icon className={styles.shortcutIcon} size={20} strokeWidth={1.5} />
+          </span>
           <span className={styles.shortcutText}>
             <strong>{title}</strong>
             <small>{description}</small>
           </span>
-          <ArrowRight className={styles.shortcutArrow} size={17} strokeWidth={1.6} aria-hidden="true" />
+          <ArrowRight className={styles.shortcutArrow} size={18} strokeWidth={1.5} aria-hidden="true" />
         </Link>
       ))}
     </div>

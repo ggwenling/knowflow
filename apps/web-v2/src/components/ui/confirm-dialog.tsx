@@ -38,7 +38,9 @@ export function ConfirmDialog({
               className={`${buttonStyles.button} ${buttonStyles.danger} ${buttonStyles.sm}`}
               onClick={(event) => { event.preventDefault(); if (!busy) onConfirm(); }}
               disabled={busy}
+              aria-busy={busy}
             >
+              {busy && <span className={buttonStyles.loader} aria-hidden="true" />}
               {confirmLabel}
             </Primitive.Action>
           </div>

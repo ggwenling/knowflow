@@ -1,7 +1,7 @@
 import localFont from "next/font/local";
 
 // Reuse the existing self-hosted files and weights: preserve the shipped glyphs.
-// next/font emits early preload hints and metric-adjusted fallback faces.
+// Only the Latin display face is on the LCP path. Body weights load on use.
 export const sans = localFont({
   src: [
     { path: "../../node_modules/@fontsource/dm-sans/files/dm-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
@@ -9,7 +9,8 @@ export const sans = localFont({
   ],
   variable: "--font-dm-sans",
   display: "swap",
-  preload: true,
+  preload: false,
+  adjustFontFallback: "Arial",
   fallback: ["PingFang SC", "Microsoft YaHei", "Arial", "sans-serif"],
 });
 export const serif = localFont({

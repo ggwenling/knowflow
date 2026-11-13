@@ -6,7 +6,7 @@ import { acceptedFileTypes } from "@/lib/upload-rules";
 import { FileText } from "lucide-react";
 import type { Document } from "@/services/api";
 import { formatBytes, formatLabel } from "@/lib/format";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@/components/ui/lazy-confirm-dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import styles from "./knowledge.module.css";
 
@@ -59,7 +59,7 @@ export function DocumentList({
         ))}
         {!documents.length && (
           <div className={styles.docEmptyRow}>
-            <FileText size={18} strokeWidth={1.4} aria-hidden="true" />
+            <FileText size={18} strokeWidth={1.5} aria-hidden="true" />
             <span>没有符合条件的资料。</span>
           </div>
         )}
@@ -68,6 +68,7 @@ export function DocumentList({
       <input
         ref={fileInput}
         type="file"
+        name="document-update"
         accept={acceptedFileTypes}
         aria-label="选择更新资料"
         hidden

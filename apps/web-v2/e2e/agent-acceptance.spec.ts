@@ -350,9 +350,9 @@ test("M1/M2/M3 agent acceptance on the real Compose stack", async ({ page, brows
       await tabTo(page.getByRole("link", { name: "跳到主要内容" }));
       await page.keyboard.press("Enter"); await expect(page.locator("#main-content")).toBeFocused();
       await page.goto("/knowledge-bases"); const search = page.getByRole("textbox", { name: "搜索知识库" });
-      await tabTo(search); await expect(search).toHaveCSS("outline-style", "solid");
+      await tabTo(search); await expect(search.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-width", "2px");
       await page.goto("/conversations"); await page.getByLabel("切换知识库").selectOption(pdfBase);
-      const input = page.getByRole("textbox", { name: "问题", exact: true }); await tabTo(input); await expect(input).toHaveCSS("outline-style", "solid");
+      const input = page.getByRole("textbox", { name: "问题", exact: true }); await tabTo(input); await expect(input.locator('xpath=ancestor::*[@data-composite-field][1]')).toHaveCSS("outline-width", "2px");
       await page.keyboard.type(`Agent keyboard ${randomUUID()}`); await page.keyboard.press("Tab");
       await expect(page.getByRole("button", { name: "提问", exact: true })).toBeFocused(); await page.keyboard.press("Enter");
       const citation = page.getByRole("button").filter({ hasText: "agent-source.pdf" }).filter({ hasText: "第" }).first();

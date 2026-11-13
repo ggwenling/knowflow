@@ -1,10 +1,16 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  min-height: 23px;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: var(--ink-2);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -18,24 +24,32 @@
 
 .ready {
   color: var(--success-ink);
+  background: var(--success-soft);
+  border-color: var(--line);
 }
 
-.ready .dot { background: var(--success); }
+.ready .dot {
+  background: var(--success);
+}
 
 .working {
   color: var(--warning-ink);
+  background: var(--warning-soft);
+  border-color: var(--line);
 }
 
-.working .dot { background: var(--warning); }
+.working .dot {
+  background: var(--warning);
+}
 
 .failed {
   color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
 }
 
-.cancelled {
+.cancelled, .neutral {
   color: var(--ink-3);
-}
-
-.neutral {
-  color: var(--ink-3);
+  background: var(--bg-muted);
+  border-color: var(--line);
 }

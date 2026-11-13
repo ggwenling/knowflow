@@ -32,10 +32,13 @@ export function formatLabel(value: string) {
   return format === "PDF" || format === "MD" ? format : "TXT";
 }
 
+const integerFormat = new Intl.NumberFormat("zh-CN", { useGrouping: false });
+const decimalFormat = new Intl.NumberFormat("zh-CN", { useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 export function formatBytes(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes >= 1024 * 1024) return `${decimalFormat.format(bytes / 1024 / 1024)} MB`;
+  return `${integerFormat.format(Math.max(1, Math.round(bytes / 1024)))} KB`;
 }
 
 const relativeFormat = new Intl.RelativeTimeFormat("zh-CN", { numeric: "auto" });

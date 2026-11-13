@@ -1,20 +1,21 @@
 "use client";
 
+import { StaticArt } from "@/components/ui/static-art";
+import { BrandSeal } from "@/components/ui/brand-seal";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import styles from "./auth-view.module.css";
 import { DeferredVisual } from "@/components/ui/deferred-visual";
+import { BackgroundMotionToggle } from "@/components/ui/background-motion-toggle";
 
 const Ribbon = dynamic(() => import("@/components/login-ribbon"), { ssr: false });
 
 export function AuthView({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const session = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +23,7 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [resetHelp, setResetHelp] = useState(false);
+  const [motionPaused, setMotionPaused] = useState(false);
 
   useEffect(() => {
     if (session.user) router.replace("/");
@@ -45,91 +47,100 @@ export function AuthView({ mode }: { mode: "login" | "register" }) {
   }
 
   return (
-    <main className={styles.page} lang="en">
-      <div className={`loginFlow ${styles.ribbon}`} aria-hidden="true">
-        <DeferredVisual><Ribbon /></DeferredVisual>
+    <main id="main-content" tabIndex={-1} className={styles.page} lang="en">
+      <div className={styles.artPanel} aria-hidden="true">
+        <StaticArt className={styles.atlasArt} src="/atlas-auth.webp?v=monochrome-d" alt="" width={720} height={1080} loading="eager" fetchPriority="high" />
+        <div className={`loginFlow ${styles.ribbon}`}>
+          <DeferredVisual><Ribbon paused={motionPaused} /></DeferredVisual>
+        </div>
       </div>
-      <motion.section
-        className={styles.content}
-        initial={reduce ? false : { opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 0.61, 0.36, 1] }}
-      >
-        <div className={styles.brand}>KnowFlow</div>
-        <h1>
-          {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
-        </h1>
-        <p className={styles.lead}>
-          {mode === "login"
-            ? <>Sign in to KnowFlow and keep your<br className={styles.break} /> knowledge in motion.</>
-            : "Create an account to start building your knowledge base."}
-        </p>
+      <div className={styles.motionControl}>
+        <BackgroundMotionToggle english paused={motionPaused} onToggle={() => setMotionPaused((paused) => !paused)} />
+      </div>
+      <section key={mode} className={styles.content}>
+        <div className={styles.brand} translate="no"><BrandSeal size={32} />KnowFlow</div>
+        <div className={styles.intro} data-ink-settle>
+          <h1>
+            {mode === "login" ? <>Knowledge<br />that flows.</> : <>Create your<br />account.</>}
+          </h1>
+          <p className={styles.lead}>
+            {mode === "login"
+              ? <>Sign in to KnowFlow and keep your<br className={styles.break} /> knowledge in motion.</>
+              : "Create an account to start building your knowledge base."}
+          </p>
+        </div>
 
-        <form className={styles.form} onSubmit={submit} noValidate={false} aria-busy={busy}>
-          <label htmlFor="auth-email">Email</label>
-          <input
-            id="auth-email"
-            name="email"
-            type="email"
-            placeholder="name@example.com"
-            autoComplete="email"
-            spellCheck={false}
-            required
-            disabled={session.loading || busy}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <label htmlFor="auth-password">Password</label>
-          <div className={styles.passwordField}>
+        <div className={styles.formGroup}>
+          <form className={styles.form} onSubmit={submit} noValidate={false} aria-busy={busy}>
+            <label htmlFor="auth-email">Email</label>
             <input
-              id="auth-password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="At least 12 characters"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={12}
-              maxLength={128}
+              id="auth-email"
+              name="email"
+              type="email"
+              placeholder="name@example.com"
+              autoComplete="email"
+              spellCheck={false}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "auth-error" : undefined}
               required
               disabled={session.loading || busy}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            <button
-              type="button"
-              aria-controls="auth-password"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((value) => !value)}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            <label htmlFor="auth-password">Password</label>
+            <div className={styles.passwordField}>
+              <input
+                id="auth-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="At least 12 characters"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                minLength={12}
+                maxLength={128}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? "auth-error" : mode === "register" ? "auth-password-hint" : undefined}
+                required
+                disabled={session.loading || busy}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                aria-controls="auth-password"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+              </button>
+            </div>
+            {mode === "register" && <small id="auth-password-hint" className={styles.hint}>Use 12–128 characters.</small>}
+            {error && <p id="auth-error" className={styles.error} lang="zh-CN" role="alert">{error}</p>}
+            <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
+              {busy && <span className={styles.spinner} aria-hidden="true" />}
+              {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
             </button>
-          </div>
-          {mode === "register" && <small className={styles.hint}>Use 12–128 characters.</small>}
-          {error && <p className={styles.error} lang="zh-CN" role="alert">{error}</p>}
-          <button className={styles.submit} disabled={session.loading || busy} aria-busy={session.loading || busy}>
-            {busy && <span className={styles.spinner} aria-hidden="true" />}
-            {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-          </button>
-        </form>
+          </form>
 
-        <div className={styles.links}>
-          {mode === "login" && (
-            <button type="button" onClick={() => setResetHelp((value) => !value)} aria-expanded={resetHelp}>
-              Forgot password?
-            </button>
+          <div className={styles.links}>
+            {mode === "login" && (
+              <button type="button" onClick={() => setResetHelp((value) => !value)} aria-expanded={resetHelp}>
+                Forgot password?
+              </button>
+            )}
+            <Link
+              href={mode === "login" ? "/register" : "/login"}
+              onClick={() => { setError(""); setPassword(""); setShowPassword(false); setResetHelp(false); }}
+            >
+              {mode === "login" ? "Create an account" : "Back to sign in"}
+            </Link>
+          </div>
+          {resetHelp && (
+            <p className={styles.resetHelp} role="status">
+              Self-service password reset is currently unavailable.
+            </p>
           )}
-          <Link
-            href={mode === "login" ? "/register" : "/login"}
-            onClick={() => { setError(""); setPassword(""); setShowPassword(false); setResetHelp(false); }}
-          >
-            {mode === "login" ? "Create an account" : "Back to sign in"}
-          </Link>
         </div>
-        {resetHelp && (
-          <p className={styles.resetHelp} role="status">
-            Self-service password reset is currently unavailable.
-          </p>
-        )}
-      </motion.section>
+      </section>
       <p className={styles.footnote}>KnowFlow · Retrieval-augmented knowledge workspace</p>
     </main>
   );

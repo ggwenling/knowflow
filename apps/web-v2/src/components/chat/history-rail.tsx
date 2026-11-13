@@ -39,8 +39,8 @@ export function HistoryRail({ items, loading, hasMore, activeId, onLoadMore, onN
           <Plus size={16} aria-hidden="true" />
         </button>
       </div>
-      <label className={styles.search}>
-        <Search size={14} aria-hidden="true" />
+      <label className={styles.search} data-composite-field>
+        <Search size={16} aria-hidden="true" />
         <input
           aria-label="搜索对话历史"
           name="history"
@@ -83,7 +83,7 @@ export function HistoryRail({ items, loading, hasMore, activeId, onLoadMore, onN
       </div>
 
       <div className={styles.railFoot}>
-        <ArrowRight size={14} aria-hidden="true" />
+        <ArrowRight size={16} aria-hidden="true" />
         <span>单轮问答 · 每次提问独立检索</span>
       </div>
     </div>

@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { OnDemand } from "@/components/ui/on-demand";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { CircleHelp, FileText, FolderOpen, Layers, PanelLeft, PanelRight, Plus } from "lucide-react";
 import { useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { useDraftActions } from "@/components/store";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FilePicker } from "@/components/ui/file-picker";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -16,10 +16,13 @@ import type { Source } from "@/services/api";
 import { HistoryRail } from "./history-rail";
 import { AnswerPanel } from "./answer-panel";
 import { Composer } from "./composer";
-import { SourceDialog } from "./source-dialog";
+import { CurrentSources } from "./current-sources";
 import styles from "./chat.module.css";
 
-function DocumentsPanel() {
+const SourceDialog = dynamic(() => import("./source-dialog").then((module) => module.SourceDialog), { ssr: false });
+const MobilePanel = dynamic(() => import("./mobile-panel").then((module) => module.MobilePanel), { ssr: false });
+
+function DocumentsPanel({ onOpenSource }: { onOpenSource: (source: Source, documentName: string, trigger: HTMLButtonElement) => void }) {
   const documents = useDocumentsContext();
   const knowledge = useKnowledgeContext();
   const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
@@ -29,16 +32,17 @@ function DocumentsPanel() {
       <div className={styles.docsHead}>
         <div>
           <p className={styles.eyebrow}>Documents</p>
-          <h2>资料 <span>{documents.documents.length}</span></h2>
+          <h2 data-display-heading>资料 <span>{documents.documents.length}</span></h2>
         </div>
         <FilePicker label="上传资料" className={styles.uploadChip} disabled={!knowledge.selectedBase || documents.working} onPick={(file) => void documents.upload(file)}>
-          <Plus size={15} aria-hidden="true" />
+          <Plus size={16} aria-hidden="true" />
         </FilePicker>
       </div>
 
       <p className={styles.docsHint}>
         {selected ? `${selected.name} · ${documents.documents.filter((item) => item.status === "READY").length} 份可用于问答` : "先选择一个知识库"}
       </p>
+      <CurrentSources onOpen={onOpenSource} />
 
       {documents.documents.length ? (
         <div className={styles.docList}>
@@ -55,7 +59,7 @@ function DocumentsPanel() {
         </div>
       ) : (
         <div className={styles.docsEmpty}>
-          <FileText size={22} strokeWidth={1.4} aria-hidden="true" />
+          <FileText size={20} strokeWidth={1.5} aria-hidden="true" />
           <p>还没有资料</p>
           <span>支持 TXT、Markdown 与可读取文本的 PDF，最大 8 MiB。</span>
         </div>
@@ -68,13 +72,13 @@ function DocumentsPanel() {
       )}
 
       <div className={styles.privacy}>
-        <CircleHelp size={14} aria-hidden="true" />
+        <CircleHelp size={16} aria-hidden="true" />
         <p>资料只对当前账户可见。索引显示“已就绪”后才会参与问答。</p>
       </div>
 
       {selected && (
         <Link className={styles.docsLink} href={`/knowledge-bases/${selected.id}`}>
-          <FolderOpen size={14} aria-hidden="true" /> 打开知识库管理
+          <FolderOpen size={16} aria-hidden="true" /> 打开知识库管理
         </Link>
       )}
     </div>
@@ -83,7 +87,6 @@ function DocumentsPanel() {
 
 export function ChatView() {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const params = useParams<{ questionId?: string }>();
   const questionId = params?.questionId;
   const knowledge = useKnowledgeContext();
@@ -126,26 +129,28 @@ export function ChatView() {
 
   const selected = knowledge.bases.find((base) => base.id === knowledge.selectedBase);
 
+  function openSource(source: Source, documentName: string, trigger: HTMLButtonElement) {
+    setSourceTrigger(trigger);
+    setViewing({ source, documentName });
+  }
+
   return (
-    <motion.div
-      className={styles.page}
-      initial={reduce ? false : { opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25 }}
-    >
-      <header className={styles.chatHeader}>
+    <div className={styles.page}>
+      <header className="workspace-header">
         <div className={styles.chatTitle}>
           <p className={styles.eyebrow}>Conversations</p>
-          <h1>对话</h1>
+          <h1 data-display-heading>对话</h1>
           <p className={styles.chatMeta}>
             {selected ? selected.name : "选择一个知识库开始"} · {readyDocuments.length} 份资料可用于问答
           </p>
         </div>
-        <div className={styles.chatActions}>
+        <div className={styles.chatActions} data-header-actions>
           {knowledge.bases.length > 1 && (
-            <label className={styles.baseSelect}>
-              <Layers size={14} aria-hidden="true" />
+            <label className={styles.baseSelect} data-composite-field>
+              <Layers size={16} aria-hidden="true" />
               <select
+                name="knowledge-base"
+                autoComplete="off"
                 aria-label="切换知识库"
                 value={knowledge.selectedBase}
                 onChange={(event) => {
@@ -159,13 +164,13 @@ export function ChatView() {
             </label>
           )}
           <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("history")}>
-            <PanelLeft size={14} aria-hidden="true" /> 历史记录
+            <PanelLeft size={16} aria-hidden="true" /> 历史记录
           </Button>
           <Button variant="secondary" size="sm" className={styles.mobileOnly} onClick={() => setPanel("docs")}>
-            <PanelRight size={14} aria-hidden="true" /> 资料
+            <PanelRight size={16} aria-hidden="true" /> 资料
           </Button>
           <Button variant="secondary" size="sm" onClick={newChat}>
-            <Plus size={14} aria-hidden="true" /> 新对话
+            <Plus size={16} aria-hidden="true" /> 新对话
           </Button>
         </div>
       </header>
@@ -198,10 +203,7 @@ export function ChatView() {
         <section className={styles.chatMain} aria-label="问答">
           <div className={styles.answerScroll}>
             <AnswerPanel
-              onOpenSource={(source, documentName, trigger) => {
-                setSourceTrigger(trigger);
-                setViewing({ source, documentName });
-              }}
+              onOpenSource={openSource}
               onEditQuestion={(question) => {
                 setDraft(question);
                 requestAnimationFrame(() => document.getElementById("desk-question")?.focus());
@@ -216,18 +218,12 @@ export function ChatView() {
         </section>
 
         <aside className={styles.docsColumn}>
-          <DocumentsPanel />
+          <DocumentsPanel onOpenSource={openSource} />
         </aside>
       </div>
 
-      <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) setPanel(null); }}>
-        <DialogContent size="lg" className={styles.sheet}>
-          <DialogTitle className={styles.sheetTitle}>
-            {panel === "history" ? "对话历史" : "资料"}
-          </DialogTitle>
-          <DialogDescription className={styles.srOnly}>
-            {panel === "history" ? "选择一条历史问答查看答案与来源。" : "当前知识库中的资料与索引状态。"}
-          </DialogDescription>
+      <OnDemand open={panel !== null}>
+        <MobilePanel panel={panel} onClose={() => setPanel(null)}>
           {panel === "history" ? (
             <HistoryRail
               items={questions.history}
@@ -238,18 +234,20 @@ export function ChatView() {
               onNew={() => { setPanel(null); newChat(); }}
               onNavigate={() => setPanel(null)}
             />
-          ) : <DocumentsPanel />}
-        </DialogContent>
-      </Dialog>
+          ) : <DocumentsPanel onOpenSource={openSource} />}
+        </MobilePanel>
+      </OnDemand>
 
-      <SourceDialog
-        source={viewing?.source ?? null}
-        documentName={viewing?.documentName ?? ""}
-        open={viewing !== null}
-        onOpenChange={(open) => { if (!open) setViewing(null); }}
-        returnFocus={sourceTrigger}
-      />
+      <OnDemand open={viewing !== null}>
+        <SourceDialog
+          source={viewing?.source ?? null}
+          documentName={viewing?.documentName ?? ""}
+          open={viewing !== null}
+          onOpenChange={(open) => { if (!open) setViewing(null); }}
+          returnFocus={sourceTrigger}
+        />
+      </OnDemand>
 
-    </motion.div>
+    </div>
   );
 }

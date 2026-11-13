@@ -1,0 +1,32 @@
+[
+  {
+    "key": "auth",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: tall auth side-panel art. One long folded paper ribbon meanders between a small stack of index cards and a precise open archival folio, suggesting information finding its place. Portrait 2:3 composition, objects in lower two-thirds, generous negative space. Minimal pencil study, not photorealistic.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  },
+  {
+    "key": "empty-bases",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: no knowledge bases empty state. An empty archival index-card box, its lid open, a single blank tab waiting inside. Precise folded white paper construction, very simple silhouette.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  },
+  {
+    "key": "empty-history",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: no conversations empty state. Two blank index cards, one lying flat and one gently raised, a single fine graphite thread connecting their corners, suggesting a question awaiting an answer. No speech bubble icons.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  },
+  {
+    "key": "empty-documents",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: no documents empty state. An open paper folder holding one empty translucent sheet, small folded corner and delicate graphite contour rules along the folder edge.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  },
+  {
+    "key": "recovery",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: 404 and error illustration. A folded paper atlas opened to blank pages, a fine graphite path ends at a small gap between pages, one loose bookmark lies beside it. No symbols or numerals.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  },
+  {
+    "key": "workflow",
+    "prompt": "Use case: stylized-concept. Monochrome minimal, a coherent knowledge-workspace illustration family. Pure white background exactly #FFFFFF, fine neutral graphite etched linework, white folded paper, very light neutral contact shadows, one tiny unlettered black square #171717. Quiet composition, delicate details. Strict grayscale only. No text, letters, numbers, logos, watermarks, people, screens, stock-photo look or glossy 3D. Edges fade into pure white. Preserve the existing subject, silhouette and composition. Asset: workflow placeholder illustration. Three small folded paper folios arranged from left to right, joined by one continuous graphite thread passing through their edges, a small graphite square at the final folio. Simple architectural pencil study.",
+    "roundD": "Existing composition converted to true grayscale with a leveled white background; original pixel dimensions and filename preserved."
+  }
+]

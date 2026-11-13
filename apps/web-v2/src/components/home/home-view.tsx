@@ -1,12 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { HomeComposer } from "./home-composer";
 import { DeferredVisual } from "@/components/ui/deferred-visual";
+import { BackgroundMotionToggle } from "@/components/ui/background-motion-toggle";
 import { useSessionContext, useKnowledgeContext, useDocumentsContext, useQuestionsContext, useStreamControls } from "@/components/workspace/workspace-provider";
 import { Button } from "@/components/ui/button";
 import { ShortcutGrid } from "./shortcut-grid";
@@ -34,8 +33,6 @@ function ModelNotice() {
 }
 
 export function HomeView() {
-  const router = useRouter();
-  const reduce = useReducedMotion();
   const session = useSessionContext();
   const knowledge = useKnowledgeContext();
   const documents = useDocumentsContext();
@@ -43,6 +40,7 @@ export function HomeView() {
   const stream = useStreamControls();
   const inputRef = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState("");
+  const [motionPaused, setMotionPaused] = useState(false);
 
   const docCount = knowledge.selectedBase && !documents.refreshing && !documents.hasMore
     ? documents.documents.length
@@ -59,21 +57,17 @@ export function HomeView() {
   }
 
   return (
-    <motion.div
-      className={styles.home}
-      initial={reduce ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.32 }}
-    >
+    <div className={styles.home}>
       <div className={styles.wave} aria-hidden="true">
         <div className={`home-art ${styles.art}`}>
-          <DeferredVisual><Wave /></DeferredVisual>
+          <DeferredVisual><Wave paused={motionPaused} /></DeferredVisual>
         </div>
       </div>
 
       <header className={styles.header}>
-        <details className={styles.notifications}>
-          <summary aria-label="通知"><Bell size={21} strokeWidth={1.6} /></summary>
+        <BackgroundMotionToggle paused={motionPaused} onToggle={() => setMotionPaused((paused) => !paused)} />
+        <details className={styles.notifications} data-popover>
+          <summary aria-label="通知"><Bell size={20} strokeWidth={1.5} aria-hidden="true" /></summary>
           <div className={styles.popover}>
             <strong>通知</strong>
             <p>暂无新通知。</p>
@@ -83,24 +77,12 @@ export function HomeView() {
 
       <section className={styles.hero} aria-labelledby="home-title">
         <p className={styles.eyebrow}>Retrieval-augmented workspace</p>
-        <h1 id="home-title">KnowFlow</h1>
+        <h1 id="home-title" data-ink-settle="hero" translate="no">KnowFlow</h1>
         <p className={styles.lead}>基于 RAG 的智能知识管理与问答系统</p>
         <HomeComposer inputRef={inputRef} />
-        {knowledge.bases.length > 1 && (
-          <label className={styles.scope}>
-            提问知识库
-            <select
-              aria-label="选择知识库"
-              value={knowledge.selectedBase}
-              onChange={(event) => knowledge.selectBase(event.target.value)}
-            >
-              {knowledge.bases.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-            </select>
-          </label>
-        )}
+        <ModelNotice />
       </section>
 
-      <ModelNotice />
       {(notice || stream.notice) && (
         <div className={styles.notice} role="status">
           <span>{notice || stream.notice}</span>
@@ -118,7 +100,6 @@ export function HomeView() {
         moreDocuments={documents.hasMore}
         history={questions.history}
         loading={knowledge.loading}
-        onCreateBase={() => router.push("/knowledge-bases?create=1")}
         onFocusComposer={() => inputRef.current?.focus()}
       />
 
@@ -126,6 +107,6 @@ export function HomeView() {
         <span>{session.user?.email}</span>
         <span>{knowledge.bases.length} 个知识库 · {questions.history.length} 条问答</span>
       </footer>
-    </motion.div>
+    </div>
   );
 }

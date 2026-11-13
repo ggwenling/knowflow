@@ -1,8 +1,6 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  background: rgba(17, 17, 17, 0.34);
   animation: overlayIn var(--dur) var(--ease);
 }
 
@@ -10,7 +8,6 @@
   position: fixed;
   top: 50%;
   left: 50%;
-  z-index: 50;
   display: grid;
   gap: 14px;
   width: min(92vw, 520px);
@@ -20,8 +17,6 @@
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: #fff;
-  box-shadow: var(--shadow-pop);
   transform: translate(-50%, -50%);
   animation: contentIn var(--dur) var(--ease);
 }
@@ -56,25 +51,21 @@
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--ink-2);
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.close:hover {
-  background: var(--bg-muted);
-  color: var(--ink);
+@media (hover: hover) and (pointer: fine) {
+  .close:hover {
+    background: var(--bg-muted);
+    color: var(--ink);
+  }
 }
 
 .title {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: 26px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
 }
 
 .description {
   margin: 0;
-  color: var(--ink-2);
   font-size: 13px;
   line-height: 1.75;
 }
@@ -118,7 +109,6 @@
     transform: none;
     animation: sheetIn var(--dur) var(--ease);
   }
-
   @keyframes sheetIn {
     from {
       opacity: 0;
@@ -126,3 +116,84 @@
     }
   }
 }
+
+.overlay {
+  z-index: var(--z-overlay);
+  background: rgba(0, 0, 0, .35);
+}
+
+.content {
+  z-index: var(--z-dialog);
+  background: var(--surface-overlay);
+  box-shadow: var(--shadow-pop), var(--highlight);
+  animation-duration: 220ms;
+}
+
+.title {
+  padding-right: 28px;
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+}
+
+.description {
+  color: var(--ink-2);
+}
+
+.overlay[data-state="closed"] {
+  animation: overlayOut 120ms var(--ease) both;
+}
+
+.content[data-state="closed"] {
+  animation: contentOut 140ms var(--ease) both;
+}
+
+@keyframes overlayOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes contentOut {
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 4px)) scale(.985);
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    animation-timing-function: var(--ease-drawer);
+  }
+  .content[data-state="closed"] {
+    animation: sheetOut 140ms var(--ease-drawer) both;
+  }
+  @keyframes sheetOut {
+    to {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .content {
+    animation: gentle-fade 120ms var(--ease) both !important;
+  }
+  .overlay[data-state="closed"], .content[data-state="closed"] {
+    animation: overlayOut 100ms var(--ease) both !important;
+  }
+}
+
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .close { width: 40px; height: 40px; top: 12px; right: 12px; }
+  .content { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+}
+.title, .description { overflow-wrap: anywhere; }
