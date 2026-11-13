@@ -19,10 +19,12 @@
 `RAG_POLICY_JSON` 和 `RAG_RUN_LIMIT_MICROYUAN`。
 价格与预算政策使用生产预算文件的结构。不要复用生产凭证。
 
-从受审核的 `local` 提交运行 `RAG quality review` 的手动校准，
-下载 `rag-latency-baseline.json` 并将其提交到
+首次启用时，给该 Environment 临时设置 `RAG_CALIBRATE=1`，重新运行
+并审批 `local → main` PR 的 `RAG quality review`。它会收集三个基线样本，
+上传基线并保持合并检查未通过。下载 `rag-latency-baseline.json` 并将其提交到
 `evaluation/data/rag-latency-baseline.json`。三次相同条件的串行留出集
-p95 中位数乘以 1.25 作为延迟上限。
+p95 中位数乘以 1.25 作为延迟上限。随后删除 `RAG_CALIBRATE`。
+工作流进入 main 后也可从受审核的 local 提交手动重新校准。
 
 候选收集完成后，另一名具有维护权限的审核者下载 `rag-live`，
 对 `report.review.json` 中每个回答及其引用依次给出判断，然后在同一 PR

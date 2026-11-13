@@ -62,6 +62,7 @@ jobs:
           KNOWFLOW_EMBEDDING_API_KEY: ${{ secrets.KNOWFLOW_EMBEDDING_API_KEY }}
           RAG_PRICE_JSON: ${{ vars.RAG_PRICE_JSON }}
           RAG_POLICY_JSON: ${{ vars.RAG_POLICY_JSON }}
+          RAG_CALIBRATE: ${{ vars.RAG_CALIBRATE }}
           KNOWFLOW_BUDGET_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           KNOWFLOW_BUDGET_RUN_LIMIT_MICROYUAN: ${{ vars.RAG_RUN_LIMIT_MICROYUAN }}
         run: |
@@ -71,12 +72,24 @@ jobs:
           export KNOWFLOW_BUDGET_POLICY_FILE="$RUNNER_TEMP/rag-policy.json"
           printf '%s' "$RAG_PRICE_JSON" > "$KNOWFLOW_BUDGET_PRICE_FILE"
           printf '%s' "$RAG_POLICY_JSON" > "$KNOWFLOW_BUDGET_POLICY_FILE"
+          if [ ! -f evaluation/data/rag-latency-baseline.json ]; then
+            test "$RAG_CALIBRATE" = 1 || { echo 'RAG latency baseline required'; exit 1; }
+            for run in 1 2 3; do
+              uv run --project services/ai --frozen python scripts/e2e-evaluation.py --real-split holdout \
+                --output "$RUNNER_TEMP/rag-baseline/$run/report.json"
+            done
+            python scripts/make-rag-baseline.py "$RUNNER_TEMP/rag-baseline"
+            echo 'Commit the calibrated baseline to the PR before merging'
+            exit 1
+          fi
           uv run --project services/ai --frozen python scripts/e2e-evaluation.py --real-split holdout --output "$RUNNER_TEMP/rag-live/report.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: rag-live
-          path: ${{ runner.temp }}/rag-live/
+          path: |
+            ${{ runner.temp }}/rag-live/
+            ${{ runner.temp }}/rag-baseline/rag-latency-baseline.json
 
   verify:
     name: Reviewed real RAG quality
