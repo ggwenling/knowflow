@@ -60,7 +60,8 @@ class ApiSecurityIntegrationTest {
     private AiInternalHealthClient aiInternalHealthClient;
 
     @DynamicPropertySource
-    static void aiServiceProperties(DynamicPropertyRegistry properties) {
+    static void aiServiceProperties(DynamicPropertyRegistry properties) throws IOException {
+        verifyStubReady(AI_STUB);
         properties.add("knowflow.ai.base-url", () -> "http://127.0.0.1:"
                 + AI_STUB.getAddress().getPort());
     }
@@ -231,10 +232,29 @@ class ApiSecurityIntegrationTest {
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/transport-probe", ApiSecurityIntegrationTest::respondFromStub);
             server.createContext("/internal/v1/health", ApiSecurityIntegrationTest::respondHealth);
+            server.createContext("/ready", exchange -> {
+                try (exchange) {
+                    exchange.sendResponseHeaders(204, -1);
+                }
+            });
             server.start();
             return server;
         } catch (IOException exception) {
             throw new ExceptionInInitializerError(exception);
+        }
+    }
+
+    private static void verifyStubReady(HttpServer server) throws IOException {
+        var ready = (java.net.HttpURLConnection) java.net.URI.create(
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/ready").toURL().openConnection();
+        ready.setConnectTimeout(2_000);
+        ready.setReadTimeout(2_000);
+        try {
+            if (ready.getResponseCode() != 204) {
+                throw new IOException("HTTP stub did not become ready");
+            }
+        } finally {
+            ready.disconnect();
         }
     }
 
@@ -244,8 +264,8 @@ class ApiSecurityIntegrationTest {
         byte[] body = "local-test-response".getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
         exchange.sendResponseHeaders(200, body.length);
-        try (var output = exchange.getResponseBody()) {
-            output.write(body);
+        try (exchange) {
+            exchange.getResponseBody().write(body);
         }
     }
 
@@ -259,8 +279,8 @@ class ApiSecurityIntegrationTest {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
         exchange.sendResponseHeaders(200, bytes.length);
-        try (var output = exchange.getResponseBody()) {
-            output.write(bytes);
+        try (exchange) {
+            exchange.getResponseBody().write(bytes);
         }
     }
 

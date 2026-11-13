@@ -1347,7 +1347,7 @@ class DocumentApiIntegrationTest {
         assertThat(first.lease().taskId()).isEqualTo(taskId);
         assertThat(first.lease().fencing()).isEqualTo(1);
         assertThat(first.dispatch().runtimeProfile()).isEqualTo(new IndexDispatch.RuntimeProfile(
-                "knowflow-index-v1", 800, 100, 16, 32, 1_048_576));
+                "knowflow-index-v2-ocr", 800, 100, 16, 32, 1_048_576));
         assertThat(jdbc.queryForObject("""
                 SELECT execution_token_hash FROM knowflow.indexing_tasks WHERE id = ?
                 """, String.class, taskId)).isEqualTo(AuthService.sha256(
@@ -2184,6 +2184,27 @@ class DocumentApiIntegrationTest {
         mockMvc.perform(multipart("/api/v1/documents/{id}/contents", document)
                 .file(new MockMultipartFile("file", "other.txt", "text/plain", "Other".getBytes(StandardCharsets.UTF_8)))
                 .header("Authorization", "Bearer " + other)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void rebuildKeyReplaysCompletedTaskAndRejectsOtherDocument() throws Exception {
+        String token = register("rebuild-key@example.test").path("access_token").asText();
+        String kb = createKnowledgeBase(token, "Rebuild keys");
+        UUID first = publishDocument(token, kb, "first.txt", "First evidence.", "key-first").lease().documentId();
+        UUID second = publishDocument(token, kb, "second.txt", "Second evidence.", "key-second").lease().documentId();
+        String key = UUID.randomUUID().toString();
+        String path = "/api/v1/documents/{id}/rebuilds";
+        var accepted = mockMvc.perform(post(path, first).header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", key)).andExpect(status().isAccepted()).andReturn();
+        var task = objectMapper.readTree(accepted.getResponse().getContentAsByteArray());
+        publishQueued(task, "First evidence.", "key-rebuild");
+        mockMvc.perform(post(path, first).header("Authorization", "Bearer " + token).header("Idempotency-Key", key))
+                .andExpect(status().isAccepted()).andExpect(jsonPath("$.task_id").value(task.path("task_id").asText()));
+        mockMvc.perform(post(path, second).header("Authorization", "Bearer " + token).header("Idempotency-Key", key))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DOCUMENT_REBUILD_CONFLICT"));
+        mockMvc.perform(post(path, first).header("Authorization", "Bearer " + token).header("Idempotency-Key", "bad-key"))
+                .andExpect(status().isBadRequest());
+        assertThat(rebuild(token, first).path("task_id").asText()).isNotEqualTo(task.path("task_id").asText());
     }
 
     @Test

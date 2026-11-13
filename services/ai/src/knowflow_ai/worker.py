@@ -225,7 +225,8 @@ class IndexWorker:
                 source, format=dispatch["source"]["format"],
                 document_id=lease["document_id"],
                 content_version_id=lease["content_version_id"],
-                file_id=dispatch["source"]["file_id"])
+                file_id=dispatch["source"]["file_id"],
+                enable_ocr=lease["pipeline_profile_id"] != "knowflow-index-v1")
         except ParseFailure as error:
             _logger.warning("ai_stage request_id=%s stage=parse duration_ms=%d outcome=failed code=%s",
                             dispatch["request_id"],
@@ -348,9 +349,9 @@ class IndexWorker:
     def _parse_failure_code(code: str) -> str:
         if code in {"EMPTY_DOCUMENT", "PDF_NO_TEXT"}:
             return "EMPTY_CONTENT"
-        if code == "PARSER_UNAVAILABLE":
+        if code in {"PARSER_UNAVAILABLE", "PDF_OCR_UNAVAILABLE"}:
             return "INDEX_WRITE_FAILED"
-        if code in {"FILE_TOO_LARGE", "TEXT_TOO_LARGE", "PDF_PAGE_LIMIT",
+        if code in {"FILE_TOO_LARGE", "TEXT_TOO_LARGE", "PDF_PAGE_LIMIT", "PDF_OCR_PAGE_LIMIT",
                     "PARSER_TIMEOUT", "PARSER_MEMORY_LIMIT",
                     "PARSER_RESOURCE_LIMIT", "PARSER_RESOURCE_LIMIT_UNAVAILABLE"}:
             return "RESOURCE_LIMIT"

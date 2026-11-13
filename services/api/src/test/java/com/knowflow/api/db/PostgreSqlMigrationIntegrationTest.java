@@ -76,7 +76,7 @@ class PostgreSqlMigrationIntegrationTest {
         migrationContext.run(context -> {
             assertThat(context).hasNotFailed();
             Flyway flyway = context.getBean(Flyway.class);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("11");
             assertThat(queryLong("SELECT count(*) FROM knowflow.questions WHERE selected_llm_model_id IS NULL"))
                     .isEqualTo(1L);
             assertThat(queryLong("""

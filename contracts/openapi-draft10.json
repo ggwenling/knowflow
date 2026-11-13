@@ -565,6 +565,12 @@
         },
         "parameters": [
           {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "同一账号和文档重放时返回原任务。绑定其他文档时返回 409。",
+            "schema": { "type": "string", "format": "uuid" }
+          },
+          {
             "name": "documentId",
             "in": "path",
             "required": true,

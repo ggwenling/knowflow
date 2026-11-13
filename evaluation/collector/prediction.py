@@ -109,7 +109,8 @@ def _locator_within(actual, chunk):
     return False
 
 
-def answer_prediction(*, question_id, runtime_question_id, trace, mappings, response, latency_ms):
+def answer_prediction(*, question_id, runtime_question_id, trace, mappings, response, latency_ms,
+                      allow_followup=False):
     """Build a dataset-keyed row from one runtime question and its captured trace."""
     evidence, runtime_to_public = _mapped_trace(
         runtime_question_id, trace, mappings, latency_ms)
@@ -155,7 +156,7 @@ def answer_prediction(*, question_id, runtime_question_id, trace, mappings, resp
             runtime_id = marker.group(1)
             public_id = runtime_to_public.get(runtime_id)
             evidence_index = next(
-                (index for index, row in enumerate(evidence[:5])
+                (index for index, row in enumerate(evidence if allow_followup else evidence[:5])
                  if row["source_id"] == public_id), None)
             if public_id is None or evidence_index is None:
                 raise ValueError("CITATION_OUTSIDE_TOP5")

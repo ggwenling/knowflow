@@ -11,7 +11,7 @@ _spec.loader.exec_module(prediction)
 
 async def collect_question(*, java, ai, knowledge_base_id, question, question_id,
                            mappings, lookup_question, diagnostics_out=None,
-                           public_sources_out=None):
+                           public_sources_out=None, streaming=False):
     """Clients own credentials; lookup uses the unique idempotency key to read Java's row.
 
     ``diagnostics_out``, when given, receives that question's citation reason
@@ -24,8 +24,27 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
     """
     key = str(uuid4())
     started = time.monotonic()
-    response = await java.post(f"/api/v1/knowledge-bases/{knowledge_base_id}/questions",
-                               headers={"Idempotency-Key": key}, json={"question": question})
+    path = f"/api/v1/knowledge-bases/{knowledge_base_id}/questions"
+    if streaming:
+        import json
+        events = []
+        async with java.stream("POST", path + "/stream", headers={"Idempotency-Key": key},
+                               json={"question": question}) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if line.startswith("data:"):
+                    events.append(json.loads(line[5:]))
+        if (not events or events[0].get("event") != "started"
+                or events[-1].get("event") != "completed"
+                or any(event.get("sequence") != i for i, event in enumerate(events, 1))
+                or sum(event.get("event") in {"completed", "error", "cancelled"} for event in events) != 1):
+            raise ValueError("EVALUATION_STREAM_INCOMPLETE")
+        sources, = [event for event in events if event.get("event") == "sources"]
+        public = {**sources, "answer": "".join(event["delta"] for event in events if event["event"] == "delta")}
+    else:
+        response = await java.post(path, headers={"Idempotency-Key": key}, json={"question": question})
+        public = response.json() if response.status_code == 200 else None
+    latency_ms = (time.monotonic() - started) * 1000
     runtime = await lookup_question(key)
     if not runtime or not runtime.get("request_id") or not runtime.get("id"):
         raise ValueError("JAVA_QUESTION_RECORD_MISSING")
@@ -38,7 +57,6 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
         raise ValueError("EVALUATION_TRACE_INCOMPLETE")
     if diagnostics_out is not None and isinstance(payload.get("citation"), dict):
         diagnostics_out.update(payload["citation"])
-    latency_ms = (time.monotonic() - started) * 1000
     if response.status_code != 200:
         code = runtime.get("failure_code")
         return prediction.error_prediction(
@@ -50,8 +68,7 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
         raise ValueError("EVALUATION_RESPONSE_INCOMPLETE")
     row = prediction.answer_prediction(
         question_id=question_id, runtime_question_id=runtime["id"], trace=payload["trace"],
-        mappings=mappings, response=internal, latency_ms=latency_ms)
-    public = response.json()
+        mappings=mappings, response=internal, latency_ms=latency_ms, allow_followup=streaming)
     expected_ids = {cite["source_id"] for cite in row["citations"]}
     public_ids = [source["source_id"] for source in public.get("sources", [])]
     if (public.get("request_id") != request_id or public.get("answer") != row["answer"]

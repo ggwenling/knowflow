@@ -53,7 +53,7 @@ def _apply_windows_memory_limit(limit_bytes):
     if not job:
         raise RuntimeError("PARSER_MEMORY_LIMIT_UNAVAILABLE")
     info = ExtendedLimitInformation()
-    info.BasicLimitInformation.LimitFlags = 0x100  # JOB_OBJECT_LIMIT_PROCESS_MEMORY
+    info.BasicLimitInformation.LimitFlags = 0x2100  # PROCESS_MEMORY and KILL_ON_JOB_CLOSE
     info.ProcessMemoryLimit = limit_bytes
     if not kernel32.SetInformationJobObject(
             job, 9, ctypes.byref(info), ctypes.sizeof(info)):
@@ -103,7 +103,7 @@ def main():
         if len(header) > 4096 or not header.endswith(b"\n"):
             raise ValueError
         metadata = json.loads(header)
-        expected = {"data_length", "format", "document_id", "content_version_id", "file_id", "limits"}
+        expected = {"data_length", "format", "document_id", "content_version_id", "file_id", "limits", "enable_ocr"}
         if set(metadata) != expected or type(metadata["data_length"]) is not int:
             raise ValueError
         if not 0 <= metadata["data_length"] <= max_input_bytes:
@@ -121,11 +121,12 @@ def main():
 
     try:
         from .parsing import ParseFailure, ParseLimits, parse_document
+        from .pdf_ocr import recognize_page
 
         parsed = parse_document(
             data, format=metadata["format"], document_id=metadata["document_id"],
             content_version_id=metadata["content_version_id"], file_id=metadata["file_id"],
-            limits=ParseLimits(**limits))
+            limits=ParseLimits(**limits), ocr_page=recognize_page if metadata["enable_ocr"] else None)
         document = {
             "document_id": parsed.document_id,
             "content_version_id": parsed.content_version_id,

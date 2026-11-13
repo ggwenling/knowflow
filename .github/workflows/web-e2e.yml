@@ -3,10 +3,15 @@ name: Web engineering E2E
 on:
   pull_request:
   push:
-    branches: [main, local, grok]
+    branches: ["**"]
+  merge_group:
+
+permissions:
+  contents: read
 
 jobs:
   evaluation-e2e:
+    name: Offline RAG quality
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -20,8 +25,13 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - name: Collect public seed through Java with fake providers
-        run: uv run --project services/ai --frozen python scripts/e2e-evaluation.py --output /tmp/knowflow-evaluation-smoke.json
+      - name: Verify reviewed holdout through Java and pgvector
+        run: uv run --project services/ai --frozen python scripts/e2e-evaluation.py --offline-quality --output "$RUNNER_TEMP/rag-offline/report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rag-offline
+          path: ${{ runner.temp }}/rag-offline/
 
   python-contract:
     runs-on: ubuntu-latest
@@ -37,6 +47,7 @@ jobs:
       - run: python -m unittest discover -s evaluation/smoke -p 'test_*.py' -v
 
   java:
+    name: Java and Testcontainers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,10 +56,19 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - run: docker info --format '{{.ServerVersion}}'
       - run: bash mvnw -B test
         working-directory: services/api
+      - name: Require Docker integration suites to have run
+        run: python scripts/check-java-integration.py services/api/target/surefire-reports
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: java-test-reports
+          path: services/api/target/surefire-reports/TEST-*.xml
 
   web:
+    name: Full Compose E2E
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -90,12 +110,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run isolated full stack
         run: node scripts/e2e-web.mjs --v2
-      - name: Report service state after failure
-        if: failure()
-        run: docker ps -a --format "table {{.Names}}\t{{.Status}}"
+        env:
+          KNOWFLOW_E2E_ARTIFACTS: ${{ runner.temp }}/knowflow-e2e-artifacts
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: web-e2e-results
-          path: apps/web-v2/test-results/
+          path: |
+            ${{ runner.temp }}/knowflow-e2e-artifacts/
+            apps/web-v2/test-results/
           if-no-files-found: ignore

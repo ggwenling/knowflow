@@ -64,7 +64,7 @@ def _budget_stop_reason(ledger):
 
 
 async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fetch_row, ledger,
-                          limit=None):
+                          limit=None, streaming=False):
     if (not isinstance(run_metadata, dict)
             or set(run_metadata) != {"code_sha", "schema_sha256", "config_sha256", "prompt_sha256", "model"}
             or not isinstance(run_metadata["model"], str) or not run_metadata["model"].strip()
@@ -163,12 +163,13 @@ async def collect_dataset(*, java, ai, dataset, split, output, run_metadata, fet
                     java=java, ai=ai, knowledge_base_id=knowledge_base_id,
                     question=question["question"], question_id=question["id"],
                     mappings=mappings, lookup_question=lookup,
-                    diagnostics_out=diagnostics, public_sources_out=public_sources)
-            except (ValueError, httpx.HTTPError):
-                status["failures"].append({"question_id": question["id"], "code": "COLLECTION_INCOMPLETE"})
+                    diagnostics_out=diagnostics, public_sources_out=public_sources, streaming=streaming)
+            except (ValueError, httpx.HTTPError) as error:
+                reason = str(error) if isinstance(error, ValueError) and re.fullmatch(r"[A-Z_0-9]{1,80}", str(error)) else "COLLECTION_INCOMPLETE"
+                status["failures"].append({"question_id": question["id"], "code": reason})
                 row = {"question_id": question["id"], "outcome": "error", "answer": "",
                        "answer_sha256": sha256(b"").hexdigest(), "retrieved_evidence": [], "citations": [],
-                       "latency_ms": 0, "error_code": "COLLECTION_INCOMPLETE"}
+                       "latency_ms": 0, "error_code": reason}
                 diagnostics = {}
             else:
                 if row["outcome"] == "error":

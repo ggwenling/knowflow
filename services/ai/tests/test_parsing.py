@@ -56,6 +56,43 @@ def test_pdf_chinese_pages_and_empty_page_keep_physical_page_numbers():
     assert all(b.char_start is None and b.char_end is None for b in first.blocks)
 
 
+def test_scan_is_ocrd_in_original_page_order_without_overwriting_native_text():
+    from io import BytesIO
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.append(FIXTURES / "chinese-pages.pdf")
+    writer.append(FIXTURES / "image-only.pdf")
+    output = BytesIO()
+    writer.write(output)
+    seen = []
+
+    def ocr(data, page):
+        assert data == output.getvalue()
+        seen.append(page)
+        return "Scanned document"
+
+    result = parse_document(output.getvalue(), format="pdf", ocr_page=ocr, **IDS)
+    assert seen == [4]
+    assert [block.page for block in result.blocks] == [1, 3, 4]
+    assert result.empty_pages == (2,)
+    assert result.blocks[-1].text == "Scanned document"
+
+
+def test_scan_budget_refuses_whole_pdf():
+    from io import BytesIO
+    from pypdf import PdfReader, PdfWriter
+
+    writer = PdfWriter()
+    page = PdfReader(FIXTURES / "image-only.pdf").pages[0]
+    for _ in range(21):
+        writer.add_page(page)
+    output = BytesIO()
+    writer.write(output)
+    with pytest.raises(ParseFailure, match="PDF_OCR_PAGE_LIMIT"):
+        parse_document(output.getvalue(), format="pdf", ocr_page=lambda *_: "Scan", **IDS)
+
+
 @pytest.mark.parametrize('filename,code',[('encrypted.pdf','PDF_ENCRYPTED'),('image-only.pdf','PDF_NO_TEXT'),
     ('blank.pdf','PDF_NO_TEXT'),('malformed.pdf','INVALID_PDF')])
 def test_pdf_unprocessable_inputs_fail_with_fixed_error(filename,code,caplog):

@@ -39,7 +39,8 @@ class CaptureStore:
         async with self._lock:
             self._pending.discard(request_id)
 
-    async def record(self, request_id, rows, scope):
+    @staticmethod
+    def _validate_rows(rows, scope):
         if not isinstance(rows, list) or len(rows) > 10 or not isinstance(scope, dict):
             raise ValueError("INVALID_RETRIEVAL_TRACE")
         try:
@@ -69,11 +70,23 @@ class CaptureStore:
                 trace.append({name: deepcopy(row[name]) for name in _TRACE_FIELDS})
         except (KeyError, TypeError):
             raise ValueError("INVALID_RETRIEVAL_TRACE") from None
+        return trace
+
+    async def record(self, request_id, rows, scope):
+        trace = self._validate_rows(rows, scope)
         async with self._lock:
             if request_id not in self._pending:
                 raise ValueError("INVALID_REQUEST_ID_STATE")
             self._pending.remove(request_id)
             self._traces[request_id] = trace
+
+    async def append_followup(self, request_id, rows, scope):
+        trace = self._validate_rows(rows, scope)
+        async with self._lock:
+            initial = self._traces[request_id]
+            seen = {row["source_id"] for row in initial}
+            initial.extend(row for row in trace if row["source_id"] not in seen)
+        return rows
 
     async def take(self, request_id):
         async with self._lock:
@@ -95,13 +108,17 @@ class CaptureStore:
 class CapturingRetriever:
     """Capture one top-10 retrieval and expose only its first five rows."""
 
-    def __init__(self, retriever, store):
+    def __init__(self, retriever, store, *, allow_followup=False):
         self._retriever = retriever
         self._store = store
+        self._allow_followup = allow_followup
 
     async def retrieve(self, question, scope, request_id, *, deadline=None, top_k=5):
         if top_k != 5:
             raise ValueError("UNSUPPORTED_GENERATION_LIMIT")
+        if self._allow_followup and request_id in self._store._traces:
+            rows = await self._retriever.retrieve(question, scope, request_id, deadline=deadline, top_k=5)
+            return await self._store.append_followup(request_id, rows, scope)
         await self._store.begin(request_id)
         try:
             rows = await self._retriever.retrieve(question, scope, request_id,

@@ -60,7 +60,7 @@ def _load(predictions_path, dataset_root, split):
                 or row["question_id"] in received or row["outcome"] not in ("answered", "refused", "error")
                 or not isinstance(row["answer"], str)
                 or sha256(row["answer"].encode("utf-8")).hexdigest() != row["answer_sha256"]
-                or not isinstance(row["retrieved_evidence"], list) or len(row["retrieved_evidence"]) > 10
+                or not isinstance(row["retrieved_evidence"], list) or len(row["retrieved_evidence"]) > 15
                 or not isinstance(row["citations"], list)
                 or type(row["latency_ms"]) not in (int, float) or not math.isfinite(row["latency_ms"]) or row["latency_ms"] < 0):
             raise ValueError("INVALID_PREDICTION")
@@ -93,7 +93,7 @@ def _load(predictions_path, dataset_root, split):
                     or type(cite["marker_index"]) is not int or not 0 <= cite["marker_index"] < len(markers)
                     or cite["marker_index"] in positions or cite["source_id"] != markers[cite["marker_index"]]
                     or type(cite["evidence_index"]) is not int
-                    or not 0 <= cite["evidence_index"] < min(5, len(row["retrieved_evidence"]))
+                    or not 0 <= cite["evidence_index"] < len(row["retrieved_evidence"])
                     or row["retrieved_evidence"][cite["evidence_index"]]["source_id"] != cite["source_id"]
                     or not isinstance(cite["claim"], str) or not cite["claim"].strip()
                     or cite["claim"] not in row["answer"]):
@@ -179,7 +179,7 @@ def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None,
         gold_hits += sum(legacy._covered(g, ev[:5]) for g in q["evidence"])
         if q["answerable"] and q["evidence"]:
             mrr_questions += 1
-            rank = next((i for i, span in enumerate(ev, 1) if any(legacy._covered(g, [span]) for g in q["evidence"])), None)
+            rank = next((i for i, span in enumerate(ev[:10], 1) if any(legacy._covered(g, [span]) for g in q["evidence"])), None)
             if rank: reciprocal += 1 / rank
         outcome = row["outcome"]
         category = q.get("category", "uncategorized")

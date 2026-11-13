@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -62,8 +63,9 @@ public class DocumentController {
 
     @PostMapping("/api/v1/documents/{documentId}/rebuilds")
     ResponseEntity<DocumentUploadAccepted> rebuild(
-            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID documentId) {
-        DocumentUploadAccepted response = documents.rebuild(user, documentId);
+            @AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID documentId,
+            @RequestHeader(value = "Idempotency-Key", required = false) UUID requestKey) {
+        DocumentUploadAccepted response = documents.rebuild(user, documentId, requestKey);
         return ResponseEntity.accepted().location(URI.create("/api/v1/tasks/" + response.taskId()))
                 .body(response);
     }

@@ -153,6 +153,7 @@ class BoundaryMiddleware:
 
 def create_app(settings: Settings | None = None, *, worker_factory=None,
                answer_service_factory=None, provider_readiness_factory=None, provider_runtime_factory=None,
+               answer_retriever_factory=None, use_product_answer_model=False,
                probe_clock=utc_now) -> FastAPI:
     install_safe_logging()
     settings = settings or Settings.from_environment()
@@ -160,7 +161,7 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
     runtime = (provider_runtime_factory or ProviderRuntime)(limits)
     contract = ContractConsumer(settings.contract_path)
     worker_factory = worker_factory if worker_factory is not None else IndexWorker
-    use_langchain = answer_service_factory is None
+    use_langchain = answer_service_factory is None or use_product_answer_model
     answer_service_factory = answer_service_factory or AnswerService
 
     @asynccontextmanager
@@ -291,6 +292,8 @@ def create_app(settings: Settings | None = None, *, worker_factory=None,
                     llm_settings, runtime=runtime, call_context=ModelCallContext(
                         request.state.request_id, owner, custom.id if custom is not None else None))
             options['llm_factory'] = llm_factory
+        if answer_retriever_factory is not None:
+            options['retriever'] = answer_retriever_factory(settings.ai_database_url, embedding_settings)
         return answer_service_factory(settings.ai_database_url, contract, **options)
 
     def require_custom():
