@@ -106,7 +106,7 @@ async def recorded_model(*replay, fragment_size=None, crlf=False):
             assert bool(payload.get('tools')) == case['allow_tools']
         body = wire_bytes(case)
         if crlf:
-            body = body.replace(b'\n', b'\r\n')
+            body = body.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
         if fragment_size:
             class Fragmented(library.AsyncByteStream):
                 async def __aiter__(self):

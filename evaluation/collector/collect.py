@@ -68,7 +68,8 @@ async def collect_question(*, java, ai, knowledge_base_id, question, question_id
         raise ValueError("EVALUATION_RESPONSE_INCOMPLETE")
     row = prediction.answer_prediction(
         question_id=question_id, runtime_question_id=runtime["id"], trace=payload["trace"],
-        mappings=mappings, response=internal, latency_ms=latency_ms, allow_followup=streaming)
+        mappings=mappings, response=internal, latency_ms=latency_ms,
+        followup_sources=payload.get("followup_sources", ()) if streaming else ())
     expected_ids = {cite["source_id"] for cite in row["citations"]}
     public_ids = [source["source_id"] for source in public.get("sources", [])]
     if (public.get("request_id") != request_id or public.get("answer") != row["answer"]

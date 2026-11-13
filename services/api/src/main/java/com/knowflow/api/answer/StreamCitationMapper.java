@@ -33,29 +33,36 @@ final class StreamCitationMapper {
                 } else {
                     output.append(current);
                 }
+            } else if (current == '[') {
+                output.append('[').append(marker);
+                marker.setLength(0);
             } else if (current == ']') {
                 String source = marker.toString();
-                if (!IDENTIFIER.matcher(source).matches()) {
-                    throw new IllegalStateException("AI citation marker is invalid");
+                if (IDENTIFIER.matcher(source).matches()) {
+                    referenced.add(source);
+                    output.append('[').append(publicId(source)).append(']');
+                } else {
+                    output.append('[').append(source).append(']');
                 }
-                referenced.add(source);
-                output.append('[').append(publicId(source)).append(']');
                 marker.setLength(0);
                 inside = false;
             } else {
                 marker.append(current);
                 if (marker.length() > 128) {
-                    throw new IllegalStateException("AI citation marker exceeds its limit");
+                    output.append('[').append(marker);
+                    marker.setLength(0);
+                    inside = false;
                 }
             }
         }
         return output.toString();
     }
 
-    void finish(Set<String> acceptedSourceIds) {
-        if (inside || !acceptedSourceIds.equals(referenced)) {
+    String finish(Set<String> acceptedSourceIds) {
+        if (!acceptedSourceIds.equals(referenced)) {
             throw new IllegalStateException("AI citations do not match the verified sources");
         }
+        return inside ? "[" + marker : "";
     }
 
     UUID publicId(String sourceId) {

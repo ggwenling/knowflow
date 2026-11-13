@@ -158,7 +158,7 @@ def run(output, real_split=None, *, offline_quality=False):
             payload = asyncio.run(collect())
             if quality:
                 scorer = load(ROOT / "evaluation/runner/runner_v2.py")
-                scored = scorer.evaluate(predictions, dataset_root=dataset, split=split)
+                scored = scorer.evaluate(predictions, dataset_root=dataset, split=split, allow_followup=bool(real_split))
                 if scored["metrics"]["execution_error_count"] or scored["sample_count"] != (20 if split == "holdout" else 40):
                     raise RuntimeError("REAL_EVALUATION_INCOMPLETE")
                 metrics = scored["metrics"]
@@ -170,7 +170,7 @@ def run(output, real_split=None, *, offline_quality=False):
                         if metrics[metric] is None or metrics[metric] < minimum:
                             raise RuntimeError("OFFLINE_QUALITY_GATE_FAILED:" + metric)
                 else:
-                    review = scorer.prepare_review(predictions, dataset, split)
+                    review = scorer.prepare_review(predictions, dataset, split, allow_followup=True)
                     output.with_suffix(".review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2), encoding="utf-8")
                     report["real_provider_calls"] = None
             else:

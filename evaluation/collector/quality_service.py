@@ -49,7 +49,7 @@ def create_quality_app():
         gold = {row["question"]: row["evidence"] for row in questions}
 
         class OfflineAnswer:
-            async def stream_content(self, question, evidence, *, request_id):
+            def answer(self, question, evidence):
                 # Extract only annotated spans actually present in retrieved chunks.
                 used, claims = [], []
                 for span in gold[question]:
@@ -61,7 +61,13 @@ def create_quality_app():
                             claims.extend(claim + f" [{source_id}]。"
                                           for claim in re.split(r"[。！？；]", span["quote"]) if claim.strip())
                             break
-                yield json.dumps({"has_answer": bool(used), "answer": "".join(claims), "source_ids": used})
+                return {"has_answer": bool(used), "answer": "".join(claims), "source_ids": used}
+
+            async def stream_content(self, question, evidence, *, request_id):
+                yield json.dumps(self.answer(question, evidence))
+
+            async def generate_repair(self, question, evidence, previous_answer, *, request_id):
+                return self.answer(question, evidence)
 
             async def aclose(self):
                 pass
@@ -85,6 +91,7 @@ def create_quality_app():
                         results[request_id] = {
                             "request_id": request_id,
                             "trace": traces.take_nowait(request_id),
+                            "followup_sources": traces.followup_sources.pop(request_id, []),
                             "response": {"request_id": request_id, "answer": "".join(answer),
                                          "sources": sources["sources"], "has_answer": sources["has_answer"]},
                         }

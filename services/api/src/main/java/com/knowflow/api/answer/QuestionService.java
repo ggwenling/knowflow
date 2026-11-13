@@ -808,7 +808,8 @@ public class QuestionService {
             AiAnswerResponse response = new AiAnswerResponse(ApiError.CONTRACT_VERSION, requestId,
                     answer.toString(), event.hasAnswer(), sources, modelProfile);
             validateAnswer(response);
-            citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId).collect(java.util.stream.Collectors.toSet()));
+            String trailingLiteral = citations.finish(sources.stream().map(AiAnswerResponse.AiSource::sourceId)
+                    .collect(java.util.stream.Collectors.toSet()));
             return Mono.fromCallable(() -> transactions.execute(status -> {
                         registerDeadlineCheck(requestStartedAt, cancellation);
                         setStatementTimeout(requestStartedAt, cancellation);
@@ -818,7 +819,7 @@ public class QuestionService {
                     .switchIfEmpty(Mono.error(new IllegalStateException(
                             "Question stream persistence did not return a response")))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .map(saved -> {
+                    .flatMapMany(saved -> {
                         assertVisible();
                         pendingAnswer = response;
                         sourcesPrepared = true;
@@ -826,8 +827,10 @@ public class QuestionService {
                                 .map(source -> new AnswerStreamSource(source.sourceId(), source.documentId(),
                                         source.contentVersionId(), source.indexVersionId(), source.chunkId(),
                                         source.locator(), source.quote())).toList();
-                        return sourcesEvent(saved.hasAnswer(), publicSources);
-                    }).flux();
+                        return trailingLiteral.isEmpty()
+                                ? Flux.just(sourcesEvent(saved.hasAnswer(), publicSources))
+                                : Flux.just(deltaEvent(trailingLiteral), sourcesEvent(saved.hasAnswer(), publicSources));
+                    });
         }
 
         private Flux<PublicAnswerStreamEvent> error(Throwable failure) {

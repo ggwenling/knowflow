@@ -25,6 +25,7 @@ class CaptureStore:
         self._seen = set()
         self._pending = set()
         self._traces = {}
+        self.followup_sources = {}
 
     async def begin(self, request_id):
         if not isinstance(request_id, str) or not _REQUEST_ID.fullmatch(request_id):
@@ -85,6 +86,7 @@ class CaptureStore:
         async with self._lock:
             initial = self._traces[request_id]
             seen = {row["source_id"] for row in initial}
+            self.followup_sources[request_id] = [row["source_id"] for row in trace]
             initial.extend(row for row in trace if row["source_id"] not in seen)
         return rows
 

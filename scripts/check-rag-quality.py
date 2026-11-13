@@ -24,7 +24,7 @@ def check(args):
     config_path = args.output.with_suffix(".thresholds.json")
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
     report = runner.evaluate(args.predictions, split="holdout", dataset_root=DATASET,
-                             quality_config_path=config_path, review_path=args.review)
+                             quality_config_path=config_path, review_path=args.review, allow_followup=True)
     baseline = json.loads(args.baseline.read_bytes())
     runs = baseline["p95_ms"]
     if (baseline["dataset_sha256"] != report["dataset_sha256"]

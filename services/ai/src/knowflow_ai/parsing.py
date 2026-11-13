@@ -10,7 +10,8 @@ from pypdf import PdfReader
 _pdf_logger = logging.getLogger('pypdf')
 _pdf_logger.addHandler(logging.NullHandler())
 _pdf_logger.propagate = False
-PARSER_PROFILE = 'text-v2+pypdf-6.21.4+ocr'
+PARSER_PROFILE = 'text-v1+pypdf-6.21.4'
+OCR_PARSER_PROFILE = 'text-v2+pypdf-6.21.4+ocr'
 IDENTIFIER = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:-]{0,127}', re.ASCII)
 
 
@@ -109,7 +110,8 @@ def parse_document(data: bytes, *, format: str, document_id: str, content_versio
         if not blocks:
             raise ParseFailure('PDF_NO_TEXT')
         return ParsedDocument(document_id,content_version_id,file_id,sha256(data).hexdigest(),format,
-                              tuple(blocks),characters,pages,tuple(empty))
+                              tuple(blocks),characters,pages,tuple(empty),
+                              OCR_PARSER_PROFILE if ocr_pages else PARSER_PROFILE)
     except (ParseFailure, MemoryError):
         raise
     except Exception:

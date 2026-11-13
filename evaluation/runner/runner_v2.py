@@ -33,7 +33,7 @@ def _timestamp(value):
         return False
 
 
-def _load(predictions_path, dataset_root, split):
+def _load(predictions_path, dataset_root, split, *, allow_followup=False):
     raw = Path(predictions_path).read_bytes()
     payload = json.loads(raw)
     manifest, questions, documents, sources, dataset_sha = legacy._load_dataset(dataset_root)
@@ -93,7 +93,8 @@ def _load(predictions_path, dataset_root, split):
                     or type(cite["marker_index"]) is not int or not 0 <= cite["marker_index"] < len(markers)
                     or cite["marker_index"] in positions or cite["source_id"] != markers[cite["marker_index"]]
                     or type(cite["evidence_index"]) is not int
-                    or not 0 <= cite["evidence_index"] < len(row["retrieved_evidence"])
+                    or not 0 <= cite["evidence_index"] < (len(row["retrieved_evidence"]) if allow_followup
+                                                           else min(5, len(row["retrieved_evidence"])))
                     or row["retrieved_evidence"][cite["evidence_index"]]["source_id"] != cite["source_id"]
                     or not isinstance(cite["claim"], str) or not cite["claim"].strip()
                     or cite["claim"] not in row["answer"]):
@@ -108,8 +109,8 @@ def _load(predictions_path, dataset_root, split):
     return raw, payload, expected, sources
 
 
-def prepare_review(predictions_path, dataset_root, split):
-    raw, payload, expected, sources = _load(predictions_path, dataset_root, split)
+def prepare_review(predictions_path, dataset_root, split, *, allow_followup=False):
+    raw, payload, expected, sources = _load(predictions_path, dataset_root, split, allow_followup=allow_followup)
     entries = []
     for row in payload["predictions"]:
         citations = []
@@ -127,9 +128,10 @@ def prepare_review(predictions_path, dataset_root, split):
             "split": split, "predictions_sha256": sha256(raw).hexdigest(), "entries": entries}
 
 
-def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None, review_path=None):
-    raw, payload, expected, sources = _load(predictions_path, dataset_root, split)
-    template = prepare_review(predictions_path, dataset_root, split)
+def evaluate(predictions_path, *, split, dataset_root, quality_config_path=None, review_path=None,
+             allow_followup=False):
+    raw, payload, expected, sources = _load(predictions_path, dataset_root, split, allow_followup=allow_followup)
+    template = prepare_review(predictions_path, dataset_root, split, allow_followup=allow_followup)
     reviews = {}
     if review_path is not None:
         review = json.loads(Path(review_path).read_bytes())

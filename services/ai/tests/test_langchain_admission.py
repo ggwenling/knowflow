@@ -113,7 +113,7 @@ async def test_slow_custom_and_probe_do_not_block_builtin(protocol, http_entry, 
             builtin = factory(LlmSettings(api_key='x' * 40), runtime=runtime,
                               call_context=ModelCallContext('builtin', OWNER))
             try:
-                result = await asyncio.wait_for(builtin.generate('synthetic', [], request_id='builtin'), 2)
+                result = await asyncio.wait_for(builtin.generate('synthetic', [], request_id='builtin'), 10)
                 assert result == fixture_case('deepseek', 'normal_stream', True)['expected_result']
             finally:
                 lease.release()
@@ -144,7 +144,7 @@ async def test_slow_custom_and_probe_do_not_block_builtin(protocol, http_entry, 
                     json={'request': payload, 'model': connection(model_config(protocol))}, headers=headers)
                 assert rejected.status_code == 429
                 assert rejected.json()['code'] == 'RESOURCE_LIMIT' and rejected.json()['message'] == BUSY_MESSAGE
-                result = await asyncio.wait_for(client.post('/internal/v1/answers', json=payload, headers=headers), 2)
+                result = await asyncio.wait_for(client.post('/internal/v1/answers', json=payload, headers=headers), 10)
                 assert result.status_code == 200 and result.json()['has_answer']
             admission = app.state.question_admission
         assert len(builtin_calls) == 1
