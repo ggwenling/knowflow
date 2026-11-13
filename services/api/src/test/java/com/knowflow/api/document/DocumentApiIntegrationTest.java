@@ -2204,7 +2204,26 @@ class DocumentApiIntegrationTest {
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DOCUMENT_REBUILD_CONFLICT"));
         mockMvc.perform(post(path, first).header("Authorization", "Bearer " + token).header("Idempotency-Key", "bad-key"))
                 .andExpect(status().isBadRequest());
-        assertThat(rebuild(token, first).path("task_id").asText()).isNotEqualTo(task.path("task_id").asText());
+        var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            String nextKey = UUID.randomUUID().toString();
+            var start = new CountDownLatch(1);
+            java.util.concurrent.Callable<String> request = () -> {
+                assertThat(start.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                var result = mockMvc.perform(post(path, first).header("Authorization", "Bearer " + token)
+                                .header("Idempotency-Key", nextKey))
+                        .andExpect(status().isAccepted()).andReturn();
+                return objectMapper.readTree(result.getResponse().getContentAsByteArray()).path("task_id").asText();
+            };
+            var one = executor.submit(request);
+            var two = executor.submit(request);
+            start.countDown();
+            assertThat(one.get(10, java.util.concurrent.TimeUnit.SECONDS))
+                    .isEqualTo(two.get(10, java.util.concurrent.TimeUnit.SECONDS))
+                    .isNotEqualTo(task.path("task_id").asText());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
