@@ -228,7 +228,10 @@ class LangChainAnswerModel:
                 if self.probe:
                     error = ProcessingError("AI_PROCESSING_FAILED", retryable=False,
                                             provider_status=response.status_code, retry_reason="http_status")
-                    error.provider_evidence = machine_evidence(body)
+                    error.provider_evidence = machine_evidence(
+                        body, status=response.status_code,
+                        host=response.request.url.host if self.protocol == "chat_completions" else None,
+                        model_id=self.model_id)
                     raise error
             except ProcessingError as error:
                 if self.probe:

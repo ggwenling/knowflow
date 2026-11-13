@@ -4,7 +4,7 @@ import { modelErrorMessage } from "../src/lib/model-errors.ts";
 const expected = {
   "LLM_MODEL_URL_INVALID": "服务地址不符合要求，请使用不含账号密码的公网 HTTPS 地址。",
   "LLM_MODEL_AUTH_FAILED": "服务拒绝了密钥或访问权限，请检查 API 密钥及其模型权限。",
-  "LLM_MODEL_NOT_FOUND": "模型不存在或当前密钥无权使用，请核对模型 ID 和模型权限。",
+  "LLM_MODEL_NOT_FOUND": "模型不存在，请核对模型 ID。",
   "LLM_MODEL_ENDPOINT_NOT_FOUND": "接口路径或模型不可用，请检查 Base URL、接口协议和模型 ID。",
   "LLM_MODEL_UNREACHABLE": "无法连接到服务，请检查公网 HTTPS 地址和网络可达性。",
   "LLM_MODEL_TIMEOUT": "连接测试超时，请稍后重试或检查服务响应速度。",

@@ -92,6 +92,31 @@ async def test_probe_rejects_missing_model_with_specific_reason(monkeypatch, evi
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('host, status, param, requested, expected', [
+    ('api.deepseek.com', 400, None, 'fixture-model', 'NOT_FOUND'),
+    ('provider.example.com', 400, None, 'fixture-model', 'PROBE_FAILED'),
+    ('api.deepseek.com', 400, 'temperature', 'fixture-model', 'PROBE_FAILED'),
+    ('api.deepseek.com', 400, None, 'different-model', 'PROBE_FAILED'),
+    ('api.deepseek.com', 404, None, 'fixture-model', 'ENDPOINT_NOT_FOUND'),
+])
+async def test_probe_recognizes_only_official_deepseek_missing_model(
+        monkeypatch, host, status, param, requested, expected):
+    def handler(request, lib, _):
+        model = json.loads(request.content)['model']
+        message = ('The supported API model names are deepseek-flash, deepseek-v4-pro, but you passed '
+                   + (model if requested == 'fixture-model' else requested)
+                   + '. (request_id: 4b50b5ed-6622-4774-8620-d365749f0709)')
+        # Use a parameter other than tools to avoid testing capability fallback.
+        return lib.Response(status, json={'error': {'code': 'invalid_request_error',
+                            'type': 'invalid_request_error', 'param': param, 'message': message}})
+
+    response, calls = await request_probe(monkeypatch, handler, url=f'https://{host}')
+    reject(response, 'LLM_MODEL_' + expected)
+    assert 'supported API model names' not in response.text
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize('protocol', PROTOCOLS)
 @pytest.mark.parametrize('status', [404, 405])
 async def test_probe_ambiguous_404_does_not_claim_model_not_found(monkeypatch, protocol, status):

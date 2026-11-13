@@ -522,9 +522,8 @@
   transition: transform var(--dur) var(--ease);
 }
 
-.ask:has(.askMain input:focus-visible) {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 3px;
+.ask:focus-within:not(:has(.askMain :focus)) {
+  outline: none;
 }
 
 .ask > svg {
@@ -930,7 +929,7 @@
   padding: 8px 20px;
 }
 
-.modelSelect {
+.ask[data-composite-field] .modelSelect {
   min-width: 0;
   max-width: min(100%, 240px);
   border: 1px solid var(--control-line);
@@ -938,6 +937,11 @@
   background: var(--surface-raised);
   padding: 4px 8px;
   font-size: 13px;
+}
+
+.ask .modelSelect:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 .askOptions {

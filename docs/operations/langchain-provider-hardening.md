@@ -82,7 +82,7 @@ LangChain、旧 DeepSeek adapter、embedding 与旧 streaming 共用标量分类
 
 ## 安全结构化调用日志
 
-仅使用 Python stdlib logging；没有 metrics stack、exporter、`/metrics` 或新增遥测依赖。`knowflow_ai.provider_observability` 在 INFO 级别输出单行 JSON：
+仅使用 Python stdlib logging；没有 metrics stack、exporter、`/metrics` 或新增遥测依赖。`knowflow_ai.provider_observability` 单独启用 INFO，默认容器将单行 JSON 输出到 stderr：
 
 ```json
 {"event":"llm_call","request_id":"request-123","protocol":"chat_completions","model_id":"example-model","duration_ms":1420,"first_token_latency_ms":180,"first_token_observation":"content_event","token_usage":{"input_tokens":80,"output_tokens":24,"total_tokens":104},"outcome":"success","failure_category":null,"call_id":"02897053b3a8438598c95694979c96e0","attempt":1,"purpose":"answer","provider_called":true}
@@ -116,7 +116,7 @@ app 和模型初始化在真实 SDK / HTTP 日志源安装丢弃 filter：`opena
 | --- | --- |
 | `LLM_MODEL_URL_INVALID` | 本地 URL 拒绝；400 |
 | `LLM_MODEL_AUTH_FAILED` | provider 401/403；422，不触发本站登录失效 |
-| `LLM_MODEL_NOT_FOUND` | 明确 `model_not_found` / `invalid_model` 或 `param=model`；422 |
+| `LLM_MODEL_NOT_FOUND` | 明确 `model_not_found` / `invalid_model` 或 `param=model`，或命中官方 DeepSeek 的模型名拒绝格式；422 |
 | `LLM_MODEL_ENDPOINT_NOT_FOUND` | 404/405 无明确模型证据；422 |
 | `LLM_MODEL_UNREACHABLE` | DNS、TLS、connect、中断、出口拒绝、redirect；422 |
 | `LLM_MODEL_TIMEOUT` | connect / first-content / total 或 route deadline；422 |
@@ -124,7 +124,7 @@ app 和模型初始化在真实 SDK / HTTP 日志源安装丢弃 filter：`opena
 | `LLM_MODEL_PROTOCOL_ERROR` | 成功响应的 wire、返回模型或工具格式不符；422 |
 | `LLM_MODEL_PROBE_FAILED` | 5xx、模糊 4xx、未知异常、Java→AI 通信或契约失败；422 |
 
-本站 `LLM_MODEL_PROBE_LIMIT` 仍是每用户每分钟 5 次的 429，区别于 provider 限流。容量不足保留 `RESOURCE_LIMIT` / 429 的固定繁忙提示。HTTP 错误最多读取 1 MiB，只提取白名单 `error.code/type/param` 的已知机器值；不从 message 猜测，不回显 body、密钥或 URL。Anthropic `not_found_error` 和裸 404 都不能证明模型不存在。Java 同样限制 1 MiB，拒绝未知代码、不匹配的 envelope、缺失 boolean/status/UTC 时间的成功结果，使用固定失败原因。
+本站 `LLM_MODEL_PROBE_LIMIT` 仍是每用户每分钟 5 次的 429，区别于 provider 限流。容量不足保留 `RESOURCE_LIMIT` / 429 的固定繁忙提示。HTTP 错误最多读取 1 MiB，提取白名单 `error.code/type/param` 的已知机器值。官方 `api.deepseek.com` 的 Chat Completions 如果返回 400、`code` 和 `type` 均为 `invalid_request_error`、无 `param`，还须完整匹配包含本次模型 ID 的固定拒绝格式才判为模型不存在。其他场景不依赖错误文案。响应不回显 body、密钥或 URL。Anthropic `not_found_error` 和裸 404 都不能证明模型不存在。Java 同样限制 1 MiB，拒绝未知代码、不匹配的 envelope、缺失 boolean/status/UTC 时间的成功结果，使用固定失败原因。
 
 只有 400/422 的 `param=tools` / `param=tool_choice` 才允许一次纯文本能力降级；501 还必须有 `not_implemented` / `unsupported_capability` 的机器 code/type，并明确指向 tools。先排除模型等明确错误。普通 400/422/501 或文字 “unsupported tools” 不触发降级；降级失败立即拒绝。降级成功允许 `supports_tools=false`。支持工具时验证 report_ready 的 id/name/空 args、tool-result 后最终非空文本及完整协议结束。
 

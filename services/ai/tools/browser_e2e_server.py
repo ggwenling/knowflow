@@ -1,6 +1,7 @@
 """Run the real AI service with local deterministic adapters for browser E2E."""
 import argparse
 import asyncio
+from functools import partial
 import json
 import os
 
@@ -65,13 +66,13 @@ def main():
     from local_backend_e2e import SyntheticEmbedding
 
     answering.SiliconFlowEmbeddingAdapter = SyntheticEmbedding
-    answering.DeepSeekAdapter = BrowserE2ELlm
     worker.SiliconFlowEmbeddingAdapter = SyntheticEmbedding
 
     import uvicorn
     from knowflow_ai.app import create_app
 
-    uvicorn.run(create_app(), host=args.host, port=args.port,
+    uvicorn.run(create_app(answer_service_factory=partial(answering.AnswerService, llm_factory=BrowserE2ELlm)),
+                host=args.host, port=args.port,
                 log_level="warning", access_log=False)
 
 

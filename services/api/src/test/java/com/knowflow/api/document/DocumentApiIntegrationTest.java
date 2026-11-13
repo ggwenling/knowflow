@@ -1002,7 +1002,7 @@ class DocumentApiIntegrationTest {
                 .andReturn();
         var result = mockMvc.perform(asyncDispatch(initial)).andReturn();
         assertThat(result.getResponse().getStatus()).isEqualTo(200);
-        String body = result.getResponse().getContentAsString();
+        String body = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertThat(body).contains("event:started", "event:error", "RESOURCE_LIMIT", "模型请求繁忙，请稍后重试。")
                 .doesNotContain("UPSTREAM_PRIVATE_MARKER", "event:delta");
         assertSseContractFrames(body);

@@ -11,7 +11,7 @@ import styles from "./home-view.module.css";
 const HomeScope = memo(function HomeScope() {
   const knowledge = useKnowledgeContext();
   return knowledge.bases.length > 1 ? (
-    <label className={styles.scope}>
+    <label className={styles.scope} data-composite-field>
       <Layers size={16} strokeWidth={1.5} aria-hidden="true" />
       <span>提问知识库</span>
       <select name="knowledge-base" autoComplete="off" aria-label="选择知识库" value={knowledge.selectedBase} onChange={(event) => knowledge.selectBase(event.target.value)}>
@@ -37,7 +37,7 @@ export function HomeComposer({ inputRef }: { inputRef: RefObject<HTMLInputElemen
     void stream.ask(question, knowledge.selectedBase, selected);
   }
   return (
-    <form className={styles.ask} onSubmit={ask}>
+    <form className={styles.ask} data-composite-field onSubmit={ask}>
       <div className={styles.askMain}>
         <Sparkles size={20} strokeWidth={1.5} aria-hidden="true" />
         <input ref={inputRef} name="question" aria-label="向知识库提问" autoComplete="off" value={draft} maxLength={4000} onChange={(event) => setDraft(event.target.value)} placeholder="向你的知识库提问…" />

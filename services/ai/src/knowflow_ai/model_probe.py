@@ -1,13 +1,14 @@
 """Save-time capability checks and safe diagnostics; unrelated to readiness."""
 from datetime import datetime, timezone
 import json
+import re
 
 from .adapters import ProcessingError
 
 MESSAGES = {
     'LLM_MODEL_URL_INVALID': '服务地址不符合要求，请使用不含账号密码的公网 HTTPS 地址。',
     'LLM_MODEL_AUTH_FAILED': '服务拒绝了密钥或访问权限，请检查 API 密钥及其模型权限。',
-    'LLM_MODEL_NOT_FOUND': '模型不存在或当前密钥无权使用，请核对模型 ID 和模型权限。',
+    'LLM_MODEL_NOT_FOUND': '模型不存在，请核对模型 ID。',
     'LLM_MODEL_ENDPOINT_NOT_FOUND': '接口路径或模型不可用，请检查 Base URL、接口协议和模型 ID。',
     'LLM_MODEL_UNREACHABLE': '无法连接到服务，请检查公网 HTTPS 地址和网络可达性。',
     'LLM_MODEL_TIMEOUT': '连接测试超时，请稍后重试或检查服务响应速度。',
@@ -25,10 +26,20 @@ _FIELDS = {
 }
 
 
-def machine_evidence(body):
+def machine_evidence(body, *, status=None, host=None, model_id=None):
     try:
         error = json.loads(body).get('error')
         if isinstance(error, dict):
+            # DeepSeek uses a generic code for unknown models. Require its exact
+            # diagnostic shape, including the requested model, on its own endpoint.
+            message = error.get('message')
+            if (host == 'api.deepseek.com' and status == 400 and model_id
+                    and error.get('code') == error.get('type') == 'invalid_request_error'
+                    and error.get('param') is None and isinstance(message, str)
+                    and re.fullmatch(r'The supported API model names are [\w., /:-]+, but you passed '
+                                     + re.escape(model_id)
+                                     + r'\.(?: \(request_id: [0-9a-fA-F-]{36}\))?', message)):
+                return frozenset({('code', 'model_not_found')})
             return frozenset((field, value) for field, allowed in _FIELDS.items()
                              if isinstance(value := error.get(field), str) and value in allowed)
     except (ValueError, AttributeError, UnicodeError):

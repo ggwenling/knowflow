@@ -7,6 +7,7 @@ test("desktop history scrolls to pagination while account controls stay accessib
     let body: unknown;
     if (path === "/api/mode") body = { mode: "synthetic" };
     else if (path === "/api/v1/me") body = { user_id: "layout-user", email: "layout@example.test" };
+    else if (path === "/api/v1/llm-models") body = { enabled: false, models: [] };
     else if (path === "/api/v1/knowledge-bases") body = { items: [{ id: "layout-base", name: "布局资料库", status: "ACTIVE" }] };
     else if (path.endsWith("/documents")) body = { items: [] };
     else if (path === "/api/v1/questions") body = {

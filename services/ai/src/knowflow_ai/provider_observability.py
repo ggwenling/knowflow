@@ -33,6 +33,10 @@ _discard = _DiscardProviderPayload()
 
 
 def install_safe_logging():
+    _logger.setLevel(logging.INFO)
+    # Uvicorn's default logging config installs handlers only for its own loggers.
+    if not _logger.hasHandlers():
+        _logger.addHandler(logging.StreamHandler())
     # Filters on ancestors do not apply to propagated child records. Install on
     # each actual source in the pinned SDKs, including both HTTP implementations.
     for name in RAW_LOGGERS:
