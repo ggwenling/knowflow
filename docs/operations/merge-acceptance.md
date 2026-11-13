@@ -52,3 +52,12 @@ OCR 在受限解析子进程内处理扫描页。资源限制、OCR 或索引提
 `POST /api/v1/documents/{documentId}/rebuilds` 可传 UUID `Idempotency-Key`。
 同账号同键重复请求同一文档返回同一个任务。键已绑定另一文档时返回 409。
 旧客户端省略该请求头时沿用运行中重建去重规则。
+
+## 合并后取证
+
+在最终 main SHA 上构建生产 Compose 镜像，使用独立实例和合成文档。
+在有浏览器的同一台机器上，用固定 Lighthouse 13.6.0 对相同 URL 生成移动、
+桌面的 HTML 和 JSON，并记录 Performance、Accessibility、LCP、CLS、TBT。
+桌面加 `--preset=desktop`。390 × 844 截图覆盖首页、PDF 问答和原文弹窗、
+模型设置。证据目录附提交 SHA、浏览器和工具版本、运行日期、测试 URL，
+以及是否启用真实模型和设备节流。Lighthouse 实验室指标与线上用户指标分别解读。

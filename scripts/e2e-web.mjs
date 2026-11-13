@@ -86,7 +86,7 @@ try {
   ].join("\n");
   secrets = env.split("\n").map((line) => line.split("=")[1]).filter((value) => /^[0-9a-f]{64}$/.test(value));
   await writeFile(envFile, env, { mode: 0o600 });
-  run("docker", [...compose, "up", "--build", "--quiet-build", "--wait", "--wait-timeout", "240"]);
+  run("docker", [...compose, "up", "--build", "--wait", "--wait-timeout", "240"]);
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForWeb(baseUrl);
   const cli = resolve(root, webApp, "node_modules/@playwright/test/cli.js");

@@ -260,6 +260,7 @@ test("register, index, stream, verify source, enforce ownership, delete and prev
   const secondEmail = `other-${randomUUID()}@example.test`;
   await secondPage.goto("/");
   await secondPage.getByRole("link", { name: "Create an account" }).click();
+  await expect(secondPage.getByRole("heading", { name: "Create your account." })).toBeVisible();
   await secondPage.getByLabel("Email").fill(secondEmail);
   await secondPage.getByLabel("Password", { exact: true }).fill(password);
   await secondPage.getByRole("button", { name: "Create account", exact: true }).click();
